@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Customer {
+  customerId              Int        @id @default(autoincrement())
+  company                 String?
+  contactPerson           String
+  address                 String
+  city                    String
+  zipCode                 String
+  email                   String
+  phone                   String?
+  yearlyInvoice           Boolean    @default(false)
+  contactInsteadOfCompany Boolean    @default(false)
+  nextInvoiceDate         DateTime?
+  invoices                Invoice[]
+  quotes                  Quote[]
+  documents               Document[]
+  notes                   CustomerNote[]
+
+  @@index([email])
+  @@index([nextInvoiceDate])
+}
+
+model Invoice {
+  id             Int              @id @default(autoincrement())
+  customerId     Int
+  documentNumber String
+  customUserText String?
+  date           DateTime
+  version        Int              @default(1)
+  totalAmount    Decimal
+  dueDate        DateTime
+  state          InvoiceState     @default(Draft)
+  paidDate       DateTime?
+  customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  items           Item[]
+  pendingEmail    PendingEmail?
+  sentLogs        InvoiceSentLog[]
+  pendingReminder PendingReminder?
+
+  @@unique([documentNumber])
+  @@index([customerId])
+  @@index([date])
+  @@index([state])
+  @@index([dueDate])
+  @@index([paidDate])
+}
+
+model InvoiceSentLog {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  sentAt    DateTime @default(now())
+  sentTo    String
+  subject   String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model QuoteSentLog {
+  id      Int      @id @default(autoincrement())
+  quoteId Int
+  sentAt  DateTime @default(now())
+  sentTo  String
+  subject String
+  quote   Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+model PendingEmail {
+  id              Int       @id @default(autoincrement())
+  invoiceId       Int       @unique
+  to              String
+  subject         String
+  body            String
+  createdAt       DateTime  @default(now())
+  adminNotifiedAt DateTime?
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Quote {
+  id             Int        @id @default(autoincrement())
+  customerId     Int
+  documentNumber String
+  customUserText String?
+  date           DateTime
+  version        Int        @default(1)
+  totalAmount    Decimal
+  validUntil     DateTime
+  state          QuoteState @default(Draft)
+  customer       Customer   @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  items          Item[]
+  sentLogs       QuoteSentLog[]
+
+  @@index([customerId])
+  @@index([documentNumber])
+  @@index([date])
+  @@index([state])
+  @@index([validUntil])
+}
+
+model Item {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  unit        Unit
+  unitPrice   Decimal
+  quantity    Decimal
+  totalAmount Decimal
+  customText  String?
+  categoryId  Int?
+  invoiceId   Int?
+  quoteId     Int?
+  category    Category? @relation(fields: [categoryId], references: [categoryId])
+  invoice     Invoice?  @relation(fields: [invoiceId], references: [id])
+  quote       Quote?    @relation(fields: [quoteId], references: [id])
+
+  @@index([invoiceId])
+  @@index([quoteId])
+}
+
+model InvoiceTemplate {
+  id    Int            @id @default(autoincrement())
+  name  String
+  items TemplateItem[]
+}
+
+model TemplateItem {
+  id          Int             @id @default(autoincrement())
+  templateId  Int
+  name        String
+  description String?
+  unit        Unit
+  unitPrice   Decimal
+  quantity    Decimal
+  categoryId  Int?
+  template    InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model Service {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  unit        Unit
+  unitPrice   Decimal
+  isActive    Boolean   @default(true)
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [categoryId])
+}
+
+model Category {
+  categoryId Int       @id @default(autoincrement())
+  name       String
+  isActive   Boolean   @default(true)
+  colorHex   String?
+  items      Item[]
+  services   Service[]
+  expenses   Expense[]
+}
+
+model Expense {
+  id          Int       @id @default(autoincrement())
+  date        DateTime
+  description String
+  amount      Decimal
+  categoryId  Int?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  category    Category? @relation(fields: [categoryId], references: [categoryId])
+
+  @@index([date])
+  @@index([categoryId])
+}
+
+model Document {
+  documentId Int      @id @default(autoincrement())
+  customerId Int
+  name       String
+  fileType   String
+  uploadDate DateTime
+  content    Bytes
+  note       String?
+  customer   Customer @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model CustomerNote {
+  noteId     Int      @id @default(autoincrement())
+  customerId Int
+  title      String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model CompanyInformation {
+  companyInformationId Int                  @id @default(autoincrement())
+  companyName          String?
+  companyHolderName    String?
+  companyAddress       String?
+  companyZip           String?
+  companyCity          String?
+  companyEmail         String?
+  companyPhone         String?
+  companyIBAN          String?
+  companyLogo          Bytes?
+  settings             ApplicationSettings?
+}
+
+model ApplicationSettings {
+  applicationSettingsId    Int                @id @default(autoincrement())
+  numberFormat             String             @default("de-CH")
+  defaultPaymentTermDays   Int                @default(30)
+  defaultQuoteValidityDays Int                @default(30)
+  invoiceNumberPrefix      String             @default("I-")
+  quoteNumberPrefix        String             @default("Q-")
+  defaultYearlyInvoice     Boolean            @default(false)
+  useHolderNameOnQR        Boolean            @default(false)
+  smtpHost                 String?
+  smtpPort                 Int?
+  smtpUser                 String?
+  smtpPassword             String?
+  smtpFromName             String?
+  smtpFromAddress          String?
+  emailSubjectTemplate     String?
+  emailBodyTemplate        String?
+  reminderCooldownDays     Int                @default(14)
+  notifyOverdueEnabled     Boolean            @default(false)
+  notifyPendingEnabled     Boolean            @default(false)
+  notifyEmailAddress       String?
+  notifyTelegramBotToken   String?
+  notifyTelegramChatId     String?
+  notifyRepeatIntervalDays Int?
+  pdfTheme                 Json?
+  companyInformationId     Int                @unique
+  companyInfo              CompanyInformation @relation(fields: [companyInformationId], references: [companyInformationId], onDelete: Cascade)
+}
+
+model PendingReminder {
+  id              Int       @id @default(autoincrement())
+  invoiceId       Int       @unique
+  reminderLevel   Int       @default(1)
+  snoozedUntil    DateTime?
+  createdAt       DateTime  @default(now())
+  adminNotifiedAt DateTime?
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  userName   String
+  action     String
+  entityType String
+  entityId   Int?
+  entityRef  String?
+  details    String?
+  createdAt  DateTime @default(now())
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  name         String
+  passwordHash String
+  totpSecret      String?
+  totpEnabled     Boolean   @default(false)
+  totpBackupCodes String?   // JSON array of bcrypt-hashed one-time backup codes
+  role            UserRole  @default(Viewer)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+enum UserRole {
+  Admin
+  Editor
+  Viewer
+}
+
+enum InvoiceState {
+  Draft
+  Sent
+  Paid
+  Overdue
+  Canceled
+}
+
+enum QuoteState {
+  Draft
+  Sent
+  Accepted
+  Declined
+  Expired
+}
+
+enum Unit {
+  Hour
+  Day
+  Piece
+  Package
+}

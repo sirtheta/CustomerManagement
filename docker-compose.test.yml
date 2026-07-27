@@ -1,0 +1,23 @@
+services:
+  app:
+    image: ghcr.io/sirtheta/customer-management:latest
+    container_name: customer-management-test
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./data-test:/app/data
+    env_file:
+      - .env.test
+    environment:
+      DATABASE_URL: "file:/app/data/customermanagement.db"
+      NODE_ENV: production
+      DISABLE_EMAIL: "true"
+      DISABLE_TELEGRAM: "true"
+      DISABLE_USER_MUTATIONS: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/auth/session"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -1,0 +1,190 @@
+name: Release & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CustomerManagement.web/**
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['CustomerManagement.web--release_created'] }}
+      tag_name: ${{ steps.release.outputs['CustomerManagement.web--tag_name'] }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  lint:
+    name: ESLint
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: CustomerManagement.web/package-lock.json
+
+      - name: Abhängigkeiten installieren
+        working-directory: CustomerManagement.web
+        run: npm ci
+
+      - name: Lint ausführen
+        working-directory: CustomerManagement.web
+        run: npm run lint
+
+  test-and-build:
+    name: Test & Build
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: CustomerManagement.web/package-lock.json
+
+      - name: Abhängigkeiten installieren
+        working-directory: CustomerManagement.web
+        run: npm ci
+
+      - name: Tests mit Coverage ausführen
+        working-directory: CustomerManagement.web
+        run: npm run test:coverage
+
+      - name: Coverage-Report hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: CustomerManagement.web/coverage
+          retention-days: 14
+
+      - name: Build ausführen
+        working-directory: CustomerManagement.web
+        run: npm run build
+
+  e2e:
+    name: Playwright E2E
+    needs: [release-please]
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: CustomerManagement.web/package-lock.json
+
+      - name: Abhängigkeiten installieren
+        working-directory: CustomerManagement.web
+        run: npm ci
+
+      - name: Playwright-Version ermitteln
+        id: playwright-version
+        working-directory: CustomerManagement.web
+        run: echo "version=$(npm ls @playwright/test --json | jq -r '.dependencies["@playwright/test"].version')" >> $GITHUB_OUTPUT
+
+      - name: Playwright-Browser-Cache
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Playwright-Browser installieren
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: CustomerManagement.web
+        run: npx playwright install --with-deps chromium
+
+      - name: System-Abhängigkeiten für Chromium installieren
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: CustomerManagement.web
+        run: npx playwright install-deps chromium
+
+      - name: E2E-Tests ausführen
+        working-directory: CustomerManagement.web
+        run: npm run test:e2e
+
+      - name: Playwright-Report hochladen
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: CustomerManagement.web/playwright-report
+          retention-days: 14
+
+  build-and-push:
+    name: Docker Build & Push
+    needs: [release-please, lint, test-and-build, e2e]
+    if: |
+      always() &&
+      needs.lint.result == 'success' &&
+      needs['test-and-build'].result == 'success' &&
+      needs.e2e.result == 'success' &&
+      (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Docker Buildx einrichten
+        uses: docker/setup-buildx-action@v4
+
+      - name: GitHub Container Registry anmelden
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image-Tags ermitteln
+        id: tags
+        run: |
+          REPO="ghcr.io/${{ github.repository_owner }}/customer-management"
+          TAG_NAME="${{ needs.release-please.outputs.tag_name }}"
+          if [[ -n "$TAG_NAME" ]]; then
+            VERSION="${TAG_NAME#web-v}"
+            echo "tags=${REPO}:${VERSION},${REPO}:latest" >> $GITHUB_OUTPUT
+          else
+            echo "tags=${REPO}:latest,${REPO}:${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Image bauen und pushen
+        uses: docker/build-push-action@v7
+        with:
+          context: CustomerManagement.web
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

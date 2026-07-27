@@ -1,0 +1,38 @@
+# Dependencies — reinstalled inside the image via `npm ci` (Windows binaries
+# must never overwrite the Linux/musl ones built in the container).
+node_modules
+npm-debug.log*
+
+# Next.js build output & dev cache (the broken .next/dev symlinks break COPY)
+.next
+out
+
+# Local data / SQLite database — must not leak into the image
+data
+*.db
+*.db-journal
+*.sqlite
+
+# Env files with secrets
+.env
+.env*.local
+
+# Version control & CI
+.git
+.gitignore
+.github
+
+# Editor / OS cruft
+.vscode
+.idea
+.DS_Store
+*.swp
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Misc
+README.md
+*.md

@@ -1,0 +1,21 @@
+services:
+  app:
+    # Vorgefertigtes Image von GitHub Container Registry (durch GitHub Actions gebaut)
+    image: ghcr.io/sirtheta/customer-management:latest
+    container_name: customer-management
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "file:/app/data/customermanagement.db"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/auth/session"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

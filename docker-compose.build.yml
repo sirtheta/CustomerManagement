@@ -1,0 +1,9 @@
+# Lokaler Build (z.B. für Entwicklung oder wenn kein GitHub Actions läuft)
+# Verwendung: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: customer-management:local
