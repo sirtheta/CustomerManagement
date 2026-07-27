@@ -10,7 +10,7 @@ The UI, user-facing text, and documentation are **in German**.
 
 ---
 
-## Web Application (`CustomerManagement.web/`)
+## Web Application
 
 ### Commands
 
@@ -112,7 +112,7 @@ The scope is optional but encouraged, e.g. `feat(invoices): add PDF download but
 
 ## CI/CD
 
-The **`web.yml`** GitHub Actions workflow triggers on changes to `CustomerManagement.web/**`. It runs Vitest, then builds and pushes a Docker image to `ghcr.io/sirtheta/customer-management` (ARM64 target: Raspberry Pi 5).
+The **`ci.yml`** workflow runs Vitest and the build on pull requests. The **`release.yml`** workflow runs on pushes to `main`: it drives `release-please`, then (once a release is created) re-runs lint/tests/e2e and builds and pushes a Docker image to `ghcr.io/sirtheta/customer-management` (ARM64 target: Raspberry Pi 5).
 
 Versioning is managed by `release-please` (config: `release-please-config.json`).
 

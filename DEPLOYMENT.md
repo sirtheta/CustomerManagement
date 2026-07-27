@@ -38,8 +38,8 @@ mkdir -p ~/customer-management
 cd ~/customer-management
 
 # docker-compose.yml und .env.example vom Repo holen:
-curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/CustomerManagement.web/docker-compose.yml
-curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/CustomerManagement.web/.env.example
+curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/.env.example
 
 # 2. Umgebungsvariablen konfigurieren
 cp .env.example .env

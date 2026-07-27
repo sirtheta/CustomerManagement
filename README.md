@@ -1,6 +1,6 @@
 # CustomerManagement
 
-[![Web CI/CD](https://github.com/sirtheta/CustomerManagement/actions/workflows/web.yml/badge.svg)](https://github.com/sirtheta/CustomerManagement/actions/workflows/web.yml)
+[![CI/CD](https://github.com/sirtheta/CustomerManagement/actions/workflows/release.yml/badge.svg)](https://github.com/sirtheta/CustomerManagement/actions/workflows/release.yml)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
@@ -40,8 +40,8 @@ Image wird automatisch bereitgestellt — kein eigener Build nötig.
 ```bash
 # 1. compose-Datei und Beispiel-Konfiguration holen
 mkdir customer-management && cd customer-management
-curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/CustomerManagement.web/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/CustomerManagement.web/.env.example
+curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/docker-compose.yml
+curl -o .env https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/.env.example
 
 # 2. .env anpassen — mindestens AUTH_SECRET und AUTH_URL setzen
 #    Secret erzeugen:
@@ -81,7 +81,7 @@ Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · Prisma + SQLite · Nex
 Das Image läuft auf `amd64` und `arm64` (z. B. Raspberry Pi 5).
 
 Entwickler:innen finden die Anleitung zum lokalen Aufsetzen, zur Architektur und zum
-Datenmodell im [README der Web-App](CustomerManagement.web/README.md).
+Datenmodell in [CLAUDE.md](CLAUDE.md).
 
 ---
 

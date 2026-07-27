@@ -25,7 +25,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult | null> {
     const data = await res.json();
     const tagName: string = data.tag_name ?? "";
 
-    const match = tagName.match(/^web-v(.+)$/);
+    const match = tagName.match(/^v(.+)$/);
     if (!match) return null;
 
     const latestVersion = match[1];
