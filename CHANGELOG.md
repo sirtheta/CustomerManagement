@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.0...customer-management-v2.0.0) (2026-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* drop CustomerManagement.web subfolder from CI, releases
+
+### Miscellaneous Chores
+
+* drop CustomerManagement.web subfolder from CI, releases ([0827e02](https://github.com/sirtheta/CustomerManagement/commit/0827e02aae604a1cdfbc1023d2a8e5e50c84012e))
+
 ## [0.1.23](https://github.com/sirtheta/CustomerManagement/compare/web-v0.1.22...web-v0.1.23) (2026-07-19)
 
 
