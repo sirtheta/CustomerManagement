@@ -74,7 +74,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
     : [{ label: "Offerten", href: "/quotes" }, { label: quote.documentNumber }];
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -111,7 +111,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           <CardTitle>Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <span className="text-gray-500">Datum:</span>{" "}
               {formatDate(quote.date)}
