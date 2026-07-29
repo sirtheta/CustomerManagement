@@ -34,7 +34,7 @@ export default async function VersionCard() {
 
         {result === null && (
           <p className="text-xs text-muted-foreground">
-            Update-Check fehlgeschlagen — GitHub nicht erreichbar oder Token ungültig.
+            Update-Check fehlgeschlagen — GitHub nicht erreichbar.
           </p>
         )}
       </CardContent>
