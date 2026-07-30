@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.0...customer-management-v1.0.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* **invoices,quotes:** use full page width on document detail pages ([8c71785](https://github.com/sirtheta/CustomerManagement/commit/8c71785cf27905ac380883e4fbaeeb17acf46780))
+* **settings:** drop GitHub PAT requirement for update check ([56a7845](https://github.com/sirtheta/CustomerManagement/commit/56a7845cfd109ce43cee7f4db56407fb3b63d0d1))
+
 ## [1.0.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.0...customer-management-v2.0.0) (2026-07-27)
 
 
