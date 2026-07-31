@@ -20,7 +20,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult | null> {
     const data = await res.json();
     const tagName: string = data.tag_name ?? "";
 
-    const match = tagName.match(/^v(.+)$/);
+    const match = tagName.match(/v(\d+\.\d+\.\d+.*)$/);
     if (!match) return null;
 
     const latestVersion = match[1];
