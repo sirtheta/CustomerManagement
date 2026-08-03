@@ -16,6 +16,12 @@
 /test-results/
 /data-e2e/
 
+# marketing screenshot tooling (scripts/marketing-screenshots.ts) — generated
+# output, not source; re-run the scripts to regenerate.
+/data-marketing/
+/marketing/screenshots/
+/marketing/screenshots-section.html
+
 # next.js
 /.next/
 /out/

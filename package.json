@@ -16,7 +16,9 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:server": "prisma migrate deploy && tsx prisma/seed.ts && next dev -p $PORT"
+    "test:e2e:server": "prisma migrate deploy && tsx prisma/seed.ts && next dev -p $PORT",
+    "marketing:screenshots": "tsx scripts/marketing-screenshots.ts",
+    "marketing:html": "tsx scripts/generate-marketing-html.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -67,6 +69,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^10.5.0",
+    "@napi-rs/canvas": "^1.0.3",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^7.6.13",
@@ -81,6 +84,7 @@
     "eslint-config-next": "16.2.7",
     "node-addon-api": "^8.9.0",
     "node-gyp": "^13.0.1",
+    "pdfjs-dist": "^6.2.108",
     "prisma": "^7.9.1",
     "shadcn": "^4.13.0",
     "tailwindcss": "^4",

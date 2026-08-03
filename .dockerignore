@@ -36,3 +36,13 @@ docker-compose*.yml
 # Misc
 README.md
 *.md
+
+# Marketing screenshot tooling — dev-only, not needed at runtime. Excluding
+# these from the build context also keeps them out of the builder stage, so
+# the Dockerfile's wholesale `COPY .../scripts ./scripts` into the runner
+# image can't pick them up either.
+marketing/
+data-marketing/
+scripts/marketing-screenshots.ts
+scripts/render-pdf-page.ts
+scripts/generate-marketing-html.ts
