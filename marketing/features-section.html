@@ -1,0 +1,102 @@
+    <style>
+    :root {
+      --primary-blue: #0084ff;
+      --dark-blue: #003c7d;
+      --light-gray: #e0e0e0;
+      --dark-gray: #333333;
+      --white: #ffffff;
+    }
+
+
+    .features {
+      padding: 5rem 0;
+      background-color: var(--white);
+    }
+
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .features-grid {
+            grid-template-columns: 1fr; /* Wechselt zu einer Spalte auf mobilen Geräten */
+        }
+    }
+
+    .feature-card {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      transition: transform 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .feature-icon {
+      font-size: 2.5rem;
+      color: var(--primary-blue);
+      margin-bottom: 1rem;
+    }
+
+    .feature-title {
+      font-size: 2.3rem;
+      margin-bottom: 1rem;
+      color: var(--dark-blue);
+    }
+
+  </style>
+
+
+  <section id="features" class="features">
+    <div class="container">
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">👥</div>
+          <h3 class="feature-title">Kundenverwaltung</h3>
+          <p>Verwalten Sie Ihre Kunden einfach und übersichtlich. Alle wichtigen Informationen auf einen Blick.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📄</div>
+          <h3 class="feature-title">Professionelle Offerten</h3>
+          <p>Erstellen Sie überzeugende Angebote in wenigen Schritten.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧾</div>
+          <h3 class="feature-title">Rechnungen mit QR-Code</h3>
+          <p>Generieren Sie Rechnungen mit Schweizer QR-Code.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3 class="feature-title">Nahtlose Umwandlung</h3>
+          <p>Wandeln Sie Offerten mit nur einem Klick in Rechnungen um - ohne Daten erneut eingeben zu müssen.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3 class="feature-title">Auswertungen</h3>
+          <p>Umsatzverlauf, Kategorien und Top-Kunden auf einen Blick, mit Drilldown bis zur einzelnen Rechnung.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📒</div>
+          <h3 class="feature-title">Buchhaltung</h3>
+          <p>Einnahmen, Ausgaben und Erfolgsrechnung ohne Excel, inklusive CSV-Export für die Steuererklärung.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔁</div>
+          <h3 class="feature-title">Wiederkehrende Rechnungen & Mahnwesen</h3>
+          <p>Jahresrechnungen werden automatisch erstellt, überfällige Zahlungen erkannt.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎨</div>
+          <h3 class="feature-title">Individuelles Design</h3>
+          <p>Farbe, Schrift und Logo frei wählbar, mit Live-Vorschau der echten PDF-Rechnung.</p>
+        </div>
+      </div>
+    </div>
+  </section>
