@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.1...customer-management-v1.1.0) (2026-08-04)
+
+
+### Features
+
+* **auth:** add self-service password reset and email-invite for new users ([4a4eddd](https://github.com/sirtheta/CustomerManagement/commit/4a4eddd90119a9a278a53f4ca12ccbc551d83871))
+* **auth:** reject passwords found in known data breaches ([e189d2a](https://github.com/sirtheta/CustomerManagement/commit/e189d2a5078ad13f238bb88607855dbf4c8ee6b5))
+* **invoices:** replace arrow-based item reordering with drag-and-drop ([95876df](https://github.com/sirtheta/CustomerManagement/commit/95876dfab73cd767f20c6d45b1c75e858d5af851))
+* **marketing:** add lightbox, WordPress-hosted images, and Features proposal ([04d71b8](https://github.com/sirtheta/CustomerManagement/commit/04d71b8150c1f0ded4e43d5f7df0ced905348dd8))
+
+
+### Bug Fixes
+
+* **auth:** reject passwords longer than bcrypt's 72-byte limit ([29b954e](https://github.com/sirtheta/CustomerManagement/commit/29b954edca8ef35c775bedd0399fd81fadf690c4))
+* **settings:** match release-please's component-prefixed tags in update check ([2400a1c](https://github.com/sirtheta/CustomerManagement/commit/2400a1c10e6c69a658a6d06c9bfcb817abd397af))
+* **theme:** forward CSP nonce to next-themes' own script ([#29](https://github.com/sirtheta/CustomerManagement/issues/29)) ([d842b11](https://github.com/sirtheta/CustomerManagement/commit/d842b11e670603d26771644f7b232b04d50b6a66))
+
 ## [1.0.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.0...customer-management-v1.0.1) (2026-07-29)
 
 
