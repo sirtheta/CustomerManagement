@@ -41,8 +41,12 @@ export function CreateUserDialog() {
             <Input name="email" type="email" required />
           </div>
           <div className="space-y-2">
-            <Label>Passwort</Label>
-            <PasswordInput name="password" required minLength={8} />
+            <Label>Passwort (optional)</Label>
+            <PasswordInput name="password" minLength={8} />
+            <p className="text-sm text-muted-foreground">
+              Leer lassen, damit der Benutzer eine E-Mail mit einem Link erhält, um selbst ein
+              Passwort zu setzen.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Rolle</Label>

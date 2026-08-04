@@ -98,7 +98,38 @@ function resolveQuotePlaceholders(
     .replace(/\{customerName\}/g, displayName);
 }
 
-export const DEFAULT_QUOTE_SUBJECT = "Offerte Nr. {documentNumber} – {companyName}";
+export function toHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  return `<!DOCTYPE html><html><head><meta name="format-detection" content="date=no, telephone=no, address=no, email=no"></head><body style="font-family: sans-serif; white-space: pre-wrap;">${escaped}</body></html>`;
+}
+
+export async function sendAccountMail(
+  settings: FullSettings,
+  to: string,
+  subject: string,
+  text: string
+): Promise<void> {
+  if (process.env.DISABLE_EMAIL === "true") {
+    console.log("[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)");
+    return;
+  }
+  const transporter = buildTransport(settings);
+  const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
+  const fromAddress = settings.smtpFromAddress || settings.smtpUser;
+  await transporter.sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject,
+    text,
+    html: toHtml(text),
+  });
+}
+
+const DEFAULT_QUOTE_SUBJECT = "Offerte Nr. {documentNumber} – {companyName}";
 export const DEFAULT_QUOTE_BODY =
   "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber} vom {date} über {totalAmount}.\n\n{customUserText}\n\nGültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}";
 

@@ -63,6 +63,8 @@ export function createTestDatabase() {
     await p.category.deleteMany();
     await p.applicationSettings.deleteMany();
     await p.companyInformation.deleteMany();
+    await p.passwordResetToken.deleteMany();
+    await p.user.deleteMany();
   });
 
   afterAll(async () => {

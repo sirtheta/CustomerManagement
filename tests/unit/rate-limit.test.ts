@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, resetRateLimit, isRateLimited, recordFailedAttempt } from "@/lib/rate-limit";
 
 // Each test uses a unique key so the module-level store doesn't leak between cases.
 let key: string;
@@ -64,5 +64,26 @@ describe("resetRateLimit", () => {
 
   it("resetting a key that has no entry is a no-op", () => {
     expect(() => resetRateLimit(`nonexistent:${Math.random()}`)).not.toThrow();
+  });
+});
+
+describe("per-call limit overrides", () => {
+  it("honors a custom maxAttempts instead of the global default", () => {
+    for (let i = 0; i < 3; i++) checkRateLimit(key, { maxAttempts: 3 });
+    expect(checkRateLimit(key, { maxAttempts: 3 })).toBe(false);
+  });
+});
+
+describe("isRateLimited / recordFailedAttempt", () => {
+  it("does not count a check as an attempt", () => {
+    expect(isRateLimited(key, { maxAttempts: 2 })).toBe(false);
+    expect(isRateLimited(key, { maxAttempts: 2 })).toBe(false);
+    expect(isRateLimited(key, { maxAttempts: 2 })).toBe(false);
+  });
+
+  it("becomes limited once enough failures are recorded", () => {
+    recordFailedAttempt(key, { maxAttempts: 2 });
+    recordFailedAttempt(key, { maxAttempts: 2 });
+    expect(isRateLimited(key, { maxAttempts: 2 })).toBe(true);
   });
 });

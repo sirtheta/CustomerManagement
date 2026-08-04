@@ -110,6 +110,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
+          sessionEpoch: user.sessionEpoch,
         };
       },
     }),
@@ -127,6 +128,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role: UserRole }).role;
+        token.sessionEpoch = (user as { sessionEpoch?: number }).sessionEpoch ?? 0;
+        return token;
+      }
+      // Re-check on every subsequent request so a password reset (which bumps
+      // User.sessionEpoch) kills sessions that are already out there, instead
+      // of leaving them valid until the JWT naturally expires.
+      const userId = parseInt(String(token.id), 10);
+      if (!Number.isInteger(userId)) return null;
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { sessionEpoch: true },
+      });
+      if (!dbUser) {
+        log.info({ userId: token.id }, "session invalidated: user missing");
+        return null;
+      }
+      const tokenEpoch = typeof token.sessionEpoch === "number" ? token.sessionEpoch : 0;
+      if (tokenEpoch !== dbUser.sessionEpoch) {
+        log.info({ userId: token.id }, "session invalidated: credentials changed");
+        return null;
       }
       return token;
     },

@@ -58,7 +58,7 @@ describe("changeOwnPassword", () => {
 
   it("rejects unauthenticated requests", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
-    const result = await changeOwnPassword({}, form("old", "newpassword"));
+    const result = await changeOwnPassword({}, form("old", "new-test-pw-9x7q"));
     expect(result.error).toBe("Nicht angemeldet.");
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
@@ -70,28 +70,28 @@ describe("changeOwnPassword", () => {
   });
 
   it("rejects when confirmation does not match", async () => {
-    const result = await changeOwnPassword({}, form("old-password", "newpassword", "different"));
+    const result = await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q", "different"));
     expect(result.error).toBe("Die Passwörter stimmen nicht überein.");
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it("rejects when rate limit is exceeded", async () => {
     vi.mocked(checkRateLimit).mockReturnValue(false);
-    const result = await changeOwnPassword({}, form("old-password", "newpassword"));
+    const result = await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
     expect(result.error).toBe("Zu viele Versuche. Bitte später erneut versuchen.");
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
   it("rejects a wrong current password", async () => {
     vi.mocked(compare).mockResolvedValue(false as never);
-    const result = await changeOwnPassword({}, form("wrong", "newpassword"));
+    const result = await changeOwnPassword({}, form("wrong", "new-test-pw-9x7q"));
     expect(result.error).toBe("Aktuelles Passwort ist falsch.");
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
   it("updates the hash and writes an audit log on success", async () => {
     vi.mocked(compare).mockResolvedValue(true as never);
-    const result = await changeOwnPassword({}, form("old-password", "newpassword"));
+    const result = await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
     expect(result.success).toBe(true);
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 1 },
@@ -104,8 +104,8 @@ describe("changeOwnPassword", () => {
 
   it("never stores the plaintext password", async () => {
     vi.mocked(compare).mockResolvedValue(true as never);
-    await changeOwnPassword({}, form("old-password", "newpassword"));
+    await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
     const updateArg = vi.mocked(prisma.user.update).mock.calls[0][0];
-    expect(JSON.stringify(updateArg)).not.toContain("newpassword");
+    expect(JSON.stringify(updateArg)).not.toContain("new-test-pw-9x7q");
   });
 });

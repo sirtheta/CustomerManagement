@@ -8,16 +8,11 @@ type UpdateCheckResult = {
 
 export async function checkForUpdate(): Promise<UpdateCheckResult | null> {
   try {
-    const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-    if (process.env.GITHUB_TOKEN) {
-      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
-
     const res = await fetch(
       "https://api.github.com/repos/sirtheta/customermanagement/releases/latest",
       {
         next: { revalidate: 3600 },
-        headers,
+        headers: { Accept: "application/vnd.github+json" },
       }
     );
     if (!res.ok) return null;
@@ -25,7 +20,7 @@ export async function checkForUpdate(): Promise<UpdateCheckResult | null> {
     const data = await res.json();
     const tagName: string = data.tag_name ?? "";
 
-    const match = tagName.match(/^v(.+)$/);
+    const match = tagName.match(/v(\d+\.\d+\.\d+.*)$/);
     if (!match) return null;
 
     const latestVersion = match[1];

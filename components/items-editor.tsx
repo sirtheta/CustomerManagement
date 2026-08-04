@@ -13,8 +13,25 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
-import { ChevronDownIcon, ChevronUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { GripVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type { Service, Unit } from "@prisma/client";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
 
@@ -60,16 +77,166 @@ function fromService(s: SerializedService): ItemData {
   };
 }
 
+type SortableItemRowProps = {
+  id: string;
+  index: number;
+  item: ItemData;
+  onUpdate: (patch: Partial<ItemData>) => void;
+  onRemove: () => void;
+  quantityDisplay: string | undefined;
+  onQuantityChange: (raw: string) => void;
+  onQuantityBlur: () => void;
+  priceDisplay: string | undefined;
+  onPriceChange: (raw: string) => void;
+  onPriceBlur: () => void;
+};
+
+function SortableItemRow({
+  id,
+  index,
+  item,
+  onUpdate,
+  onRemove,
+  quantityDisplay,
+  onQuantityChange,
+  onQuantityBlur,
+  priceDisplay,
+  onPriceChange,
+  onPriceBlur,
+}: SortableItemRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-lg border p-3 space-y-2 bg-background",
+        index % 2 === 0 ? "" : "bg-muted/20",
+        isDragging && "opacity-50 z-10 shadow-lg"
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1 cursor-grab active:cursor-grabbing touch-none"
+            aria-label="Position verschieben"
+          >
+            <GripVerticalIcon className="size-4" />
+          </button>
+          <span className="text-xs font-medium text-muted-foreground">Position {index + 1}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-destructive hover:text-destructive/70 transition-colors p-1"
+          aria-label="Position entfernen"
+        >
+          <Trash2Icon className="size-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Bezeichnung</label>
+          <Input
+            value={item.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            placeholder="Bezeichnung"
+            className="h-8 text-sm"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Beschreibung</label>
+          <Textarea
+            value={item.description}
+            onChange={(e) => onUpdate({ description: e.target.value })}
+            placeholder="Beschreibung"
+            rows={2}
+            className="text-sm resize-none"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Einheit</label>
+          <Select
+            value={item.unit}
+            onValueChange={(val: string | null) => { if (val) onUpdate({ unit: val as Unit }); }}
+          >
+            <SelectTrigger size="sm" className="h-8 text-sm w-full">
+              <SelectValue>
+                {(value: string | null) => value ? (unitLabels[value as Unit] ?? value) : "Einheit"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(unitLabels) as Unit[]).map((u) => (
+                <SelectItem key={u} value={u}>
+                  {unitLabels[u]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Menge</label>
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={quantityDisplay ?? String(item.quantity)}
+            onChange={(e) => onQuantityChange(e.target.value)}
+            onBlur={onQuantityBlur}
+            className="h-8 text-sm text-right"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Preis (CHF)</label>
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={priceDisplay ?? String(item.unitPrice)}
+            onChange={(e) => onPriceChange(e.target.value)}
+            onBlur={onPriceBlur}
+            className="h-8 text-sm text-right"
+          />
+        </div>
+        <div className="space-y-1 hidden sm:block">
+          <label className="text-xs font-medium">Total (CHF)</label>
+          <div className="h-8 flex items-center justify-end text-sm font-semibold">
+            {formatCurrency(item.totalAmount)}
+          </div>
+        </div>
+      </div>
+      <div className="text-right text-sm font-semibold sm:hidden">
+        Total: {formatCurrency(item.totalAmount)}
+      </div>
+    </div>
+  );
+}
+
 export default function ItemsEditor({
   services,
   initialItems = [],
   inputName = "itemsJson",
 }: Props) {
   const [items, setItems] = useState<ItemData[]>(initialItems);
+  const [ids, setIds] = useState<string[]>(() => initialItems.map(() => crypto.randomUUID()));
   const [addMode, setAddMode] = useState<"service" | "custom" | null>(null);
   const [serviceSearch, setServiceSearch] = useState<string>("");
-  const [quantityDisplays, setQuantityDisplays] = useState<Record<number, string>>({});
-  const [priceDisplays, setPriceDisplays] = useState<Record<number, string>>({});
+  const [quantityDisplays, setQuantityDisplays] = useState<Record<string, string>>({});
+  const [priceDisplays, setPriceDisplays] = useState<Record<string, string>>({});
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   function updateItem(index: number, patch: Partial<ItemData>) {
     setItems((prev) => {
@@ -85,53 +252,34 @@ export default function ItemsEditor({
   }
 
   function removeItem(index: number) {
+    const removedId = ids[index];
     setItems((prev) => prev.filter((_, i) => i !== index));
-    setQuantityDisplays((prev) => {
-      const next: Record<number, string> = {};
-      for (const [key, val] of Object.entries(prev)) {
-        const k = Number(key);
-        if (k < index) next[k] = val;
-        else if (k > index) next[k - 1] = val;
-      }
-      return next;
-    });
-    setPriceDisplays((prev) => {
-      const next: Record<number, string> = {};
-      for (const [key, val] of Object.entries(prev)) {
-        const k = Number(key);
-        if (k < index) next[k] = val;
-        else if (k > index) next[k - 1] = val;
-      }
-      return next;
-    });
-  }
-
-  function moveItem(index: number, dir: -1 | 1) {
-    const target = index + dir;
-    if (target < 0 || target >= items.length) return;
-    setItems((prev) => {
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
-    const swapDisplays = (
-      setter: Dispatch<SetStateAction<Record<number, string>>>
-    ) => {
+    setIds((prev) => prev.filter((_, i) => i !== index));
+    const dropId = (setter: Dispatch<SetStateAction<Record<string, string>>>) => {
       setter((prev) => {
+        if (!(removedId in prev)) return prev;
         const next = { ...prev };
-        const a = next[index];
-        const b = next[target];
-        if (b === undefined) delete next[index]; else next[index] = b;
-        if (a === undefined) delete next[target]; else next[target] = a;
+        delete next[removedId];
         return next;
       });
     };
-    swapDisplays(setQuantityDisplays);
-    swapDisplays(setPriceDisplays);
+    dropId(setQuantityDisplays);
+    dropId(setPriceDisplays);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = ids.indexOf(String(active.id));
+    const newIndex = ids.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    setItems((prev) => arrayMove(prev, oldIndex, newIndex));
+    setIds((prev) => arrayMove(prev, oldIndex, newIndex));
   }
 
   function addCustomItem() {
     setItems((prev) => [...prev, emptyItem()]);
+    setIds((prev) => [...prev, crypto.randomUUID()]);
     setAddMode(null);
   }
 
@@ -146,143 +294,56 @@ export default function ItemsEditor({
             Noch keine Positionen hinzugefügt.
           </p>
         )}
-        {items.map((item, i) => (
-          <div key={i} className={cn("rounded-lg border p-3 space-y-2", i % 2 === 0 ? "" : "bg-muted/20")}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Position {i + 1}</span>
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => moveItem(i, -1)}
-                  disabled={i === 0}
-                  className="text-muted-foreground hover:text-foreground transition-colors p-1 disabled:opacity-30 disabled:pointer-events-none"
-                  aria-label="Position nach oben verschieben"
-                >
-                  <ChevronUpIcon className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => moveItem(i, 1)}
-                  disabled={i === items.length - 1}
-                  className="text-muted-foreground hover:text-foreground transition-colors p-1 disabled:opacity-30 disabled:pointer-events-none"
-                  aria-label="Position nach unten verschieben"
-                >
-                  <ChevronDownIcon className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeItem(i)}
-                  className="text-destructive hover:text-destructive/70 transition-colors p-1"
-                  aria-label="Position entfernen"
-                >
-                  <Trash2Icon className="size-4" />
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Bezeichnung</label>
-                <Input
-                  value={item.name}
-                  onChange={(e) => updateItem(i, { name: e.target.value })}
-                  placeholder="Bezeichnung"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Beschreibung</label>
-                <Textarea
-                  value={item.description}
-                  onChange={(e) => updateItem(i, { description: e.target.value })}
-                  placeholder="Beschreibung"
-                  rows={2}
-                  className="text-sm resize-none"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Einheit</label>
-                <Select
-                  value={item.unit}
-                  onValueChange={(val: string | null) => { if (val) updateItem(i, { unit: val as Unit }); }}
-                >
-                  <SelectTrigger size="sm" className="h-8 text-sm w-full">
-                    <SelectValue>
-                      {(value: string | null) => value ? (unitLabels[value as Unit] ?? value) : "Einheit"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(unitLabels) as Unit[]).map((u) => (
-                      <SelectItem key={u} value={u}>
-                        {unitLabels[u]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Menge</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={quantityDisplays[i] ?? String(item.quantity)}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setQuantityDisplays((prev) => ({ ...prev, [i]: raw }));
-                    const num = parseFloat(raw.replace(",", "."));
-                    if (!isNaN(num) && num >= 0) updateItem(i, { quantity: num });
-                  }}
-                  onBlur={() => {
-                    const raw = quantityDisplays[i] ?? String(item.quantity);
-                    const num = parseFloat(raw.replace(",", "."));
-                    updateItem(i, { quantity: isNaN(num) || num < 0 ? 0 : num });
-                    setQuantityDisplays((prev) => {
-                      const next = { ...prev };
-                      delete next[i];
-                      return next;
-                    });
-                  }}
-                  className="h-8 text-sm text-right"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Preis (CHF)</label>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  value={priceDisplays[i] ?? String(item.unitPrice)}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    setPriceDisplays((prev) => ({ ...prev, [i]: raw }));
-                    const num = parseFloat(raw.replace(",", "."));
-                    if (!isNaN(num) && num >= 0) updateItem(i, { unitPrice: num });
-                  }}
-                  onBlur={() => {
-                    const raw = priceDisplays[i] ?? String(item.unitPrice);
-                    const num = parseFloat(raw.replace(",", "."));
-                    updateItem(i, { unitPrice: isNaN(num) || num < 0 ? 0 : num });
-                    setPriceDisplays((prev) => {
-                      const next = { ...prev };
-                      delete next[i];
-                      return next;
-                    });
-                  }}
-                  className="h-8 text-sm text-right"
-                />
-              </div>
-              <div className="space-y-1 hidden sm:block">
-                <label className="text-xs font-medium">Total (CHF)</label>
-                <div className="h-8 flex items-center justify-end text-sm font-semibold">
-                  {formatCurrency(item.totalAmount)}
-                </div>
-              </div>
-            </div>
-            <div className="text-right text-sm font-semibold sm:hidden">
-              Total: {formatCurrency(item.totalAmount)}
-            </div>
-          </div>
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            {items.map((item, i) => (
+              <SortableItemRow
+                key={ids[i]}
+                id={ids[i]}
+                index={i}
+                item={item}
+                onUpdate={(patch) => updateItem(i, patch)}
+                onRemove={() => removeItem(i)}
+                quantityDisplay={quantityDisplays[ids[i]]}
+                onQuantityChange={(raw) => {
+                  setQuantityDisplays((prev) => ({ ...prev, [ids[i]]: raw }));
+                  const num = parseFloat(raw.replace(",", "."));
+                  if (!isNaN(num) && num >= 0) updateItem(i, { quantity: num });
+                }}
+                onQuantityBlur={() => {
+                  const raw = quantityDisplays[ids[i]] ?? String(item.quantity);
+                  const num = parseFloat(raw.replace(",", "."));
+                  updateItem(i, { quantity: isNaN(num) || num < 0 ? 0 : num });
+                  setQuantityDisplays((prev) => {
+                    const next = { ...prev };
+                    delete next[ids[i]];
+                    return next;
+                  });
+                }}
+                priceDisplay={priceDisplays[ids[i]]}
+                onPriceChange={(raw) => {
+                  setPriceDisplays((prev) => ({ ...prev, [ids[i]]: raw }));
+                  const num = parseFloat(raw.replace(",", "."));
+                  if (!isNaN(num) && num >= 0) updateItem(i, { unitPrice: num });
+                }}
+                onPriceBlur={() => {
+                  const raw = priceDisplays[ids[i]] ?? String(item.unitPrice);
+                  const num = parseFloat(raw.replace(",", "."));
+                  updateItem(i, { unitPrice: isNaN(num) || num < 0 ? 0 : num });
+                  setPriceDisplays((prev) => {
+                    const next = { ...prev };
+                    delete next[ids[i]];
+                    return next;
+                  });
+                }}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         {items.length > 0 && (
           <div className="text-right text-sm font-semibold pt-1 border-t">
             Gesamt: {formatCurrency(total)}
@@ -325,6 +386,7 @@ export default function ItemsEditor({
                   type="button"
                   onClick={() => {
                     setItems((prev) => [...prev, fromService(s)]);
+                    setIds((prev) => [...prev, crypto.randomUUID()]);
                     setServiceSearch("");
                     setAddMode(null);
                   }}

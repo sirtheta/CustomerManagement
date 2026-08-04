@@ -5,7 +5,7 @@ import log from "@/lib/logger";
 
 let _cacheDir: string | undefined;
 function getCacheDir(): string {
-  return (_cacheDir ??= path.join(process.cwd(), config.pdf.cacheDir));
+  return (_cacheDir ??= path.join(/* turbopackIgnore: true */ process.cwd(), config.pdf.cacheDir));
 }
 
 const CACHE_TTL_MS = config.pdf.cacheTtlMs;

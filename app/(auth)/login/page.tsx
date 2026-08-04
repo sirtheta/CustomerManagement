@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { login } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,12 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                <Link
+                  href="/forgot-password"
+                  className="block text-right text-sm text-muted-foreground hover:underline"
+                >
+                  Passwort vergessen?
+                </Link>
               </>
             )}
             {totpStep && (

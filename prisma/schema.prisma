@@ -278,6 +278,26 @@ model User {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  // Bumped whenever the password is reset (self-service or by an admin).
+  // The JWT carries the epoch it was issued under; lib/auth.ts's session
+  // callback rejects a token once this value has moved on, which is what
+  // makes a reset actually revoke sessions that are already out there.
+  sessionEpoch Int @default(0)
+
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 enum UserRole {

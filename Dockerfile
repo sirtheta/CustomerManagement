@@ -71,6 +71,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/public          ./public
 # Prisma schema
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
+# Breached-password wordlist: standalone tracing doesn't follow the
+# gunzip+readFileSync path in lib/password.ts, so this needs an explicit copy.
+COPY --from=builder --chown=nextjs:nodejs /app/lib/data ./lib/data
+
 # Full production node_modules (native modules already compiled for target platform)
 COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 

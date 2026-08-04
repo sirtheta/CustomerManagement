@@ -15,6 +15,12 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
       count: vi.fn(),
     },
+    passwordResetToken: {
+      deleteMany: vi.fn(),
+    },
+    applicationSettings: {
+      findFirst: vi.fn(),
+    },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -22,6 +28,9 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("bcryptjs", () => ({ hash: vi.fn() }));
 vi.mock("@/lib/password", () => ({ validatePasswordPolicy: vi.fn() }));
+vi.mock("@/lib/password-reset", () => ({ createPasswordResetToken: vi.fn() }));
+vi.mock("@/lib/email", () => ({ sendAccountMail: vi.fn() }));
+vi.mock("@/lib/origin", () => ({ appOrigin: vi.fn().mockResolvedValue("http://localhost:3000") }));
 vi.mock("@/lib/crypto", () => ({
   encryptSecret: vi.fn((v: string) => `enc:${v}`),
   decryptSecret: vi.fn((v: string) => v.replace("enc:", "")),
@@ -50,6 +59,7 @@ import {
   deleteUser,
   generateTotpSetup,
   confirmTotpSetup,
+  sendPasswordSetupEmail,
   disableTotp,
 } from "@/app/(app)/settings/users/actions";
 import prisma from "@/lib/prisma";
@@ -58,6 +68,8 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { hash } from "bcryptjs";
 import { validatePasswordPolicy } from "@/lib/password";
+import { createPasswordResetToken } from "@/lib/password-reset";
+import { sendAccountMail } from "@/lib/email";
 
 const adminSession = {
   user: { id: "1", name: "Admin", email: "admin@test.ch", role: "Admin" },
@@ -142,6 +154,59 @@ describe("settings/users actions", () => {
       );
       expect(revalidatePath).toHaveBeenCalledWith("/settings/users");
     });
+
+    it("creates user with empty password, hashes a random value, and sends an invite email", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(hash).mockResolvedValue("$2b$10$randomhash" as never);
+      vi.mocked(prisma.user.create).mockResolvedValue({
+        id: 11,
+        name: "Eingeladen",
+        email: "invite@user.ch",
+      } as never);
+      vi.mocked(createPasswordResetToken).mockResolvedValue("raw-token");
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        companyInfo: {},
+      } as never);
+
+      const result = await createUser(
+        {},
+        form({ email: "invite@user.ch", name: "Eingeladen", password: "", role: "Editor" })
+      );
+
+      expect(result).toEqual({});
+      expect(validatePasswordPolicy).not.toHaveBeenCalled();
+      expect(prisma.user.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          email: "invite@user.ch",
+          name: "Eingeladen",
+          passwordHash: "$2b$10$randomhash",
+          role: "Editor",
+        }),
+      });
+      expect(createPasswordResetToken).toHaveBeenCalledWith(prisma, 11);
+      expect(sendAccountMail).toHaveBeenCalled();
+    });
+
+    it("still creates the user when the invite email fails to send", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(hash).mockResolvedValue("$2b$10$randomhash" as never);
+      vi.mocked(prisma.user.create).mockResolvedValue({
+        id: 12,
+        name: "Eingeladen",
+        email: "invite2@user.ch",
+      } as never);
+      vi.mocked(createPasswordResetToken).mockRejectedValue(new Error("db down"));
+
+      const result = await createUser(
+        {},
+        form({ email: "invite2@user.ch", name: "Eingeladen", password: "", role: "Viewer" })
+      );
+
+      expect(result).toEqual({});
+      expect(prisma.user.create).toHaveBeenCalled();
+    });
   });
 
   describe("updateUser", () => {
@@ -211,8 +276,9 @@ describe("settings/users actions", () => {
       expect(result.success).toBe(true);
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 5 },
-        data: { passwordHash: "$2b$10$newhash" },
+        data: { passwordHash: "$2b$10$newhash", sessionEpoch: { increment: 1 } },
       });
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 5 } });
       expect(logAudit).toHaveBeenCalledWith(
         adminSession,
         "UPDATE",
@@ -221,6 +287,54 @@ describe("settings/users actions", () => {
         "user@test.ch",
         { action: "password-reset" }
       );
+    });
+  });
+
+  describe("sendPasswordSetupEmail", () => {
+    it("sends the invite email and logs audit on success", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 8,
+        name: "Eingeladen",
+        email: "invite@user.ch",
+      } as never);
+      vi.mocked(createPasswordResetToken).mockResolvedValue("raw-token");
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        companyInfo: {},
+      } as never);
+
+      const result = await sendPasswordSetupEmail(8);
+      expect(result.success).toBe(true);
+      expect(sendAccountMail).toHaveBeenCalled();
+      expect(logAudit).toHaveBeenCalledWith(
+        adminSession,
+        "UPDATE",
+        "User",
+        8,
+        "invite@user.ch",
+        { action: "password-setup-email-sent" }
+      );
+    });
+
+    it("returns an error when the user is not found", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockRejectedValue(new Error("not found"));
+
+      await expect(sendPasswordSetupEmail(999)).rejects.toThrow();
+    });
+
+    it("returns an error when the mail send fails", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 9,
+        name: "Eingeladen",
+        email: "invite@user.ch",
+      } as never);
+      vi.mocked(createPasswordResetToken).mockRejectedValue(new Error("smtp down"));
+
+      const result = await sendPasswordSetupEmail(9);
+      expect(result.error).toBe("E-Mail konnte nicht gesendet werden. Bitte SMTP-Einstellungen prüfen.");
+      expect(logAudit).not.toHaveBeenCalled();
     });
   });
 
