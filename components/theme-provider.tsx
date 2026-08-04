@@ -287,9 +287,28 @@ function ColorSchemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  nonce,
+}: {
+  children: React.ReactNode;
+  /**
+   * CSP nonce for next-themes' own pre-hydration FOUC-prevention script
+   * (separate from the manual one(s) in app/layout.tsx). Without it, that
+   * script renders with no nonce attribute and gets silently blocked under
+   * this app's strict `script-src 'nonce-…' 'strict-dynamic'` — no visible
+   * error to the user, just a theme flash on every load.
+   */
+  nonce?: string;
+}) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      nonce={nonce}
+    >
       <ColorSchemeProvider>{children}</ColorSchemeProvider>
     </NextThemesProvider>
   );
