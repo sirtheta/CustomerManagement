@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { checkForUpdate } from "@/lib/check-update";
+
+// checkForUpdate() wraps its GitHub call in unstable_cache so the result is
+// shared across requests instead of hitting GitHub's rate limit on every page
+// view (see lib/check-update.ts). unstable_cache requires a real Next.js
+// server's incrementalCache, which doesn't exist under Vitest, so it's
+// stubbed here as a passthrough — each test's mocked fetch runs directly,
+// uncached, same as the other action tests that mock next/cache.
+vi.mock("next/cache", () => ({
+  unstable_cache:
+    (fn: (...args: unknown[]) => unknown) =>
+    (...args: unknown[]) =>
+      fn(...args),
+}));
+
+const { checkForUpdate } = await import("@/lib/check-update");
 
 afterEach(() => {
   vi.unstubAllGlobals();
