@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.1.0...customer-management-v1.1.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **settings:** cache the GitHub release lookup independent of request-time APIs ([#30](https://github.com/sirtheta/CustomerManagement/issues/30)) ([d231055](https://github.com/sirtheta/CustomerManagement/commit/d231055d402ebb834b65424d1f1e099d1f0ac8e5))
+
 ## [1.1.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.0.1...customer-management-v1.1.0) (2026-08-04)
 
 
