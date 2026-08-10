@@ -1,82 +1,20 @@
 import cron from "node-cron";
-import {
-  copyFileSync,
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  statSync,
-  truncateSync,
-  unlinkSync,
-} from "fs";
-import { dirname, join } from "path";
+import { copyFileSync, existsSync, readdirSync, statSync, truncateSync, unlinkSync } from "fs";
+import { join } from "path";
 import logger from "@/lib/logger";
 import { config } from "@/lib/config";
 import { toDateString } from "@/lib/date";
+import { LOG_DIR } from "@/lib/log-capture";
+
+export { LOG_DIR, LOG_FILE, tee, startLogCapture } from "@/lib/log-capture";
 
 const log = logger.child({ module: "logs" });
 
-/**
- * Log file directory, next to the SQLite database (inside the data volume in
- * Docker, so it survives restarts). Reads DATABASE_URL directly rather than
- * importing lib/prisma's getDbPath — that module instantiates the Prisma
- * client at import time, which this module (loaded from instrumentation.ts
- * before anything else needs a DB handle) has no reason to force this early.
- */
-function getLogDir(): string {
-  const dbPath = (process.env.DATABASE_URL ?? "file:./data/customermanagement.db").replace(/^file:/, "");
-  return join(dirname(dbPath), "logs");
-}
-
-export const LOG_DIR = getLogDir();
-export const LOG_FILE = join(LOG_DIR, "app.log");
-
 const globalForScheduler = globalThis as unknown as {
   logRotationSchedulerStarted?: boolean;
-  logCaptureStarted?: boolean;
 };
 
 const ROTATED_LOG_RE = /^app-(\d{4}-\d{2}-\d{2})\.log$/;
-
-type Chunk = string | Uint8Array;
-
-/** Wraps `stream.write` so every call also reaches `sink`, in addition to whatever it already did. */
-export function tee(
-  stream: { write(...args: unknown[]): boolean },
-  sink: { write(chunk: Chunk): unknown }
-): void {
-  const original = stream.write.bind(stream);
-  stream.write = (...args: unknown[]) => {
-    sink.write(args[0] as Chunk);
-    return original(...args);
-  };
-}
-
-/**
- * Tees `process.stdout`/`process.stderr` to `LOG_FILE`, in addition to
- * whatever already consumes them (the terminal, `docker logs`).
- *
- * Patching the process streams rather than adding a second destination to
- * the shared pino logger means every line that would show up in
- * `docker logs` ends up in the file, not just what happens to go through
- * `lib/logger.ts` — a node-cron error, an uncaught exception's stack trace,
- * anything printed with a bare `console.log`. It also means `lib/logger.ts`
- * itself never needs to import `fs`, keeping it safe wherever it happens to
- * be reachable from client code.
- */
-export function startLogCapture(): void {
-  if (globalForScheduler.logCaptureStarted) return;
-  mkdirSync(LOG_DIR, { recursive: true });
-  const file = createWriteStream(LOG_FILE, { flags: "a" });
-  file.on("error", (err) => {
-    // Not routed through the logger: if the log file itself is the problem,
-    // writing about it there is the last thing that should happen.
-    process.stderr.write(`[logs] failed to write to ${LOG_FILE}: ${err.message}\n`);
-  });
-  tee(process.stdout, file);
-  tee(process.stderr, file);
-  globalForScheduler.logCaptureStarted = true;
-}
 
 export interface LogFileInfo {
   /** Filename only, safe to use as a URL path segment. */

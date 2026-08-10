@@ -1,5 +1,13 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Must run before anything imports "@/lib/logger" — pino locks its
+    // destination in at construction time and, unless process.stdout/stderr
+    // are already patched by then, writes straight to file descriptor 1/2,
+    // bypassing process.stdout.write entirely. lib/log-capture.ts has no
+    // dependency on lib/logger for exactly this reason.
+    const { startLogCapture } = await import("@/lib/log-capture");
+    startLogCapture();
+
     const { validateEnv } = await import("@/lib/env");
     validateEnv();
     const { default: prisma } = await import("@/lib/prisma");
@@ -12,8 +20,7 @@ export async function register() {
     const { startNotificationScheduler } = await import("@/lib/notifications");
     startNotificationScheduler();
 
-    const { startLogCapture, startLogRotationScheduler } = await import("@/lib/logs");
-    startLogCapture();
+    const { startLogRotationScheduler } = await import("@/lib/logs");
     startLogRotationScheduler();
 
     // Checkpoint WAL on shutdown so SQLite WAL changes flush to main .db file.

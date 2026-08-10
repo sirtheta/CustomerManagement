@@ -2,49 +2,11 @@ import { describe, expect, it, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { listLogFiles, pruneOldLogs, resolveLogFilePath, rotateLogs, tee } from "@/lib/logs";
+import { listLogFiles, pruneOldLogs, resolveLogFilePath, rotateLogs } from "@/lib/logs";
 
 function tmpDir() {
   return mkdtempSync(join(tmpdir(), "customermanagement-logs-"));
 }
-
-describe("tee", () => {
-  it("forwards every write to both the original stream and the sink, and returns the original's result", () => {
-    const originalCalls: unknown[] = [];
-    const sinkCalls: unknown[] = [];
-    const stream = {
-      write: (chunk: unknown) => {
-        originalCalls.push(chunk);
-        return true;
-      },
-    };
-    const sink = { write: (chunk: unknown) => sinkCalls.push(chunk) };
-
-    tee(stream, sink);
-    const result = stream.write("hello\n");
-
-    expect(result).toBe(true);
-    expect(originalCalls).toEqual(["hello\n"]);
-    expect(sinkCalls).toEqual(["hello\n"]);
-  });
-
-  it("passes extra arguments (encoding, callback) through to the original write only", () => {
-    const originalCalls: unknown[][] = [];
-    const stream = {
-      write: (...args: unknown[]) => {
-        originalCalls.push(args);
-        return true;
-      },
-    };
-    const sink = { write: () => undefined };
-
-    tee(stream, sink);
-    const callback = () => {};
-    stream.write("chunk", "utf8", callback);
-
-    expect(originalCalls).toEqual([["chunk", "utf8", callback]]);
-  });
-});
 
 describe("listLogFiles", () => {
   let dir: string;
