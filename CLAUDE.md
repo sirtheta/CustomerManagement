@@ -79,6 +79,8 @@ npx vitest run tests/unit/calculations.test.ts
 
 **Audit logging** (`lib/audit.ts`): All significant mutations call `createAuditLog(...)` which writes to `AuditLog`.
 
+**Logs** (`lib/logs.ts`): `startLogCapture()` tees `process.stdout`/`process.stderr` to `logs/app.log` in the data volume, so a file ends up with everything `docker logs` would show — not just what happens to go through the shared pino logger — without `lib/logger.ts` itself needing to import `fs`. A nightly job copy-truncates `app.log` to `app-<date>.log` (rename would leave the already-open write stream writing into the renamed file) and prunes files older than `LOG_MAX_KEEP_DAYS` (default 14; `DISABLE_LOG_ROTATION=true` turns rotation off). Admins download files from Einstellungen → Logs (`GET /api/logs/[filename]`, filename validated against the exact `app.log` / `app-YYYY-MM-DD.log` shape before touching the filesystem).
+
 **Production startup** (`scripts/startup.js`): In the Docker image, this script applies pending Prisma migrations directly via `better-sqlite3` (no Prisma CLI in the image) and seeds the first Admin user from env vars before the Next.js server starts.
 
 ### Key Environment Variables
@@ -90,6 +92,7 @@ npx vitest run tests/unit/calculations.test.ts
 | `AUTH_URL` | Production only | Full URL for auth redirects |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | First run | Bootstraps the initial admin user |
 | `ADMIN_PASSWORD_HASH` | First run | Pre-hashed bcrypt alternative to `ADMIN_PASSWORD` |
+| `LOG_ROTATE_CRON_SCHEDULE` / `LOG_MAX_KEEP_DAYS` | No | Nightly log rotation schedule (default `35 2 * * *`) and retention in days (default `14`, `0` = keep all) |
 
 ### Testing
 

@@ -18,4 +18,15 @@ export const config = {
   notifications: {
     cronSchedule: process.env.NOTIFY_CRON_SCHEDULE || "0 8 * * *",
   },
+  logs: {
+    // Nightly log rotation (<data>/logs/app.log -> app-<date>.log).
+    rotateCronSchedule: process.env.LOG_ROTATE_CRON_SCHEDULE || "35 2 * * *",
+    // Days to keep rotated log files; 0 disables pruning (keep all) — unlike
+    // the other numeric settings above, 0 is a valid, meaningful value here,
+    // so it can't use the `parseInt(...) || fallback` idiom (0 is falsy).
+    maxKeepDays: (() => {
+      const parsed = parseInt(process.env.LOG_MAX_KEEP_DAYS ?? "", 10);
+      return Number.isFinite(parsed) ? parsed : 14;
+    })(),
+  },
 } as const;
