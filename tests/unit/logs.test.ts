@@ -107,7 +107,7 @@ describe("pruneOldLogs", () => {
 describe("resolveLogFilePath", () => {
   it("accepts the current file and the exact rotated-file shape", () => {
     expect(resolveLogFilePath("app.log")).toBeTruthy();
-    expect(resolveLogFilePath("app-2026-07-28.log", "/data/logs")).toBe("/data/logs/app-2026-07-28.log");
+    expect(resolveLogFilePath("app-2026-07-28.log", "/data/logs")).toBe(join("/data/logs", "app-2026-07-28.log"));
   });
 
   it("rejects anything else, including path traversal attempts", () => {
