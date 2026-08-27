@@ -34,7 +34,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-14 items-center justify-between gap-4">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex h-14 items-center justify-between gap-4">
           <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
             <Link
               href="/dashboard"
@@ -56,7 +56,7 @@ export default async function AppLayout({
           </div>
         </div>
         <div className="hidden md:block border-t">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
+          <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
             <Suspense fallback={null}>
               <GlobalSearch size="sm" className="flex items-center w-72" />
             </Suspense>
@@ -64,11 +64,11 @@ export default async function AppLayout({
         </div>
       </header>
       {hasRole(session, [UserRole.Admin]) && <UpdateNotification />}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </main>
       <footer className="border-t py-3">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
+        <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
           v{pkg.version}
         </div>
       </footer>
