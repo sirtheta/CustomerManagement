@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     currentYearRevenue,
     pendingEmailCount,
     overdueCount,
+    scheduledCustomerCount,
     scheduledCustomers,
   ] = await Promise.all([
     prisma.customer.count(),
@@ -48,6 +49,9 @@ export default async function DashboardPage() {
     }),
     prisma.pendingEmail.count(),
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
+    prisma.customer.count({
+      where: { yearlyInvoice: true, nextInvoiceDate: { not: null } },
+    }),
     prisma.customer.findMany({
       where: { yearlyInvoice: true, nextInvoiceDate: { not: null } },
       select: {
@@ -58,6 +62,7 @@ export default async function DashboardPage() {
         nextInvoiceDate: true,
       },
       orderBy: { nextInvoiceDate: "asc" },
+      take: 5,
     }),
   ]);
 
@@ -168,7 +173,7 @@ export default async function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{scheduledCustomers.length}</p>
+              <p className="text-3xl font-bold">{scheduledCustomerCount}</p>
               <p className="text-sm text-gray-500 mt-1">Aktive Planungen</p>
             </CardContent>
           </Card>
@@ -187,7 +192,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-gray-500">Keine Jahresrechnungen geplant.</p>
           ) : (
             <ul className="divide-y">
-              {scheduledCustomers.slice(0, 5).map((customer) => (
+              {scheduledCustomers.map((customer) => (
                 <li key={customer.customerId} className="py-2 flex justify-between items-center gap-3">
                   <Link href={`/customers/${customer.customerId}`} className="font-medium text-sm hover:underline">
                     {customer.contactInsteadOfCompany
