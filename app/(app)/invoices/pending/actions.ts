@@ -50,10 +50,14 @@ export async function approvePendingEmail(
       where: { id: pending.invoiceId },
       data: { state: "Sent" },
     }),
+    prisma.invoiceSentLog.create({
+      data: { invoiceId: pending.invoiceId, sentTo: to, subject },
+    }),
     prisma.pendingEmail.delete({ where: { id } }),
   ]);
 
   revalidatePath("/invoices/pending");
+  revalidatePath(`/invoices/${pending.invoiceId}`);
   return { success: true, _ts: Date.now() };
 }
 

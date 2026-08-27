@@ -331,6 +331,7 @@ describe("invoices/pending actions", () => {
       vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.invoiceSentLog.create).mockResolvedValue({} as never);
       vi.mocked(prisma.pendingEmail.delete).mockResolvedValue({} as never);
       vi.mocked(prisma.$transaction).mockImplementation((arg: ((tx: typeof prisma) => Promise<unknown>) | Promise<unknown>[]) =>
         Array.isArray(arg) ? Promise.all(arg) as never : arg(prisma) as never
@@ -346,7 +347,11 @@ describe("invoices/pending actions", () => {
         where: { id: 10 },
         data: { state: "Sent" },
       });
+      expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({
+        data: { invoiceId: 10, sentTo: "kunde@test.ch", subject: "Rechnung" },
+      });
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/pending");
+      expect(revalidatePath).toHaveBeenCalledWith("/invoices/10");
     });
   });
 
