@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.1.1...customer-management-v1.2.0) (2026-08-27)
+
+
+### Features
+
+* **dashboard:** show scheduled invoices ([559843b](https://github.com/sirtheta/CustomerManagement/commit/559843be3ae093fac3d19bbc6c9cdb813f26a988))
+* **invoices:** add percentage discounts ([afdedf6](https://github.com/sirtheta/CustomerManagement/commit/afdedf6e601da4bbbcb8a33491a04dee216a07df)), closes [#59](https://github.com/sirtheta/CustomerManagement/issues/59)
+* **logs:** admin log export from the UI ([#40](https://github.com/sirtheta/CustomerManagement/issues/40)) ([e5a1e08](https://github.com/sirtheta/CustomerManagement/commit/e5a1e080172812f605ac0dfa2e5e5bfa850248bf))
+
+
+### Bug Fixes
+
+* **ci:** publish versioned image tags ([d56e7b3](https://github.com/sirtheta/CustomerManagement/commit/d56e7b3b47edf803deeeda94715aa8e75e6d1525))
+* **dashboard:** limit scheduled customer query ([89487bf](https://github.com/sirtheta/CustomerManagement/commit/89487bf0c6619f3930214758eb35cbe4bf4ef507))
+* **invoices:** log automatic email sends ([fc9a8df](https://github.com/sirtheta/CustomerManagement/commit/fc9a8dfa134f04b8b0a305fbb41974eb853d78b6))
+* **layout:** use wider desktop content area ([93bf481](https://github.com/sirtheta/CustomerManagement/commit/93bf481d602d72b07a3e717b1f8111f6461c5bb5))
+* **logs:** capture pino output instead of silently dropping it ([#42](https://github.com/sirtheta/CustomerManagement/issues/42)) ([024aaae](https://github.com/sirtheta/CustomerManagement/commit/024aaaee1d07562b0733ea895a5c313a8721c50a))
+* **logs:** make path assertion portable ([eabd897](https://github.com/sirtheta/CustomerManagement/commit/eabd8978f54c302f0671bdab285600067d0fc081))
+
 ## [1.1.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.1.0...customer-management-v1.1.1) (2026-08-05)
 
 
