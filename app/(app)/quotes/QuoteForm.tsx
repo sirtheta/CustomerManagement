@@ -37,6 +37,7 @@ function toItemData(item: SerializedItem): ItemData {
     unit: item.unit,
     unitPrice: item.unitPrice,
     quantity: item.quantity,
+    discountPercent: Number(item.discountPercent ?? 0),
     totalAmount: item.totalAmount,
     customText: item.customText ?? "",
     categoryId: item.categoryId,

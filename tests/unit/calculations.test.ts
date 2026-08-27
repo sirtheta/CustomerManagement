@@ -1,5 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
+import {
+  calculateInvoiceTotal,
+  calculateItemTotal,
+  validateDiscountPercent,
+} from "@/lib/calculations";
+
+describe("Discount calculations", () => {
+  it.each([
+    [100, 10, 90],
+    [99.99, 12.5, 87.49],
+    [10.005, 0, 10.01],
+  ])("calculates item total %f with %f%% discount as %f", (amount, discount, expected) => {
+    expect(calculateItemTotal({ quantity: 1, unitPrice: amount, discountPercent: discount })).toBe(expected);
+  });
+
+  it("applies item discounts before invoice discount", () => {
+    expect(calculateInvoiceTotal([
+      { quantity: 2, unitPrice: 100, discountPercent: 10 },
+      { quantity: 1, unitPrice: 50 },
+    ], 10)).toBe(207);
+  });
+
+  it.each([-1, 100.01, Number.NaN])("rejects invalid discount %f", (discount) => {
+    expect(validateDiscountPercent(discount)).toBe(false);
+    expect(() => calculateInvoiceTotal([], discount)).toThrow();
+  });
+});
 
 describe("Item calculations", () => {
   // Equivalent: CalculateInvoiceTotal_WithMultipleItems_ShouldReturnCorrectTotal

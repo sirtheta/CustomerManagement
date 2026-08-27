@@ -61,6 +61,7 @@ export default async function TemplatesPage() {
                       unit: item.unit,
                       quantity: item.quantity.toNumber(),
                       unitPrice: item.unitPrice.toNumber(),
+                      discountPercent: 0,
                       totalAmount:
                         item.quantity.toNumber() * item.unitPrice.toNumber(),
                     }))}

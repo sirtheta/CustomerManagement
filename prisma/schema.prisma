@@ -36,6 +36,7 @@ model Invoice {
   version        Int              @default(1)
   totalAmount    Decimal
   dueDate        DateTime
+  discountPercent Decimal  @default(0)
   state          InvoiceState     @default(Draft)
   paidDate       DateTime?
   customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
@@ -109,6 +110,7 @@ model Item {
   unit        Unit
   unitPrice   Decimal
   quantity    Decimal
+  discountPercent Decimal @default(0)
   totalAmount Decimal
   customText  String?
   categoryId  Int?

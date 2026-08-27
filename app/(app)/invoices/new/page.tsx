@@ -20,7 +20,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       orderBy: { name: "asc" },
     }).then(rows => rows.map(t => ({
       ...t,
-      items: t.items.map(i => ({ ...i, unitPrice: Number(i.unitPrice), quantity: Number(i.quantity) })),
+      items: t.items.map(i => ({ ...i, unitPrice: Number(i.unitPrice), quantity: Number(i.quantity), discountPercent: 0 })),
     }))),
   ]);
 

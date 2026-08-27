@@ -32,6 +32,7 @@ export default async function TemplateEditPage({ params }: Props) {
     unit: item.unit,
     unitPrice: Number(item.unitPrice),
     quantity: Number(item.quantity),
+    discountPercent: 0,
     totalAmount: Number(item.unitPrice) * Number(item.quantity),
     customText: "",
     categoryId: item.categoryId,

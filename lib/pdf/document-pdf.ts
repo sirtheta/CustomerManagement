@@ -36,6 +36,7 @@ export type RenderDoc = {
   dueLabel: string; // "Fälligkeit:" | "Gültig bis:"
   closingNoteLabel: string; // "Zahlbar bis:" | "Gültig bis:"
   customUserText: string | null;
+  discountPercent?: Numeric;
   totalAmount: number;
   customer: Pick<
     Customer,
@@ -56,6 +57,7 @@ export type RenderItem = {
   quantity: Numeric;
   unitPrice: Numeric;
   totalAmount: Numeric;
+  discountPercent?: Numeric;
 };
 
 export type CompanyInfoForPdf = {
@@ -275,7 +277,8 @@ export async function generateDocumentPdf(
       const descH = item.description
         ? pdf.font(FONT).fontSize(SMALL).heightOfString(item.description, { width: COL_W.desc })
         : 0;
-      const rowH = Math.max(TABLE_ROW_H, nameH + descH + 4);
+      const discountH = Number(item.discountPercent ?? 0) > 0 ? LINE_HEIGHT : 0;
+      const rowH = Math.max(TABLE_ROW_H, nameH + descH + discountH + 4);
 
       x = MARGIN;
       pdf.font(BOLD).fontSize(BASE).fillColor(TEXT_COLOR);
@@ -283,6 +286,12 @@ export async function generateDocumentPdf(
       if (item.description) {
         pdf.font(FONT).fontSize(SMALL);
         pdf.text(item.description, x, y + nameH + 2, { width: COL_W.desc });
+      }
+      if (Number(item.discountPercent ?? 0) > 0) {
+        pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
+        pdf.text(`Rabatt: ${fmt(Number(item.discountPercent), locale)} %`, x, y + nameH + descH + 4, {
+          width: COL_W.desc,
+        });
       }
 
       x += COL_W.desc;
@@ -308,6 +317,21 @@ export async function generateDocumentPdf(
     y += 5;
     rule(y, 0.5);
     y += 8;
+
+    const subtotal = doc.items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+    const invoiceDiscount = Number(doc.discountPercent ?? 0);
+    if (invoiceDiscount > 0) {
+      pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+      pdf.text("Zwischensumme", MARGIN, y);
+      pdf.text(`CHF ${fmt(subtotal, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
+      y += LINE_HEIGHT + 4;
+      pdf.text(`Gesamtrabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
+      pdf.text(`- CHF ${fmt(subtotal - doc.totalAmount, locale)}`, MARGIN, y, {
+        width: CONTENT_W,
+        align: "right",
+      });
+      y += LINE_HEIGHT + 6;
+    }
 
     pdf.font(BOLD).fontSize(TOTAL).fillColor(TEXT_COLOR);
     pdf.text("Gesamtbetrag", MARGIN, y);

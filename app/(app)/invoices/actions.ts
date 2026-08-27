@@ -38,8 +38,9 @@ export async function createInvoice(
 
   let items: ItemData[];
   let totalAmount: number;
+  let discountPercent: number;
   try {
-    ({ items, totalAmount } = parseDocumentItems(formData));
+    ({ items, totalAmount, discountPercent } = parseDocumentItems(formData));
   } catch (err) {
     log.error({ err }, "createInvoice: invalid items JSON");
     return { error: "Ungültige Positionsdaten." };
@@ -59,6 +60,7 @@ export async function createInvoice(
           date: new Date(dateRaw),
           dueDate: new Date(dueDateRaw),
           totalAmount,
+          discountPercent,
           state: "Draft",
         },
       });
@@ -74,6 +76,7 @@ export async function createInvoice(
             unit: item.unit,
             unitPrice: item.unitPrice,
             quantity: item.quantity,
+            discountPercent: item.discountPercent,
             totalAmount: item.totalAmount,
             customText: item.customText || null,
             categoryId: item.categoryId,
@@ -109,8 +112,9 @@ export async function updateInvoice(
 
   let items: ItemData[];
   let totalAmount: number;
+  let discountPercent: number;
   try {
-    ({ items, totalAmount } = parseDocumentItems(formData));
+    ({ items, totalAmount, discountPercent } = parseDocumentItems(formData));
   } catch (err) {
     log.error({ id, err }, "updateInvoice: invalid items JSON");
     return { error: "Ungültige Positionsdaten." };
@@ -127,6 +131,7 @@ export async function updateInvoice(
           date: new Date(dateRaw),
           dueDate: new Date(dueDateRaw),
           totalAmount,
+          discountPercent,
           version: { increment: 1 },
         },
       });
@@ -140,6 +145,7 @@ export async function updateInvoice(
             unit: item.unit,
             unitPrice: item.unitPrice,
             quantity: item.quantity,
+            discountPercent: item.discountPercent,
             totalAmount: item.totalAmount,
             customText: item.customText || null,
             categoryId: item.categoryId,

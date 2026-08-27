@@ -16,6 +16,7 @@ export type ItemViewData = {
   unit: Unit;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
   totalAmount: number;
 };
 
@@ -61,6 +62,9 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
                 {formatCurrency(item.totalAmount)}
               </span>
             </div>
+            {(item.discountPercent ?? 0) > 0 && (
+              <p className="text-xs text-muted-foreground">Rabatt: {item.discountPercent}%</p>
+            )}
           </div>
         ))}
       </div>
@@ -75,6 +79,7 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
               <TableHead>Einheit</TableHead>
               <TableHead className="text-right">Menge</TableHead>
               <TableHead className="text-right">Preis</TableHead>
+              <TableHead className="text-right">Rabatt</TableHead>
               <TableHead className="text-right">Total</TableHead>
             </TableRow>
           </TableHeader>
@@ -89,6 +94,9 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
                 <TableCell className="text-right">{item.quantity}</TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(item.unitPrice)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {(item.discountPercent ?? 0) > 0 ? `${item.discountPercent}%` : "—"}
                 </TableCell>
                 <TableCell className="text-right font-medium">
                   {formatCurrency(item.totalAmount)}

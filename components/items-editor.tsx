@@ -41,6 +41,7 @@ type Props = {
   services: SerializedService[];
   initialItems?: ItemData[];
   inputName?: string;
+  showDiscount?: boolean;
 };
 
 const unitLabels: Record<Unit, string> = {
@@ -57,6 +58,7 @@ function emptyItem(): ItemData {
     unit: "Hour",
     unitPrice: 0,
     quantity: 1,
+    discountPercent: 0,
     totalAmount: 0,
     customText: "",
     categoryId: null,
@@ -71,6 +73,7 @@ function fromService(s: SerializedService): ItemData {
     unit: s.unit,
     unitPrice,
     quantity: 1,
+    discountPercent: 0,
     totalAmount: unitPrice,
     customText: "",
     categoryId: s.categoryId,
@@ -89,6 +92,7 @@ type SortableItemRowProps = {
   priceDisplay: string | undefined;
   onPriceChange: (raw: string) => void;
   onPriceBlur: () => void;
+  showDiscount: boolean;
 };
 
 function SortableItemRow({
@@ -103,6 +107,7 @@ function SortableItemRow({
   priceDisplay,
   onPriceChange,
   onPriceBlur,
+  showDiscount,
 }: SortableItemRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -164,7 +169,7 @@ function SortableItemRow({
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+      <div className={cn("grid grid-cols-1 gap-2", showDiscount ? "sm:grid-cols-5" : "sm:grid-cols-4")}>
         <div className="space-y-1">
           <label className="text-xs font-medium">Einheit</label>
           <Select
@@ -207,6 +212,20 @@ function SortableItemRow({
             className="h-8 text-sm text-right"
           />
         </div>
+        {showDiscount && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Rabatt (%)</label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={item.discountPercent}
+              onChange={(e) => onUpdate({ discountPercent: Number(e.target.value) || 0 })}
+              className="h-8 text-sm text-right"
+            />
+          </div>
+        )}
         <div className="space-y-1 hidden sm:block">
           <label className="text-xs font-medium">Total (CHF)</label>
           <div className="h-8 flex items-center justify-end text-sm font-semibold">
@@ -225,6 +244,7 @@ export default function ItemsEditor({
   services,
   initialItems = [],
   inputName = "itemsJson",
+  showDiscount = false,
 }: Props) {
   const [items, setItems] = useState<ItemData[]>(initialItems);
   const [ids, setIds] = useState<string[]>(() => initialItems.map(() => crypto.randomUUID()));
@@ -242,9 +262,9 @@ export default function ItemsEditor({
     setItems((prev) => {
       const next = [...prev];
       const updated = { ...next[index], ...patch };
-      if ("quantity" in patch || "unitPrice" in patch) {
+      if ("quantity" in patch || "unitPrice" in patch || "discountPercent" in patch) {
         updated.totalAmount =
-          Number(updated.quantity) * Number(updated.unitPrice);
+          Number(updated.quantity) * Number(updated.unitPrice) * (1 - Number(updated.discountPercent) / 100);
       }
       next[index] = updated;
       return next;
@@ -340,6 +360,7 @@ export default function ItemsEditor({
                     return next;
                   });
                 }}
+                showDiscount={showDiscount}
               />
             ))}
           </SortableContext>

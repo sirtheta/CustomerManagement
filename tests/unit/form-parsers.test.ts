@@ -42,8 +42,8 @@ describe("parseDocumentItems", () => {
 
   it("sums multiple items correctly", () => {
     const items = [
-      { ...validItem, totalAmount: 150 },
-      { ...validItem, totalAmount: 75 },
+      { ...validItem, unitPrice: 75, totalAmount: 150 },
+      { ...validItem, unitPrice: 75, quantity: 1, totalAmount: 75 },
     ];
     const fd = makeFormData(JSON.stringify(items));
     const { totalAmount } = parseDocumentItems(fd);

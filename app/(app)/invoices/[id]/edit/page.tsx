@@ -29,10 +29,12 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const serializedInvoice = {
     ...invoice,
     totalAmount: invoice.totalAmount.toNumber(),
+    discountPercent: invoice.discountPercent.toNumber(),
     items: invoice.items.map((item) => ({
       ...item,
       unitPrice: item.unitPrice.toNumber(),
       quantity: item.quantity.toNumber(),
+      discountPercent: item.discountPercent.toNumber(),
       totalAmount: item.totalAmount.toNumber(),
     })),
   };

@@ -6,6 +6,7 @@ export const itemDataSchema = z.object({
   unit: z.enum(["Hour", "Day", "Piece", "Package"]),
   unitPrice: z.number(),
   quantity: z.number(),
+  discountPercent: z.number().min(0).max(100).default(0),
   totalAmount: z.number(),
   customText: z.string(),
   categoryId: z.number().nullable(),

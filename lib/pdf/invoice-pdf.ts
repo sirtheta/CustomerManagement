@@ -46,6 +46,7 @@ export async function generateInvoicePdf(
     dueLabel: "Fälligkeit:",
     closingNoteLabel: "Zahlbar bis:",
     customUserText: invoice.customUserText,
+    discountPercent: Number(invoice.discountPercent),
     totalAmount: total,
     customer: invoice.customer,
     items: invoice.items,

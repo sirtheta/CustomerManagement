@@ -19,11 +19,11 @@ import { addDays } from "@/lib/date";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 
-type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "totalAmount"> & {
-  unitPrice: number; quantity: number; totalAmount: number;
+type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
+  unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
 };
-type SerializedInvoice = Omit<Invoice, "totalAmount"> & {
-  totalAmount: number; items: SerializedItem[];
+type SerializedInvoice = Omit<Invoice, "totalAmount" | "discountPercent"> & {
+  totalAmount: number; discountPercent: number; items: SerializedItem[];
 };
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
@@ -36,6 +36,7 @@ type SerializedTemplateItem = {
   unit: Unit;
   unitPrice: number;
   quantity: number;
+  discountPercent: number;
   categoryId: number | null;
 };
 
@@ -62,6 +63,7 @@ function toItemData(item: SerializedItem): ItemData {
     unit: item.unit,
     unitPrice: item.unitPrice,
     quantity: item.quantity,
+    discountPercent: item.discountPercent,
     totalAmount: item.totalAmount,
     customText: item.customText ?? "",
     categoryId: item.categoryId,
@@ -126,6 +128,7 @@ export default function InvoiceForm({
         unit: item.unit,
         unitPrice: item.unitPrice,
         quantity: item.quantity,
+        discountPercent: item.discountPercent ?? 0,
         totalAmount: item.unitPrice * item.quantity,
         customText: "",
         categoryId: item.categoryId,
@@ -230,7 +233,24 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} initialItems={currentItems} />
+            <ItemsEditor key={templateKey} services={services} initialItems={currentItems} showDiscount />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Rabatt auf Gesamtrechnung</CardTitle></CardHeader>
+          <CardContent className="space-y-1.5">
+            <Label htmlFor="discountPercent">Rabatt (%)</Label>
+            <input
+              id="discountPercent"
+              name="discountPercent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue={invoice?.discountPercent?.toString() ?? "0"}
+              className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            />
           </CardContent>
         </Card>
 

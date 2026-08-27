@@ -166,12 +166,16 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               quantity: item.quantity.toNumber(),
               unitPrice: item.unitPrice.toNumber(),
               totalAmount: item.totalAmount.toNumber(),
+              discountPercent: item.discountPercent.toNumber(),
             }))}
           />
           <div className="flex justify-end mt-3">
-            <p className="text-sm font-semibold">
-              Total: {formatCurrency(invoice.totalAmount.toNumber())}
-            </p>
+            <div className="text-right text-sm space-y-1">
+              {invoice.discountPercent.toNumber() > 0 && (
+                <p className="text-muted-foreground">Gesamtrabatt: {invoice.discountPercent.toNumber()}%</p>
+              )}
+              <p className="font-semibold">Total: {formatCurrency(invoice.totalAmount.toNumber())}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
