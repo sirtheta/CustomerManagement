@@ -12,22 +12,13 @@ Raspberry Pi 5  →  docker compose pull  →  docker compose up -d
 
 ## 1. Einmalige Einrichtung
 
-### GitHub Container Registry freischalten
+### Öffentliches Container-Image
 
-Das Image auf **ghcr.io** ist standardmässig privat. Damit der Pi pullen kann:
-
-**Variante A — Image öffentlich machen (einfach):**
-
-1. GitHub → Repo → Packages → `customer-management`
-2. Package Settings → "Change visibility" → Public
-
-**Variante B — Privat lassen + Token auf Pi:**
+Das Image liegt öffentlich in der **GitHub Container Registry (ghcr.io)**. Für den
+Download ist keine Anmeldung und kein GitHub-Token erforderlich.
 
 ```bash
-# Auf GitHub: Settings → Developer Settings → Personal Access Tokens → Fine-grained
-# Berechtigung: read:packages
-# Token auf dem Pi speichern:
-echo "dein-github-token" | docker login ghcr.io -u sirtheta --password-stdin
+docker pull ghcr.io/sirtheta/customer-management:latest
 ```
 
 ### Auf dem Pi einrichten
