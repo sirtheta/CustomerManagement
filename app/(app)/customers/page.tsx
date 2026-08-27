@@ -24,6 +24,7 @@ type SortOrder = "asc" | "desc";
 
 type TableProps = {
   term: string;
+  yearlyOnly: boolean;
   currentPage: number;
   sortField: SortField;
   sortOrder: SortOrder;
@@ -31,17 +32,20 @@ type TableProps = {
   sortHrefs: Record<SortField, string>;
 };
 
-async function CustomersTable({ term, currentPage, sortField, sortOrder, baseHref, sortHrefs }: TableProps) {
-  const where = term
-    ? {
-        OR: [
-          { company: { contains: term } },
-          { contactPerson: { contains: term } },
-          { email: { contains: term } },
-          { city: { contains: term } },
-        ],
-      }
-    : undefined;
+async function CustomersTable({ term, yearlyOnly, currentPage, sortField, sortOrder, baseHref, sortHrefs }: TableProps) {
+  const where = {
+    ...(yearlyOnly ? { yearlyInvoice: true, nextInvoiceDate: { not: null } } : {}),
+    ...(term
+      ? {
+          OR: [
+            { company: { contains: term } },
+            { contactPerson: { contains: term } },
+            { email: { contains: term } },
+            { city: { contains: term } },
+          ],
+        }
+      : {}),
+  };
 
   const [customers, totalCount] = await Promise.all([
     prisma.customer.findMany({
@@ -154,21 +158,23 @@ function CustomersTableSkeleton() {
 }
 
 type Props = {
-  searchParams: Promise<{ search?: string; page?: string; sortBy?: string; order?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; sortBy?: string; order?: string; yearlyInvoice?: string }>;
 };
 
 export default async function CustomersPage({ searchParams }: Props) {
-  const { search, page, sortBy, order } = await searchParams;
+  const { search, page, sortBy, order, yearlyInvoice } = await searchParams;
 
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const sortField: SortField =
     sortBy === "city" || sortBy === "email" ? sortBy : "contactPerson";
   const sortOrder: SortOrder = order === "desc" ? "desc" : "asc";
   const term = search?.trim() ?? "";
+  const yearlyOnly = yearlyInvoice === "true";
 
   function sortHref(col: SortField) {
     const p = new URLSearchParams();
     if (term) p.set("search", term);
+    if (yearlyOnly) p.set("yearlyInvoice", "true");
     p.set("sortBy", col);
     p.set("order", sortField === col && sortOrder === "asc" ? "desc" : "asc");
     return `/customers?${p.toString()}`;
@@ -177,6 +183,7 @@ export default async function CustomersPage({ searchParams }: Props) {
   const baseHref = (() => {
     const p = new URLSearchParams();
     if (term) p.set("search", term);
+    if (yearlyOnly) p.set("yearlyInvoice", "true");
     if (sortField !== "contactPerson") p.set("sortBy", sortField);
     if (sortOrder !== "asc") p.set("order", sortOrder);
     return `/customers${p.size ? "?" + p.toString() : ""}`;
@@ -191,7 +198,7 @@ export default async function CustomersPage({ searchParams }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Kunden</h1>
+        <h1 className="text-2xl font-semibold">{yearlyOnly ? "Geplante Jahresrechnungen" : "Kunden"}</h1>
         <div className="flex items-center gap-2">
           <ExportButton href="/api/export/customers" />
           <Button render={<Link href="/customers/new" />}>Neuer Kunde</Button>
@@ -205,6 +212,7 @@ export default async function CustomersPage({ searchParams }: Props) {
       <Suspense fallback={<CustomersTableSkeleton />}>
         <CustomersTable
           term={term}
+          yearlyOnly={yearlyOnly}
           currentPage={currentPage}
           sortField={sortField}
           sortOrder={sortOrder}

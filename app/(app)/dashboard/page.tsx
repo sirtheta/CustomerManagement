@@ -20,6 +20,7 @@ export default async function DashboardPage() {
     currentYearRevenue,
     pendingEmailCount,
     overdueCount,
+    scheduledCustomers,
   ] = await Promise.all([
     prisma.customer.count(),
     prisma.invoice.aggregate({
@@ -47,6 +48,17 @@ export default async function DashboardPage() {
     }),
     prisma.pendingEmail.count(),
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
+    prisma.customer.findMany({
+      where: { yearlyInvoice: true, nextInvoiceDate: { not: null } },
+      select: {
+        customerId: true,
+        company: true,
+        contactPerson: true,
+        contactInsteadOfCompany: true,
+        nextInvoiceDate: true,
+      },
+      orderBy: { nextInvoiceDate: "asc" },
+    }),
   ]);
 
   return (
@@ -89,7 +101,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Link href="/customers" className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
@@ -147,7 +159,50 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </Link>
+
+        <Link href="/customers?yearlyInvoice=true" className="h-full">
+          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Geplante Jahresrechnungen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{scheduledCustomers.length}</p>
+              <p className="text-sm text-gray-500 mt-1">Aktive Planungen</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Kommende Jahresrechnungen</CardTitle>
+          <Button variant="outline" size="sm" render={<Link href="/customers?yearlyInvoice=true" />}>
+            Alle anzeigen
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {scheduledCustomers.length === 0 ? (
+            <p className="text-sm text-gray-500">Keine Jahresrechnungen geplant.</p>
+          ) : (
+            <ul className="divide-y">
+              {scheduledCustomers.slice(0, 5).map((customer) => (
+                <li key={customer.customerId} className="py-2 flex justify-between items-center gap-3">
+                  <Link href={`/customers/${customer.customerId}`} className="font-medium text-sm hover:underline">
+                    {customer.contactInsteadOfCompany
+                      ? customer.contactPerson
+                      : (customer.company || customer.contactPerson)}
+                  </Link>
+                  <span className="text-sm text-gray-500 whitespace-nowrap">
+                    {customer.nextInvoiceDate?.toLocaleDateString("de-CH")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
