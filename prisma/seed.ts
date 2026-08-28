@@ -1,8 +1,11 @@
 import { PrismaClient, InvoiceState, QuoteState, Unit, UserRole } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { loadEnvConfig } from "@next/env";
 import { faker } from "@faker-js/faker";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
+
+loadEnvConfig(process.cwd());
 
 function createClient() {
   const url = process.env.DATABASE_URL ?? "file:./data/customermanagement.db";
@@ -39,15 +42,14 @@ async function ensureUsers() {
   if (adminPasswordHash) {
     adminHash = adminPasswordHash;
   } else {
-    let plainPassword = process.env.ADMIN_PASSWORD;
-    if (!plainPassword) {
-      plainPassword = randomBytes(12).toString("base64url");
+    const plainPassword = process.env.ADMIN_PASSWORD ?? randomBytes(12).toString("base64url");
+    if (!process.env.ADMIN_PASSWORD) {
       console.log(`No ADMIN_PASSWORD(_HASH) set — generated admin password: ${plainPassword}`);
     }
     adminHash = await hash(plainPassword, 10);
   }
 
-  const testHash = await hash("changeme123", 10);
+  const testHash = await hash("admin123", 10);
 
   const users = [
     { email: adminEmail, name: adminName, passwordHash: adminHash, role: UserRole.Admin, totpSecret, totpEnabled: !!totpSecret },
