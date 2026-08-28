@@ -70,7 +70,12 @@ function applyMigrations(db) {
          VALUES (?, ?, ?, ?, ?, 1)`,
       ).run(crypto.randomUUID(), checksum, now, name, now);
     });
-    run();
+    db.pragma('foreign_keys = OFF');
+    try {
+      run();
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
 
     console.log(`[startup] Applied migration: ${name}`);
   }
