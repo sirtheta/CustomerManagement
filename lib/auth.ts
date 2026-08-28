@@ -34,6 +34,16 @@ class TotpInvalidError extends CredentialsSignin {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  logger: {
+    error(error) {
+      if (error instanceof CredentialsSignin) {
+        const code = "code" in error ? error.code : undefined;
+        log.info({ code }, "auth: sign-in rejected");
+        return;
+      }
+      log.error(error);
+    },
+  },
   providers: [
     Credentials({
       credentials: {
