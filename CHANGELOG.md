@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.0...customer-management-v1.2.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **customers:** reset form state after cancel ([1f8e2e5](https://github.com/sirtheta/CustomerManagement/commit/1f8e2e503d07e23dd30ea7c53c3884cfe01461c5))
+* **seed:** use test admin password ([791f389](https://github.com/sirtheta/CustomerManagement/commit/791f38991889e02b1bba8c5f012fddb615d75a0d))
+* **test:** correct e2e login password and cross-platform PORT handling ([869f3bc](https://github.com/sirtheta/CustomerManagement/commit/869f3bc4a2ac19c56c1a16004af550813f67e14e))
+
 ## [1.2.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.1.1...customer-management-v1.2.0) (2026-08-27)
 
 
