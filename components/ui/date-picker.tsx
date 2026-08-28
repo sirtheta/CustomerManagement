@@ -15,6 +15,7 @@ interface DatePickerInputProps {
   defaultValue?: string;
   value?: string;
   onChange?: (value: string) => void;
+  disabled?: boolean;
   "aria-label"?: string;
   className?: string;
 }
@@ -25,6 +26,7 @@ export function DatePickerInput({
   defaultValue,
   value,
   onChange,
+  disabled,
   "aria-label": ariaLabel,
   className,
 }: DatePickerInputProps) {
@@ -58,6 +60,7 @@ export function DatePickerInput({
             <Button
               id={id}
               type="button"
+              disabled={disabled}
               aria-label={ariaLabel}
               variant="outline"
               className={cn(

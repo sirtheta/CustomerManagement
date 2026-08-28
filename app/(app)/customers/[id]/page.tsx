@@ -122,6 +122,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       <h1 className="text-2xl font-semibold">{customerName}</h1>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <CustomerForm
+          key={`${customer.customerId}-${isEditing}`}
           customer={customer}
           readOnly={!isEditing}
           cancelHref={`/customers/${customerId}`}

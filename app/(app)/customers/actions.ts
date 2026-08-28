@@ -51,7 +51,7 @@ export async function createCustomer(
   const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
   const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
-  const nextInvoiceDate = nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
+  const nextInvoiceDate = yearlyInvoice && nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
 
   const customer = await prisma.customer.create({
     data: {
@@ -103,7 +103,7 @@ export async function updateCustomer(
   const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
   const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
-  const nextInvoiceDate = nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
+  const nextInvoiceDate = yearlyInvoice && nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
 
   await prisma.customer.update({
     where: { customerId: id },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,8 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
   const nextInvoiceDateDefault = customer?.nextInvoiceDate
     ? new Date(customer.nextInvoiceDate).toISOString().split("T")[0]
     : "";
+  const [yearlyInvoice, setYearlyInvoice] = useState(customer?.yearlyInvoice ?? false);
+  const [nextInvoiceDate, setNextInvoiceDate] = useState(nextInvoiceDateDefault);
 
   if (customer && readOnly) {
     return (
@@ -241,7 +243,9 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               <DatePickerInput
                 id="nextInvoiceDate"
                 name="nextInvoiceDate"
-                defaultValue={nextInvoiceDateDefault}
+                value={nextInvoiceDate}
+                onChange={setNextInvoiceDate}
+                disabled={!yearlyInvoice}
               />
             </div>
 
@@ -250,7 +254,12 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <input
                   type="checkbox"
                   name="yearlyInvoice"
-                  defaultChecked={customer?.yearlyInvoice ?? false}
+                  checked={yearlyInvoice}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setYearlyInvoice(checked);
+                    if (!checked) setNextInvoiceDate("");
+                  }}
                   className="h-4 w-4 rounded border-input accent-primary"
                 />
                 Jährliche Rechnung

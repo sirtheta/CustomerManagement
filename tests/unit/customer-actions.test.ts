@@ -127,10 +127,25 @@ describe("customer actions", () => {
       });
 
       await expect(
-        createCustomer({}, form({ ...VALID_FIELDS, nextInvoiceDate: "2027-01-01" }))
+        createCustomer({}, form({ ...VALID_FIELDS, yearlyInvoice: "on", nextInvoiceDate: "2027-01-01" }))
       ).rejects.toThrow("REDIRECT");
       expect(prisma.customer.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ nextInvoiceDate: new Date("2027-01-01") }),
+      });
+    });
+
+    it("ignores nextInvoiceDate when yearlyInvoice is not enabled", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT");
+      });
+
+      await expect(
+        createCustomer({}, form({ ...VALID_FIELDS, nextInvoiceDate: "2027-01-01" }))
+      ).rejects.toThrow("REDIRECT");
+      expect(prisma.customer.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ yearlyInvoice: false, nextInvoiceDate: null }),
       });
     });
 
