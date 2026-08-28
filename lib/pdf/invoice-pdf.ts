@@ -1,5 +1,6 @@
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateDocumentPdf, type RenderDoc } from "@/lib/pdf/document-pdf";
+import { calculateInvoiceTotal } from "@/lib/calculations";
 import type {
   Invoice,
   Quote,
@@ -28,7 +29,15 @@ export async function generateInvoicePdf(
   settings: Settings
 ): Promise<Buffer> {
   const company = settings.companyInfo;
-  const total = Number(invoice.totalAmount);
+  const discountPercent = Number(invoice.discountPercent ?? 0);
+  const total = calculateInvoiceTotal(
+    invoice.items.map((item) => ({
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
+      discountPercent: Number(item.discountPercent ?? 0),
+    })),
+    discountPercent
+  );
 
   const qr = buildQrBillData({
     invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
@@ -46,7 +55,7 @@ export async function generateInvoicePdf(
     dueLabel: "Fälligkeit:",
     closingNoteLabel: "Zahlbar bis:",
     customUserText: invoice.customUserText,
-    discountPercent: Number(invoice.discountPercent),
+    discountPercent,
     totalAmount: total,
     customer: invoice.customer,
     items: invoice.items,

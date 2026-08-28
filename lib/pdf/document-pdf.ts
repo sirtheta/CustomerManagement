@@ -325,7 +325,7 @@ export async function generateDocumentPdf(
       pdf.text("Zwischensumme", MARGIN, y);
       pdf.text(`CHF ${fmt(subtotal, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
       y += LINE_HEIGHT + 4;
-      pdf.text(`Gesamtrabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
+      pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
       pdf.text(`- CHF ${fmt(subtotal - doc.totalAmount, locale)}`, MARGIN, y, {
         width: CONTENT_W,
         align: "right",
