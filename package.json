@@ -16,7 +16,7 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:server": "prisma migrate deploy && tsx prisma/seed.ts && next dev -p $PORT",
+    "test:e2e:server": "prisma migrate deploy && tsx prisma/seed.ts && node -e \"require('child_process').execSync('next dev -p ' + (process.env.PORT || '3100'), { stdio: 'inherit' })\"",
     "marketing:screenshots": "tsx scripts/marketing-screenshots.ts",
     "marketing:html": "tsx scripts/generate-marketing-html.ts"
   },

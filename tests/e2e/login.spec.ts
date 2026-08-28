@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 // Credentials come from prisma/seed.ts, which the webServer seeds into the
 // isolated e2e DB before these tests run (see playwright.config.ts).
 const EDITOR_EMAIL = "editor@example.com";
-const EDITOR_PASSWORD = "changeme123";
+const EDITOR_PASSWORD = "admin123";
 
 test.describe("Login", () => {
   test("shows an error for wrong credentials", async ({ page }) => {
