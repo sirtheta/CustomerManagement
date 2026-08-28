@@ -13,6 +13,7 @@ import { sendQuoteEmail } from "@/lib/email";
 import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
+import { saveItemsToCatalog } from "@/lib/service-catalog";
 
 const log = logger.child({ module: "quotes" });
 
@@ -64,6 +65,8 @@ export async function createQuote(
       });
 
       newQuoteId = quote.id;
+
+      await saveItemsToCatalog(tx, items);
 
       if (items.length > 0) {
         await tx.item.createMany({
@@ -130,6 +133,8 @@ export async function updateQuote(
           version: { increment: 1 },
         },
       });
+
+      await saveItemsToCatalog(tx, items);
 
       if (items.length > 0) {
         await tx.item.createMany({

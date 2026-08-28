@@ -12,7 +12,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);
 
-  const [quote, customers, services, settings] = await Promise.all([
+    const [quote, customers, services, settings, categories] = await Promise.all([
     prisma.quote.findUnique({
       where: { id: quoteId },
       include: { items: true },
@@ -22,6 +22,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
     prisma.applicationSettings.findFirst(),
+      prisma.category.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   if (!quote) notFound();
@@ -44,6 +45,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
       services={services}
       defaultQuoteValidityDays={settings?.defaultQuoteValidityDays ?? 30}
       from={from?.startsWith("customers/") ? from : undefined}
+        categories={categories}
     />
   );
 }

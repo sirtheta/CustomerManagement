@@ -13,6 +13,7 @@ import { sendInvoiceEmail } from "@/lib/email";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
+import { saveItemsToCatalog } from "@/lib/service-catalog";
 
 const log = logger.child({ module: "invoices" });
 
@@ -66,6 +67,8 @@ export async function createInvoice(
       });
 
       newInvoiceId = invoice.id;
+
+      await saveItemsToCatalog(tx, items);
 
       if (items.length > 0) {
         await tx.item.createMany({
@@ -135,6 +138,8 @@ export async function updateInvoice(
           version: { increment: 1 },
         },
       });
+
+      await saveItemsToCatalog(tx, items);
 
       if (items.length > 0) {
         await tx.item.createMany({

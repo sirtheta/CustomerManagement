@@ -17,7 +17,7 @@ import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/date";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
-import type { Customer, Invoice, Item, Service, Unit } from "@prisma/client";
+import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -49,6 +49,7 @@ type SerializedTemplate = {
 type Props = {
   customers: Customer[];
   services: SerializedService[];
+  categories: Category[];
   defaultPaymentTermDays: number;
   invoice?: SerializedInvoice;
   templates?: SerializedTemplate[];
@@ -73,6 +74,7 @@ function toItemData(item: SerializedItem): ItemData {
 export default function InvoiceForm({
   customers,
   services,
+  categories,
   defaultPaymentTermDays,
   invoice,
   templates = [],
@@ -233,7 +235,7 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} initialItems={currentItems} showDiscount />
+            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount />
           </CardContent>
         </Card>
 

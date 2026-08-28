@@ -9,7 +9,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-  const [customers, services, settings, templates] = await Promise.all([
+    const [customers, services, settings, templates, categories] = await Promise.all([
     prisma.customer.findMany({ orderBy: { contactPerson: "asc" } }),
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
@@ -22,6 +22,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       ...t,
       items: t.items.map(i => ({ ...i, unitPrice: Number(i.unitPrice), quantity: Number(i.quantity), discountPercent: 0 })),
     }))),
+      prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -31,6 +32,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       defaultPaymentTermDays={settings?.defaultPaymentTermDays ?? 30}
       templates={templates}
       defaultCustomerId={defaultCustomerId}
+        categories={categories}
     />
   );
 }

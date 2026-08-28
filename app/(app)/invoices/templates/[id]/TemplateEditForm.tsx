@@ -9,7 +9,7 @@ import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { updateTemplate } from "../actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import Link from "next/link";
-import type { Service } from "@prisma/client";
+import type { Category, Service } from "@prisma/client";
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
 
@@ -18,9 +18,10 @@ type Props = {
   name: string;
   initialItems: ItemData[];
   services: SerializedService[];
+  categories: Category[];
 };
 
-export default function TemplateEditForm({ templateId, name, initialItems, services }: Props) {
+export default function TemplateEditForm({ templateId, name, initialItems, services, categories }: Props) {
   const action = updateTemplate.bind(null, templateId);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(action, {});
   useActionToast(state, "Vorlage gespeichert");
@@ -41,7 +42,7 @@ export default function TemplateEditForm({ templateId, name, initialItems, servi
         </CardContent>
       </Card>
 
-      <ItemsEditor services={services} initialItems={initialItems} />
+      <ItemsEditor services={services} categories={categories} initialItems={initialItems} />
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={isPending}>

@@ -10,6 +10,9 @@ export const itemDataSchema = z.object({
   totalAmount: z.number(),
   customText: z.string(),
   categoryId: z.number().nullable(),
+  isCustom: z.boolean().optional(),
+  saveToCatalog: z.boolean().optional(),
+  includeDescription: z.boolean().optional(),
 });
 
 export type ItemData = z.infer<typeof itemDataSchema>;

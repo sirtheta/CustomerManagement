@@ -12,7 +12,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
-  const [invoice, customers, services, settings] = await Promise.all([
+    const [invoice, customers, services, settings, categories] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { items: true },
@@ -22,6 +22,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
     prisma.applicationSettings.findFirst(),
+      prisma.category.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   if (!invoice) notFound();
@@ -46,6 +47,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       services={services}
       defaultPaymentTermDays={settings?.defaultPaymentTermDays ?? 30}
       from={from?.startsWith("customers/") ? from : undefined}
+        categories={categories}
     />
   );
 }

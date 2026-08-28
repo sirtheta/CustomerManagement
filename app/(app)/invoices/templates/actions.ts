@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import type { ActionState } from "@/hooks/use-action-toast";
+import { saveItemsToCatalog } from "@/lib/service-catalog";
 
 export async function saveAsTemplate(
   invoiceId: number,
@@ -65,9 +66,10 @@ export async function updateTemplate(
   const { itemDataSchema } = await import("@/components/items-editor-schema");
   const items = itemDataSchema.array().parse(JSON.parse(itemsJson || "[]"));
 
-  await prisma.$transaction([
-    prisma.templateItem.deleteMany({ where: { templateId: id } }),
-    prisma.invoiceTemplate.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.templateItem.deleteMany({ where: { templateId: id } });
+    await saveItemsToCatalog(tx, items);
+    await tx.invoiceTemplate.update({
       where: { id },
       data: {
         name,
@@ -82,8 +84,8 @@ export async function updateTemplate(
           })),
         },
       },
-    }),
-  ]);
+    });
+  });
 
   revalidatePath("/invoices/templates");
   return { success: true, _ts: Date.now() };

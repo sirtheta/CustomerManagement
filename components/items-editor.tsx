@@ -14,7 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
 import { GripVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import type { Service, Unit } from "@prisma/client";
+import type { Category, Service, Unit } from "@prisma/client";
 import {
   DndContext,
   KeyboardSensor,
@@ -39,6 +39,7 @@ export { itemDataSchema, type ItemData } from "@/components/items-editor-schema"
 
 type Props = {
   services: SerializedService[];
+  categories?: Category[];
   initialItems?: ItemData[];
   inputName?: string;
   showDiscount?: boolean;
@@ -62,6 +63,9 @@ function emptyItem(): ItemData {
     totalAmount: 0,
     customText: "",
     categoryId: null,
+    isCustom: true,
+    saveToCatalog: false,
+    includeDescription: true,
   };
 }
 
@@ -77,6 +81,7 @@ function fromService(s: SerializedService): ItemData {
     totalAmount: unitPrice,
     customText: "",
     categoryId: s.categoryId,
+    isCustom: false,
   };
 }
 
@@ -93,6 +98,7 @@ type SortableItemRowProps = {
   onPriceChange: (raw: string) => void;
   onPriceBlur: () => void;
   showDiscount: boolean;
+  categories: Category[];
 };
 
 function SortableItemRow({
@@ -108,6 +114,7 @@ function SortableItemRow({
   onPriceChange,
   onPriceBlur,
   showDiscount,
+  categories,
 }: SortableItemRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -169,7 +176,30 @@ function SortableItemRow({
           />
         </div>
       </div>
-      <div className={cn("grid grid-cols-1 gap-2", showDiscount ? "sm:grid-cols-5" : "sm:grid-cols-4")}>
+      <div className={cn("grid grid-cols-1 gap-2", showDiscount ? "sm:grid-cols-6" : "sm:grid-cols-5")}>
+        <div className="space-y-1">
+          <label className="text-xs font-medium">Kategorie</label>
+          <Select
+            value={item.categoryId?.toString() ?? "none"}
+            onValueChange={(value) => onUpdate({ categoryId: value === "none" ? null : Number(value) })}
+          >
+            <SelectTrigger size="sm" className="h-8 text-sm w-full">
+              <SelectValue>
+                {(value: string | null) => value === "none" || !value
+                  ? "Keine Kategorie"
+                  : categories.find((category) => category.categoryId.toString() === value)?.name ?? value}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Keine Kategorie</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category.categoryId} value={category.categoryId.toString()}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-1">
           <label className="text-xs font-medium">Einheit</label>
           <Select
@@ -233,6 +263,30 @@ function SortableItemRow({
           </div>
         </div>
       </div>
+      {item.isCustom && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={item.saveToCatalog ?? false}
+              onChange={(event) => onUpdate({ saveToCatalog: event.target.checked })}
+              className="h-3.5 w-3.5 accent-primary"
+            />
+            Zum Leistungskatalog hinzufügen
+          </label>
+          {item.saveToCatalog && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={item.includeDescription ?? true}
+                onChange={(event) => onUpdate({ includeDescription: event.target.checked })}
+                className="h-3.5 w-3.5 accent-primary"
+              />
+              Beschreibung übernehmen
+            </label>
+          )}
+        </div>
+      )}
       <div className="text-right text-sm font-semibold sm:hidden">
         Total: {formatCurrency(item.totalAmount)}
       </div>
@@ -242,6 +296,7 @@ function SortableItemRow({
 
 export default function ItemsEditor({
   services,
+  categories = [],
   initialItems = [],
   inputName = "itemsJson",
   showDiscount = false,
@@ -361,6 +416,7 @@ export default function ItemsEditor({
                   });
                 }}
                 showDiscount={showDiscount}
+                categories={categories}
               />
             ))}
           </SortableContext>
@@ -418,6 +474,9 @@ export default function ItemsEditor({
                     {s.description && (
                       <div className="text-xs text-muted-foreground">{s.description}</div>
                     )}
+                    <div className="text-xs text-muted-foreground">
+                      {categories.find((category) => category.categoryId === s.categoryId)?.name ?? "Keine Kategorie"}
+                    </div>
                   </div>
                   <div className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                     {formatCurrency(s.unitPrice)}

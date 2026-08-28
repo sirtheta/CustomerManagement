@@ -9,12 +9,13 @@ export default async function NewQuotePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-  const [customers, services, settings] = await Promise.all([
+    const [customers, services, settings, categories] = await Promise.all([
     prisma.customer.findMany({ orderBy: { contactPerson: "asc" } }),
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
     prisma.applicationSettings.findFirst(),
+      prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -23,6 +24,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
       services={services}
       defaultQuoteValidityDays={settings?.defaultQuoteValidityDays ?? 30}
       defaultCustomerId={defaultCustomerId}
+        categories={categories}
     />
   );
 }

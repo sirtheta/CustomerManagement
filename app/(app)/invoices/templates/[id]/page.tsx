@@ -14,7 +14,7 @@ export default async function TemplateEditPage({ params }: Props) {
   const { id } = await params;
   const templateId = parseInt(id, 10);
 
-  const [template, services] = await Promise.all([
+    const [template, services, categories] = await Promise.all([
     prisma.invoiceTemplate.findUnique({
       where: { id: templateId },
       include: { items: { orderBy: { id: "asc" } } },
@@ -22,6 +22,7 @@ export default async function TemplateEditPage({ params }: Props) {
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
+      prisma.category.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   if (!template) notFound();
@@ -51,6 +52,7 @@ export default async function TemplateEditPage({ params }: Props) {
         name={template.name}
         initialItems={initialItems}
         services={services}
+          categories={categories}
       />
     </div>
   );
