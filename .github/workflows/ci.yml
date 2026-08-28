@@ -23,6 +23,13 @@ jobs:
 
       - name: Lint ausführen
         run: npm run lint
+      # `npm ci` installiert stur aus dem Lockfile und merkt Peer-Konflikte
+      # nicht. Das Docker-Image ruft zusätzlich `npm prune --omit=dev` auf,
+      # das den Baum neu auflöst — dort schlug ein von Dependabot erzeugtes,
+      # peer-widersprüchliches Lockfile erst beim Release-Build fehl.
+      # --dry-run verändert node_modules nicht, prüft aber dieselbe Auflösung.
+      - name: Prod-Dependency-Auflösung prüfen (wie im Docker-Image)
+        run: npm prune --omit=dev --dry-run
 
   test-and-build:
     name: Test & Build
