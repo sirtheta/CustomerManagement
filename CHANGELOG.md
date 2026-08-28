@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.1...customer-management-v1.2.2) (2026-08-28)
+
+
+### Bug Fixes
+
+* log of missing totp silent ([18d1466](https://github.com/sirtheta/CustomerManagement/commit/18d14666343857ca62cd9cd22d9bed90a39d2a72))
+* migration failure ([24f307b](https://github.com/sirtheta/CustomerManagement/commit/24f307b0c7db40341af6982c5b75610da694b760))
+* **pdf:** apply invoice discount ([76c1c85](https://github.com/sirtheta/CustomerManagement/commit/76c1c858a1b69ca6d6665c5581614ad1d4e9d599))
+* **pdf:** prevent stale browser PDFs ([377f5cd](https://github.com/sirtheta/CustomerManagement/commit/377f5cd5e09a9e80e458de08d00a00cc69ddd876))
+
 ## [1.2.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.0...customer-management-v1.2.1) (2026-08-28)
 
 
