@@ -36,7 +36,7 @@ export async function GET(
   const headers = {
     "Content-Type": "application/pdf",
     "Content-Disposition": `inline; filename="${filename}"`,
-    "Cache-Control": "private, max-age=600",
+    "Cache-Control": "private, no-store",
   };
 
   if (cached) {
