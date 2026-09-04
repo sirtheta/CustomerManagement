@@ -43,8 +43,14 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
 
-  // NextAuth API routes pass through without the auth redirect.
-  if (!pathname.startsWith("/api/auth")) {
+  // NextAuth API routes and the machine-to-machine external API pass
+  // through without the auth redirect — /api/external/* authenticates
+  // callers itself via x-api-key (see app/api/external/payments/route.ts),
+  // and has no session cookie to redirect on. Without this exclusion, a
+  // server-to-server caller (e.g. the Budget app) gets redirected to
+  // /login and fetch() silently follows it, handing back the login page's
+  // HTML where JSON was expected.
+  if (!pathname.startsWith("/api/auth") && !pathname.startsWith("/api/external")) {
     const isLoggedIn = !!request.cookies.get(SESSION_COOKIE)?.value;
     const isLoginPage = pathname.startsWith("/login");
 
