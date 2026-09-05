@@ -84,7 +84,7 @@
     "eslint-config-next": "16.2.7",
     "node-addon-api": "^8.9.0",
     "node-gyp": "^13.0.1",
-    "pdfjs-dist": "^6.2.108",
+    "pdfjs-dist": "^6.3.289",
     "prisma": "^7.10.0",
     "shadcn": "^4.19.0",
     "tailwindcss": "^4",
