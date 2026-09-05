@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.2...customer-management-v1.3.0) (2026-09-05)
+
+
+### Features
+
+* **services:** add custom items to catalog ([2ca3002](https://github.com/sirtheta/CustomerManagement/commit/2ca300242e564acd08838291763434238a19f15d))
+
+
+### Bug Fixes
+
+* **auth:** exempt /api/external/* from the login redirect ([#72](https://github.com/sirtheta/CustomerManagement/issues/72)) ([bf80c48](https://github.com/sirtheta/CustomerManagement/commit/bf80c488081c0feeceb31f5d4f37ca84565a3000))
+
 ## [1.2.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.1...customer-management-v1.2.2) (2026-08-28)
 
 
