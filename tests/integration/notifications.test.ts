@@ -297,6 +297,35 @@ describe("sendAdminNotifications", () => {
     expect(mockSendMail).not.toHaveBeenCalled();
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("does not re-notify a snoozed reminder even when the repeat interval has elapsed", async () => {
+    const reminder = await seedOverdueReminder("N-022");
+    await db.prisma.pendingReminder.update({
+      where: { id: reminder.id },
+      data: {
+        adminNotifiedAt: pastDate(5),
+        snoozedUntil: new Date(Date.now() + 14 * 86_400_000),
+      },
+    });
+    const s = { ...baseSettings(), notifyRepeatIntervalDays: 1 };
+    await sendAdminNotifications(db.prisma, s);
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("re-notifies once the snooze period has expired and the repeat interval elapsed", async () => {
+    const reminder = await seedOverdueReminder("N-023");
+    await db.prisma.pendingReminder.update({
+      where: { id: reminder.id },
+      data: {
+        adminNotifiedAt: pastDate(5),
+        snoozedUntil: pastDate(1),
+      },
+    });
+    const s = { ...baseSettings(), notifyRepeatIntervalDays: 1 };
+    await sendAdminNotifications(db.prisma, s);
+    expect(mockSendMail).toHaveBeenCalledOnce();
+  });
 });
 
 describe("startNotificationScheduler", () => {
