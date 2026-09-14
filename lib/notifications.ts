@@ -63,7 +63,12 @@ export async function sendAdminNotifications(
   const [unnotifiedReminders, unnotifiedPending] = await Promise.all([
     settings.notifyOverdueEnabled
       ? prisma.pendingReminder.findMany({
-          where: notifiedFilter,
+          where: {
+            AND: [
+              notifiedFilter,
+              { OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }] },
+            ],
+          },
           select: { id: true },
         })
       : Promise.resolve([]),
