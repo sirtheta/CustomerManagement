@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.3.0...customer-management-v1.3.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **notifications:** stop repeat admin notify for snoozed reminders ([#92](https://github.com/sirtheta/CustomerManagement/issues/92)) ([76fa943](https://github.com/sirtheta/CustomerManagement/commit/76fa9430bddebfb293fdb87ac1df7269f83a0e0e))
+
 ## [1.3.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.2.2...customer-management-v1.3.0) (2026-09-05)
 
 
