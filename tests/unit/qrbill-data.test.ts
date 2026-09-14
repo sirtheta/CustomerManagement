@@ -113,6 +113,7 @@ describe("QRBill data preparation", () => {
         state: "Draft",
         paidDate: null,
         totalAmount: 1250.9 as unknown as import("@prisma/client").Prisma.Decimal,
+        discountPercent: 0 as unknown as import("@prisma/client").Prisma.Decimal,
         customUserText: null,
         customer: {
           customerId: 1,
@@ -143,6 +144,7 @@ describe("QRBill data preparation", () => {
         smtpUser: null,
         smtpPassword: null,
         smtpFromName: null,
+        smtpFromAddress: null,
         emailSubjectTemplate: null,
         emailBodyTemplate: null,
         reminderCooldownDays: 14,
