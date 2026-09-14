@@ -95,7 +95,7 @@ describe("quote actions", () => {
 
     it("returns error when transaction fails", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
       vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-001");
       vi.mocked(prisma.$transaction).mockRejectedValue(new Error("DB error"));
       const result = await createQuote({}, form(BASE_FORM));
@@ -104,7 +104,7 @@ describe("quote actions", () => {
 
     it("creates quote, writes audit log, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 350 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 350, discountPercent: 0 });
       vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-001");
       vi.mocked(prisma.quote.create).mockResolvedValue({
         id: 5,
@@ -141,7 +141,7 @@ describe("quote actions", () => {
           categoryId: null,
         },
       ];
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: items as never, totalAmount: 300 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: items as never, totalAmount: 300, discountPercent: 0 });
       vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-002");
       vi.mocked(prisma.quote.create).mockResolvedValue({
         id: 6,
@@ -190,7 +190,7 @@ describe("quote actions", () => {
 
     it("updates quote, deletes old items, creates new items, logs audit, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 200 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 200, discountPercent: 0 });
       vi.mocked(prisma.item.deleteMany).mockResolvedValue({ count: 2 } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
@@ -209,7 +209,7 @@ describe("quote actions", () => {
 
     it("includes ?from= in redirect when from starts with 'customers/'", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT");
@@ -223,7 +223,7 @@ describe("quote actions", () => {
 
     it("omits ?from= when from does not start with 'customers/'", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0 });
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT");
@@ -459,10 +459,10 @@ describe("quote actions", () => {
       vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-002");
 
       let capturedDueDate: Date | undefined;
-      vi.mocked(prisma.invoice.create).mockImplementation(async (args) => {
-        capturedDueDate = (args.data as { dueDate?: Date }).dueDate;
-        return { id: 100 } as never;
-      });
+      vi.mocked(prisma.invoice.create).mockImplementation(((args: { data: { dueDate?: Date } }) => {
+        capturedDueDate = args.data.dueDate;
+        return Promise.resolve({ id: 100 });
+      }) as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
       vi.mocked(redirect).mockImplementation(() => {

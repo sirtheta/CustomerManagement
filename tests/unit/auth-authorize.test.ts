@@ -150,7 +150,7 @@ describe("auth.ts – authorize()", () => {
       totpBackupCodes: null,
     } as never);
     vi.mocked(compare).mockResolvedValue(true as never);
-    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: false, consumedIndex: null });
+    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: false });
     await expect(
       callAuthorize({ email: "user@test.ch", password: "correct", totpCode: "000000" })
     ).rejects.toMatchObject({ code: "totp_invalid" });

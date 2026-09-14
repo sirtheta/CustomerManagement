@@ -49,7 +49,7 @@ function makeInvoice(customer = makeCustomer()) {
     dueDate: new Date("2026-02-15"),
     customUserText: "",
     customer,
-  } as never;
+  } as unknown as Parameters<typeof sendInvoiceEmail>[0];
 }
 
 function makeQuote(customer = makeCustomer()) {
@@ -60,7 +60,7 @@ function makeQuote(customer = makeCustomer()) {
     validUntil: new Date("2026-02-20"),
     customUserText: "",
     customer,
-  } as never;
+  } as unknown as Parameters<typeof sendQuoteEmail>[0];
 }
 
 describe("email.ts", () => {
