@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.0...customer-management-v1.4.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* **invoices:** remove pending reminder when invoice leaves Overdue ([7324a39](https://github.com/sirtheta/CustomerManagement/commit/7324a3972de7112b24e26e60a7dac7475ab0288c))
+* **invoices:** show invoice number instead of ID in payment import select ([a898d00](https://github.com/sirtheta/CustomerManagement/commit/a898d007df09941a102c5463a493e947ca714708))
+
 ## [1.4.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.3.1...customer-management-v1.4.0) (2026-09-18)
 
 
