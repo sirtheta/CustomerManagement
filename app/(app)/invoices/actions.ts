@@ -13,6 +13,7 @@ import { sendInvoiceEmail } from "@/lib/email";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
+import { markInvoicePaid } from "@/lib/payment-matching";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 
 const log = logger.child({ module: "invoices" });
@@ -222,6 +223,64 @@ export async function updateInvoicePaidDate(
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/accounting");
+}
+
+export type ImportMatch = {
+  invoiceId: number;
+  /** Booking date from the statement entry, YYYY-MM-DD. */
+  paidDate: string;
+  bankReference: string | null;
+};
+
+export type ImportMatchResult = {
+  error?: string;
+  paidCount?: number;
+};
+
+/**
+ * Marks invoices paid from confirmed CAMT-import matches (see
+ * `app/(app)/invoices/import/`). Each invoice is re-checked against its
+ * current state rather than trusting the preview: two people confirming the
+ * same statement, or an invoice edited in between, must not clobber a state
+ * the preview no longer reflects — such rows are silently skipped rather
+ * than failing the whole batch.
+ */
+export async function markInvoicesPaidFromImport(
+  matches: ImportMatch[]
+): Promise<ImportMatchResult> {
+  const session = await requireEditor();
+
+  if (matches.length === 0) return { error: "Keine Zuordnung ausgewählt." };
+
+  let paidCount = 0;
+
+  for (const match of matches) {
+    const paidDate = new Date(match.paidDate);
+    if (isNaN(paidDate.getTime())) continue;
+
+    const current = await prisma.invoice.findUnique({
+      where: { id: match.invoiceId },
+      select: { state: true, documentNumber: true },
+    });
+    if (!current || (current.state !== "Sent" && current.state !== "Overdue")) continue;
+
+    await markInvoicePaid({
+      invoiceId: match.invoiceId,
+      documentNumber: current.documentNumber,
+      previousState: current.state,
+      paidDate,
+      actor: session,
+      source: "camt-import",
+      bankReference: match.bankReference,
+    });
+
+    paidCount++;
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath("/accounting");
+
+  return { paidCount };
 }
 
 export async function deleteInvoice(id: number): Promise<{ error?: string }> {

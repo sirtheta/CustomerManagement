@@ -297,6 +297,9 @@ export default async function InvoicesPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold">Rechnungen</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportButton href={exportHref} />
+          <Button variant="outline" size="sm" render={<Link href="/invoices/import" />}>
+            Zahlungen importieren
+          </Button>
           <Button variant="outline" size="sm" render={<Link href="/invoices/templates" />}>
             Vorlagen
           </Button>
