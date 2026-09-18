@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    pendingReminder: { deleteMany: vi.fn() },
   },
 }));
 
@@ -90,6 +91,28 @@ describe("updateInvoiceStatus", () => {
       where: { id: 1 },
       data: { state: "Sent" },
     });
+  });
+
+  it("removes the pending reminder when leaving Overdue", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      state: "Overdue",
+      documentNumber: "I-25060003",
+    } as never);
+
+    await updateInvoiceStatus(1, "Paid");
+
+    expect(prisma.pendingReminder.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
+  });
+
+  it("keeps the pending reminder when moving to Overdue", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      state: "Sent",
+      documentNumber: "I-25060004",
+    } as never);
+
+    await updateInvoiceStatus(1, "Overdue");
+
+    expect(prisma.pendingReminder.deleteMany).not.toHaveBeenCalled();
   });
 
   it("does nothing when the invoice does not exist", async () => {

@@ -194,6 +194,12 @@ export async function updateInvoiceStatus(
     },
   });
 
+  // Reminders only make sense while the invoice is Overdue; any other
+  // state clears the pending one so it disappears from the Mahnungen list.
+  if (state !== "Overdue") {
+    await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
+  }
+
   await logAudit(session, "STATUS", "Invoice", id, current.documentNumber, {
     from: current.state,
     to: state,
@@ -201,6 +207,7 @@ export async function updateInvoiceStatus(
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/invoices");
+  revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
 }
 
@@ -278,6 +285,7 @@ export async function markInvoicesPaidFromImport(
   }
 
   revalidatePath("/invoices");
+  revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
 
   return { paidCount };

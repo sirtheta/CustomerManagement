@@ -33,6 +33,10 @@ export async function markInvoicePaid(params: {
     data: { state: "Paid", paidDate: params.paidDate },
   });
 
+  // A paid invoice no longer needs a reminder; drop the pending one (if any)
+  // so it leaves the Mahnungen list and the header badge immediately.
+  await prisma.pendingReminder.deleteMany({ where: { invoiceId: params.invoiceId } });
+
   await logAudit(params.actor, "STATUS", "Invoice", params.invoiceId, params.documentNumber, {
     from: params.previousState,
     to: "Paid",

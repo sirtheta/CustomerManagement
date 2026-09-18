@@ -58,6 +58,19 @@ describe("checkOverdueInvoices", () => {
     expect(reminder).toBeNull();
   });
 
+  it("removes a stale reminder whose invoice is no longer Overdue", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const invoice = await seedOverdueInvoice(customer.customerId, "R-240010");
+    await prisma.pendingReminder.create({ data: { invoiceId: invoice.id } });
+    await prisma.invoice.update({ where: { id: invoice.id }, data: { state: "Paid", paidDate: new Date() } });
+
+    await checkOverdueInvoices(prisma);
+
+    const reminder = await prisma.pendingReminder.findUnique({ where: { invoiceId: invoice.id } });
+    expect(reminder).toBeNull();
+  });
+
   it("does not create a second reminder if one already exists (active)", async () => {
     const { prisma } = db;
     const customer = await seedCustomer();

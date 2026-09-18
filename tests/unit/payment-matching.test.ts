@@ -4,11 +4,12 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     applicationSettings: { findFirst: vi.fn() },
     invoice: { findFirst: vi.fn(), update: vi.fn() },
+    pendingReminder: { deleteMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-import { matchAndMarkPaid } from "@/lib/payment-matching";
+import { matchAndMarkPaid, markInvoicePaid } from "@/lib/payment-matching";
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 
@@ -80,5 +81,26 @@ describe("matchAndMarkPaid", () => {
       where: { documentNumber: "R-26070042", state: { not: "Paid" } },
     });
     expect(result).toEqual({ matched: false });
+  });
+});
+
+describe("markInvoicePaid", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("removes the pending reminder of the invoice", async () => {
+    vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
+
+    await markInvoicePaid({
+      invoiceId: 10,
+      documentNumber: "R-26070042",
+      previousState: "Overdue",
+      paidDate: new Date("2026-09-01"),
+      actor: { user: { id: "1", name: "E", email: "e@x" } } as never,
+      source: "camt-import",
+    });
+
+    expect(prisma.pendingReminder.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 10 } });
   });
 });
