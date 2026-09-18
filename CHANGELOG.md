@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.3.1...customer-management-v1.4.0) (2026-09-18)
+
+
+### Features
+
+* **invoices:** import CAMT.053 statements and match payments to invoices ([#96](https://github.com/sirtheta/CustomerManagement/issues/96)) ([20ef86a](https://github.com/sirtheta/CustomerManagement/commit/20ef86a3e01111642e6e5939a95498f7260dd2e6))
+* **settings:** add database export ([#94](https://github.com/sirtheta/CustomerManagement/issues/94)) ([187ad52](https://github.com/sirtheta/CustomerManagement/commit/187ad52ee3c6687e330c38cdc12a497d84da21ad))
+
 ## [1.3.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.3.0...customer-management-v1.3.1) (2026-09-14)
 
 
