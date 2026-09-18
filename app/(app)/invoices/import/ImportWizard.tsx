@@ -189,7 +189,14 @@ export function ImportWizard() {
                               }
                             >
                               <SelectTrigger className="w-56">
-                                <SelectValue placeholder="Rechnung wählen" />
+                                <SelectValue placeholder="Rechnung wählen">
+                                  {(value: string | null) =>
+                                    value
+                                      ? (candidates.find((c) => String(c.invoiceId) === value)
+                                          ?.documentNumber ?? value)
+                                      : "Rechnung wählen"
+                                  }
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {candidates.map((candidate) => (
