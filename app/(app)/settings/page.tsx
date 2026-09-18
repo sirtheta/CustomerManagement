@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import SettingsForm from "./SettingsForm";
 import LogoCard from "./LogoCard";
 import VersionCard from "./VersionCard";
+import DatabaseExportCard from "./DatabaseExportCard";
 import DevToolsCard from "./DevToolsCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ export default async function SettingsPage() {
           <LogoCard hasLogo={!!c?.companyLogo} />
 
           <VersionCard />
+
+          <DatabaseExportCard />
 
           {process.env.NODE_ENV !== "production" && <DevToolsCard />}
         </div>
