@@ -26,3 +26,10 @@ export function addDays(str: string, days: number): string {
   d.setDate(d.getDate() + days);
   return toDateString(d);
 }
+
+/** True for a syntactically valid `YYYY-MM-DD` that is also a real calendar day. */
+export function isValidDateString(str: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const d = parseDate(str);
+  return !!d && toDateString(d) === str;
+}
