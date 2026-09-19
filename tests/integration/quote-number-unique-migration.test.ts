@@ -9,7 +9,7 @@ import { randomUUID } from "crypto";
 // does in production) on a throwaway SQLite file, with duplicate quote numbers
 // seeded before the unique-index migration runs. A legacy database with
 // colliding Quote.documentNumber values must not make startup abort.
-const UNIQUE_MIGRATION = "20260919140000_quote_document_number_unique";
+const UNIQUE_MIGRATION = "20260919140000_quote_unique_number_discount_and_indexes";
 const migrationsDir = path.join(process.cwd(), "prisma", "migrations");
 
 const folders = fs

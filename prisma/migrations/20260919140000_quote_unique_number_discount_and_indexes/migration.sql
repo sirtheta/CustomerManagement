@@ -11,3 +11,12 @@ DROP INDEX "Quote_documentNumber_idx";
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Quote_documentNumber_key" ON "Quote"("documentNumber");
+
+-- AlterTable
+ALTER TABLE "Quote" ADD COLUMN "discountPercent" DECIMAL NOT NULL DEFAULT 0;
+
+-- CreateIndex
+CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Item_categoryId_idx" ON "Item"("categoryId");
