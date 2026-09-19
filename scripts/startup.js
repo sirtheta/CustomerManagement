@@ -73,6 +73,9 @@ function applyMigrations(db) {
     db.pragma('foreign_keys = OFF');
     try {
       run();
+    } catch (err) {
+      console.error(`[startup] Migration failed: ${name} — ${err.message}`);
+      throw err;
     } finally {
       db.pragma('foreign_keys = ON');
     }
