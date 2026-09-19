@@ -28,16 +28,26 @@ export function startNotificationScheduler(): void {
     // The shared client uses the better-sqlite3 driver adapter; a plain
     // `new PrismaClient()` has no datasource URL in this setup and throws.
     const { default: prisma } = await import("@/lib/prisma");
-    try {
-      await checkAndUpdateAllDocumentStates(prisma);
-      await checkOverdueInvoices(prisma);
-      await checkYearlyInvoices(prisma);
-      const settings = await prisma.applicationSettings.findFirst({
-        include: { companyInfo: true },
-      });
-      await sendAdminNotifications(prisma, settings);
-    } catch (err) {
-      log.error({ err }, "Daily notification cron failed");
+    const steps: [string, () => Promise<unknown>][] = [
+      ["checkAndUpdateAllDocumentStates", () => checkAndUpdateAllDocumentStates(prisma)],
+      ["checkOverdueInvoices", () => checkOverdueInvoices(prisma)],
+      ["checkYearlyInvoices", () => checkYearlyInvoices(prisma)],
+      [
+        "sendAdminNotifications",
+        async () => {
+          const settings = await prisma.applicationSettings.findFirst({
+            include: { companyInfo: true },
+          });
+          await sendAdminNotifications(prisma, settings);
+        },
+      ],
+    ];
+    for (const [name, step] of steps) {
+      try {
+        await step();
+      } catch (err) {
+        log.error({ err, step: name }, "Daily notification cron step failed");
+      }
     }
   });
   globalForScheduler.notificationSchedulerStarted = true;
