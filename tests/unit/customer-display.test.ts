@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { customerDisplayName } from "@/lib/search";
+import { customerDisplayName } from "@/lib/customer-display";
 
 describe("customerDisplayName", () => {
   it("should return the company when contactInsteadOfCompany is false", () => {
@@ -38,5 +38,15 @@ describe("customerDisplayName", () => {
         contactInsteadOfCompany: false,
       })
     ).toBe("Hans Muster");
+  });
+
+  it("should return an empty string when contactPerson is null and contactInsteadOfCompany is true", () => {
+    expect(
+      customerDisplayName({
+        company: "Muster AG",
+        contactPerson: null,
+        contactInsteadOfCompany: true,
+      })
+    ).toBe("");
   });
 });

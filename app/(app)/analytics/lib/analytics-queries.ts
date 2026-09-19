@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { InvoiceState } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
+import { customerDisplayName } from "@/lib/customer-display";
 export { categoryParamValue } from "./analytics-utils";
 
 export function yearBounds(year: number): { start: Date; end: Date } {
@@ -55,7 +56,7 @@ function mapInvoice(inv: {
     id: inv.id,
     invoiceNumber: inv.documentNumber,
     customerId: inv.customerId,
-    customerName: resolveCustomerName(inv.customer),
+    customerName: customerDisplayName(inv.customer),
     date: formatDateIso(inv.date),
     totalAmount: inv.totalAmount.toNumber(),
     state: inv.state,
@@ -67,7 +68,7 @@ export async function fetchCustomerName(customerId: number): Promise<string> {
     where: { customerId },
     select: { company: true, contactPerson: true, contactInsteadOfCompany: true },
   });
-  return c ? resolveCustomerName(c) : `Kunde #${customerId}`;
+  return c ? customerDisplayName(c) : `Kunde #${customerId}`;
 }
 
 export async function fetchDrilldownInvoices(
@@ -160,7 +161,7 @@ export async function fetchDrilldownIncomeItems(
     id: item.id,
     invoiceId: item.invoice!.id,
     invoiceNumber: item.invoice!.documentNumber,
-    customerName: resolveCustomerName(item.invoice!.customer),
+    customerName: customerDisplayName(item.invoice!.customer),
     date: formatDateIso(item.invoice!.date),
     name: item.name,
     totalAmount: item.totalAmount.toNumber(),
@@ -185,16 +186,6 @@ export async function fetchDrilldownExpenses(
     description: exp.description,
     amount: exp.amount.toNumber(),
   }));
-}
-
-function resolveCustomerName(customer: {
-  company: string | null;
-  contactPerson: string | null;
-  contactInsteadOfCompany: boolean;
-}): string {
-  return customer.contactInsteadOfCompany
-    ? (customer.contactPerson ?? "")
-    : (customer.company || customer.contactPerson) ?? "";
 }
 
 export type MonthlyRevenue = { month: string; monthIndex: number; amount: number };
@@ -286,6 +277,10 @@ function yearRangeDescending(min: Date | null, max: Date | null): number[] {
   return years;
 }
 
+// Every Server Action / Route Handler that touches invoices, expenses,
+// categories or customer names busts ANALYTICS_CACHE_TAG. The nightly cron
+// (Sent → Overdue, yearly Draft invoices) runs outside request scope where
+// revalidateTag is unavailable; its changes surface via the 5-minute TTL.
 export const fetchAnalyticsData = unstable_cache(
   fetchAnalyticsDataUncached,
   ["analytics-data"],
@@ -392,11 +387,7 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
   const customerMap = new Map(customers.map((c) => [c.customerId, c]));
   const topCustomers: TopCustomer[] = topCustomerGroups.map((g) => {
     const c = customerMap.get(g.customerId);
-    const name = c
-      ? c.contactInsteadOfCompany
-        ? c.contactPerson
-        : (c.company || c.contactPerson)
-      : `Kunde #${g.customerId}`;
+    const name = c ? customerDisplayName(c) : `Kunde #${g.customerId}`;
     return { customerId: g.customerId, name, total: g._sum.totalAmount?.toNumber() ?? 0 };
   });
 

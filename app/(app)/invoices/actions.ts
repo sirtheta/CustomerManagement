@@ -6,16 +6,18 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { InvoiceState } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
-import { generateInvoiceNumber } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
-import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
-import { sendInvoiceEmail } from "@/lib/email";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { markInvoicePaid } from "@/lib/payment-matching";
-import { saveItemsToCatalog } from "@/lib/service-catalog";
+import {
+  createDocumentWithItems,
+  updateDocumentWithItems,
+  sendDocument,
+  isDocumentNumberCollision,
+} from "@/lib/document-actions";
 
 const log = logger.child({ module: "invoices" });
 
@@ -49,47 +51,24 @@ export async function createInvoice(
     return { error: "Ungültige Positionsdaten." };
   }
 
-  let newInvoiceId!: number;
-  let documentNumber!: string;
-
+  let newInvoiceId: number;
+  let documentNumber: string;
   try {
-    await prisma.$transaction(async (tx) => {
-      documentNumber = await generateInvoiceNumber(tx);
-      const invoice = await tx.invoice.create({
-        data: {
-          customerId,
-          documentNumber,
-          customUserText: customUserText || null,
-          date: new Date(dateRaw),
-          dueDate: new Date(dueDateRaw),
-          totalAmount,
-          discountPercent,
-          state: "Draft",
-        },
-      });
-
-      newInvoiceId = invoice.id;
-
-      await saveItemsToCatalog(tx, items);
-
-      if (items.length > 0) {
-        await tx.item.createMany({
-          data: items.map((item) => ({
-            invoiceId: invoice.id,
-            name: item.name,
-            description: item.description || null,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            discountPercent: item.discountPercent,
-            totalAmount: item.totalAmount,
-            customText: item.customText || null,
-            categoryId: item.categoryId,
-          })),
-        });
-      }
-    });
+    ({ id: newInvoiceId, documentNumber } = await createDocumentWithItems({
+      kind: "invoice",
+      customerId,
+      customUserText: customUserText || null,
+      date: new Date(dateRaw),
+      dueDate: new Date(dueDateRaw),
+      totalAmount,
+      discountPercent,
+      items,
+    }));
   } catch (err) {
+    if (isDocumentNumberCollision(err)) {
+      log.error({ err }, "createInvoice failed after retry");
+      return { error: "Rechnungsnummer war belegt, bitte erneut versuchen." };
+    }
     log.error({ err }, "createInvoice failed");
     return { error: "Rechnung konnte nicht erstellt werden." };
   }
@@ -127,39 +106,15 @@ export async function updateInvoice(
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.item.deleteMany({ where: { invoiceId: id } });
-      await tx.invoice.update({
-        where: { id },
-        data: {
-          customerId,
-          customUserText: customUserText || null,
-          date: new Date(dateRaw),
-          dueDate: new Date(dueDateRaw),
-          totalAmount,
-          discountPercent,
-          version: { increment: 1 },
-        },
-      });
-
-      await saveItemsToCatalog(tx, items);
-
-      if (items.length > 0) {
-        await tx.item.createMany({
-          data: items.map((item) => ({
-            invoiceId: id,
-            name: item.name,
-            description: item.description || null,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            discountPercent: item.discountPercent,
-            totalAmount: item.totalAmount,
-            customText: item.customText || null,
-            categoryId: item.categoryId,
-          })),
-        });
-      }
+    await updateDocumentWithItems(id, {
+      kind: "invoice",
+      customerId,
+      customUserText: customUserText || null,
+      date: new Date(dateRaw),
+      dueDate: new Date(dueDateRaw),
+      totalAmount,
+      discountPercent,
+      items,
     });
   } catch (err) {
     log.error({ id, err }, "updateInvoice failed");
@@ -327,34 +282,7 @@ export async function sendInvoice(
   const body = ((formData.get("body") as string) ?? "").trim();
   if (!to) return { error: "Bitte eine Empfänger-E-Mail-Adresse angeben." };
 
-  const [invoice, settings] = await Promise.all([
-    prisma.invoice.findUnique({
-      where: { id: invoiceId },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
-    }),
-    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
-  ]);
-
-  if (!invoice) return { error: "Rechnung nicht gefunden." };
-  if (!settings) return { error: "Einstellungen nicht konfiguriert." };
-
-  try {
-    const pdf = await generateInvoicePdf(invoice, settings);
-    await sendInvoiceEmail(invoice, settings, pdf, { to, subject, body });
-  } catch (err) {
-    log.error({ invoiceId, to, err }, "sendInvoice failed");
-    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-    return { error: message };
-  }
-
-  await prisma.$transaction([
-    prisma.invoice.update({ where: { id: invoiceId }, data: { state: "Sent" } }),
-    prisma.invoiceSentLog.create({
-      data: { invoiceId, sentTo: to, subject },
-    }),
-  ]);
-  await logAudit(session, "SEND", "Invoice", invoiceId, invoice.documentNumber, { to });
-  revalidatePath(`/invoices/${invoiceId}`);
-  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
+  const result = await sendDocument({ kind: "invoice", id: invoiceId, to, subject, body, actor: session });
+  if (result.error) return { error: result.error };
   return { success: true, _ts: Date.now() };
 }

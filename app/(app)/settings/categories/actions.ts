@@ -2,8 +2,9 @@
 
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 
 export type CategoryFormState = {
   error?: string;
@@ -49,5 +50,7 @@ export async function updateCategory(
   });
   await logAudit(session, "UPDATE", "Settings", id, category.name);
   revalidatePath("/settings/categories");
+  // Category names/colours are baked into the cached analytics payload.
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   return {};
 }

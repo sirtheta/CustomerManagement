@@ -30,10 +30,12 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
   const serializedQuote = {
     ...quote,
     totalAmount: quote.totalAmount.toNumber(),
+    discountPercent: quote.discountPercent.toNumber(),
     items: quote.items.map((item) => ({
       ...item,
       unitPrice: item.unitPrice.toNumber(),
       quantity: item.quantity.toNumber(),
+      discountPercent: item.discountPercent.toNumber(),
       totalAmount: item.totalAmount.toNumber(),
     })),
   };

@@ -91,6 +91,7 @@ model Quote {
   version        Int        @default(1)
   totalAmount    Decimal
   validUntil     DateTime
+  discountPercent Decimal   @default(0)
   state          QuoteState @default(Draft)
   customer       Customer   @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
   items          Item[]

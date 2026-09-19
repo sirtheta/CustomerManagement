@@ -1,4 +1,7 @@
 import type { InvoiceState, PrismaClient, QuoteState } from "@prisma/client";
+import { customerDisplayName } from "@/lib/customer-display";
+
+export { customerDisplayName };
 
 export const SEARCH_MIN_LENGTH = 2;
 export const SEARCH_MAX_RESULTS = 5;
@@ -34,14 +37,6 @@ export const EMPTY_SEARCH_RESULTS: GlobalSearchResults = {
   invoices: [],
   quotes: [],
 };
-
-export function customerDisplayName(c: {
-  company: string | null;
-  contactPerson: string;
-  contactInsteadOfCompany: boolean;
-}): string {
-  return c.contactInsteadOfCompany ? c.contactPerson : (c.company || c.contactPerson);
-}
 
 const documentSelect = {
   id: true,

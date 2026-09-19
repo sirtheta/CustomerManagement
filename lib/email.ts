@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import type { ApplicationSettings, CompanyInformation, Customer, Invoice, Quote } from "@prisma/client";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { decryptSecret } from "@/lib/crypto";
+import { customerDisplayName } from "@/lib/customer-display";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 type FullInvoice = Invoice & { customer: Customer };
@@ -28,8 +29,7 @@ function resolvePlaceholders(
   settings: FullSettings
 ): string {
   const c = invoice.customer;
-  const displayName =
-    c.contactInsteadOfCompany ? c.contactPerson : (c.company || c.contactPerson);
+  const displayName = customerDisplayName(c);
 
   return template
     .replace(/\{documentNumber\}/g, invoice.documentNumber)
@@ -84,8 +84,7 @@ function resolveQuotePlaceholders(
   settings: FullSettings
 ): string {
   const c = quote.customer;
-  const displayName =
-    c.contactInsteadOfCompany ? c.contactPerson : (c.company || c.contactPerson);
+  const displayName = customerDisplayName(c);
 
   return template
     .replace(/\{documentNumber\}/g, quote.documentNumber)

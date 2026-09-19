@@ -1,4 +1,5 @@
-import prisma from "@/lib/prisma";
+import defaultPrisma from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import logger from "@/lib/logger";
 import type { Session } from "next-auth";
 
@@ -13,7 +14,8 @@ export async function logAudit(
   entityType: AuditEntity,
   entityId?: number,
   entityRef?: string,
-  details?: Record<string, unknown>
+  details?: Record<string, unknown>,
+  prisma: PrismaClient = defaultPrisma
 ): Promise<void> {
   try {
     await prisma.auditLog.create({

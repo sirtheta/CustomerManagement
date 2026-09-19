@@ -10,7 +10,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("sharp", () => ({
   default: vi.fn(),
@@ -50,7 +50,7 @@ import {
 import { savePdfTheme } from "@/app/(app)/settings/design/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
@@ -516,6 +516,8 @@ describe("category actions", () => {
       });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "Settings", 3, "Design");
       expect(revalidatePath).toHaveBeenCalledWith("/settings/categories");
+      // Category names/colours are baked into the cached analytics payload.
+      expect(revalidateTag).toHaveBeenCalledWith("analytics", { expire: 0 });
     });
 
     it("sets isActive to false when checkbox not checked", async () => {

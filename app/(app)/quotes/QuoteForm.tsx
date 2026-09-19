@@ -12,11 +12,11 @@ import { addDays } from "@/lib/date";
 import { createQuote, updateQuote, type QuoteFormState } from "./actions";
 import type { Category, Customer, Quote, Item, Service } from "@prisma/client";
 
-type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "totalAmount"> & {
-  unitPrice: number; quantity: number; totalAmount: number;
+type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
+  unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
 };
-type SerializedQuote = Omit<Quote, "totalAmount"> & {
-  totalAmount: number; items: SerializedItem[];
+type SerializedQuote = Omit<Quote, "totalAmount" | "discountPercent"> & {
+  totalAmount: number; discountPercent: number; items: SerializedItem[];
 };
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
@@ -38,7 +38,7 @@ function toItemData(item: SerializedItem): ItemData {
     unit: item.unit,
     unitPrice: item.unitPrice,
     quantity: item.quantity,
-    discountPercent: Number(item.discountPercent ?? 0),
+    discountPercent: item.discountPercent,
     totalAmount: item.totalAmount,
     customText: item.customText ?? "",
     categoryId: item.categoryId,
@@ -168,7 +168,24 @@ export default function QuoteForm({
             <CardTitle>Positionen</CardTitle>
           </CardHeader>
           <CardContent>
-            <ItemsEditor services={services} categories={categories} initialItems={initialItems} />
+            <ItemsEditor services={services} categories={categories} initialItems={initialItems} showDiscount />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Rabatt auf Gesamtofferte</CardTitle></CardHeader>
+          <CardContent className="space-y-1.5">
+            <Label htmlFor="discountPercent">Rabatt (%)</Label>
+            <input
+              id="discountPercent"
+              name="discountPercent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue={quote?.discountPercent?.toString() ?? "0"}
+              className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            />
           </CardContent>
         </Card>
 
