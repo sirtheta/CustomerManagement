@@ -195,6 +195,7 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
         date: today,
         dueDate,
         totalAmount: quote.totalAmount,
+        discountPercent: quote.discountPercent,
         state: "Draft",
       },
     });
@@ -210,6 +211,7 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
           unit: item.unit,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
+          discountPercent: item.discountPercent,
           totalAmount: item.totalAmount,
           customText: item.customText,
           categoryId: item.categoryId,

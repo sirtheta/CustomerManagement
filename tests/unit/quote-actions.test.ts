@@ -553,5 +553,48 @@ describe("quote actions", () => {
         ]),
       });
     });
+
+    it("carries document-level and item-level discounts over to the invoice", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        id: 4,
+        customerId: 7,
+        customUserText: null,
+        totalAmount: 171,
+        discountPercent: 10,
+        items: [
+          {
+            name: "Entwicklung",
+            description: null,
+            unit: "Stunde",
+            unitPrice: 200,
+            quantity: 1,
+            discountPercent: 5,
+            totalAmount: 190,
+            customText: null,
+            categoryId: null,
+          },
+        ],
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        defaultPaymentTermDays: 30,
+      } as never);
+      vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-004");
+      vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 102 } as never);
+      vi.mocked(prisma.item.createMany).mockResolvedValue({ count: 1 } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT");
+      });
+
+      await expect(convertQuoteToInvoice(4)).rejects.toThrow("REDIRECT");
+      expect(prisma.invoice.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ totalAmount: 171, discountPercent: 10 }),
+      });
+      expect(prisma.item.createMany).toHaveBeenCalledWith({
+        data: [expect.objectContaining({ invoiceId: 102, discountPercent: 5, totalAmount: 190 })],
+      });
+    });
   });
 });
