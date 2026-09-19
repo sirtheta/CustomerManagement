@@ -1,6 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
@@ -52,8 +53,8 @@ export async function createInvoice(
   let newInvoiceId!: number;
   let documentNumber!: string;
 
-  try {
-    await prisma.$transaction(async (tx) => {
+  const attemptCreate = () =>
+    prisma.$transaction(async (tx) => {
       documentNumber = await generateInvoiceNumber(tx);
       const invoice = await tx.invoice.create({
         data: {
@@ -89,9 +90,27 @@ export async function createInvoice(
         });
       }
     });
+
+  const isDocumentNumberCollision = (err: unknown) =>
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === "P2002" &&
+    (err.meta?.target as string[] | undefined)?.includes("documentNumber");
+
+  try {
+    await attemptCreate();
   } catch (err) {
-    log.error({ err }, "createInvoice failed");
-    return { error: "Rechnung konnte nicht erstellt werden." };
+    if (isDocumentNumberCollision(err)) {
+      log.warn({ documentNumber }, "createInvoice: document number collision, retrying");
+      try {
+        await attemptCreate();
+      } catch (retryErr) {
+        log.error({ err: retryErr }, "createInvoice failed after retry");
+        return { error: "Rechnungsnummer war belegt, bitte erneut versuchen." };
+      }
+    } else {
+      log.error({ err }, "createInvoice failed");
+      return { error: "Rechnung konnte nicht erstellt werden." };
+    }
   }
 
   await logAudit(session, "CREATE", "Invoice", newInvoiceId, documentNumber);
