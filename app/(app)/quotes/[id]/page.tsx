@@ -153,12 +153,16 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
               quantity: item.quantity.toNumber(),
               unitPrice: item.unitPrice.toNumber(),
               totalAmount: item.totalAmount.toNumber(),
+              discountPercent: item.discountPercent.toNumber(),
             }))}
           />
           <div className="flex justify-end mt-3">
-            <p className="text-sm font-semibold">
-              Total: {formatCurrency(quote.totalAmount.toNumber())}
-            </p>
+            <div className="text-right text-sm space-y-1">
+              {quote.discountPercent.toNumber() > 0 && (
+                <p className="text-muted-foreground">Gesamtrabatt: {quote.discountPercent.toNumber()}%</p>
+              )}
+              <p className="font-semibold">Total: {formatCurrency(quote.totalAmount.toNumber())}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
