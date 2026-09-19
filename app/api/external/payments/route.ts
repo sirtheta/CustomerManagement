@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
+import { revalidateTag } from "next/cache";
 import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import { matchAndMarkPaid } from "@/lib/payment-matching";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import logger from "@/lib/logger";
 
 // Called by the Budget app (separate container) after a bank import, to check
@@ -46,6 +48,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await matchAndMarkPaid(parsed.data);
+    if (result.matched) revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
     return Response.json(result);
   } catch (err) {
     log.error({ err }, "matchAndMarkPaid failed");

@@ -10,10 +10,11 @@ import { parseDocumentItems } from "@/lib/form-parsers";
 import { logAudit } from "@/lib/audit";
 import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendQuoteEmail } from "@/lib/email";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 
 const log = logger.child({ module: "quotes" });
 
@@ -46,12 +47,12 @@ export async function createQuote(
     return { error: "Ungültige Positionsdaten." };
   }
 
-  const documentNumber = await generateQuoteNumber();
-
   let newQuoteId!: number;
+  let documentNumber!: string;
 
   try {
     await prisma.$transaction(async (tx) => {
+      documentNumber = await generateQuoteNumber(tx);
       const quote = await tx.quote.create({
         data: {
           customerId,
@@ -240,7 +241,6 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   const settings = await prisma.applicationSettings.findFirst();
   const paymentTermDays = settings?.defaultPaymentTermDays ?? 30;
 
-  const documentNumber = await generateInvoiceNumber();
   const today = new Date();
   const dueDate = new Date(today);
   dueDate.setDate(dueDate.getDate() + paymentTermDays);
@@ -248,6 +248,7 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   let newInvoiceId: number;
 
   await prisma.$transaction(async (tx) => {
+    const documentNumber = await generateInvoiceNumber(tx);
     const invoice = await tx.invoice.create({
       data: {
         customerId: quote.customerId,
@@ -283,6 +284,8 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
       data: { state: "Accepted" },
     });
   });
+
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 
   redirect(`/invoices/${newInvoiceId!}`);
 }

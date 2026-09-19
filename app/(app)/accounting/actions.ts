@@ -2,9 +2,10 @@
 
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 
 export type ExpenseFormState = {
   error?: string;
@@ -54,6 +55,7 @@ export async function createExpense(
   const expense = await prisma.expense.create({ data: parsed.data });
   await logAudit(session, "CREATE", "Expense", expense.id, expense.description);
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/accounting");
 }
 
@@ -69,6 +71,7 @@ export async function updateExpense(
   await prisma.expense.update({ where: { id }, data: parsed.data });
   await logAudit(session, "UPDATE", "Expense", id, parsed.data.description);
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/accounting");
 }
 
@@ -78,4 +81,5 @@ export async function deleteExpense(id: number): Promise<void> {
   await prisma.expense.delete({ where: { id } });
   await logAudit(session, "DELETE", "Expense", id, expense?.description);
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 }

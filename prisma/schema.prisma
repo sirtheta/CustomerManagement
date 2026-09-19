@@ -96,8 +96,8 @@ model Quote {
   items          Item[]
   sentLogs       QuoteSentLog[]
 
+  @@unique([documentNumber])
   @@index([customerId])
-  @@index([documentNumber])
   @@index([date])
   @@index([state])
   @@index([validUntil])
@@ -122,6 +122,7 @@ model Item {
 
   @@index([invoiceId])
   @@index([quoteId])
+  @@index([categoryId])
 }
 
 model InvoiceTemplate {
@@ -266,6 +267,8 @@ model AuditLog {
   entityRef  String?
   details    String?
   createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model User {

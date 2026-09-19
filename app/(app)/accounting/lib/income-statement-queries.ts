@@ -27,7 +27,7 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [paidInvoices, expenses, allPaidDates, allExpenseDates] = await Promise.all([
+  const [paidInvoices, expenses, paidDateRange, expenseDateRange] = await Promise.all([
     prisma.invoice.findMany({
       where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
       select: { paidDate: true, totalAmount: true },
@@ -36,11 +36,12 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
       where: { date: { gte: yearStart, lt: yearEnd } },
       select: { date: true, amount: true },
     }),
-    prisma.invoice.findMany({
+    prisma.invoice.aggregate({
       where: { state: InvoiceState.Paid, paidDate: { not: null } },
-      select: { paidDate: true },
+      _min: { paidDate: true },
+      _max: { paidDate: true },
     }),
-    prisma.expense.findMany({ select: { date: true } }),
+    prisma.expense.aggregate({ _min: { date: true }, _max: { date: true } }),
   ]);
 
   const incomeByMonth = new Array(12).fill(0) as number[];
@@ -65,9 +66,16 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
   const totalExpenses = expensesByMonth.reduce((sum, v) => sum + v, 0);
 
   const years = new Set<number>();
-  for (const inv of allPaidDates) years.add(inv.paidDate!.getFullYear());
-  for (const exp of allExpenseDates) years.add(exp.date.getFullYear());
+  if (paidDateRange._min.paidDate) years.add(paidDateRange._min.paidDate.getFullYear());
+  if (paidDateRange._max.paidDate) years.add(paidDateRange._max.paidDate.getFullYear());
+  if (expenseDateRange._min.date) years.add(expenseDateRange._min.date.getFullYear());
+  if (expenseDateRange._max.date) years.add(expenseDateRange._max.date.getFullYear());
   years.add(new Date().getFullYear());
+  // Fill the gaps between the extremes so the dropdown offers every year in
+  // between, not just years that happen to have data on either boundary.
+  const minYear = Math.min(...years);
+  const maxYear = Math.max(...years);
+  for (let y = minYear; y <= maxYear; y++) years.add(y);
   const availableYears = Array.from(years).sort((a, b) => b - a);
 
   return {
