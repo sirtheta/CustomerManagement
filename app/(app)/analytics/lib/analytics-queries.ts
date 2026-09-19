@@ -277,6 +277,10 @@ function yearRangeDescending(min: Date | null, max: Date | null): number[] {
   return years;
 }
 
+// Every Server Action / Route Handler that touches invoices, expenses,
+// categories or customer names busts ANALYTICS_CACHE_TAG. The nightly cron
+// (Sent → Overdue, yearly Draft invoices) runs outside request scope where
+// revalidateTag is unavailable; its changes surface via the 5-minute TTL.
 export const fetchAnalyticsData = unstable_cache(
   fetchAnalyticsDataUncached,
   ["analytics-data"],

@@ -7,12 +7,14 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
 import { createCustomer, updateCustomer, deleteCustomer } from "@/app/(app)/customers/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { revalidateTag } from "next/cache";
 import { logAudit } from "@/lib/audit";
 
 const editorSession = {
@@ -197,6 +199,8 @@ describe("customer actions", () => {
         data: expect.objectContaining({ contactPerson: "Max Muster", email: "max@muster.ch" }),
       });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "Customer", 5, "Max Muster");
+      // Top-customer names come from the cached analytics payload.
+      expect(revalidateTag).toHaveBeenCalledWith("analytics", { expire: 0 });
     });
   });
 
@@ -220,6 +224,8 @@ describe("customer actions", () => {
       await expect(deleteCustomer(7)).rejects.toThrow("REDIRECT:/customers");
       expect(prisma.customer.delete).toHaveBeenCalledWith({ where: { customerId: 7 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Customer", 7);
+      // Cascade-deletes the customer's invoices, which feed the revenue figures.
+      expect(revalidateTag).toHaveBeenCalledWith("analytics", { expire: 0 });
     });
   });
 });

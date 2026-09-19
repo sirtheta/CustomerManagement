@@ -2,7 +2,9 @@
 
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { revalidateTag } from "next/cache";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { logAudit } from "@/lib/audit";
 import { z } from "zod";
 
@@ -121,6 +123,8 @@ export async function updateCustomer(
     },
   });
   await logAudit(session, "UPDATE", "Customer", id, contactPerson);
+  // Top-customer names come from the cached analytics payload.
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 
   redirect(`/customers/${id}`);
 }
@@ -129,5 +133,7 @@ export async function deleteCustomer(id: number): Promise<void> {
   const session = await requireAdmin();
   await prisma.customer.delete({ where: { customerId: id } });
   await logAudit(session, "DELETE", "Customer", id);
+  // Cascade-deletes the customer's invoices, which feed the revenue figures.
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/customers");
 }
