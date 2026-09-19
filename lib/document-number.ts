@@ -1,9 +1,11 @@
-"use server";
-
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
+
+// Deliberately no "use server": that directive would expose every export
+// here as a public Server Action endpoint, callable without a session.
+// These are plain helpers used from within actions/transactions only.
 
 /**
  * Must be called from inside the same `$transaction` that creates the
