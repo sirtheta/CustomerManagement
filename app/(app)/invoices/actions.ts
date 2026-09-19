@@ -2,7 +2,8 @@
 
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { InvoiceState } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { generateInvoiceNumber } from "@/lib/document-number";
@@ -48,12 +49,12 @@ export async function createInvoice(
     return { error: "Ungültige Positionsdaten." };
   }
 
-  const documentNumber = await generateInvoiceNumber();
-
   let newInvoiceId!: number;
+  let documentNumber!: string;
 
   try {
     await prisma.$transaction(async (tx) => {
+      documentNumber = await generateInvoiceNumber(tx);
       const invoice = await tx.invoice.create({
         data: {
           customerId,
@@ -94,6 +95,7 @@ export async function createInvoice(
   }
 
   await logAudit(session, "CREATE", "Invoice", newInvoiceId, documentNumber);
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect(`/invoices/${newInvoiceId}`);
 }
 
@@ -165,6 +167,7 @@ export async function updateInvoice(
   }
 
   await logAudit(session, "UPDATE", "Invoice", id);
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   const from = formData.get("from") as string | null;
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   redirect(`/invoices/${id}${fromCustomer ? `?from=${fromCustomer}` : ""}`);
@@ -209,6 +212,7 @@ export async function updateInvoiceStatus(
   revalidatePath("/invoices");
   revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 }
 
 export async function updateInvoicePaidDate(
@@ -230,6 +234,7 @@ export async function updateInvoicePaidDate(
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 }
 
 export type ImportMatch = {
@@ -287,6 +292,7 @@ export async function markInvoicesPaidFromImport(
   revalidatePath("/invoices");
   revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 
   return { paidCount };
 }
@@ -302,6 +308,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   }
   await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber);
   revalidatePath("/invoices");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");
 }
 
@@ -348,5 +355,6 @@ export async function sendInvoice(
   ]);
   await logAudit(session, "SEND", "Invoice", invoiceId, invoice.documentNumber, { to });
   revalidatePath(`/invoices/${invoiceId}`);
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   return { success: true, _ts: Date.now() };
 }

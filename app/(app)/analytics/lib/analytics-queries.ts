@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma";
 import { InvoiceState } from "@prisma/client";
+import { unstable_cache } from "next/cache";
+import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 export { categoryParamValue } from "./analytics-utils";
 
 export function yearBounds(year: number): { start: Date; end: Date } {
@@ -275,7 +277,22 @@ const MONTH_LABELS = [
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
 ];
 
-export async function fetchAnalyticsData(year: number): Promise<AnalyticsData> {
+function yearRangeDescending(min: Date | null, max: Date | null): number[] {
+  const currentYear = new Date().getFullYear();
+  const startYear = min ? min.getFullYear() : currentYear;
+  const endYear = Math.max(max ? max.getFullYear() : currentYear, currentYear);
+  const years: number[] = [];
+  for (let y = endYear; y >= startYear; y--) years.push(y);
+  return years;
+}
+
+export const fetchAnalyticsData = unstable_cache(
+  fetchAnalyticsDataUncached,
+  ["analytics-data"],
+  { revalidate: 300, tags: [ANALYTICS_CACHE_TAG] }
+);
+
+async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> {
   const { start: yearStart, end: yearEnd } = yearBounds(year);
 
   const [
@@ -284,7 +301,7 @@ export async function fetchAnalyticsData(year: number): Promise<AnalyticsData> {
     allNonDraftInvoices,
     paidInYear,
     topCustomerGroups,
-    allInvoiceDates,
+    invoiceDateRange,
     incomeItems,
     expenseRows,
   ] = await Promise.all([
@@ -312,7 +329,7 @@ export async function fetchAnalyticsData(year: number): Promise<AnalyticsData> {
       orderBy: { _sum: { totalAmount: "desc" } },
       take: 5,
     }),
-    prisma.invoice.findMany({ select: { date: true } }),
+    prisma.invoice.aggregate({ _min: { date: true }, _max: { date: true } }),
     prisma.item.findMany({
       where: { invoice: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } } },
       select: {
@@ -383,9 +400,10 @@ export async function fetchAnalyticsData(year: number): Promise<AnalyticsData> {
     return { customerId: g.customerId, name, total: g._sum.totalAmount?.toNumber() ?? 0 };
   });
 
-  const years = new Set(allInvoiceDates.map((d) => new Date(d.date).getFullYear()));
-  years.add(new Date().getFullYear());
-  const availableYears = Array.from(years).sort((a, b) => b - a);
+  const availableYears = yearRangeDescending(
+    invoiceDateRange._min.date,
+    invoiceDateRange._max.date
+  );
 
   return {
     annualRevenue,
