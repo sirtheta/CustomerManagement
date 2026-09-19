@@ -4,17 +4,20 @@ import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
-import { generateQuoteNumber, generateInvoiceNumber } from "@/lib/document-number";
+import { generateInvoiceNumber } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
 import { logAudit } from "@/lib/audit";
-import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
-import { sendQuoteEmail } from "@/lib/email";
 import { revalidatePath, revalidateTag } from "next/cache";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
-import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
+import {
+  createDocumentWithItems,
+  updateDocumentWithItems,
+  sendDocument,
+  isDocumentNumberCollision,
+} from "@/lib/document-actions";
 
 const log = logger.child({ module: "quotes" });
 
@@ -40,52 +43,32 @@ export async function createQuote(
 
   let items: ItemData[];
   let totalAmount: number;
+  let discountPercent: number;
   try {
-    ({ items, totalAmount } = parseDocumentItems(formData));
+    ({ items, totalAmount, discountPercent } = parseDocumentItems(formData));
   } catch (err) {
     log.error({ err }, "createQuote: invalid items JSON");
     return { error: "Ungültige Positionsdaten." };
   }
 
-  let newQuoteId!: number;
-  let documentNumber!: string;
-
+  let newQuoteId: number;
+  let documentNumber: string;
   try {
-    await prisma.$transaction(async (tx) => {
-      documentNumber = await generateQuoteNumber(tx);
-      const quote = await tx.quote.create({
-        data: {
-          customerId,
-          documentNumber,
-          customUserText: customUserText || null,
-          date: new Date(dateRaw),
-          validUntil: new Date(validUntilRaw),
-          totalAmount,
-          state: "Draft",
-        },
-      });
-
-      newQuoteId = quote.id;
-
-      await saveItemsToCatalog(tx, items);
-
-      if (items.length > 0) {
-        await tx.item.createMany({
-          data: items.map((item) => ({
-            quoteId: quote.id,
-            name: item.name,
-            description: item.description || null,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            totalAmount: item.totalAmount,
-            customText: item.customText || null,
-            categoryId: item.categoryId,
-          })),
-        });
-      }
-    });
+    ({ id: newQuoteId, documentNumber } = await createDocumentWithItems({
+      kind: "quote",
+      customerId,
+      customUserText: customUserText || null,
+      date: new Date(dateRaw),
+      validUntil: new Date(validUntilRaw),
+      totalAmount,
+      discountPercent,
+      items,
+    }));
   } catch (err) {
+    if (isDocumentNumberCollision(err)) {
+      log.error({ err }, "createQuote failed after retry");
+      return { error: "Offertennummer war belegt, bitte erneut versuchen." };
+    }
     log.error({ err }, "createQuote failed");
     return { error: "Offerte konnte nicht erstellt werden." };
   }
@@ -113,45 +96,24 @@ export async function updateQuote(
 
   let items: ItemData[];
   let totalAmount: number;
+  let discountPercent: number;
   try {
-    ({ items, totalAmount } = parseDocumentItems(formData));
+    ({ items, totalAmount, discountPercent } = parseDocumentItems(formData));
   } catch (err) {
     log.error({ id, err }, "updateQuote: invalid items JSON");
     return { error: "Ungültige Positionsdaten." };
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.item.deleteMany({ where: { quoteId: id } });
-      await tx.quote.update({
-        where: { id },
-        data: {
-          customerId,
-          customUserText: customUserText || null,
-          date: new Date(dateRaw),
-          validUntil: new Date(validUntilRaw),
-          totalAmount,
-          version: { increment: 1 },
-        },
-      });
-
-      await saveItemsToCatalog(tx, items);
-
-      if (items.length > 0) {
-        await tx.item.createMany({
-          data: items.map((item) => ({
-            quoteId: id,
-            name: item.name,
-            description: item.description || null,
-            unit: item.unit,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            totalAmount: item.totalAmount,
-            customText: item.customText || null,
-            categoryId: item.categoryId,
-          })),
-        });
-      }
+    await updateDocumentWithItems(id, {
+      kind: "quote",
+      customerId,
+      customUserText: customUserText || null,
+      date: new Date(dateRaw),
+      validUntil: new Date(validUntilRaw),
+      totalAmount,
+      discountPercent,
+      items,
     });
   } catch (err) {
     log.error({ id, err }, "updateQuote failed");
@@ -200,32 +162,8 @@ export async function sendQuote(
   const body = ((formData.get("body") as string) ?? "").trim();
   if (!to) return { error: "Bitte eine Empfänger-E-Mail-Adresse angeben." };
 
-  const [quote, settings] = await Promise.all([
-    prisma.quote.findUnique({
-      where: { id: quoteId },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
-    }),
-    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
-  ]);
-
-  if (!quote) return { error: "Offerte nicht gefunden." };
-  if (!settings) return { error: "Einstellungen nicht konfiguriert." };
-
-  try {
-    const pdf = await generateQuotePdf(quote, settings);
-    await sendQuoteEmail(quote, settings, pdf, { to, subject, body });
-  } catch (err) {
-    log.error({ quoteId, to, err }, "sendQuote failed");
-    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-    return { error: message };
-  }
-
-  await prisma.$transaction([
-    prisma.quote.update({ where: { id: quoteId }, data: { state: "Sent" } }),
-    prisma.quoteSentLog.create({ data: { quoteId, sentTo: to, subject } }),
-  ]);
-  await logAudit(session, "SEND", "Quote", quoteId, quote.documentNumber, { to });
-  revalidatePath(`/quotes/${quoteId}`);
+  const result = await sendDocument({ kind: "quote", id: quoteId, to, subject, body, actor: session });
+  if (result.error) return { error: result.error };
   return { success: true, _ts: Date.now() };
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Prisma } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
@@ -10,6 +11,7 @@ vi.mock("@/lib/prisma", () => ({
     invoice: { create: vi.fn() },
   },
 }));
+vi.mock("@/lib/service-catalog", () => ({ saveItemsToCatalog: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
@@ -60,6 +62,14 @@ function form(fields: Record<string, string>): FormData {
 }
 
 const BASE_FORM = { customerId: "1", date: "2026-01-15", validUntil: "2026-02-15" };
+
+function collisionError() {
+  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+    code: "P2002",
+    clientVersion: "test",
+    meta: { target: ["documentNumber"] },
+  });
+}
 
 describe("quote actions", () => {
   beforeEach(() => {
@@ -125,6 +135,34 @@ describe("quote actions", () => {
         }),
       });
       expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Quote", 5, "Q-2026-001");
+    });
+
+    it("retries once on a document number collision, then succeeds", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 100, discountPercent: 0 });
+      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-003");
+      vi.mocked(prisma.quote.create)
+        .mockRejectedValueOnce(collisionError())
+        .mockResolvedValueOnce({ id: 7, documentNumber: "Q-2026-003" } as never);
+      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/quotes/7");
+      });
+
+      await expect(createQuote({}, form(BASE_FORM))).rejects.toThrow("REDIRECT:/quotes/7");
+      expect(prisma.quote.create).toHaveBeenCalledTimes(2);
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Quote", 7, "Q-2026-003");
+    });
+
+    it("returns a specific error when the collision persists after retry", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 100, discountPercent: 0 });
+      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-004");
+      vi.mocked(prisma.quote.create).mockRejectedValue(collisionError());
+      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+
+      const result = await createQuote({}, form(BASE_FORM));
+      expect(result.error).toBe("Offertennummer war belegt, bitte erneut versuchen.");
     });
 
     it("creates quote items when items are provided", async () => {
