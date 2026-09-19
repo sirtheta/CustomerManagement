@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.1...customer-management-v1.4.2) (2026-09-19)
+
+
+### Bug Fixes
+
+* address remaining code-review findings (races, dedup, PDF/payment tests) ([#100](https://github.com/sirtheta/CustomerManagement/issues/100)) ([0a54650](https://github.com/sirtheta/CustomerManagement/commit/0a54650bddd9ef62ec694a0f82877880725217ab))
+* address top 5 code-review findings ([#98](https://github.com/sirtheta/CustomerManagement/issues/98)) ([469355a](https://github.com/sirtheta/CustomerManagement/commit/469355a654ec6252c27d8e73caab6750865caf41))
+
 ## [1.4.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.0...customer-management-v1.4.1) (2026-09-18)
 
 
