@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import path from "path";
 import { generateDocumentPdf, type RenderDoc, type RenderItem } from "@/lib/pdf/document-pdf";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
+import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 
 // Real byte-level assertions on pdfkit's output (page count, embedded text,
 // the Swiss QR bill page) — the existing pdf-fonts.test.ts only checks
@@ -146,5 +147,62 @@ describe("generateDocumentPdf byte assembly", () => {
     const { pageText } = await extractText(buf);
     expect(pageText[0]).toContain("Rabatt");
     expect(pageText[0]).toContain("Zwischensumme");
+  });
+});
+
+describe("generateQuotePdf", () => {
+  it("renders the document-level discount stored on the quote", async () => {
+    const decimal = (n: number) => n as unknown as import("@prisma/client").Prisma.Decimal;
+    const buf = await generateQuotePdf(
+      {
+        id: 1,
+        customerId: 1,
+        documentNumber: "O-26010001",
+        date: new Date("2026-01-01"),
+        validUntil: new Date("2026-01-31"),
+        version: 1,
+        state: "Draft",
+        totalAmount: decimal(90),
+        discountPercent: decimal(10),
+        customUserText: null,
+        customer: {
+          customerId: 1,
+          company: "Muster AG",
+          contactPerson: "Anna Beispiel",
+          address: "Weg 1",
+          zipCode: "8000",
+          city: "Zürich",
+          email: "anna@muster.ch",
+          phone: null,
+          yearlyInvoice: false,
+          contactInsteadOfCompany: false,
+          nextInvoiceDate: null,
+        },
+        items: [
+          {
+            id: 1,
+            invoiceId: null,
+            quoteId: 1,
+            name: "Pos 1",
+            description: null,
+            unit: "Hour",
+            unitPrice: decimal(100),
+            quantity: decimal(1),
+            discountPercent: decimal(0),
+            totalAmount: decimal(100),
+            customText: null,
+            categoryId: null,
+          },
+        ],
+      },
+      {
+        companyInfo: { companyName: "Firma AG", companyHolderName: "Inhaber" },
+        numberFormat: "de-CH",
+        pdfTheme: null,
+      } as never
+    );
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Zwischensumme");
+    expect(pageText[0]).toContain("Rabatt (10");
   });
 });
