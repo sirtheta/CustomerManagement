@@ -22,6 +22,11 @@
 /marketing/screenshots/
 /marketing/screenshots-section.html
 
+# benutzerhandbuch screenshot tooling (scripts/manual-screenshots.ts) —
+# generated output, not source; re-run the scripts to regenerate.
+/data-manual/
+/scripts/.manual-shots/
+
 # next.js
 /.next/
 /out/

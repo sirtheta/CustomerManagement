@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LogOutIcon, UserIcon } from "lucide-react";
+import { HelpCircleIcon, LogOutIcon, UserIcon } from "lucide-react";
 
 type Props = {
   name: string;
@@ -55,6 +55,16 @@ export function UserMenu({ name, signOutAction }: Props) {
               <UserIcon className="size-4 shrink-0" />
               Profil
             </Link>
+            <a
+              href="/benutzerhandbuch.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <HelpCircleIcon className="size-4 shrink-0" />
+              Benutzerhandbuch
+            </a>
           </div>
           <form action={signOutAction} className="p-1">
             <button

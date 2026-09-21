@@ -1,0 +1,4 @@
+# Generated end-user manual with embedded screenshots — excluded from
+# GitHub's language-detection stats, which otherwise count its base64
+# image data as "HTML" and drown out the actual source code.
+public/benutzerhandbuch.html linguist-documentation
