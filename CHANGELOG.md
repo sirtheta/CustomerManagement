@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.2...customer-management-v1.5.0) (2026-09-21)
+
+
+### Features
+
+* **docs:** add in-app Benutzerhandbuch with screenshot pipeline ([fbef9dc](https://github.com/sirtheta/CustomerManagement/commit/fbef9dc14a76ae09488341173980ccdadc78ebff))
+
+
+### Bug Fixes
+
+* **scripts:** widen expenseRows categoryId type in manual demo seed ([660c97a](https://github.com/sirtheta/CustomerManagement/commit/660c97a762cea10f43033ed38ffdc011593751a3))
+
 ## [1.4.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.1...customer-management-v1.4.2) (2026-09-19)
 
 
