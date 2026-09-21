@@ -183,7 +183,7 @@ async function main() {
     });
   }
 
-  const expenseRows: { description: string; amount: number; categoryId: number; daysAgo: number }[] = [
+  const expenseRows: { description: string; amount: number; categoryId: number | null; daysAgo: number }[] = [
     { description: "Büromiete", amount: 1450, categoryId: expenseCategories[0].categoryId, daysAgo: 15 },
     { description: "Büromiete", amount: 1450, categoryId: expenseCategories[0].categoryId, daysAgo: 45 },
     { description: "Materialeinkauf Webshop", amount: 320.5, categoryId: expenseCategories[1].categoryId, daysAgo: 8 },
