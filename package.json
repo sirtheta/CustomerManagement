@@ -75,7 +75,7 @@
     "@napi-rs/canvas": "^1.0.3",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.0",
