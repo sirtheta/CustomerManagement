@@ -4,7 +4,7 @@ import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 const validCompany = {
   companyName: "Test Company AG",
   companyHolderName: "John Doe",
-  companyAddress: "Bahnhofstrasse 1",
+  companyStreet: "Bahnhofstrasse", companyHouseNumber: "1",
   companyZip: "8000",
   companyCity: "Zürich",
   companyIBAN: "CH9300762011623852957",
@@ -17,7 +17,7 @@ const validCustomer = {
   company: "Client AG",
   contactPerson: "Test Person",
   contactInsteadOfCompany: false,
-  address: "Seestrasse 100",
+  street: "Seestrasse", houseNumber: "100",
   zipCode: "8002",
   city: "Zürich",
 };
@@ -28,6 +28,38 @@ const validInvoice = {
 };
 
 describe("QRBill data preparation", () => {
+  it("passes street, building number and country as separate structured fields", () => {
+    const data = buildQrBillData({
+      invoice: validInvoice,
+      company: { ...validCompany, companyCountry: "LI" },
+      customer: { ...validCustomer, country: "DE" },
+    });
+
+    expect(data!.creditor).toMatchObject({
+      address: "Bahnhofstrasse",
+      buildingNumber: "1",
+      country: "LI",
+    });
+    expect(data!.debtor).toMatchObject({
+      address: "Seestrasse",
+      buildingNumber: "100",
+      country: "DE",
+    });
+  });
+
+  it("omits the building number and defaults the country to CH when missing", () => {
+    const data = buildQrBillData({
+      invoice: validInvoice,
+      company: { ...validCompany, companyHouseNumber: null, companyCountry: null },
+      customer: { ...validCustomer, houseNumber: "  ", country: undefined },
+    });
+
+    expect(data!.creditor).not.toHaveProperty("buildingNumber");
+    expect(data!.creditor.country).toBe("CH");
+    expect(data!.debtor).not.toHaveProperty("buildingNumber");
+    expect(data!.debtor.country).toBe("CH");
+  });
+
   // Equivalent: CreateQRBill_WithValidData_ShouldGenerateCorrectBill
   it("should generate correct bill data with valid input", () => {
     const data = buildQrBillData({
@@ -44,7 +76,7 @@ describe("QRBill data preparation", () => {
     expect(data!.creditor.country).toBe("CH");
 
     expect(data!.debtor.name).toBe(validCustomer.company);
-    expect(data!.debtor.address).toBe(validCustomer.address);
+    expect(data!.debtor.address).toBe(validCustomer.street);
     expect(data!.debtor.zip).toBe(validCustomer.zipCode);
     expect(data!.debtor.country).toBe("CH");
 
@@ -119,7 +151,10 @@ describe("QRBill data preparation", () => {
           customerId: 1,
           company: validCustomer.company,
           contactPerson: validCustomer.contactPerson,
-          address: validCustomer.address,
+          street: validCustomer.street,
+          houseNumber: validCustomer.houseNumber,
+          country: "CH",
+          addressNeedsReview: false,
           zipCode: validCustomer.zipCode,
           city: validCustomer.city,
           email: "jane@clientag.ch",
@@ -160,7 +195,10 @@ describe("QRBill data preparation", () => {
           companyInformationId: 1,
           companyName: validCompany.companyName,
           companyHolderName: validCompany.companyHolderName,
-          companyAddress: validCompany.companyAddress,
+          companyStreet: validCompany.companyStreet,
+          companyHouseNumber: validCompany.companyHouseNumber,
+          companyCountry: "CH",
+          companyAddressNeedsReview: false,
           companyZip: validCompany.companyZip,
           companyCity: validCompany.companyCity,
           companyEmail: validCompany.companyEmail,

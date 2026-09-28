@@ -4,6 +4,7 @@ import sharp from "sharp";
 import type { QrBillData } from "@/lib/pdf/qrbill-helpers";
 import { detectImageMime } from "@/lib/file-validation";
 import logger from "@/lib/logger";
+import { countryName, formatCityLine, formatStreetLine } from "@/lib/address";
 import { DEFAULT_THEME, resolveTheme, type PdfTheme } from "@/lib/pdf/theme";
 import { applyFonts } from "@/lib/pdf/fonts";
 import { Prisma } from "@prisma/client";
@@ -40,7 +41,14 @@ export type RenderDoc = {
   totalAmount: number;
   customer: Pick<
     Customer,
-    "contactInsteadOfCompany" | "company" | "contactPerson" | "address" | "zipCode" | "city"
+    | "contactInsteadOfCompany"
+    | "company"
+    | "contactPerson"
+    | "street"
+    | "houseNumber"
+    | "zipCode"
+    | "city"
+    | "country"
   >;
   items: RenderItem[];
   /** Prebuilt Swiss QR bill data; null skips the QR page (always null for quotes). */
@@ -63,13 +71,20 @@ export type RenderItem = {
 export type CompanyInfoForPdf = {
   companyName?: string | null;
   companyHolderName?: string | null;
-  companyAddress?: string | null;
+  companyStreet?: string | null;
+  companyHouseNumber?: string | null;
   companyZip?: string | null;
   companyCity?: string | null;
+  companyCountry?: string | null;
   companyEmail?: string | null;
   companyPhone?: string | null;
   companyLogo?: Uint8Array | Buffer | null;
 };
+
+// Domestic addresses omit the country line; foreign ones print the country name.
+function foreignCountryLine(code?: string | null): string | null {
+  return code && code !== "CH" ? countryName(code) : null;
+}
 
 function fmt(n: number, locale: string) {
   return new Intl.NumberFormat(locale, {
@@ -173,8 +188,9 @@ export async function generateDocumentPdf(
     const companyLines = [
       company.companyName,
       company.companyHolderName,
-      company.companyAddress,
-      `${company.companyZip ?? ""} ${company.companyCity ?? ""}`.trim(),
+      formatStreetLine(company.companyStreet, company.companyHouseNumber),
+      formatCityLine(company.companyZip, company.companyCity),
+      foreignCountryLine(company.companyCountry),
       null,
       theme.showPhone && company.companyPhone ? `Tel. ${company.companyPhone}` : null,
       theme.showEmail ? company.companyEmail : null,
@@ -194,8 +210,9 @@ export async function generateDocumentPdf(
     const addrLines = [
       displayName,
       !customer.contactInsteadOfCompany && customer.company ? customer.contactPerson : null,
-      customer.address,
-      `${customer.zipCode} ${customer.city}`,
+      formatStreetLine(customer.street, customer.houseNumber),
+      formatCityLine(customer.zipCode, customer.city),
+      foreignCountryLine(customer.country),
     ].filter(Boolean) as string[];
 
     pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);

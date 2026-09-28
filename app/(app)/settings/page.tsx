@@ -55,9 +55,12 @@ export default async function SettingsPage() {
         <SettingsForm
           companyName={c?.companyName ?? ""}
           companyHolderName={c?.companyHolderName ?? ""}
-          companyAddress={c?.companyAddress ?? ""}
+          companyStreet={c?.companyStreet ?? ""}
+          companyHouseNumber={c?.companyHouseNumber ?? ""}
           companyZip={c?.companyZip ?? ""}
           companyCity={c?.companyCity ?? ""}
+          companyCountry={c?.companyCountry ?? "CH"}
+          companyAddressNeedsReview={c?.companyAddressNeedsReview ?? false}
           companyEmail={c?.companyEmail ?? ""}
           companyPhone={c?.companyPhone ?? ""}
           companyIBAN={c?.companyIBAN ?? ""}
