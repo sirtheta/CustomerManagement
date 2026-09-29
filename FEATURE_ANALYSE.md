@@ -43,7 +43,7 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 
 | # | Befund | Beleg | Einstufung |
 |---|---|---|---|
-| Q1 | **Nur Referenztyp „ohne Referenz“ (NON).** Die Rechnungsnummer steht als unstrukturierte Mitteilung im QR-Code. Es gibt keine QR-Referenz (QRR) und keine Creditor Reference (SCOR, ISO 11649). | [Code] `qrbill-helpers.ts` (`message: invoice.documentNumber`, kein `reference`). Suche `QRR\|SCOR\|reference\|qr-?iban`: keine Treffer in der QR-Erzeugung. | Der Zahlungsabgleich hängt davon ab, dass die Bank die Mitteilung unverändert weitergibt. Eine QR-IBAN wird **bewusst nicht unterstützt** (Entscheid des Entwicklers, derzeit kein Bedarf). Mit normaler IBAN ist eine Creditor Reference (SCOR) möglich [Quelle: SIX Implementation Guidelines QR-Rechnung v2.3, bitte prüfen]. |
+| Q1 | **Ohne Referenz (NON) – bewusster Entscheid.** Die Rechnungsnummer steht als Mitteilung im QR-Code. QR-Referenz (QRR), QR-IBAN und Creditor Reference (SCOR) werden bewusst nicht verwendet (Entscheid des Entwicklers, derzeit kein Bedarf). | [Code] `qrbill-helpers.ts` (`message: invoice.documentNumber`, kein `reference`) | Kein Handlungsbedarf. Folge: Der Zahlungsabgleich hängt davon ab, dass die Bank die Mitteilung unverändert im Kontoauszug weitergibt. |
 | Q2 | ~~Die Adresse ist ein einziges Feld~~ **Erledigt mit #111.** Strasse, Hausnummer und Land sind getrennte Felder (`street`, `houseNumber`, `country` bzw. `companyStreet`, `companyHouseNumber`, `companyCountry`). Sie werden als `address`/`buildingNumber`/`country` an swissqrbill übergeben. Bestehende Adressen wurden per Migration aufgeteilt und mit `addressNeedsReview` markiert, bis sie gespeichert werden. | [Code] `schema.prisma`, `lib/address.ts`, `lib/pdf/qrbill-helpers.ts`, `tests/unit/qrbill-data.test.ts`, `tests/integration/structured-addresses-migration.test.ts` | Hintergrund: Seit dem **21.11.2025** sind im QR-Code nur noch strukturierte Adressen zulässig [Quelle: [timesafe.ch](https://timesafe.ch/neue-vorgaben-fuer-qr-rechnungen-ab-november-2025-alles-was-du-wissen-musst/), [KMU Partner Group](https://www.kmupartnergroup.ch/newsroom/aenderungen-bei-qr-rechnungen-in-der-schweiz-ab-21-november-2025)]. Empfehlung: einmal ein PDF mit dem Validator der Bank bzw. von SIX prüfen und die markierten Adressen durchgehen. |
 | Q3 | **Die IBAN wird serverseitig nicht geprüft.** | [Code] `app/(app)/settings/actions.ts` Z. 47 speichert den Rohwert. Der Test `tests/unit/iban-validation.test.ts` prüft ein Schema, das **im Test selbst** definiert ist, nicht App-Code. | Eine falsche IBAN fällt erst auf, wenn das PDF erzeugt wird oder der Kunde zahlt. |
 | Q4 | **Die Sprache des QR-Zahlteils ist nicht gesetzt.** | [Code] `document-pdf.ts`: `new SwissQRBill(doc.qr)` ohne `language` | swissqrbill unterstützt DE/FR/IT/EN [Quelle: swissqrbill README]. Welche Sprache ohne Angabe verwendet wird, habe ich nicht geprüft. |
@@ -107,12 +107,12 @@ Siehe **Abschnitt 7**.
 
 Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, **mittel** = 1–3 Wochen, **hoch** = mehr als 3 Wochen (für eine Person). Das ist eine grobe Schätzung.
 
-### F1 · Creditor Reference (SCOR) und IBAN-Prüfung — **Muss**
-- **Beschreibung:** *(Strukturierte Adressen und Land sind mit #111 erledigt.)* Creditor Reference (SCOR, ISO 11649) zur normalen IBAN, die Rechnungsnummer bleibt als Mitteilung. Serverseitige Prüfung der IBAN (Prüfsumme). QR-IBAN/QRR ist bewusst ausgeklammert. Sprache des Zahlteils pro Kunde.
-- **Nutzen:** Zahlungen lassen sich zuverlässig zuordnen (die Referenz ist maschinenlesbar und hat eine Prüfziffer), der Abgleich hängt nicht mehr am freien Mitteilungstext (Q1), und eine falsche IBAN fällt beim Speichern auf (Q3).
-- **Aufwand:** gering–mittel
-- **Code:** `lib/pdf/qrbill-helpers.ts`, `lib/pdf/document-pdf.ts`, `schema.prisma` (`Invoice.paymentReference`, Kundensprache), `app/(app)/settings/actions.ts`, `lib/import/matching.ts`
-- **Ansatz:** Die Referenz beim Versand erzeugen und in `Invoice` speichern, damit sie unveränderlich ist. IBAN-Prüfung in `saveSettings` (Prüfsumme) und den bisherigen Test `tests/unit/iban-validation.test.ts` auf den echten App-Code umstellen. Mit dem Validator von SIX bzw. der Bank testen.
+### F1 · IBAN-Prüfung und Sprache des Zahlteils — **Muss**
+- **Beschreibung:** *(Strukturierte Adressen und Land sind mit #111 erledigt. Eine Zahlungsreferenz ist bewusst ausgeklammert.)* Serverseitige Prüfung der IBAN beim Speichern (Länge, Prüfsumme). Sprache des QR-Zahlteils pro Kunde (DE/FR/IT/EN).
+- **Nutzen:** Eine falsche IBAN fällt beim Speichern auf und nicht erst, wenn Zahlungen ausbleiben (Q3). Kunden in der Romandie oder im Tessin erhalten den Zahlteil in ihrer Sprache (Q4).
+- **Aufwand:** gering
+- **Code:** `app/(app)/settings/actions.ts`, `tests/unit/iban-validation.test.ts`, `lib/pdf/document-pdf.ts` (`new SwissQRBill(…, { language })`), `schema.prisma` (Kundensprache, zusammen mit F9)
+- **Ansatz:** IBAN-Prüfung in `saveSettings` (Prüfsumme nach ISO 13616) und den bisherigen Test auf den echten App-Code umstellen. Die Sprache an swissqrbill übergeben.
 
 ### F2 · Rechnungen festschreiben, Gutschrift und Storno — **Muss**
 - **Beschreibung:** Ab Status „Versendet“ ist eine Rechnung nicht mehr änderbar. Korrekturen laufen über eine **Gutschrift** (eigener Belegtyp mit Bezug zur Originalrechnung) oder einen Storno mit neuer Rechnung. Nicht-Entwürfe können nicht gelöscht werden. Kunden mit Rechnungen können nur archiviert, nicht gelöscht werden. Statuswechsel nur entlang erlaubter Übergänge.
@@ -143,7 +143,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Ansatz:** Zuerst ein konfigurierbares, generisches Journal-CSV. Danach gezielt das Format der Software, die die Nutzer tatsächlich haben (siehe Abschnitt 7, Fragen). **Welche Importformate Banana, bexio oder Abacus genau erwarten, habe ich nicht geprüft.** Das ist vor der Umsetzung anhand der Hersteller-Dokumentation zu klären.
 
 ### F6 · Besserer Bankabgleich — **Sollte**
-- **Beschreibung:** Abgleich über die QR-Referenz (nach F1). Teilzahlungen (nach F4). Die importierten Bewegungen werden gespeichert (Duplikatschutz per Bankreferenz, Saldovergleich Anfangs-/Endsaldo). Warnung, wenn Währung oder IBAN nicht passen (Z3). Optional camt.054 als zweiter Parser. Die Ausgabenseite des Auszugs kann direkt als `Expense` übernommen werden.
+- **Beschreibung:** Treffersuche robuster machen (z. B. Rechnungsnummer auch mit Leerzeichen oder ohne Präfix erkennen, Kundenname als Zusatzsignal). Teilzahlungen (nach F4). Die importierten Bewegungen werden gespeichert (Duplikatschutz per Bankreferenz, Saldovergleich Anfangs-/Endsaldo). Warnung, wenn Währung oder IBAN nicht passen (Z3). Optional camt.054 als zweiter Parser. Die Ausgabenseite des Auszugs kann direkt als `Expense` übernommen werden.
 - **Nutzen:** Das Verbuchen der Zahlungseingänge geht fast automatisch. Die Ausgaben müssen nicht mehr doppelt erfasst werden.
 - **Aufwand:** mittel
 - **Code:** `lib/import/camt.ts`, `lib/import/matching.ts`, `app/(app)/invoices/import/*`, `schema.prisma` (`BankTransaction`)
@@ -201,7 +201,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
 1. F2 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen
-2. F1 Creditor Reference (SCOR) und IBAN-Prüfung
+2. F1 IBAN-Prüfung und Sprache des Zahlteils
 3. F3 Belegarchiv und automatisches Backup
 4. Kleine Fixes: Import prüft Währung und IBAN (Z3), Audit-Log für Pending-E-Mails (U6), Entwürfe ohne Nummer oder mit Nummer erst beim Versand (R5; vorher mit Treuhänder klären)
 
@@ -234,7 +234,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 1. **Zielgruppe:** Nur du bzw. dein Betrieb, oder sollen auch andere die App einsetzen? Einzelfirmen, GmbH/AG, Vereine?
 2. **Treuhänder:** Mit welcher Software arbeitet dein Treuhänder bzw. arbeiten die Treuhänder deiner Nutzer (Banana, bexio, Abacus, Run my Accounts, andere)?
-3. **Bank:** Welche Bank nutzt du? Gibt sie die SCOR-Referenz im CAMT.053 zuverlässig zurück? (Bestimmt, wie der Abgleich in F6 gebaut wird.)
+3. **Bank:** Welche Bank nutzt du? Gibt sie die Mitteilung aus dem QR-Code im CAMT.053 zuverlässig und unverändert zurück? (Bestimmt, wie der Abgleich in F6 gebaut wird.)
 4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)? Kunden in der Romandie oder im Tessin?
 5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F6 ersetzt werden?
 6. **Volumen:** Wie viele Rechnungen, Ausgaben und Belege pro Jahr? (Relevant für BLOB-Speicherung in SQLite und Backups.)
@@ -288,7 +288,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 Begründung:
 1. Die Architektur (eine Firma, SQLite, self-hosted, Einzelentwickler) und die angenommene Zielgruppe passen zu einer schlanken Fakturierung, nicht zu einer vollen Finanzbuchhaltung.
 2. Treuhänder geben in der Praxis oft die Software vor. Eine eigene Buchhaltung würde dann doppelt geführt.
-3. Die Teile, die *nur* die App gut kann, bleiben in der App: Rechnungen, QR-Referenz, Zahlungsabgleich, offene Posten, Mahnwesen, Belegarchiv. Genau diese Daten braucht der Treuhänder sauber.
+3. Die Teile, die *nur* die App gut kann, bleiben in der App: Rechnungen, QR-Zahlteil, Zahlungsabgleich, offene Posten, Mahnwesen, Belegarchiv. Genau diese Daten braucht der Treuhänder sauber.
 4. Die Grenze liegt beim **Journal-Export**. Alles, was Konten, Abschluss und Bilanz betrifft, bleibt im Fachprogramm.
 
 Umsetzung in dieser Reihenfolge: F2 → F4 → F5, danach F6/F8. Kontonummern und Buchungslogik (z. B. ob pro Rechnung oder pro Zahlung gebucht wird) **legt der Treuhänder fest**. Die App bietet dafür eine Konfiguration an und enthält keine eingebauten Konten.
