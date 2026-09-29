@@ -1,35 +1,37 @@
 import { describe, it, expect } from "vitest";
-import { z } from "zod";
+import { validateIban } from "@/lib/iban";
 
-// Swiss IBAN: CH + 2 check digits + 5-digit bank code + 12-digit account number
-// with optional spaces every 4 characters.
-const ibanSchema = z
-  .string()
-  .regex(
-    /^CH\d{2}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{1}$/,
-    "Invalid Swiss IBAN"
-  );
-
-describe("IBAN validation", () => {
-  // Equivalent: SaveSettings_WithInvalidIBAN_ShouldThrowValidationException (Theory)
+describe("validateIban", () => {
   it.each([
-    [""],
-    [null],
-    ["test"],
-    ["CH123ABC"],
-    ["DE89370400440532013000"], // valid German IBAN – not Swiss
-    ["CH123456789012345678901"], // too long
-  ])("should reject invalid IBAN: '%s'", (iban) => {
-    const result = ibanSchema.safeParse(iban ?? "");
-    expect(result.success).toBe(false);
+    ["CH9300762011623852957"],
+    ["CH93 0076 2011 6238 5295 7"],
+    ["ch9300762011623852957"],
+    ["  CH93 0076 2011 6238 5295 7  "],
+    ["LI21088100002324013AA"],
+  ])("accepts valid CH/LI IBAN: '%s'", (input) => {
+    const result = validateIban(input);
+    expect(result.valid).toBe(true);
   });
 
-  // Equivalent: SaveSettings_WithValidIBAN_ShouldNotThrow (Theory)
+  it("returns the normalized IBAN without spaces in upper case", () => {
+    expect(validateIban("ch93 0076 2011 6238 5295 7")).toEqual({
+      valid: true,
+      iban: "CH9300762011623852957",
+    });
+  });
+
   it.each([
-    ["CH9300762011623852957"],          // without spaces
-    ["CH93 0076 2011 6238 5295 7"],    // with spaces
-  ])("should accept valid Swiss IBAN: '%s'", (iban) => {
-    const result = ibanSchema.safeParse(iban);
-    expect(result.success).toBe(true);
+    ["test"],
+    ["CH123ABC"],
+    ["CH123456789012345678901"], // right length, wrong check digits
+    ["CH9300762011623852958"], // one digit off: checksum mismatch
+    ["CH93007620116238529571"], // too long
+    ["CH930076201162385295"], // too short
+    ["DE89370400440532013000"], // valid IBAN, but not CH/LI
+    ["CH93-0076-2011-6238-5295-7"], // illegal characters
+  ])("rejects invalid IBAN: '%s'", (input) => {
+    const result = validateIban(input);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.error).toBeTruthy();
   });
 });
