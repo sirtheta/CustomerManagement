@@ -351,6 +351,13 @@ describe("invoices/pending actions", () => {
         expect.anything(),
         { to: "k@test.ch", subject: "Rechnung R-26090001", body: "Nr. R-26090001" }
       );
+      expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({
+        data: { invoiceId: 10, sentTo: "k@test.ch", subject: "Rechnung R-26090001" },
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "SEND", "Invoice", 10, "R-26090001", {
+        to: "k@test.ch",
+        subject: "Rechnung R-26090001",
+      });
     });
 
     it("returns error and sends nothing when number assignment fails", async () => {

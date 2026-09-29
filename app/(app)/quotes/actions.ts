@@ -125,9 +125,10 @@ export async function updateQuoteStatus(
   state: QuoteState
 ): Promise<void> {
   const session = await requireEditor();
-  const current = await prisma.quote.findUnique({ where: { id }, select: { state: true } });
+  const current = await prisma.quote.findUnique({ where: { id }, select: { state: true, documentNumber: true },
+  });
   if (!current) return;
-  if (current.state === "Draft" && (state === "Sent" || state === "Accepted")) {
+  if (!current.documentNumber && (state === "Sent" || state === "Accepted")) {
     await assignDocumentNumber("quote", id, { actor: session });
   }
   await prisma.quote.update({ where: { id }, data: { state } });
@@ -167,7 +168,7 @@ export async function sendQuote(
 }
 
 export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: string }> {
-  await requireEditor();
+  const session = await requireEditor();
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
     include: { items: true },
@@ -181,6 +182,10 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   const today = new Date();
   const dueDate = new Date(today);
   dueDate.setDate(dueDate.getDate() + paymentTermDays);
+
+  if (!quote.documentNumber) {
+    await assignDocumentNumber("quote", quoteId, { actor: session });
+  }
 
   let newInvoiceId: number;
 

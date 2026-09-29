@@ -7,5 +7,5 @@ export function documentLabel(documentNumber: string | null | undefined): string
 
 /** Replaces the {documentNumber} placeholder once the number is known (at send time). */
 export function fillDocumentNumber(text: string, documentNumber: string): string {
-  return text.replace(/\{documentNumber\}/g, documentNumber);
+  return text.replace(/\{documentNumber\}/g, () => documentNumber);
 }

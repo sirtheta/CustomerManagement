@@ -19,6 +19,10 @@ describe("fillDocumentNumber", () => {
     ).toBe("Rechnung R-26090001 / Ref R-26090001");
   });
 
+  it("inserts the number literally, without replacement-pattern expansion", () => {
+    expect(fillDocumentNumber("Nr. {documentNumber}", "R-$&-$1-$$")).toBe("Nr. R-$&-$1-$$");
+  });
+
   it("leaves text without placeholder unchanged", () => {
     expect(fillDocumentNumber("Guten Tag", "R-1")).toBe("Guten Tag");
   });

@@ -137,7 +137,7 @@ export async function updateInvoiceStatus(
 
   const NUMBERED_STATES: InvoiceState[] = ["Sent", "Overdue", "Paid"];
   let documentNumber = current.documentNumber;
-  if (current.state === "Draft" && NUMBERED_STATES.includes(state)) {
+  if (!current.documentNumber && NUMBERED_STATES.includes(state)) {
     documentNumber = await assignDocumentNumber("invoice", id, { actor: session });
   }
 

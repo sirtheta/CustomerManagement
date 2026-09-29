@@ -273,6 +273,26 @@ describe("quote actions", () => {
       expect(prisma.quote.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { state } });
     });
 
+    it.each([
+      ["Declined", "Sent"],
+      ["Expired", "Accepted"],
+    ] as const)("assigns a number when an unnumbered %s quote goes to %s", async (from, to) => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: from, documentNumber: null } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("O-26090001");
+      await updateQuoteStatus(3, to);
+      expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 3, { actor: editorSession });
+    });
+
+    it("does not assign a number when the quote already has one", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Sent", documentNumber: "O-1" } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      await updateQuoteStatus(3, "Accepted");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
+    });
+
     it("does not assign a number when a draft is declined", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Draft" } as never);
@@ -463,11 +483,35 @@ describe("quote actions", () => {
         }),
       });
       expect(vi.mocked(prisma.invoice.create).mock.calls[0][0].data).not.toHaveProperty("documentNumber");
-      expect(assignDocumentNumber).not.toHaveBeenCalled();
+      expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 1, { actor: editorSession });
+      expect(vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(prisma.$transaction).mock.invocationCallOrder[0]
+      );
       expect(prisma.quote.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { state: "Accepted" },
       });
+    });
+
+    it("does not assign a number when the quote already has one", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        id: 1,
+        customerId: 10,
+        documentNumber: "O-26090001",
+        customUserText: null,
+        totalAmount: 500,
+        items: [],
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ defaultPaymentTermDays: 30 } as never);
+      vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 99 } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/invoices/99");
+      });
+      await expect(convertQuoteToInvoice(1)).rejects.toThrow("REDIRECT:/invoices/99");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
     });
 
     it("calculates due date using defaultPaymentTermDays from settings", async () => {
