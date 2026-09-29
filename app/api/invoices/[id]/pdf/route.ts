@@ -29,7 +29,7 @@ export async function GET(
   if (!invoice) return Response.json({ error: "Not Found" }, { status: 404 });
   if (!settings) return Response.json({ error: "Company settings not configured" }, { status: 500 });
 
-  const filename = `rechnung-${invoice.documentNumber}.pdf`;
+  const filename = `rechnung-${invoice.documentNumber ?? `entwurf-${invoice.id}`}.pdf`;
   const cacheKey = `inv-${invoiceId}-v${invoice.version}-t${themeRevision(settings.pdfTheme)}`;
   const cached = await readCache(cacheKey);
 

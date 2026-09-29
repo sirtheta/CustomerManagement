@@ -1,6 +1,7 @@
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateDocumentPdf, type RenderDoc } from "@/lib/pdf/document-pdf";
 import { calculateInvoiceTotal } from "@/lib/calculations";
+import { documentLabel } from "@/lib/document-display";
 import type {
   Invoice,
   Quote,
@@ -48,7 +49,7 @@ export async function generateInvoicePdf(
   const doc: RenderDoc = {
     kind: "invoice",
     title: "Rechnung",
-    documentNumber: invoice.documentNumber,
+    documentNumber: documentLabel(invoice.documentNumber),
     numberLabel: "Rechnungs-Nr.:",
     date: invoice.date,
     dueDate: invoice.dueDate,
@@ -74,7 +75,7 @@ export async function generateQuotePdf(
   const doc: RenderDoc = {
     kind: "quote",
     title: "Offerte",
-    documentNumber: quote.documentNumber,
+    documentNumber: documentLabel(quote.documentNumber),
     numberLabel: "Offerten-Nr.:",
     date: quote.date,
     dueDate: quote.validUntil,

@@ -19,7 +19,7 @@ export type CustomerHit = {
 // can cross the server-action boundary to client components.
 export type DocumentHit<TState extends string> = {
   id: number;
-  documentNumber: string;
+  documentNumber: string | null;
   date: string;
   totalAmount: number;
   state: TState;
@@ -102,7 +102,7 @@ export async function searchGlobal(
 
   const toHit = <TState extends string>(doc: {
     id: number;
-    documentNumber: string;
+    documentNumber: string | null;
     date: Date;
     totalAmount: { toNumber(): number };
     state: TState;

@@ -18,6 +18,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
+import { documentLabel } from "@/lib/document-display";
 
 const PAGE_SIZE = 25;
 
@@ -225,7 +226,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                 <TableRow key={q.id}>
                   <TableCell className="font-medium">
                     <Link href={`/quotes/${q.id}`} className="hover:underline">
-                      {q.documentNumber}
+                      {documentLabel(q.documentNumber)}
                     </Link>
                   </TableCell>
                   <TableCell>

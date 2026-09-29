@@ -10,6 +10,7 @@ import { sendReminder, dismissReminder } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { SendIcon, Trash2Icon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { documentLabel } from "@/lib/document-display";
 
 const levelLabels: Record<number, string> = {
   1: "Zahlungserinnerung",
@@ -20,7 +21,7 @@ const levelLabels: Record<number, string> = {
 type Props = {
   reminderId: number;
   invoiceId: number;
-  documentNumber: string;
+  documentNumber: string | null;
   customerName: string;
   totalAmount: number;
   dueDate: string;
@@ -37,7 +38,7 @@ export default function ReminderRow(props: Props) {
   );
   const [dismissing, startDismiss] = useTransition();
 
-  useActionToast(state, `Mahnung für ${props.documentNumber} versendet`);
+  useActionToast(state, `Mahnung für ${documentLabel(props.documentNumber)} versendet`);
 
   const levelLabel = levelLabels[props.reminderLevel] ?? `Mahnung ${props.reminderLevel}`;
 
@@ -47,7 +48,7 @@ export default function ReminderRow(props: Props) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <CardTitle className="text-base">
-              {props.documentNumber}{" "}
+              {documentLabel(props.documentNumber)}{" "}
               <span className="text-xs font-normal text-muted-foreground">· {levelLabel}</span>
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-0.5">

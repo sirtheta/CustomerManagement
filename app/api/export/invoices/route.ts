@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { InvoiceState, UserRole } from "@prisma/client";
 import { z } from "zod";
+import { documentLabel } from "@/lib/document-display";
 
 const stateLabels: Record<string, string> = {
   Draft: "Entwurf",
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
 
   const headers = ["Nummer", "Datum", "Fälligkeit", "Kunde", "Betrag (CHF)", "Status"];
   const rows = invoices.map((inv) => [
-    inv.documentNumber,
+    documentLabel(inv.documentNumber),
     inv.date.toLocaleDateString("de-CH"),
     inv.dueDate.toLocaleDateString("de-CH"),
     inv.customer.contactInsteadOfCompany

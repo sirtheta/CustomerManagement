@@ -11,6 +11,7 @@ import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/date";
 import { createQuote, updateQuote, type QuoteFormState } from "./actions";
 import type { Category, Customer, Quote, Item, Service } from "@prisma/client";
+import { documentLabel } from "@/lib/document-display";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -92,7 +93,7 @@ export default function QuoteForm({
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
-          {quote ? `Offerte ${quote.documentNumber}` : "Neue Offerte"}
+          {quote ? `Offerte ${documentLabel(quote.documentNumber)}` : "Neue Offerte"}
         </h1>
         <Button variant="outline" render={<Link href={cancelHref} />}>
           Abbrechen

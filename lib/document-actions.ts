@@ -213,7 +213,7 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
         data: { invoiceId: input.id, sentTo: input.to, subject: input.subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Invoice", input.id, invoice.documentNumber, {
+    await logAudit(input.actor, "SEND", "Invoice", input.id, invoice.documentNumber ?? undefined, {
       to: input.to,
     });
     revalidatePath(`/invoices/${input.id}`);
@@ -243,7 +243,7 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
         data: { quoteId: input.id, sentTo: input.to, subject: input.subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Quote", input.id, quote.documentNumber, {
+    await logAudit(input.actor, "SEND", "Quote", input.id, quote.documentNumber ?? undefined, {
       to: input.to,
     });
     revalidatePath(`/quotes/${input.id}`);

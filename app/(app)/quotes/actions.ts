@@ -143,7 +143,7 @@ export async function deleteQuote(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteQuote failed");
     return { error: "Offerte konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Quote", id, q?.documentNumber);
+  await logAudit(session, "DELETE", "Quote", id, q?.documentNumber ?? undefined);
   revalidatePath("/quotes");
   redirect("/quotes");
 }

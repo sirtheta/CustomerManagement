@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { InvoiceState } from "@prisma/client";
 import { customerDisplayName } from "@/lib/customer-display";
+import { documentLabel } from "@/lib/document-display";
 
 export type MonthlyResult = {
   month: string;
@@ -115,7 +116,7 @@ export async function fetchPaidInvoicesForYear(prisma: PrismaClient, year: numbe
 
   return invoices.map((inv) => ({
     id: inv.id,
-    documentNumber: inv.documentNumber,
+    documentNumber: documentLabel(inv.documentNumber),
     customerName: customerDisplayName(inv.customer),
     paidDate: inv.paidDate!.toISOString(),
     totalAmount: inv.totalAmount.toNumber(),

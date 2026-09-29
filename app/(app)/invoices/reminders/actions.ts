@@ -62,7 +62,7 @@ export async function sendReminder(
     }),
   ]);
 
-  await logAudit(session, "SEND", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber, {
+  await logAudit(session, "SEND", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
     to,
     level: reminder.reminderLevel,
   });
@@ -86,7 +86,7 @@ export async function dismissReminder(id: number): Promise<void> {
     data: { snoozedUntil },
   });
   if (reminder) {
-    await logAudit(session, "UPDATE", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber, {
+    await logAudit(session, "UPDATE", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
       action: "dismissed",
     });
   }

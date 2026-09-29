@@ -5,6 +5,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import ReminderRow from "./ReminderRow";
 import { SearchInput } from "@/components/search-input";
 import { Suspense } from "react";
+import { documentLabel } from "@/lib/document-display";
 
 type Props = {
   searchParams: Promise<{ search?: string }>;
@@ -84,15 +85,15 @@ export default async function RemindersPage({ searchParams }: Props) {
               ? "1. Mahnung"
               : "2. Mahnung";
 
-            const defaultSubject = `${levelLabel}: Rechnung ${inv.documentNumber} – ${companyName}`;
-            const defaultBody = `Guten Tag ${c.contactPerson}\n\nwir möchten Sie höflich daran erinnern, dass folgende Rechnung noch offen ist:\n\nRechnung Nr.: ${inv.documentNumber}\nBetrag: ${formatCurrency(inv.totalAmount.toNumber())}\nFälligkeitsdatum: ${formatDate(inv.dueDate)}\n\nBitte überweisen Sie den Betrag umgehend auf unser Konto.\n\nMit freundlichen Grüssen\n${companyName}`;
+            const defaultSubject = `${levelLabel}: Rechnung ${documentLabel(inv.documentNumber)} – ${companyName}`;
+            const defaultBody = `Guten Tag ${c.contactPerson}\n\nwir möchten Sie höflich daran erinnern, dass folgende Rechnung noch offen ist:\n\nRechnung Nr.: ${documentLabel(inv.documentNumber)}\nBetrag: ${formatCurrency(inv.totalAmount.toNumber())}\nFälligkeitsdatum: ${formatDate(inv.dueDate)}\n\nBitte überweisen Sie den Betrag umgehend auf unser Konto.\n\nMit freundlichen Grüssen\n${companyName}`;
 
             return (
               <ReminderRow
                 key={r.id}
                 reminderId={r.id}
                 invoiceId={inv.id}
-                documentNumber={inv.documentNumber}
+                documentNumber={documentLabel(inv.documentNumber)}
                 customerName={customerName}
                 totalAmount={inv.totalAmount.toNumber()}
                 dueDate={formatDate(inv.dueDate)}

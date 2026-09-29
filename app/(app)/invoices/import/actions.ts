@@ -52,11 +52,13 @@ export async function parseStatement(
 
   const matches = matchStatementToInvoices(
     statement.transactions,
-    openInvoices.map((invoice) => ({
-      id: invoice.id,
-      documentNumber: invoice.documentNumber,
-      totalAmount: invoice.totalAmount.toNumber(),
-    })),
+    openInvoices
+      .filter((invoice): invoice is typeof invoice & { documentNumber: string } => invoice.documentNumber !== null)
+      .map((invoice) => ({
+        id: invoice.id,
+        documentNumber: invoice.documentNumber,
+        totalAmount: invoice.totalAmount.toNumber(),
+      })),
     settings?.invoiceNumberPrefix ?? "R-"
   );
 

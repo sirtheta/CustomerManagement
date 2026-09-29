@@ -42,7 +42,7 @@ async function generateNumber(
       select: { documentNumber: true },
     });
     for (const inv of latest) {
-      const seq = parseInt(inv.documentNumber.slice(-4), 10);
+      const seq = parseInt((inv.documentNumber ?? "").slice(-4), 10);
       if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
   } else {
@@ -51,7 +51,7 @@ async function generateNumber(
       select: { documentNumber: true },
     });
     for (const q of latest) {
-      const seq = parseInt(q.documentNumber.slice(-4), 10);
+      const seq = parseInt((q.documentNumber ?? "").slice(-4), 10);
       if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
   }

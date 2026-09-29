@@ -32,7 +32,7 @@ function resolvePlaceholders(
   const displayName = customerDisplayName(c);
 
   return template
-    .replace(/\{documentNumber\}/g, invoice.documentNumber)
+    .replace(/\{documentNumber\}/g, invoice.documentNumber ?? "")
     .replace(/\{contactPerson\}/g, c.contactPerson)
     .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
     .replace(/\{totalAmount\}/g, formatCurrency(invoice.totalAmount.toNumber()))
@@ -52,6 +52,7 @@ export async function sendInvoiceEmail(
   pdf: Buffer,
   overrides?: { to?: string; subject?: string; body?: string }
 ): Promise<void> {
+  if (!invoice.documentNumber) throw new Error("Rechnung hat noch keine Nummer.");
   if (process.env.DISABLE_EMAIL === 'true') {
     console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
     return;
@@ -87,7 +88,7 @@ function resolveQuotePlaceholders(
   const displayName = customerDisplayName(c);
 
   return template
-    .replace(/\{documentNumber\}/g, quote.documentNumber)
+    .replace(/\{documentNumber\}/g, quote.documentNumber ?? "")
     .replace(/\{contactPerson\}/g, c.contactPerson)
     .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
     .replace(/\{totalAmount\}/g, formatCurrency(quote.totalAmount.toNumber()))
@@ -138,6 +139,7 @@ export async function sendQuoteEmail(
   pdf: Buffer,
   overrides?: { to?: string; subject?: string; body?: string }
 ): Promise<void> {
+  if (!quote.documentNumber) throw new Error("Offerte hat noch keine Nummer.");
   if (process.env.DISABLE_EMAIL === 'true') {
     console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
     return;

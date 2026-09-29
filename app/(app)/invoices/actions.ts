@@ -158,7 +158,7 @@ export async function updateInvoiceStatus(
     await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
   }
 
-  await logAudit(session, "STATUS", "Invoice", id, current.documentNumber, {
+  await logAudit(session, "STATUS", "Invoice", id, current.documentNumber ?? undefined, {
     from: current.state,
     to: state,
   });
@@ -185,7 +185,7 @@ export async function updateInvoicePaidDate(
     select: { documentNumber: true },
   });
 
-  await logAudit(session, "UPDATE", "Invoice", id, invoice.documentNumber, { paidDate });
+  await logAudit(session, "UPDATE", "Invoice", id, invoice.documentNumber ?? undefined, { paidDate });
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/accounting");
@@ -261,7 +261,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber);
+  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber ?? undefined);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");

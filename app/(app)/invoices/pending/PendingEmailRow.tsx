@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { approvePendingEmail, discardPendingEmail } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
+import { documentLabel } from "@/lib/document-display";
 
 type Props = {
   id: number;
   invoiceId: number;
-  documentNumber: string;
+  documentNumber: string | null;
   customerName: string;
   totalAmount: number;
   to: string;
@@ -28,7 +29,7 @@ export default function PendingEmailRow(props: Props) {
   );
   const [discarding, startDiscard] = useTransition();
 
-  useActionToast(state, `Rechnung ${props.documentNumber} versendet`);
+  useActionToast(state, `Rechnung ${documentLabel(props.documentNumber)} versendet`);
 
   const isEmpty = props.totalAmount === 0;
 
@@ -37,7 +38,7 @@ export default function PendingEmailRow(props: Props) {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <CardTitle className="text-base">{props.documentNumber}</CardTitle>
+            <CardTitle className="text-base">{documentLabel(props.documentNumber)}</CardTitle>
             <p className="text-sm text-muted-foreground mt-0.5">{props.customerName}</p>
           </div>
           <Button
