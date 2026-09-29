@@ -53,6 +53,8 @@ export type RenderDoc = {
   items: RenderItem[];
   /** Prebuilt Swiss QR bill data; null skips the QR page (always null for quotes). */
   qr: QrBillData | null;
+  /** True for an unnumbered draft: renders a diagonal "ENTWURF" watermark. */
+  draft: boolean;
 };
 
 // Accepts both Prisma Decimal (real documents) and plain numbers (preview samples).
@@ -166,6 +168,19 @@ export async function generateDocumentPdf(
 
     // Register the selected font family (embedded fonts attach to this doc).
     const { regular: FONT, bold: BOLD } = applyFonts(pdf, theme.fontFamily);
+
+    // Diagonal "ENTWURF" watermark, painted first on every page so content sits on top.
+    const drawWatermark = () => {
+      if (!doc.draft) return;
+      pdf.save();
+      pdf.rotate(-45, { origin: [PAGE_W / 2, PAGE_H / 2] });
+      pdf.font(BOLD).fontSize(96).fillColor("#cccccc").fillOpacity(0.35);
+      pdf.text("ENTWURF", 0, PAGE_H / 2 - 40, { width: PAGE_W, align: "center", lineBreak: false });
+      pdf.restore();
+      pdf.fillOpacity(1).fillColor(TEXT_COLOR);
+    };
+    drawWatermark();
+    pdf.on("pageAdded", drawWatermark);
 
     // Draw a horizontal rule in the accent color.
     const rule = (y: number, width = 0.5) => {

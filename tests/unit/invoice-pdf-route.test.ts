@@ -70,7 +70,7 @@ describe("GET /api/invoices/[id]/pdf", () => {
 
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("cached-pdf-bytes");
-    expect(readCache).toHaveBeenCalledWith("inv-1-v3-t1");
+    expect(readCache).toHaveBeenCalledWith("inv-1-v3-nI-260700001-t1");
     expect(generateInvoicePdf).not.toHaveBeenCalled();
     expect(writeCache).not.toHaveBeenCalled();
   });
@@ -84,7 +84,7 @@ describe("GET /api/invoices/[id]/pdf", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("fresh-pdf-bytes");
     expect(generateInvoicePdf).toHaveBeenCalledTimes(1);
-    expect(writeCache).toHaveBeenCalledWith("inv-1-v3-t1", Buffer.from("fresh-pdf-bytes"));
+    expect(writeCache).toHaveBeenCalledWith("inv-1-v3-nI-260700001-t1", Buffer.from("fresh-pdf-bytes"));
   });
 
   it("keys the cache on the invoice version, invalidating after an edit", async () => {
@@ -94,6 +94,34 @@ describe("GET /api/invoices/[id]/pdf", () => {
 
     await GET(req(), ctx("1"));
 
-    expect(readCache).toHaveBeenCalledWith("inv-1-v4-t1");
+    expect(readCache).toHaveBeenCalledWith("inv-1-v4-nI-260700001-t1");
+  });
+
+  it("uses a draft file name and a cache key without number for drafts", async () => {
+    vi.mocked(readCache).mockResolvedValue(Buffer.from("x"));
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 5,
+      documentNumber: null,
+      version: 1,
+    } as never);
+
+    const res = await GET(req(), ctx("5"));
+
+    expect(res.headers.get("Content-Disposition")).toContain('filename="entwurf-5.pdf"');
+    expect(readCache).toHaveBeenCalledWith("inv-5-v1-ndraft-t1");
+  });
+
+  it("includes the number in the cache key once assigned", async () => {
+    vi.mocked(readCache).mockResolvedValue(Buffer.from("x"));
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 5,
+      documentNumber: "R-26090001",
+      version: 1,
+    } as never);
+
+    const res = await GET(req(), ctx("5"));
+
+    expect(res.headers.get("Content-Disposition")).toContain('filename="rechnung-R-26090001.pdf"');
+    expect(readCache).toHaveBeenCalledWith("inv-5-v1-nR-26090001-t1");
   });
 });

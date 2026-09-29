@@ -40,11 +40,14 @@ export async function generateInvoicePdf(
     discountPercent
   );
 
-  const qr = buildQrBillData({
-    invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
-    company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
-    customer: invoice.customer,
-  });
+  const draft = !invoice.documentNumber;
+  const qr = draft
+    ? null
+    : buildQrBillData({
+        invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
+        company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
+        customer: invoice.customer,
+      });
 
   const doc: RenderDoc = {
     kind: "invoice",
@@ -61,6 +64,7 @@ export async function generateInvoicePdf(
     customer: invoice.customer,
     items: invoice.items,
     qr,
+    draft,
   };
 
   return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);
@@ -87,6 +91,7 @@ export async function generateQuotePdf(
     customer: quote.customer,
     items: quote.items,
     qr: null, // quotes carry no Swiss QR payment slip
+    draft: !quote.documentNumber,
   };
 
   return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);

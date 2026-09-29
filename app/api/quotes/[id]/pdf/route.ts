@@ -29,8 +29,10 @@ export async function GET(
   if (!quote) return Response.json({ error: "Not Found" }, { status: 404 });
   if (!settings) return Response.json({ error: "Company settings not configured" }, { status: 500 });
 
-  const filename = `offerte-${quote.documentNumber ?? `entwurf-${quote.id}`}.pdf`;
-  const cacheKey = `quote-${quoteId}-v${quote.version}-t${themeRevision(settings.pdfTheme)}`;
+  const filename = quote.documentNumber
+    ? `offerte-${quote.documentNumber}.pdf`
+    : `entwurf-${quote.id}.pdf`;
+  const cacheKey = `quote-${quoteId}-v${quote.version}-n${quote.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}`;
   const cached = await readCache(cacheKey);
 
   const headers = {
