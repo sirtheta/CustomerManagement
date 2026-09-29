@@ -3,12 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
-import {
-  assignDocumentNumber,
-  generateInvoiceNumber,
-  generateQuoteNumber,
-  isDocumentNumberCollision,
-} from "@/lib/document-number";
+import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber } from "@/lib/document-display";
 import type { DocumentKind } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
@@ -26,8 +21,6 @@ const log = logger.child({ module: "document-actions" });
  * see review finding #10. Branching on `kind` instead of a Prisma generic
  * keeps each side's `data` object plainly typed against its own delegate.
  */
-export { isDocumentNumberCollision };
-
 async function createItems(
   tx: Prisma.TransactionClient,
   kind: DocumentKind,
@@ -65,57 +58,45 @@ export type CreateDocumentInput = {
 
 export async function createDocumentWithItems(
   input: CreateDocumentInput
-): Promise<{ id: number; documentNumber: string }> {
-  let id!: number;
-  let documentNumber!: string;
+): Promise<{ id: number; documentNumber: null }> {
+  // Drafts are created without a number; assignDocumentNumber hands it out
+  // when the document first leaves Draft.
+  const id = await defaultPrisma.$transaction(async (tx) => {
+    let documentId: number;
+    if (input.kind === "invoice") {
+      const invoice = await tx.invoice.create({
+        data: {
+          customerId: input.customerId,
+          customUserText: input.customUserText,
+          date: input.date,
+          dueDate: input.dueDate!,
+          totalAmount: input.totalAmount,
+          discountPercent: input.discountPercent,
+          state: "Draft",
+        },
+      });
+      documentId = invoice.id;
+    } else {
+      const quote = await tx.quote.create({
+        data: {
+          customerId: input.customerId,
+          customUserText: input.customUserText,
+          date: input.date,
+          validUntil: input.validUntil!,
+          totalAmount: input.totalAmount,
+          discountPercent: input.discountPercent,
+          state: "Draft",
+        },
+      });
+      documentId = quote.id;
+    }
 
-  const attempt = () =>
-    defaultPrisma.$transaction(async (tx) => {
-      if (input.kind === "invoice") {
-        documentNumber = await generateInvoiceNumber(tx);
-        const invoice = await tx.invoice.create({
-          data: {
-            customerId: input.customerId,
-            documentNumber,
-            customUserText: input.customUserText,
-            date: input.date,
-            dueDate: input.dueDate!,
-            totalAmount: input.totalAmount,
-            discountPercent: input.discountPercent,
-            state: "Draft",
-          },
-        });
-        id = invoice.id;
-      } else {
-        documentNumber = await generateQuoteNumber(tx);
-        const quote = await tx.quote.create({
-          data: {
-            customerId: input.customerId,
-            documentNumber,
-            customUserText: input.customUserText,
-            date: input.date,
-            validUntil: input.validUntil!,
-            totalAmount: input.totalAmount,
-            discountPercent: input.discountPercent,
-            state: "Draft",
-          },
-        });
-        id = quote.id;
-      }
+    await saveItemsToCatalog(tx, input.items);
+    await createItems(tx, input.kind, documentId, input.items);
+    return documentId;
+  });
 
-      await saveItemsToCatalog(tx, input.items);
-      await createItems(tx, input.kind, id, input.items);
-    });
-
-  try {
-    await attempt();
-  } catch (err) {
-    if (!isDocumentNumberCollision(err)) throw err;
-    log.warn({ documentNumber, kind: input.kind }, "document number collision, retrying");
-    await attempt();
-  }
-
-  return { id, documentNumber };
+  return { id, documentNumber: null };
 }
 
 export type UpdateDocumentInput = {

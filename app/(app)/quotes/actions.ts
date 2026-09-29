@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
-import { generateInvoiceNumber } from "@/lib/document-number";
+import { assignDocumentNumber } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
 import { logAudit } from "@/lib/audit";
@@ -16,7 +16,6 @@ import {
   createDocumentWithItems,
   updateDocumentWithItems,
   sendDocument,
-  isDocumentNumberCollision,
 } from "@/lib/document-actions";
 
 const log = logger.child({ module: "quotes" });
@@ -52,9 +51,8 @@ export async function createQuote(
   }
 
   let newQuoteId: number;
-  let documentNumber: string;
   try {
-    ({ id: newQuoteId, documentNumber } = await createDocumentWithItems({
+    ({ id: newQuoteId } = await createDocumentWithItems({
       kind: "quote",
       customerId,
       customUserText: customUserText || null,
@@ -65,15 +63,11 @@ export async function createQuote(
       items,
     }));
   } catch (err) {
-    if (isDocumentNumberCollision(err)) {
-      log.error({ err }, "createQuote failed after retry");
-      return { error: "Offertennummer war belegt, bitte erneut versuchen." };
-    }
     log.error({ err }, "createQuote failed");
     return { error: "Offerte konnte nicht erstellt werden." };
   }
 
-  await logAudit(session, "CREATE", "Quote", newQuoteId, documentNumber);
+  await logAudit(session, "CREATE", "Quote", newQuoteId);
   redirect(`/quotes/${newQuoteId}`);
 }
 
@@ -130,7 +124,12 @@ export async function updateQuoteStatus(
   id: number,
   state: QuoteState
 ): Promise<void> {
-  await requireEditor();
+  const session = await requireEditor();
+  const current = await prisma.quote.findUnique({ where: { id }, select: { state: true } });
+  if (!current) return;
+  if (current.state === "Draft" && (state === "Sent" || state === "Accepted")) {
+    await assignDocumentNumber("quote", id, { actor: session });
+  }
   await prisma.quote.update({ where: { id }, data: { state } });
 }
 
@@ -186,11 +185,9 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   let newInvoiceId: number;
 
   await prisma.$transaction(async (tx) => {
-    const documentNumber = await generateInvoiceNumber(tx);
     const invoice = await tx.invoice.create({
       data: {
         customerId: quote.customerId,
-        documentNumber,
         customUserText: quote.customUserText,
         date: today,
         dueDate,

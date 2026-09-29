@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Prisma } from "@prisma/client";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
@@ -18,8 +17,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/document-number", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/document-number")>()),
-  generateQuoteNumber: vi.fn(),
-  generateInvoiceNumber: vi.fn(),
+  assignDocumentNumber: vi.fn(),
 }));
 vi.mock("@/lib/form-parsers", () => ({ parseDocumentItems: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateQuotePdf: vi.fn() }));
@@ -41,7 +39,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
-import { generateQuoteNumber, generateInvoiceNumber } from "@/lib/document-number";
+import { assignDocumentNumber } from "@/lib/document-number";
 import { parseDocumentItems } from "@/lib/form-parsers";
 import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendQuoteEmail } from "@/lib/email";
@@ -63,14 +61,6 @@ function form(fields: Record<string, string>): FormData {
 }
 
 const BASE_FORM = { customerId: "1", date: "2026-01-15", validUntil: "2026-02-15" };
-
-function collisionError() {
-  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-    code: "P2002",
-    clientVersion: "test",
-    meta: { target: ["documentNumber"] },
-  });
-}
 
 describe("quote actions", () => {
   beforeEach(() => {
@@ -107,7 +97,6 @@ describe("quote actions", () => {
     it("returns error when transaction fails", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
-      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-001");
       vi.mocked(prisma.$transaction).mockRejectedValue(new Error("DB error"));
       const result = await createQuote({}, form(BASE_FORM));
       expect(result.error).toBe("Offerte konnte nicht erstellt werden.");
@@ -116,7 +105,6 @@ describe("quote actions", () => {
     it("creates quote, writes audit log, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 350, discountPercent: 0 });
-      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-001");
       vi.mocked(prisma.quote.create).mockResolvedValue({
         id: 5,
         documentNumber: "Q-2026-001",
@@ -130,40 +118,12 @@ describe("quote actions", () => {
       expect(prisma.quote.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           customerId: 1,
-          documentNumber: "Q-2026-001",
           totalAmount: 350,
           state: "Draft",
         }),
       });
-      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Quote", 5, "Q-2026-001");
-    });
-
-    it("retries once on a document number collision, then succeeds", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 100, discountPercent: 0 });
-      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-003");
-      vi.mocked(prisma.quote.create)
-        .mockRejectedValueOnce(collisionError())
-        .mockResolvedValueOnce({ id: 7, documentNumber: "Q-2026-003" } as never);
-      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/quotes/7");
-      });
-
-      await expect(createQuote({}, form(BASE_FORM))).rejects.toThrow("REDIRECT:/quotes/7");
-      expect(prisma.quote.create).toHaveBeenCalledTimes(2);
-      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Quote", 7, "Q-2026-003");
-    });
-
-    it("returns a specific error when the collision persists after retry", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 100, discountPercent: 0 });
-      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-004");
-      vi.mocked(prisma.quote.create).mockRejectedValue(collisionError());
-      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
-
-      const result = await createQuote({}, form(BASE_FORM));
-      expect(result.error).toBe("Offertennummer war belegt, bitte erneut versuchen.");
+      expect(vi.mocked(prisma.quote.create).mock.calls[0][0].data).not.toHaveProperty("documentNumber");
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Quote", 5);
     });
 
     it("creates quote items when items are provided", async () => {
@@ -181,7 +141,6 @@ describe("quote actions", () => {
         },
       ];
       vi.mocked(parseDocumentItems).mockReturnValue({ items: items as never, totalAmount: 300, discountPercent: 0 });
-      vi.mocked(generateQuoteNumber).mockResolvedValue("Q-2026-002");
       vi.mocked(prisma.quote.create).mockResolvedValue({
         id: 6,
         documentNumber: "Q-2026-002",
@@ -287,12 +246,39 @@ describe("quote actions", () => {
 
     it("updates quote state", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Sent" } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
-      await updateQuoteStatus(3, "Sent");
+      await updateQuoteStatus(3, "Accepted");
       expect(prisma.quote.update).toHaveBeenCalledWith({
         where: { id: 3 },
-        data: { state: "Sent" },
+        data: { state: "Accepted" },
       });
+    });
+
+    it("does nothing when the quote does not exist", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue(null);
+      await updateQuoteStatus(3, "Sent");
+      expect(prisma.quote.update).not.toHaveBeenCalled();
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
+    });
+
+    it.each(["Sent", "Accepted"] as const)("assigns a number when a draft goes to %s", async (state) => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Draft" } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("O-26090001");
+      await updateQuoteStatus(3, state);
+      expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 3, { actor: editorSession });
+      expect(prisma.quote.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { state } });
+    });
+
+    it("does not assign a number when a draft is declined", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Draft" } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      await updateQuoteStatus(3, "Declined");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
     });
   });
 
@@ -393,6 +379,7 @@ describe("quote actions", () => {
         items: [],
       };
       const mockSettings = { companyInfo: {} };
+      vi.mocked(assignDocumentNumber).mockResolvedValue("Q-2026-001");
       vi.mocked(prisma.quote.findUnique).mockResolvedValue(mockQuote as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(
         mockSettings as never
@@ -460,7 +447,6 @@ describe("quote actions", () => {
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
         defaultPaymentTermDays: 30,
       } as never);
-      vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-001");
       vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 99 } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
@@ -472,11 +458,12 @@ describe("quote actions", () => {
       expect(prisma.invoice.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           customerId: 10,
-          documentNumber: "I-2026-001",
           totalAmount: 500,
           state: "Draft",
         }),
       });
+      expect(vi.mocked(prisma.invoice.create).mock.calls[0][0].data).not.toHaveProperty("documentNumber");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
       expect(prisma.quote.update).toHaveBeenCalledWith({
         where: { id: 1 },
         data: { state: "Accepted" },
@@ -495,7 +482,6 @@ describe("quote actions", () => {
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
         defaultPaymentTermDays: 14,
       } as never);
-      vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-002");
 
       let capturedDueDate: Date | undefined;
       vi.mocked(prisma.invoice.create).mockImplementation(((args: { data: { dueDate?: Date } }) => {
@@ -538,7 +524,6 @@ describe("quote actions", () => {
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
         defaultPaymentTermDays: 30,
       } as never);
-      vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-003");
       vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 101 } as never);
       vi.mocked(prisma.item.createMany).mockResolvedValue({ count: 1 } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
@@ -580,7 +565,6 @@ describe("quote actions", () => {
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
         defaultPaymentTermDays: 30,
       } as never);
-      vi.mocked(generateInvoiceNumber).mockResolvedValue("I-2026-004");
       vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 102 } as never);
       vi.mocked(prisma.item.createMany).mockResolvedValue({ count: 1 } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);

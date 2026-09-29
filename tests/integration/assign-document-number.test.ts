@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { assignDocumentNumber } from "@/lib/document-number";
+import { assignDocumentNumber, isDocumentNumberCollision } from "@/lib/document-number";
 
 vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
@@ -90,6 +91,113 @@ describe("assignDocumentNumber", () => {
     const entries = await db.prisma.auditLog.findMany();
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ action: "UPDATE", entityType: "Invoice", entityId: invoice.id });
+  });
+
+  function collisionError() {
+    return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+      code: "P2002",
+      clientVersion: "test",
+      meta: { target: ["documentNumber"] },
+    });
+  }
+
+  // Wraps the client so `$transaction` fails with a number collision for the
+  // first `failures` calls, then passes through to the real database.
+  function collidingClient(failures: number) {
+    let calls = 0;
+    const client = new Proxy(db.prisma, {
+      get(target, prop, receiver) {
+        if (prop === "$transaction") {
+          return (...args: unknown[]) => {
+            calls += 1;
+            if (calls <= failures) return Promise.reject(collisionError());
+            return (target.$transaction as (...a: unknown[]) => unknown)(...args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as PrismaClient;
+    return { client, calls: () => calls };
+  }
+
+  it("retries once on a documentNumber collision and succeeds", async () => {
+    const invoice = await draftInvoice();
+    const { client, calls } = collidingClient(1);
+
+    const number = await assignDocumentNumber("invoice", invoice.id, { client });
+
+    expect(calls()).toBe(2);
+    const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
+    expect(stored?.documentNumber).toBe(number);
+  });
+
+  it("gives up after a second collision", async () => {
+    const invoice = await draftInvoice();
+    const { client, calls } = collidingClient(2);
+
+    await expect(assignDocumentNumber("invoice", invoice.id, { client, actor })).rejects.toSatisfy(
+      (err: unknown) => isDocumentNumberCollision(err)
+    );
+
+    expect(calls()).toBe(2);
+    const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
+    expect(stored?.documentNumber).toBeNull();
+    expect(await db.prisma.auditLog.count()).toBe(0);
+  });
+
+  it("does not retry on a non-collision error", async () => {
+    const invoice = await draftInvoice();
+    let calls = 0;
+    const client = new Proxy(db.prisma, {
+      get(target, prop, receiver) {
+        if (prop === "$transaction") {
+          return () => {
+            calls += 1;
+            return Promise.reject(new Error("DB down"));
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as PrismaClient;
+
+    await expect(assignDocumentNumber("invoice", invoice.id, { client })).rejects.toThrow("DB down");
+    expect(calls).toBe(1);
+  });
+
+  it("returns the winner's number when a concurrent call numbers the draft first", async () => {
+    const invoice = await draftInvoice();
+    // Simulates the race: between our read and our conditional update,
+    // another caller writes a number, so our updateMany matches no row.
+    const client = new Proxy(db.prisma, {
+      get(target, prop, receiver) {
+        if (prop !== "$transaction") return Reflect.get(target, prop, receiver);
+        return (cb: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+          target.$transaction(async (tx) => {
+            const racingTx = new Proxy(tx, {
+              get(t, p, r) {
+                if (p !== "invoice") return Reflect.get(t, p, r);
+                return new Proxy(t.invoice, {
+                  get(m, name, mr) {
+                    if (name !== "updateMany") return Reflect.get(m, name, mr);
+                    return async (args: Prisma.InvoiceUpdateManyArgs) => {
+                      await t.invoice.update({ where: { id: invoice.id }, data: { documentNumber: "R-99990001" } });
+                      return t.invoice.updateMany(args);
+                    };
+                  },
+                });
+              },
+            });
+            return cb(racingTx as Prisma.TransactionClient);
+          });
+      },
+    }) as PrismaClient;
+
+    const number = await assignDocumentNumber("invoice", invoice.id, { client, actor });
+
+    expect(number).toBe("R-99990001");
+    const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
+    expect(stored?.documentNumber).toBe("R-99990001");
+    expect(await db.prisma.auditLog.count()).toBe(0);
   });
 
   it("throws for an unknown id", async () => {
