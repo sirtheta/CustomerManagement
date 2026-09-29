@@ -113,6 +113,11 @@ async function CustomersTable({ term, yearlyOnly, currentPage, sortField, sortOr
                       {!c.contactInsteadOfCompany && c.company && (
                         <div className="text-xs text-gray-500">{c.contactPerson}</div>
                       )}
+                      {c.addressNeedsReview && (
+                        <div className="text-xs text-amber-700 dark:text-amber-400">
+                          Adresse prüfen
+                        </div>
+                      )}
                     </Link>
                   </TableCell>
                   <TableCell>{c.zipCode} {c.city}</TableCell>

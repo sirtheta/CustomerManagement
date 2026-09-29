@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { createCustomer, updateCustomer, type CustomerFormState } from "./actions";
 import type { Customer } from "@prisma/client";
+import { ADDRESS_LIMITS, COUNTRIES, countryName, formatCityLine, formatStreetLine } from "@/lib/address";
 
 type Props = {
   customer?: Customer;
@@ -22,6 +23,18 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   return (
     <p id={id} className="text-xs text-destructive mt-1" role="alert">
       {message}
+    </p>
+  );
+}
+
+function ReviewNotice() {
+  return (
+    <p
+      role="status"
+      className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+    >
+      Die Adresse wurde automatisch in Strasse und Hausnummer aufgeteilt. Bitte prüfen und
+      speichern — die QR-Rechnung verlangt getrennte Felder.
     </p>
   );
 }
@@ -64,7 +77,12 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
             </div>
             <div className="sm:col-span-2">
               <dt className="text-muted-foreground">Adresse</dt>
-              <dd className="font-medium">{customer.address}, {customer.zipCode} {customer.city}</dd>
+              <dd className="font-medium">
+                {formatStreetLine(customer.street, customer.houseNumber)},{" "}
+                {formatCityLine(customer.zipCode, customer.city)}
+                {customer.country !== "CH" && `, ${countryName(customer.country)}`}
+              </dd>
+              {customer.addressNeedsReview && <ReviewNotice />}
             </div>
             <div>
               <dt className="text-muted-foreground">E-Mail</dt>
@@ -158,23 +176,42 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="address">
-                Adresse <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="address"
-                name="address"
-                required
-                defaultValue={customer?.address ?? ""}
-                placeholder="Musterstrasse 1"
-                aria-invalid={!!fe.address}
-                aria-describedby={fe.address ? "address-error" : undefined}
-              />
-              <FieldError id="address-error" message={fe.address} />
+            {customer?.addressNeedsReview && <ReviewNotice />}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="street">
+                  Strasse <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="street"
+                  name="street"
+                  required
+                  maxLength={ADDRESS_LIMITS.street}
+                  defaultValue={customer?.street ?? ""}
+                  placeholder="Musterstrasse"
+                  aria-invalid={!!fe.street}
+                  aria-describedby={fe.street ? "street-error" : undefined}
+                />
+                <FieldError id="street-error" message={fe.street} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="houseNumber">Hausnummer</Label>
+                <Input
+                  id="houseNumber"
+                  name="houseNumber"
+                  maxLength={ADDRESS_LIMITS.houseNumber}
+                  defaultValue={customer?.houseNumber ?? ""}
+                  placeholder="1"
+                  aria-invalid={!!fe.houseNumber}
+                  aria-describedby={fe.houseNumber ? "houseNumber-error" : undefined}
+                />
+                <FieldError id="houseNumber-error" message={fe.houseNumber} />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="zipCode">
                   PLZ <span className="text-destructive">*</span>
@@ -205,6 +242,25 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   aria-describedby={fe.city ? "city-error" : undefined}
                 />
                 <FieldError id="city-error" message={fe.city} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="country">Land</Label>
+                <select
+                  id="country"
+                  name="country"
+                  defaultValue={customer?.country ?? "CH"}
+                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                >
+                  {Object.entries(COUNTRIES).map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                  {customer?.country && !(customer.country in COUNTRIES) && (
+                    <option value={customer.country}>{customer.country}</option>
+                  )}
+                </select>
               </div>
             </div>
 
