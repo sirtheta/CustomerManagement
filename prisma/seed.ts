@@ -111,7 +111,8 @@ async function main() {
       data: {
         company: faker.company.name(),
         contactPerson: faker.person.fullName(),
-        address: faker.location.streetAddress(),
+        street: faker.location.street(),
+        houseNumber: faker.location.buildingNumber(),
         city: faker.location.city(),
         zipCode: swissZip(),
         email: faker.internet.email(),
@@ -228,7 +229,8 @@ async function main() {
     data: {
       companyName: faker.company.name(),
       companyHolderName: faker.person.fullName(),
-      companyAddress: faker.location.streetAddress(),
+      companyStreet: faker.location.street(),
+      companyHouseNumber: faker.location.buildingNumber(),
       companyCity: "Zürich",
       companyZip: "8000",
       companyEmail: faker.internet.email(),

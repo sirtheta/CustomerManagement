@@ -8,13 +8,17 @@ import { Button } from "@/components/ui/button";
 import { saveSettings, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { PasswordInput } from "@/components/ui/password-input";
+import { ADDRESS_LIMITS, CREDITOR_COUNTRIES, countryName } from "@/lib/address";
 
 type Props = {
   companyName: string;
   companyHolderName: string;
-  companyAddress: string;
+  companyStreet: string;
+  companyHouseNumber: string;
   companyZip: string;
   companyCity: string;
+  companyCountry: string;
+  companyAddressNeedsReview: boolean;
   companyEmail: string;
   companyPhone: string;
   companyIBAN: string;
@@ -77,18 +81,48 @@ export default function SettingsForm(props: Props) {
               <Input id="companyHolderName" name="companyHolderName" defaultValue={props.companyHolderName} />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="companyAddress">Adresse</Label>
-            <Input id="companyAddress" name="companyAddress" defaultValue={props.companyAddress} />
+          {props.companyAddressNeedsReview && (
+            <p
+              role="status"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            >
+              Die Adresse wurde automatisch in Strasse und Hausnummer aufgeteilt. Bitte prüfen und
+              speichern — die QR-Rechnung verlangt getrennte Felder.
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-1">
+              <Label htmlFor="companyStreet">Strasse</Label>
+              <Input id="companyStreet" name="companyStreet" maxLength={ADDRESS_LIMITS.street} defaultValue={props.companyStreet} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="companyHouseNumber">Hausnummer</Label>
+              <Input id="companyHouseNumber" name="companyHouseNumber" maxLength={ADDRESS_LIMITS.houseNumber} defaultValue={props.companyHouseNumber} />
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label htmlFor="companyZip">PLZ</Label>
-              <Input id="companyZip" name="companyZip" defaultValue={props.companyZip} />
+              <Input id="companyZip" name="companyZip" maxLength={ADDRESS_LIMITS.zip} defaultValue={props.companyZip} />
             </div>
-            <div className="col-span-2 space-y-1">
+            <div className="space-y-1">
               <Label htmlFor="companyCity">Ort</Label>
-              <Input id="companyCity" name="companyCity" defaultValue={props.companyCity} />
+              <Input id="companyCity" name="companyCity" maxLength={ADDRESS_LIMITS.city} defaultValue={props.companyCity} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="companyCountry">Land</Label>
+              <select
+                id="companyCountry"
+                name="companyCountry"
+                defaultValue={props.companyCountry}
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              >
+                {CREDITOR_COUNTRIES.map((code) => (
+                  <option key={code} value={code}>
+                    {countryName(code)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

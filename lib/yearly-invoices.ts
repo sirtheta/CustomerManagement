@@ -1,24 +1,6 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { generateInvoiceNumber } from "@/lib/document-number";
 import { formatCurrency, formatDate } from "@/lib/utils";
-
-async function generateInvoiceNumberTx(
-  tx: Prisma.TransactionClient,
-  prefix: string
-): Promise<string> {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const existingInvoices = await tx.invoice.findMany({
-    where: { documentNumber: { startsWith: `${prefix}${yy}${mm}` } },
-    select: { documentNumber: true },
-  });
-  let maxSeq = 0;
-  for (const inv of existingInvoices) {
-    const seq = parseInt(inv.documentNumber.slice(-4), 10);
-    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-  }
-  return `${prefix}${yy}${mm}${String(maxSeq + 1).padStart(4, "0")}`;
-}
 
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
@@ -48,7 +30,6 @@ export async function checkYearlyInvoices(prisma: PrismaClient): Promise<void> {
   const subjectTpl = settings?.emailSubjectTemplate || DEFAULT_SUBJECT;
   const bodyTpl = settings?.emailBodyTemplate || DEFAULT_BODY;
   const paymentDays = settings?.defaultPaymentTermDays ?? 30;
-  const prefix = settings?.invoiceNumberPrefix ?? "R-";
 
   for (const customer of dueCustomers) {
     const dueDate = new Date(today);
@@ -59,7 +40,7 @@ export async function checkYearlyInvoices(prisma: PrismaClient): Promise<void> {
     // leave nextInvoiceDate un-advanced, so the next cron run would bill the
     // same customer again for the same period.
     await prisma.$transaction(async (tx) => {
-      const documentNumber = await generateInvoiceNumberTx(tx, prefix);
+      const documentNumber = await generateInvoiceNumber(tx);
 
       const invoice = await tx.invoice.create({
         data: {

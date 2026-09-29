@@ -83,7 +83,7 @@ export function createValidTestCustomer() {
   return {
     contactPerson: "Test Person",
     company: "Client AG",
-    address: "Seestrasse 100",
+    street: "Seestrasse", houseNumber: "100",
     zipCode: "8002",
     city: "Zürich",
     email: "jane@clientag.ch",
