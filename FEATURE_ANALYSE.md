@@ -46,7 +46,7 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 | Q1 | **Ohne Referenz (NON) – bewusster Entscheid.** Die Rechnungsnummer steht als Mitteilung im QR-Code. QR-Referenz (QRR), QR-IBAN und Creditor Reference (SCOR) werden bewusst nicht verwendet (Entscheid des Entwicklers, derzeit kein Bedarf). | [Code] `qrbill-helpers.ts` (`message: invoice.documentNumber`, kein `reference`) | Kein Handlungsbedarf. Folge: Der Zahlungsabgleich hängt davon ab, dass die Bank die Mitteilung unverändert im Kontoauszug weitergibt. |
 | Q2 | ~~Die Adresse ist ein einziges Feld~~ **Erledigt mit #111.** Strasse, Hausnummer und Land sind getrennte Felder (`street`, `houseNumber`, `country` bzw. `companyStreet`, `companyHouseNumber`, `companyCountry`). Sie werden als `address`/`buildingNumber`/`country` an swissqrbill übergeben. Bestehende Adressen wurden per Migration aufgeteilt und mit `addressNeedsReview` markiert, bis sie gespeichert werden. | [Code] `schema.prisma`, `lib/address.ts`, `lib/pdf/qrbill-helpers.ts`, `tests/unit/qrbill-data.test.ts`, `tests/integration/structured-addresses-migration.test.ts` | Hintergrund: Seit dem **21.11.2025** sind im QR-Code nur noch strukturierte Adressen zulässig [Quelle: [timesafe.ch](https://timesafe.ch/neue-vorgaben-fuer-qr-rechnungen-ab-november-2025-alles-was-du-wissen-musst/), [KMU Partner Group](https://www.kmupartnergroup.ch/newsroom/aenderungen-bei-qr-rechnungen-in-der-schweiz-ab-21-november-2025)]. Empfehlung: einmal ein PDF mit dem Validator der Bank bzw. von SIX prüfen und die markierten Adressen durchgehen. |
 | Q3 | **Die IBAN wird serverseitig nicht geprüft.** | [Code] `app/(app)/settings/actions.ts` Z. 47 speichert den Rohwert. Der Test `tests/unit/iban-validation.test.ts` prüft ein Schema, das **im Test selbst** definiert ist, nicht App-Code. | Eine falsche IBAN fällt erst auf, wenn das PDF erzeugt wird oder der Kunde zahlt. |
-| Q4 | **Die Sprache des QR-Zahlteils ist nicht gesetzt.** | [Code] `document-pdf.ts`: `new SwissQRBill(doc.qr)` ohne `language` | swissqrbill unterstützt DE/FR/IT/EN [Quelle: swissqrbill README]. Welche Sprache ohne Angabe verwendet wird, habe ich nicht geprüft. |
+| Q4 | **Nur Deutsch – bewusster Entscheid.** Die Sprache des QR-Zahlteils wird nicht gesetzt, Rechnungen und Offerten sind deutsch. | [Code] `document-pdf.ts`: `new SwissQRBill(doc.qr)` ohne `language` | Kein Handlungsbedarf. |
 | Q5 | Die alten Einzahlungsscheine werden nirgends verwendet. | [Code] Es gibt nur swissqrbill. | In Ordnung. |
 
 ### 2.3 Unveränderbarkeit und Nachvollziehbarkeit
@@ -76,10 +76,10 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 
 Zur Einordnung: Verzug durch Mahnung (Art. 102 OR), Verzugszins 5 % (Art. 104 OR), Mahngebühren nur bei Vereinbarung [alles bitte prüfen]. Die Bundesverwaltung verlangt E-Rechnungen ab CHF 5'000 Vertragswert (seit 2016) [Quelle: [Bundeskanzlei E-Rechnung](https://www.bk.admin.ch/bk/de/home/digitale-transformation-ikt-lenkung/e-services-bund/services/e-rechnung.html), [verband-e-rechnung.org](https://www.verband-e-rechnung.org/schweiz-macht-e-invoicing-fuer-bundeslieferanten-zur-pflicht/)].
 
-### 2.5 Kundenmodell, Sprachen, CRM
+### 2.5 Kundenmodell, CRM
 
-- **Das Kundenmodell ist minimal:** eine Kontaktperson, Strasse, Hausnummer, PLZ, Ort, Land (seit #111), eine E-Mail, Telefon. Es fehlen: Kanton, UID, Korrespondenzsprache, abweichende Rechnungsadresse, mehrere Ansprechpartner, Zahlungsfrist pro Kunde, Kundennummer. [Code] `schema.prisma` `Customer`, `CustomerForm.tsx`
-- **Nur Deutsch.** Die Texte sind fest im Code, es gibt kein i18n-Framework. Datumsformate sind fest `de-CH`. [Code] Suche `i18n\|locale\|language`. Nur `numberFormat` ist einstellbar (`ApplicationSettings.numberFormat`).
+- **Das Kundenmodell ist minimal:** eine Kontaktperson, Strasse, Hausnummer, PLZ, Ort, Land (seit #111), eine E-Mail, Telefon. Es fehlen: Kanton, UID, abweichende Rechnungsadresse, mehrere Ansprechpartner, Zahlungsfrist pro Kunde, Kundennummer. [Code] `schema.prisma` `Customer`, `CustomerForm.tsx`
+- **Nur Deutsch – bewusster Entscheid.** Oberfläche und Dokumente sind deutsch, Mehrsprachigkeit ist nicht vorgesehen. [Code] kein i18n-Framework, Datumsformate fest `de-CH`.
 - **Keine Aufgaben, Wiedervorlagen, Pipeline oder Aktivitätsverlauf.** [Code] Suche `task\|aufgabe` in `schema.prisma`: keine Treffer. Vorhanden sind nur Notizen (`CustomerNote`) und Dateien (`Document`).
 
 ### 2.6 Buchhaltung
@@ -107,12 +107,12 @@ Siehe **Abschnitt 7**.
 
 Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, **mittel** = 1–3 Wochen, **hoch** = mehr als 3 Wochen (für eine Person). Das ist eine grobe Schätzung.
 
-### F1 · IBAN-Prüfung und Sprache des Zahlteils — **Muss**
-- **Beschreibung:** *(Strukturierte Adressen und Land sind mit #111 erledigt. Eine Zahlungsreferenz ist bewusst ausgeklammert.)* Serverseitige Prüfung der IBAN beim Speichern (Länge, Prüfsumme). Sprache des QR-Zahlteils pro Kunde (DE/FR/IT/EN).
-- **Nutzen:** Eine falsche IBAN fällt beim Speichern auf und nicht erst, wenn Zahlungen ausbleiben (Q3). Kunden in der Romandie oder im Tessin erhalten den Zahlteil in ihrer Sprache (Q4).
+### F1 · IBAN-Prüfung — **Muss**
+- **Beschreibung:** *(Strukturierte Adressen und Land sind mit #111 erledigt. Zahlungsreferenz und Mehrsprachigkeit sind bewusst ausgeklammert.)* Serverseitige Prüfung der IBAN beim Speichern der Einstellungen (Länge, Prüfsumme).
+- **Nutzen:** Eine falsche IBAN fällt beim Speichern auf und nicht erst, wenn Zahlungen ausbleiben (Q3).
 - **Aufwand:** gering
-- **Code:** `app/(app)/settings/actions.ts`, `tests/unit/iban-validation.test.ts`, `lib/pdf/document-pdf.ts` (`new SwissQRBill(…, { language })`), `schema.prisma` (Kundensprache, zusammen mit F9)
-- **Ansatz:** IBAN-Prüfung in `saveSettings` (Prüfsumme nach ISO 13616) und den bisherigen Test auf den echten App-Code umstellen. Die Sprache an swissqrbill übergeben.
+- **Code:** `app/(app)/settings/actions.ts`, `tests/unit/iban-validation.test.ts`
+- **Ansatz:** IBAN-Prüfung in `saveSettings` (Prüfsumme nach ISO 13616) und den bisherigen Test auf den echten App-Code umstellen.
 
 ### F2 · Rechnungen festschreiben, Gutschrift und Storno — **Muss**
 - **Beschreibung:** Ab Status „Versendet“ ist eine Rechnung nicht mehr änderbar. Korrekturen laufen über eine **Gutschrift** (eigener Belegtyp mit Bezug zur Originalrechnung) oder einen Storno mit neuer Rechnung. Nicht-Entwürfe können nicht gelöscht werden. Kunden mit Rechnungen können nur archiviert, nicht gelöscht werden. Statuswechsel nur entlang erlaubter Übergänge.
@@ -161,11 +161,11 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Aufwand:** mittel (Belege), hoch (pain.001)
 - **Code:** `schema.prisma` `Expense`, `app/(app)/accounting/ExpenseForm.tsx`, `accounting/actions.ts`, `lib/file-validation.ts`, Dateiablage wie bei `customers/document-actions.ts`
 
-### F9 · Kundenmodell und mehrsprachige Dokumente — **Sollte**
-- **Beschreibung:** UID, Kundennummer, Korrespondenzsprache (DE/FR/IT/EN), abweichende Rechnungsadresse und -E-Mail, Zahlungsfrist pro Kunde, mehrere Kontakte. PDF, E-Mail-Texte und QR-Zahlteil in der Sprache des Kunden. Die Oberfläche bleibt Deutsch.
-- **Nutzen:** Für Kunden in der Romandie und im Tessin wichtig und in der Schweiz ein häufiges Auswahlkriterium.
-- **Aufwand:** mittel (nur Dokumente); Oberfläche mehrsprachig: hoch, bewusst ausgeklammert
-- **Code:** `schema.prisma` `Customer`, `CustomerForm.tsx`, `lib/pdf/invoice-pdf.ts` (Labels), `lib/pdf/document-pdf.ts` (`UNIT_LABELS`), `lib/email.ts`, `lib/yearly-invoices.ts` (Vorlagen)
+### F9 · Erweitertes Kundenmodell — **Sollte**
+- **Beschreibung:** UID, Kundennummer, abweichende Rechnungsadresse und -E-Mail, Zahlungsfrist pro Kunde, mehrere Kontakte.
+- **Nutzen:** Firmenkunden mit Buchhaltungsabteilung (eigene Rechnungsadresse/-E-Mail) und individuelle Zahlungsfristen lassen sich ohne Umwege abbilden.
+- **Aufwand:** mittel
+- **Code:** `schema.prisma` `Customer`, `CustomerForm.tsx`, `customers/actions.ts`, `lib/pdf/invoice-pdf.ts`, `lib/document-actions.ts` (Empfänger), `app/api/export/customers/route.ts`
 
 ### F10 · Flexible Abos statt leerer Jahresrechnung — **Sollte**
 - **Beschreibung:** Intervall pro Kunde (monatlich, quartalsweise, jährlich) mit hinterlegter Vorlage (`InvoiceTemplate`). Die Rechnung wird dadurch **mit Positionen** erzeugt, nicht mit CHF 0. Optional mit automatischem Versand.
@@ -201,7 +201,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
 1. F2 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen
-2. F1 IBAN-Prüfung und Sprache des Zahlteils
+2. F1 IBAN-Prüfung
 3. F3 Belegarchiv und automatisches Backup
 4. Kleine Fixes: Import prüft Währung und IBAN (Z3), Audit-Log für Pending-E-Mails (U6), Entwürfe ohne Nummer oder mit Nummer erst beim Versand (R5; vorher mit Treuhänder klären)
 
@@ -214,7 +214,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
 9. F7 Mahnwesen mit Mahnbelegen
 10. F8 Belege zu Ausgaben
-11. F9 mehrsprachige Dokumente
+11. F9 erweitertes Kundenmodell
 12. F11 Verlauf und Aufgaben
 13. Optional: F12 Online-Bezahlung, F13 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
 
@@ -235,7 +235,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 1. **Zielgruppe:** Nur du bzw. dein Betrieb, oder sollen auch andere die App einsetzen? Einzelfirmen, GmbH/AG, Vereine?
 2. **Treuhänder:** Mit welcher Software arbeitet dein Treuhänder bzw. arbeiten die Treuhänder deiner Nutzer (Banana, bexio, Abacus, Run my Accounts, andere)?
 3. **Bank:** Welche Bank nutzt du? Gibt sie die Mitteilung aus dem QR-Code im CAMT.053 zuverlässig und unverändert zurück? (Bestimmt, wie der Abgleich in F6 gebaut wird.)
-4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)? Kunden in der Romandie oder im Tessin?
+4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)?
 5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F6 ersetzt werden?
 6. **Volumen:** Wie viele Rechnungen, Ausgaben und Belege pro Jahr? (Relevant für BLOB-Speicherung in SQLite und Backups.)
 7. **Nummernlücken:** Sind Lücken durch gelöschte Entwürfe für dich ein Problem? Soll das Format (Präfix + JJMM + 4 Ziffern) konfigurierbar werden?
@@ -311,6 +311,6 @@ Umsetzung in dieser Reihenfolge: F2 → F4 → F5, danach F6/F8. Kontonummern un
 
 ### Verwendete externe Quellen
 - Strukturierte Adressen QR-Rechnung ab 21.11.2025: https://timesafe.ch/neue-vorgaben-fuer-qr-rechnungen-ab-november-2025-alles-was-du-wissen-musst/ · https://www.kmupartnergroup.ch/newsroom/aenderungen-bei-qr-rechnungen-in-der-schweiz-ab-21-november-2025 · Primärquelle: SIX Implementation Guidelines QR-Rechnung v2.3 (https://www.six-group.com/dam/download/banking-services/standardization/qr-bill/ig-qr-bill-v2.3-en.pdf)
-- swissqrbill (Adresstyp „S“, Sprachen): https://github.com/schoero/swissqrbill
+- swissqrbill (Adresstyp „S“): https://github.com/schoero/swissqrbill
 - E-Rechnung Bund (ab CHF 5'000): https://www.bk.admin.ch/bk/de/home/digitale-transformation-ikt-lenkung/e-services-bund/services/e-rechnung.html · https://www.verband-e-rechnung.org/schweiz-macht-e-invoicing-fuer-bundeslieferanten-zur-pflicht/
 - Gesetzesartikel (MWSTG Art. 10; OR Art. 102, 104, 957, 958f; GeBüV SR 221.431) nenne ich aus Fachwissen. **Den genauen Wortlaut bitte auf fedlex.admin.ch prüfen.**
