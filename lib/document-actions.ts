@@ -3,7 +3,13 @@ import { Prisma } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
-import { generateInvoiceNumber, generateQuoteNumber, isDocumentNumberCollision } from "@/lib/document-number";
+import {
+  assignDocumentNumber,
+  generateInvoiceNumber,
+  generateQuoteNumber,
+  isDocumentNumberCollision,
+} from "@/lib/document-number";
+import { fillDocumentNumber } from "@/lib/document-display";
 import type { DocumentKind } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
@@ -188,12 +194,23 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     });
     if (!invoice) return { error: "Rechnung nicht gefunden." };
 
+    let documentNumber: string;
     try {
-      const pdf = await generateInvoicePdf(invoice, settings);
-      await sendInvoiceEmail(invoice, settings, pdf, {
+      documentNumber = await assignDocumentNumber("invoice", input.id, { actor: input.actor });
+    } catch (err) {
+      log.error({ invoiceId: input.id, err }, "sendDocument (invoice): number assignment failed");
+      return { error: "Rechnungsnummer konnte nicht vergeben werden." };
+    }
+    const numbered = { ...invoice, documentNumber };
+    const subject = fillDocumentNumber(input.subject, documentNumber);
+    const body = fillDocumentNumber(input.body, documentNumber);
+
+    try {
+      const pdf = await generateInvoicePdf(numbered, settings);
+      await sendInvoiceEmail(numbered, settings, pdf, {
         to: input.to,
-        subject: input.subject,
-        body: input.body,
+        subject,
+        body,
       });
     } catch (err) {
       log.error({ invoiceId: input.id, to: input.to, err }, "sendDocument (invoice) failed");
@@ -203,10 +220,10 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     await defaultPrisma.$transaction([
       defaultPrisma.invoice.update({ where: { id: input.id }, data: { state: "Sent" } }),
       defaultPrisma.invoiceSentLog.create({
-        data: { invoiceId: input.id, sentTo: input.to, subject: input.subject },
+        data: { invoiceId: input.id, sentTo: input.to, subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Invoice", input.id, invoice.documentNumber ?? undefined, {
+    await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
     });
     revalidatePath(`/invoices/${input.id}`);
@@ -218,12 +235,23 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     });
     if (!quote) return { error: "Offerte nicht gefunden." };
 
+    let documentNumber: string;
     try {
-      const pdf = await generateQuotePdf(quote, settings);
-      await sendQuoteEmail(quote, settings, pdf, {
+      documentNumber = await assignDocumentNumber("quote", input.id, { actor: input.actor });
+    } catch (err) {
+      log.error({ quoteId: input.id, err }, "sendDocument (quote): number assignment failed");
+      return { error: "Offertennummer konnte nicht vergeben werden." };
+    }
+    const numbered = { ...quote, documentNumber };
+    const subject = fillDocumentNumber(input.subject, documentNumber);
+    const body = fillDocumentNumber(input.body, documentNumber);
+
+    try {
+      const pdf = await generateQuotePdf(numbered, settings);
+      await sendQuoteEmail(numbered, settings, pdf, {
         to: input.to,
-        subject: input.subject,
-        body: input.body,
+        subject,
+        body,
       });
     } catch (err) {
       log.error({ quoteId: input.id, to: input.to, err }, "sendDocument (quote) failed");
@@ -233,10 +261,10 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     await defaultPrisma.$transaction([
       defaultPrisma.quote.update({ where: { id: input.id }, data: { state: "Sent" } }),
       defaultPrisma.quoteSentLog.create({
-        data: { quoteId: input.id, sentTo: input.to, subject: input.subject },
+        data: { quoteId: input.id, sentTo: input.to, subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Quote", input.id, quote.documentNumber ?? undefined, {
+    await logAudit(input.actor, "SEND", "Quote", input.id, documentNumber, {
       to: input.to,
     });
     revalidatePath(`/quotes/${input.id}`);

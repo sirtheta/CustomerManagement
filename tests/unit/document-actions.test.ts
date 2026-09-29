@@ -16,6 +16,7 @@ vi.mock("@/lib/document-number", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/document-number")>()),
   generateInvoiceNumber: vi.fn(),
   generateQuoteNumber: vi.fn(),
+  assignDocumentNumber: vi.fn(),
 }));
 vi.mock("@/lib/service-catalog", () => ({ saveItemsToCatalog: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({
@@ -39,7 +40,7 @@ import {
   isDocumentNumberCollision,
 } from "@/lib/document-actions";
 import prisma from "@/lib/prisma";
-import { generateInvoiceNumber, generateQuoteNumber } from "@/lib/document-number";
+import { generateInvoiceNumber, generateQuoteNumber, assignDocumentNumber } from "@/lib/document-number";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
 
@@ -197,6 +198,7 @@ describe("sendDocument", () => {
       customer: {},
       items: [],
     } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-001");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
     vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
 
@@ -216,6 +218,7 @@ describe("sendDocument", () => {
       customer: {},
       items: [],
     } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("Q-2026-001");
     vi.mocked(generateQuotePdf).mockResolvedValue(Buffer.from("pdf"));
     vi.mocked(sendQuoteEmail).mockResolvedValue(undefined);
 
@@ -225,5 +228,62 @@ describe("sendDocument", () => {
     expect(prisma.quoteSentLog.create).toHaveBeenCalledWith({
       data: { quoteId: 2, sentTo: "a@b.ch", subject: "s" },
     });
+  });
+
+  it("assigns the number before rendering and fills the placeholder", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 1,
+      documentNumber: null,
+      customer: {},
+      items: [],
+    } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+    vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+    vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+
+    const result = await sendDocument({
+      kind: "invoice",
+      id: 1,
+      to: "a@b.ch",
+      subject: "Rechnung {documentNumber}",
+      body: "Nr. {documentNumber}",
+      actor,
+    });
+
+    expect(result.success).toBe(true);
+    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 1, { actor });
+    expect(vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(generateInvoicePdf).mock.invocationCallOrder[0]
+    );
+    expect(vi.mocked(generateInvoicePdf).mock.calls[0][0]).toMatchObject({ documentNumber: "R-26090001" });
+    expect(sendInvoiceEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ documentNumber: "R-26090001" }),
+      expect.anything(),
+      expect.anything(),
+      { to: "a@b.ch", subject: "Rechnung R-26090001", body: "Nr. R-26090001" }
+    );
+    expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({
+      data: { invoiceId: 1, sentTo: "a@b.ch", subject: "Rechnung R-26090001" },
+    });
+  });
+
+  it("keeps the assigned number when the mail fails", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+      id: 2,
+      documentNumber: null,
+      customer: {},
+      items: [],
+    } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("O-26090001");
+    vi.mocked(generateQuotePdf).mockResolvedValue(Buffer.from("pdf"));
+    vi.mocked(sendQuoteEmail).mockRejectedValue(new Error("SMTP down"));
+
+    const result = await sendDocument({ kind: "quote", id: 2, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(result.error).toBe("SMTP down");
+    expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 2, { actor });
+    expect(prisma.quote.update).not.toHaveBeenCalled();
   });
 });
