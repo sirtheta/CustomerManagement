@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
-import { generateInvoiceNumber, generateQuoteNumber } from "@/lib/document-number";
+import { generateInvoiceNumber, generateQuoteNumber, isDocumentNumberCollision } from "@/lib/document-number";
+import type { DocumentKind } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
@@ -19,15 +20,7 @@ const log = logger.child({ module: "document-actions" });
  * see review finding #10. Branching on `kind` instead of a Prisma generic
  * keeps each side's `data` object plainly typed against its own delegate.
  */
-type DocumentKind = "invoice" | "quote";
-
-export function isDocumentNumberCollision(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === "P2002" &&
-    ((err.meta?.target as string[] | undefined)?.includes("documentNumber") ?? false)
-  );
-}
+export { isDocumentNumberCollision };
 
 async function createItems(
   tx: Prisma.TransactionClient,

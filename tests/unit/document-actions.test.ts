@@ -12,7 +12,8 @@ vi.mock("@/lib/prisma", () => ({
     applicationSettings: { findFirst: vi.fn() },
   },
 }));
-vi.mock("@/lib/document-number", () => ({
+vi.mock("@/lib/document-number", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/document-number")>()),
   generateInvoiceNumber: vi.fn(),
   generateQuoteNumber: vi.fn(),
 }));
