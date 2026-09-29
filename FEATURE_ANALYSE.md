@@ -36,7 +36,7 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 | R2 | **Keine 5-Rappen-Rundung.** Gerundet wird nur auf 0.01. | [Code] `lib/calculations.ts` (`roundCents`). Suche `rappen\|0\.05\|round`: keine Rundung auf 5 Rappen. | Ob man auf 5 Rappen runden muss, hängt von der Praxis ab (beim QR-Zahlteil ist sie nicht zwingend) [bitte prüfen]. Als Einstellung wäre sie nützlich. |
 | R3 | **Nur CHF.** Die Währung ist im QR-Code und im PDF fest „CHF“. | [Code] `lib/pdf/qrbill-helpers.ts` (`currency: "CHF"`), `lib/pdf/document-pdf.ts` (`CHF ${fmt…}`) | Rechnungen in EUR sind nicht möglich. Die QR-Rechnung erlaubt CHF und EUR [Quelle: SIX IG QR-Rechnung, bitte prüfen]. |
 | R4 | ~~Keine Auslandskunden~~ **Erledigt mit #111.** `Customer.country` und `CompanyInformation.companyCountry` (ISO-Code, Standard „CH“) werden im QR-Zahlteil und im PDF verwendet. Offen bleibt nur die Währung (R3). | [Code] `schema.prisma`, `lib/pdf/qrbill-helpers.ts`, `lib/pdf/document-pdf.ts` | – |
-| R5 | **Rechnungsnummer ist hart formatiert.** Aufbau: Präfix + JJMM (Erstelldatum, nicht Rechnungsdatum) + 4 Ziffern. Die Nummer wird schon beim **Entwurf** vergeben. | [Code] `lib/document-number.ts` (`generateNumber` nutzt `new Date()`), `lib/document-actions.ts` | Gelöschte Entwürfe hinterlassen Lücken. Ob lückenlose Nummern verlangt sind: bitte mit Treuhänder klären. |
+| R5 | **Die Nummer wird schon beim Entwurf vergeben.** Aufbau: Präfix + JJMM (Erstelldatum, nicht Rechnungsdatum) + 4 Ziffern. Das gilt für Rechnungen, Offerten, die Umwandlung Offerte → Rechnung und die automatische Jahresrechnung. | [Code] `lib/document-number.ts` (`generateNumber` nutzt `new Date()`), `lib/document-actions.ts` (`createDocumentWithItems`), `app/(app)/quotes/actions.ts` (`convertQuoteToInvoice`), `lib/yearly-invoices.ts` | Gelöschte oder verworfene Entwürfe hinterlassen Lücken (siehe auch Z7). **Entscheid:** Entwürfe bekommen keine Nummer mehr, siehe F2. |
 | R6 | ~~Die Logik für Nummern ist doppelt vorhanden~~ **Erledigt mit #110.** Die Jahresrechnung nutzt jetzt `generateInvoiceNumber` aus `lib/document-number.ts`. | [Code] `lib/yearly-invoices.ts` | – |
 
 ### 2.2 QR-Rechnung
@@ -114,81 +114,94 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Code:** `app/(app)/settings/actions.ts`, `tests/unit/iban-validation.test.ts`
 - **Ansatz:** IBAN-Prüfung in `saveSettings` (Prüfsumme nach ISO 13616) und den bisherigen Test auf den echten App-Code umstellen.
 
-### F2 · Rechnungen festschreiben, Gutschrift und Storno — **Muss**
+### F2 · Nummer erst beim Versand bzw. bei der PDF-Erzeugung — **Muss**
+- **Beschreibung:** Entwürfe (Rechnungen und Offerten) haben keine Nummer. Die Nummer wird beim ersten Versand oder bei der ersten PDF-Erzeugung vergeben und ändert sich danach nicht mehr. Bis dahin zeigt die App „Entwurf“ statt einer Nummer.
+- **Nutzen:** Keine Lücken mehr durch gelöschte oder verworfene Entwürfe (R5, Z7). Die Nummern entsprechen der Reihenfolge, in der Dokumente tatsächlich hinausgehen.
+- **Aufwand:** gering–mittel
+- **Code:** `prisma/schema.prisma` (`documentNumber String?` bei `Invoice` und `Quote`; `@unique` bleibt, SQLite erlaubt mehrere `NULL`), `lib/document-number.ts`, `lib/document-actions.ts` (`createDocumentWithItems` ohne Nummer, `sendDocument` vergibt sie), `app/api/invoices/[id]/pdf/route.ts`, `app/api/quotes/[id]/pdf/route.ts`, `app/(app)/quotes/actions.ts` (`convertQuoteToInvoice`), `lib/yearly-invoices.ts`, `app/(app)/invoices/pending/*`, alle Listen, Suche (`lib/search.ts`) und Exporte, die `documentNumber` anzeigen
+- **Ansatz:**
+  - Eine Funktion `assignDocumentNumber(tx, kind, id)`: vergibt die Nummer nur, wenn noch keine gesetzt ist, in derselben Transaktion wie die Nummernberechnung (wie heute in `createDocumentWithItems`, inkl. Retry bei Kollision). Aufgerufen von `sendDocument`, `approvePendingEmail`, `sendReminder` und den PDF-Routen.
+  - Die PDF-Routen sind `GET`-Anfragen. Wenn dort eine Nummer vergeben wird, darf das nicht versehentlich passieren (z. B. durch Link-Vorschau oder Prefetch). Empfehlung: den Download-Button für Entwürfe als Aktion „Nummer vergeben und PDF erzeugen“ mit Bestätigung umsetzen (Server Action oder `POST`); eine reine Vorschau ohne Nummer zeigt „ENTWURF“.
+  - Die Jahresrechnung speichert Betreff und Text der E-Mail heute schon beim Anlegen, mit eingesetzter Nummer (`lib/yearly-invoices.ts`). Die Platzhalter müssen deshalb erst beim Versand ersetzt werden.
+  - Für JJMM in der Nummer das Vergabedatum (oder Rechnungsdatum) statt des Erstelldatums verwenden.
+  - Migration: bestehende Entwürfe behalten ihre Nummer (einfachste Variante), oder man setzt sie auf `NULL`, wenn sie noch nie versendet wurden (`InvoiceSentLog` leer). Bitte entscheiden.
+  - Passt zu F3: sobald eine Nummer vergeben ist, gilt das Dokument als festgeschrieben.
+
+### F3 · Rechnungen festschreiben, Gutschrift und Storno — **Muss**
 - **Beschreibung:** Ab Status „Versendet“ ist eine Rechnung nicht mehr änderbar. Korrekturen laufen über eine **Gutschrift** (eigener Belegtyp mit Bezug zur Originalrechnung) oder einen Storno mit neuer Rechnung. Nicht-Entwürfe können nicht gelöscht werden. Kunden mit Rechnungen können nur archiviert, nicht gelöscht werden. Statuswechsel nur entlang erlaubter Übergänge.
 - **Nutzen:** Nachvollziehbarkeit gegenüber Kunden, Treuhänder und Behörden. Das ist die Voraussetzung für jeden Buchhaltungsexport.
 - **Aufwand:** mittel
 - **Code:** `lib/document-actions.ts`, `app/(app)/invoices/actions.ts`, `invoices/[id]/page.tsx`, `invoices/[id]/edit/page.tsx`, `InvoiceStatusSelect.tsx`, `customers/actions.ts`, `schema.prisma` (`onDelete: Restrict`, `Invoice.kind` bzw. `creditNoteForId`), `lib/state-manager.ts`
 - **Ansatz:** Eine Zustandsmaschine in `lib/state-manager.ts` mit einer Tabelle erlaubter Übergänge. Serverseitig prüfen in `updateDocumentWithItems`. Die Gutschrift als `Invoice` mit negativem Betrag oder als eigenes Modell: **bitte mit Treuhänder klären**, wie sie im Export erscheinen soll.
 
-### F3 · Revisionssicheres Belegarchiv und automatisches Backup — **Muss**
+### F4 · Revisionssicheres Belegarchiv und automatisches Backup — **Muss**
 - **Beschreibung:** Beim Versand wird das exakte PDF gespeichert, mit SHA-256-Hash. Das Audit-Log bekommt eine Hash-Kette (jeder Eintrag enthält den Hash des vorherigen). Dazu ein automatisches nächtliches Backup (SQLite-Backup-API) mit Aufbewahrungsregel und optional verschlüsseltem Ziel ausser Haus.
 - **Nutzen:** Man kann belegen, was verschickt wurde, und hat Schutz vor Datenverlust auf dem Raspberry Pi (SD-Karte!).
 - **Aufwand:** mittel
 - **Code:** `lib/document-actions.ts` `sendDocument`, `invoices/reminders/actions.ts`, `invoices/pending/actions.ts`, `lib/audit.ts`, `schema.prisma` (`SentDocument`), `lib/notifications.ts` (Cron), `app/api/export/database/route.ts`
 - **Ansatz:** PDFs besser im Dateisystem unter `data/archive/JJJJ/` ablegen als als BLOB, den Hash in der DB speichern. Den Backup-Job an den bestehenden node-cron-Scheduler anhängen (Muster wie `startLogRotationScheduler`). Ob das GeBüV-konform ist: **bitte prüfen lassen**.
 
-### F4 · Zahlungen und offene Posten (Debitoren) — **Muss**
+### F5 · Zahlungen und offene Posten (Debitoren) — **Muss**
 - **Beschreibung:** Neues Modell `Payment` (Rechnung, Datum, Betrag, Quelle, Bankreferenz). Rechnungsstatus „Teilbezahlt“, Restbetrag, Überzahlung als Guthaben, Skonto und Debitorenverlust (Ausbuchung) als eigene Zahlungsart. Offene-Posten-Liste per Stichtag (z. B. 31.12.) mit Altersstruktur (0–30/31–60/61–90/>90 Tage).
 - **Nutzen:** Die Debitorenliste zum Jahresende ist genau das, was der Treuhänder braucht. Teilzahlungen sind im Alltag häufig.
 - **Aufwand:** mittel
 - **Code:** `schema.prisma`, `lib/payment-matching.ts`, `lib/import/matching.ts`, `app/(app)/invoices/actions.ts`, `accounting/lib/income-statement-queries.ts`, `analytics-queries.ts`, neue Seite `app/(app)/accounting/receivables/`
 - **Ansatz:** `markInvoicePaid` wird zu `recordPayment`. Der Status ergibt sich aus der Summe der Zahlungen. Bestehende `Paid`-Rechnungen per Migration in je eine Zahlung über den Gesamtbetrag umwandeln.
 
-### F5 · Buchhaltungsexport für den Treuhänder — **Muss**
+### F6 · Buchhaltungsexport für den Treuhänder — **Muss**
 - **Beschreibung:** Kontierung einrichten: Ertragskonto pro Kategorie/Leistung, Aufwandkonto pro Ausgabenkategorie, Debitorenkonto, Bankkonto. Die Kontonummern **gibt der Treuhänder vor**, die App liefert keine. Export als Buchungsjournal (Datum, Beleg-Nr., Soll, Haben, Text, Betrag) als CSV. Dazu ein Jahrespaket als ZIP (Journal, OP-Liste, alle Rechnungs-PDFs, Belege).
 - **Nutzen:** Weniger Aufwand beim Treuhänder. Genau diese Übergabe fehlt heute, der CSV-Export `app/api/export/accounting/route.ts` enthält nur Einnahmen/Ausgaben ohne Konten.
 - **Aufwand:** mittel (generisches CSV), danach mittel pro Zielsoftware
 - **Code:** `schema.prisma` (`Account`, Kontierung an `Category`/`Service`), `app/api/export/accounting/route.ts`, `lib/csv-export.ts`, Einstellungen
 - **Ansatz:** Zuerst ein konfigurierbares, generisches Journal-CSV. Danach gezielt das Format der Software, die die Nutzer tatsächlich haben (siehe Abschnitt 7, Fragen). **Welche Importformate Banana, bexio oder Abacus genau erwarten, habe ich nicht geprüft.** Das ist vor der Umsetzung anhand der Hersteller-Dokumentation zu klären.
 
-### F6 · Besserer Bankabgleich — **Sollte**
-- **Beschreibung:** Treffersuche robuster machen (z. B. Rechnungsnummer auch mit Leerzeichen oder ohne Präfix erkennen, Kundenname als Zusatzsignal). Teilzahlungen (nach F4). Die importierten Bewegungen werden gespeichert (Duplikatschutz per Bankreferenz, Saldovergleich Anfangs-/Endsaldo). Warnung, wenn Währung oder IBAN nicht passen (Z3). Optional camt.054 als zweiter Parser. Die Ausgabenseite des Auszugs kann direkt als `Expense` übernommen werden.
+### F7 · Besserer Bankabgleich — **Sollte**
+- **Beschreibung:** Treffersuche robuster machen (z. B. Rechnungsnummer auch mit Leerzeichen oder ohne Präfix erkennen, Kundenname als Zusatzsignal). Teilzahlungen (nach F5). Die importierten Bewegungen werden gespeichert (Duplikatschutz per Bankreferenz, Saldovergleich Anfangs-/Endsaldo). Warnung, wenn Währung oder IBAN nicht passen (Z3). Optional camt.054 als zweiter Parser. Die Ausgabenseite des Auszugs kann direkt als `Expense` übernommen werden.
 - **Nutzen:** Das Verbuchen der Zahlungseingänge geht fast automatisch. Die Ausgaben müssen nicht mehr doppelt erfasst werden.
 - **Aufwand:** mittel
 - **Code:** `lib/import/camt.ts`, `lib/import/matching.ts`, `app/(app)/invoices/import/*`, `schema.prisma` (`BankTransaction`)
 
-### F7 · Mahnwesen nach Schweizer Praxis — **Sollte**
+### F8 · Mahnwesen nach Schweizer Praxis — **Sollte**
 - **Beschreibung:** Eigener Mahnbeleg (PDF „1./2./3. Mahnung“ mit Bezug auf die Originalrechnung und aktualisiertem QR-Zahlteil über den offenen Betrag). Mahngebühr und Verzugszins sind konfigurierbar und standardmässig aus. Nach der letzten Stufe: Status „Betreibung/Inkasso“ und Export der Forderungsdaten für das Betreibungsbegehren.
 - **Nutzen:** Eine Mahnung sieht heute aus wie eine erneute Rechnung (Z5). Mit dem Mahnbeleg ist für den Kunden klar, dass gemahnt wird.
 - **Aufwand:** mittel
 - **Code:** `app/(app)/invoices/reminders/*`, `lib/reminders.ts`, `lib/pdf/invoice-pdf.ts` (neuer `generateReminderPdf`), `schema.prisma` (`ReminderLog`, Gebühren in `ApplicationSettings`)
 - **Rechtliches:** Ob Gebühren und Zinsen erlaubt sind und wie hoch, bitte mit Treuhänder bzw. Jurist klären. Die elektronische Übermittlung von Betreibungsbegehren (eSchKG) habe ich nicht geprüft.
 
-### F8 · Ausgaben mit Belegen — **Sollte**
+### F9 · Ausgaben mit Belegen — **Sollte**
 - **Beschreibung:** Beleg (PDF oder Foto) zu jeder Ausgabe, Lieferant, Status bezahlt/offen, Fälligkeit. Optional: Eingangs-QR-Rechnung einlesen (QR-Code aus PDF oder Bild auslesen) und daraus pain.001 für den Zahlungsauftrag erzeugen.
 - **Nutzen:** Die Belegsammlung für den Treuhänder ist vollständig, und offene Lieferantenrechnungen sind sichtbar.
 - **Aufwand:** mittel (Belege), hoch (pain.001)
 - **Code:** `schema.prisma` `Expense`, `app/(app)/accounting/ExpenseForm.tsx`, `accounting/actions.ts`, `lib/file-validation.ts`, Dateiablage wie bei `customers/document-actions.ts`
 
-### F9 · Erweitertes Kundenmodell — **Sollte**
+### F10 · Erweitertes Kundenmodell — **Sollte**
 - **Beschreibung:** UID, Kundennummer, abweichende Rechnungsadresse und -E-Mail, Zahlungsfrist pro Kunde, mehrere Kontakte.
 - **Nutzen:** Firmenkunden mit Buchhaltungsabteilung (eigene Rechnungsadresse/-E-Mail) und individuelle Zahlungsfristen lassen sich ohne Umwege abbilden.
 - **Aufwand:** mittel
 - **Code:** `schema.prisma` `Customer`, `CustomerForm.tsx`, `customers/actions.ts`, `lib/pdf/invoice-pdf.ts`, `lib/document-actions.ts` (Empfänger), `app/api/export/customers/route.ts`
 
-### F10 · Flexible Abos statt leerer Jahresrechnung — **Sollte**
+### F11 · Flexible Abos statt leerer Jahresrechnung — **Sollte**
 - **Beschreibung:** Intervall pro Kunde (monatlich, quartalsweise, jährlich) mit hinterlegter Vorlage (`InvoiceTemplate`). Die Rechnung wird dadurch **mit Positionen** erzeugt, nicht mit CHF 0. Optional mit automatischem Versand.
 - **Nutzen:** Weniger manuelle Arbeit. Das 0-CHF-Risiko fällt weg (Z7). Für Vereine eignet sich das für Mitgliederbeiträge.
 - **Aufwand:** gering–mittel
 - **Code:** `lib/yearly-invoices.ts`, `schema.prisma` (`Customer.yearlyInvoice` wird zu `Subscription`), `invoices/templates/*`, `invoices/pending/*`.
 
-### F11 · Kundenverlauf, Aufgaben und Wiedervorlagen — **Kann**
+### F12 · Kundenverlauf, Aufgaben und Wiedervorlagen — **Kann**
 - **Beschreibung:** Chronologischer Verlauf pro Kunde aus bestehenden Daten (Offerten, Rechnungen, `InvoiceSentLog`, Zahlungen, Notizen, Audit-Log). Dazu Aufgaben mit Fälligkeit und Zuständigem, z. B. automatisch „Offerte nachfassen“ 7 Tage nach dem Versand.
 - **Nutzen:** Einfache CRM-Funktion ohne eigene Vertriebs-Pipeline.
 - **Aufwand:** gering (Verlauf), mittel (Aufgaben)
 - **Code:** `app/(app)/customers/[id]/page.tsx`, `schema.prisma` (`Task`), `lib/notifications.ts` (Erinnerungen an die bestehenden E-Mail/Telegram-Kanäle)
 
-### F12 · Online-Bezahlung (TWINT/Karte) per Link — **Kann**
-- **Beschreibung:** Optionaler Zahlungslink auf Rechnung und E-Mail über einen Schweizer Payment-Service-Provider. Der Zahlungseingang kommt per Webhook als `Payment` (nach F4).
+### F13 · Online-Bezahlung (TWINT/Karte) per Link — **Kann**
+- **Beschreibung:** Optionaler Zahlungslink auf Rechnung und E-Mail über einen Schweizer Payment-Service-Provider. Der Zahlungseingang kommt per Webhook als `Payment` (nach F5).
 - **Nutzen:** Schnellere Zahlung bei Privatkunden.
 - **Aufwand:** mittel
 - **Differenzierung:** gering
 - **Code:** neuer Webhook `app/api/external/…` (Muster: `payments/route.ts`), `lib/email.ts`, PDF
 - **Hinweis:** Welcher Anbieter und zu welchen Gebühren: bitte selbst vergleichen, hier nicht geprüft. Eine öffentlich erreichbare Webhook-URL passt schlecht zum Raspberry Pi im Heimnetz.
 
-### F13 · KI-Belegerfassung (lokal oder opt-in) — **Kann**
-- **Beschreibung:** Ein hochgeladener Beleg (F8) wird ausgelesen und Datum, Betrag, Lieferant und Kategorie werden vorgeschlagen. Der Nutzer bestätigt.
+### F14 · KI-Belegerfassung (lokal oder opt-in) — **Kann**
+- **Beschreibung:** Ein hochgeladener Beleg (F9) wird ausgelesen und Datum, Betrag, Lieferant und Kategorie werden vorgeschlagen. Der Nutzer bestätigt.
 - **Nutzen:** Spart Tipparbeit bei vielen Ausgaben.
 - **Aufwand:** mittel
 - **Differenzierung:** mittel
@@ -200,23 +213,24 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 ## 4. Roadmap
 
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
-1. F2 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen
-2. F1 IBAN-Prüfung
-3. F3 Belegarchiv und automatisches Backup
-4. Kleine Fixes: Import prüft Währung und IBAN (Z3), Audit-Log für Pending-E-Mails (U6), Entwürfe ohne Nummer oder mit Nummer erst beim Versand (R5; vorher mit Treuhänder klären)
+1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung
+2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen
+3. F1 IBAN-Prüfung
+4. F4 Belegarchiv und automatisches Backup
+5. Kleine Fixes: Import prüft Währung und IBAN (Z3), Audit-Log für Pending-E-Mails (U6)
 
 **Phase 2: mittelfristig (3–9 Monate) – Buchhaltungsfähigkeit**
-5. F4 Zahlungen und offene Posten
-6. F5 Treuhänder-Export (generisch, danach 1 Zielsoftware)
-7. F6 Bankabgleich 2.0
-8. F10 flexible Abos
+6. F5 Zahlungen und offene Posten
+7. F6 Treuhänder-Export (generisch, danach 1 Zielsoftware)
+8. F7 Bankabgleich 2.0
+9. F11 flexible Abos
 
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
-9. F7 Mahnwesen mit Mahnbelegen
-10. F8 Belege zu Ausgaben
-11. F9 erweitertes Kundenmodell
-12. F11 Verlauf und Aufgaben
-13. Optional: F12 Online-Bezahlung, F13 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
+10. F8 Mahnwesen mit Mahnbelegen
+11. F9 Belege zu Ausgaben
+12. F10 erweitertes Kundenmodell
+13. F12 Verlauf und Aufgaben
+14. Optional: F13 Online-Bezahlung, F14 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
 
 ---
 
@@ -234,13 +248,13 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 1. **Zielgruppe:** Nur du bzw. dein Betrieb, oder sollen auch andere die App einsetzen? Einzelfirmen, GmbH/AG, Vereine?
 2. **Treuhänder:** Mit welcher Software arbeitet dein Treuhänder bzw. arbeiten die Treuhänder deiner Nutzer (Banana, bexio, Abacus, Run my Accounts, andere)?
-3. **Bank:** Welche Bank nutzt du? Gibt sie die Mitteilung aus dem QR-Code im CAMT.053 zuverlässig und unverändert zurück? (Bestimmt, wie der Abgleich in F6 gebaut wird.)
+3. **Bank:** Welche Bank nutzt du? Gibt sie die Mitteilung aus dem QR-Code im CAMT.053 zuverlässig und unverändert zurück? (Bestimmt, wie der Abgleich in F7 gebaut wird.)
 4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)?
-5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F6 ersetzt werden?
+5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F7 ersetzt werden?
 6. **Volumen:** Wie viele Rechnungen, Ausgaben und Belege pro Jahr? (Relevant für BLOB-Speicherung in SQLite und Backups.)
-7. **Nummernlücken:** Sind Lücken durch gelöschte Entwürfe für dich ein Problem? Soll das Format (Präfix + JJMM + 4 Ziffern) konfigurierbar werden?
+7. **Nummern:** Sollen bestehende, nie versendete Entwürfe bei F2 ihre Nummer verlieren oder behalten? Soll das Format (Präfix + JJMM + 4 Ziffern) konfigurierbar werden?
 8. **Betrieb:** Läuft die Instanz aus dem Internet erreichbar oder nur im LAN? (Relevant für Online-Zahlungs-Webhooks und die Backup-Strategie.) Welche Zeitzone hat der Container?
-9. **Bearbeitete Rechnungen:** Gibt es heute schon versendete Rechnungen, die nachträglich geändert wurden? Das wäre vor F2 per Audit-Log zu prüfen.
+9. **Bearbeitete Rechnungen:** Gibt es heute schon versendete Rechnungen, die nachträglich geändert wurden? Das wäre vor F3 per Audit-Log zu prüfen.
 
 ---
 
@@ -276,7 +290,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 | Kriterium | A – selbst bauen | B – sauber anbinden |
 |---|---|---|
-| Aufwand | Hoch: Hauptbuch, Kontenplan, Abschluss, Bilanz, Abgrenzungen, Mehrjahresbetrieb | Mittel: Kontierung, Journal-Export, 1–2 Zielformate, Datenqualität (F2, F4) |
+| Aufwand | Hoch: Hauptbuch, Kontenplan, Abschluss, Bilanz, Abgrenzungen, Mehrjahresbetrieb | Mittel: Kontierung, Journal-Export, 1–2 Zielformate, Datenqualität (F3, F5) |
 | Fach- und Haftungsrisiko | Hoch: Fehler landen direkt im Abschluss und in der Steuererklärung | Tief: Verbucht und abgeschlossen wird im Fachprogramm unter Kontrolle des Treuhänders |
 | Wartung bei Gesetzesänderungen | Dauernd (Rechnungslegung, Kontenrahmen) | Gering: nur Exportformate |
 | Abhängigkeit von Dritten | Keine | Von Import-Schnittstellen und -Formaten (können sich ändern) |
@@ -291,9 +305,9 @@ Begründung:
 3. Die Teile, die *nur* die App gut kann, bleiben in der App: Rechnungen, QR-Zahlteil, Zahlungsabgleich, offene Posten, Mahnwesen, Belegarchiv. Genau diese Daten braucht der Treuhänder sauber.
 4. Die Grenze liegt beim **Journal-Export**. Alles, was Konten, Abschluss und Bilanz betrifft, bleibt im Fachprogramm.
 
-Umsetzung in dieser Reihenfolge: F2 → F4 → F5, danach F6/F8. Kontonummern und Buchungslogik (z. B. ob pro Rechnung oder pro Zahlung gebucht wird) **legt der Treuhänder fest**. Die App bietet dafür eine Konfiguration an und enthält keine eingebauten Konten.
+Umsetzung in dieser Reihenfolge: F3 → F5 → F6, danach F7/F9. Kontonummern und Buchungslogik (z. B. ob pro Rechnung oder pro Zahlung gebucht wird) **legt der Treuhänder fest**. Die App bietet dafür eine Konfiguration an und enthält keine eingebauten Konten.
 
-**Offener Punkt:** Direkte API-Anbindungen (z. B. bexio) und genaue Importformate (Banana, Abacus) habe ich **nicht geprüft**. Vor F5 bitte die Hersteller-Dokumentation lesen und die Machbarkeit bestätigen.
+**Offener Punkt:** Direkte API-Anbindungen (z. B. bexio) und genaue Importformate (Banana, Abacus) habe ich **nicht geprüft**. Vor F6 bitte die Hersteller-Dokumentation lesen und die Machbarkeit bestätigen.
 
 ### 7.4 Fragen an einen Treuhänder
 
@@ -302,7 +316,7 @@ Umsetzung in dieser Reihenfolge: F2 → F4 → F5, danach F6/F8. Kontonummern un
 3. Welcher Kontenplan (z. B. Kontenrahmen KMU) und welche Konten für Ertrag, Debitoren, Bank und Aufwand pro Kategorie?
 4. Wie runde ich das Rechnungstotal korrekt (5-Rappen-Rundung ja/nein)?
 5. Wie sollen Gutschriften, Stornos, Skonti und Debitorenverluste im Export aussehen?
-6. Sind Lücken in der Rechnungsnummerierung (gelöschte Entwürfe) ein Problem?
+6. Reicht es, wenn Rechnungsnummern erst beim Versand vergeben werden und dadurch lückenlos sind, oder gibt es weitere Anforderungen an die Nummerierung?
 7. Was brauchst du zum Jahresende: OP-Liste per 31.12., Belege als PDF, Kontoauszüge? In welcher Struktur?
 8. Erfüllt ein PDF-Archiv mit Hash-Werten und Audit-Log die Anforderungen der GeBüV an Integrität und Aufbewahrung, oder braucht es mehr (z. B. externe Zeitstempel, WORM-Speicher)?
 9. Für Vereine: Welche Besonderheiten (Mitgliederbeiträge, Spenden) müsste die App abbilden?
