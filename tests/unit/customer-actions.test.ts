@@ -35,7 +35,7 @@ function form(fields: Record<string, string>): FormData {
 
 const VALID_FIELDS = {
   contactPerson: "Max Muster",
-  address: "Seestrasse 1",
+  street: "Seestrasse", houseNumber: "1",
   city: "Zürich",
   zipCode: "8001",
   email: "max@muster.ch",
@@ -61,7 +61,7 @@ describe("customer actions", () => {
       const result = await createCustomer({}, form({}));
       expect(result.error).toBe("Bitte alle Pflichtfelder korrekt ausfüllen.");
       expect(result.fieldErrors?.contactPerson).toBeDefined();
-      expect(result.fieldErrors?.address).toBeDefined();
+      expect(result.fieldErrors?.street).toBeDefined();
       expect(result.fieldErrors?.city).toBeDefined();
       expect(result.fieldErrors?.zipCode).toBeDefined();
       expect(result.fieldErrors?.email).toBeDefined();

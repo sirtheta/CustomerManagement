@@ -15,9 +15,11 @@ const SAMPLE_CUSTOMER = {
   contactInsteadOfCompany: false,
   company: "Muster AG",
   contactPerson: "Anna Beispiel",
-  address: "Musterstrasse 12",
+  street: "Musterstrasse",
+  houseNumber: "12",
   zipCode: "8000",
   city: "Zürich",
+  country: "CH",
 };
 
 const SAMPLE_ITEMS = [
@@ -31,9 +33,11 @@ const SAMPLE_TOTAL = 4182.5;
 const FALLBACK_COMPANY: CompanyInfoForPdf = {
   companyName: "Meine Firma GmbH",
   companyHolderName: "Max Mustermann",
-  companyAddress: "Beispielweg 1",
+  companyStreet: "Beispielweg",
+  companyHouseNumber: "1",
   companyZip: "3000",
   companyCity: "Bern",
+  companyCountry: "CH",
   companyEmail: "kontakt@meinefirma.ch",
   companyPhone: "031 123 45 67",
   companyLogo: null,

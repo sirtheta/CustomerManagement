@@ -13,6 +13,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkYearlyInvoices } from "@/lib/yearly-invoices";
 import { sendAdminNotifications } from "@/lib/notifications";
 import { validateIban } from "@/lib/iban";
+import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
 const log = logger.child({ module: "settings" });
 
@@ -45,12 +46,29 @@ export async function saveSettings(
     logoBytes = new Uint8Array(pngBuffer.buffer as ArrayBuffer) as Uint8Array<ArrayBuffer>;
   }
 
+  const companyCountry = ((formData.get("companyCountry") as string) || "CH").trim().toUpperCase();
+  if (!(CREDITOR_COUNTRIES as readonly string[]).includes(companyCountry)) {
+    return { error: "Für die QR-Rechnung muss die Firmenadresse in der Schweiz oder in Liechtenstein liegen." };
+  }
+  const addressTooLong =
+    (String(formData.get("companyStreet") ?? "").trim().length > ADDRESS_LIMITS.street && "Strasse") ||
+    (String(formData.get("companyHouseNumber") ?? "").trim().length > ADDRESS_LIMITS.houseNumber && "Hausnummer") ||
+    (String(formData.get("companyZip") ?? "").trim().length > ADDRESS_LIMITS.zip && "PLZ") ||
+    (String(formData.get("companyCity") ?? "").trim().length > ADDRESS_LIMITS.city && "Ort");
+  if (addressTooLong) {
+    return { error: `${addressTooLong} der Firmenadresse ist zu lang für die QR-Rechnung.` };
+  }
+
   const companyData = {
     companyName: (formData.get("companyName") as string) || null,
     companyHolderName: (formData.get("companyHolderName") as string) || null,
-    companyAddress: (formData.get("companyAddress") as string) || null,
-    companyZip: (formData.get("companyZip") as string) || null,
-    companyCity: (formData.get("companyCity") as string) || null,
+    companyStreet: (formData.get("companyStreet") as string)?.trim() || null,
+    companyHouseNumber: (formData.get("companyHouseNumber") as string)?.trim() || null,
+    companyZip: (formData.get("companyZip") as string)?.trim() || null,
+    companyCity: (formData.get("companyCity") as string)?.trim() || null,
+    companyCountry,
+    // Saving confirms the address, e.g. after the migration's automatic split.
+    companyAddressNeedsReview: false,
     companyEmail: (formData.get("companyEmail") as string) || null,
     companyPhone: (formData.get("companyPhone") as string) || null,
     companyIBAN,

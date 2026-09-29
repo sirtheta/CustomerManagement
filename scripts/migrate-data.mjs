@@ -28,6 +28,17 @@ const UNIT          = { 0: "Hour",  1: "Day",  2: "Piece",  3: "Package" };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const nullable = (v) => (v === "" || v === null || v === undefined ? null : v);
+
+// Same heuristic as prisma/migrations/*_structured_addresses: a trailing token
+// starting with a digit is the house number. Migrated rows are flagged for review.
+const splitStreet = (line) => {
+  const trimmed = (line ?? "").trim();
+  const sp = trimmed.lastIndexOf(" ");
+  if (sp > 0 && /^\d/.test(trimmed.slice(sp + 1))) {
+    return { street: trimmed.slice(0, sp).trim(), houseNumber: trimmed.slice(sp + 1) };
+  }
+  return { street: trimmed, houseNumber: null };
+};
 const toDate   = (v) => v ? new Date(v) : null;
 const toBool   = (v) => v === 1 || v === true;
 
@@ -56,12 +67,15 @@ async function main() {
 
   // ── 1. CompanyInformation (only the active one: id=1) ─────────────────────
   const companyRow = src.prepare("SELECT * FROM CompanyInfo WHERE CompanyInformationId = 1").get();
+  const companyStreet = splitStreet(companyRow.CompanyAddress);
   await prisma.companyInformation.create({
     data: {
       companyInformationId: companyRow.CompanyInformationId,
       companyName:          nullable(companyRow.CompanyName),
       companyHolderName:    nullable(companyRow.CompanyHolderName),
-      companyAddress:       nullable(companyRow.CompanyAddress),
+      companyStreet:        companyStreet.street,
+      companyHouseNumber:   companyStreet.houseNumber,
+      companyAddressNeedsReview: true,
       companyZip:           nullable(companyRow.CompanyZip),
       companyCity:          nullable(companyRow.CompanyCity),
       companyEmail:         nullable(companyRow.CompanyEmail),
@@ -107,12 +121,15 @@ async function main() {
   // ── 4. Customers ──────────────────────────────────────────────────────────
   const customers = src.prepare("SELECT * FROM Customers ORDER BY CustomerId").all();
   for (const r of customers) {
+    const street = splitStreet(r.Address);
     await prisma.customer.create({
       data: {
         customerId:              r.CustomerId,
         company:                 nullable(r.Company),
         contactPerson:           r.ContactPerson,
-        address:                 r.Address,
+        street:                  street.street,
+        houseNumber:             street.houseNumber,
+        addressNeedsReview:      true,
         city:                    r.City,
         zipCode:                 r.ZipCode,
         email:                   r.Email,

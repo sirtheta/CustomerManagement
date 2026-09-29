@@ -69,14 +69,14 @@ async function main() {
   });
 
   const customerData = [
-    { company: "Bergland Bäckerei AG", contactPerson: "Fritz Amrein", address: "Dorfstrasse 12", city: "Interlaken", zipCode: "3800", email: "info@bergland-baeckerei.ch", phone: "+41 33 822 14 50", yearlyInvoice: true, nextInvoiceDate: daysFromNow(45) },
-    { company: "Zimmerei Wüthrich GmbH", contactPerson: "Karin Wüthrich", address: "Industriestrasse 8", city: "Thun", zipCode: "3600", email: "kontakt@zimmerei-wuethrich.ch", phone: "+41 33 437 60 10", yearlyInvoice: false, nextInvoiceDate: null },
-    { company: "Café Lumière", contactPerson: "Aline Perret", address: "Rue du Marché 5", city: "Lausanne", zipCode: "1003", email: "aline@cafe-lumiere.ch", phone: "+41 21 311 22 44", yearlyInvoice: false, nextInvoiceDate: null },
-    { company: "Optik Sonnenschein", contactPerson: "David Meyer", address: "Bahnhofstrasse 44", city: "Zürich", zipCode: "8001", email: "david.meyer@optik-sonnenschein.ch", phone: "+41 44 211 90 30", yearlyInvoice: true, nextInvoiceDate: daysFromNow(120) },
-    { company: "Physiopraxis Bergmatt", contactPerson: "Nadja Steiner", address: "Bergmattweg 3", city: "Luzern", zipCode: "6003", email: "info@physio-bergmatt.ch", phone: "+41 41 240 55 12", yearlyInvoice: false, nextInvoiceDate: null },
-    { company: null, contactPerson: "Beat Hofmann", address: "Rosenweg 9", city: "Basel", zipCode: "4056", email: "beat.hofmann@bluewin.ch", phone: "+41 61 333 77 89", yearlyInvoice: false, nextInvoiceDate: null, contactInsteadOfCompany: true },
-    { company: "Garage Oberland AG", contactPerson: "Res Baumann", address: "Seestrasse 120", city: "Spiez", zipCode: "3700", email: "info@garage-oberland.ch", phone: "+41 33 654 22 11", yearlyInvoice: false, nextInvoiceDate: null },
-    { company: "Confiserie Mathez", contactPerson: "Chantal Mathez", address: "Marktgasse 21", city: "Bern", zipCode: "3011", email: "chantal@confiserie-mathez.ch", phone: "+41 31 311 45 67", yearlyInvoice: true, nextInvoiceDate: daysFromNow(200) },
+    { company: "Bergland Bäckerei AG", contactPerson: "Fritz Amrein", street: "Dorfstrasse", houseNumber: "12", city: "Interlaken", zipCode: "3800", email: "info@bergland-baeckerei.ch", phone: "+41 33 822 14 50", yearlyInvoice: true, nextInvoiceDate: daysFromNow(45) },
+    { company: "Zimmerei Wüthrich GmbH", contactPerson: "Karin Wüthrich", street: "Industriestrasse", houseNumber: "8", city: "Thun", zipCode: "3600", email: "kontakt@zimmerei-wuethrich.ch", phone: "+41 33 437 60 10", yearlyInvoice: false, nextInvoiceDate: null },
+    { company: "Café Lumière", contactPerson: "Aline Perret", street: "Rue du Marché", houseNumber: "5", city: "Lausanne", zipCode: "1003", email: "aline@cafe-lumiere.ch", phone: "+41 21 311 22 44", yearlyInvoice: false, nextInvoiceDate: null },
+    { company: "Optik Sonnenschein", contactPerson: "David Meyer", street: "Bahnhofstrasse", houseNumber: "44", city: "Zürich", zipCode: "8001", email: "david.meyer@optik-sonnenschein.ch", phone: "+41 44 211 90 30", yearlyInvoice: true, nextInvoiceDate: daysFromNow(120) },
+    { company: "Physiopraxis Bergmatt", contactPerson: "Nadja Steiner", street: "Bergmattweg", houseNumber: "3", city: "Luzern", zipCode: "6003", email: "info@physio-bergmatt.ch", phone: "+41 41 240 55 12", yearlyInvoice: false, nextInvoiceDate: null },
+    { company: null, contactPerson: "Beat Hofmann", street: "Rosenweg", houseNumber: "9", city: "Basel", zipCode: "4056", email: "beat.hofmann@bluewin.ch", phone: "+41 61 333 77 89", yearlyInvoice: false, nextInvoiceDate: null, contactInsteadOfCompany: true },
+    { company: "Garage Oberland AG", contactPerson: "Res Baumann", street: "Seestrasse", houseNumber: "120", city: "Spiez", zipCode: "3700", email: "info@garage-oberland.ch", phone: "+41 33 654 22 11", yearlyInvoice: false, nextInvoiceDate: null },
+    { company: "Confiserie Mathez", contactPerson: "Chantal Mathez", street: "Marktgasse", houseNumber: "21", city: "Bern", zipCode: "3011", email: "chantal@confiserie-mathez.ch", phone: "+41 31 311 45 67", yearlyInvoice: true, nextInvoiceDate: daysFromNow(200) },
   ];
   const customers = await Promise.all(customerData.map((data) => prisma.customer.create({ data })));
 
@@ -210,7 +210,8 @@ async function main() {
     data: {
       companyName: "Muster Digitalwerkstatt GmbH",
       companyHolderName: "Sandra Keller",
-      companyAddress: "Handwerkerstrasse 4",
+      companyStreet: "Handwerkerstrasse",
+      companyHouseNumber: "4",
       companyCity: "Zürich",
       companyZip: "8005",
       companyEmail: "info@muster-digitalwerkstatt.ch",
