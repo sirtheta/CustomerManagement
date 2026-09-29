@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
+import { assignDocumentNumber } from "@/lib/document-number";
+import { fillDocumentNumber } from "@/lib/document-display";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
@@ -38,9 +40,20 @@ export async function approvePendingEmail(
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
+  let documentNumber: string;
   try {
-    const pdf = await generateInvoicePdf(pending.invoice, settings);
-    await sendInvoiceEmail(pending.invoice, settings, pdf, { to, subject, body });
+    documentNumber = await assignDocumentNumber("invoice", pending.invoiceId, { actor: session });
+  } catch (err) {
+    log.error({ pendingId: id, err }, "approvePendingEmail: number assignment failed");
+    return { error: "Rechnungsnummer konnte nicht vergeben werden." };
+  }
+  const invoice = { ...pending.invoice, documentNumber };
+  const finalSubject = fillDocumentNumber(subject, documentNumber);
+  const finalBody = fillDocumentNumber(body, documentNumber);
+
+  try {
+    const pdf = await generateInvoicePdf(invoice, settings);
+    await sendInvoiceEmail(invoice, settings, pdf, { to, subject: finalSubject, body: finalBody });
   } catch (err) {
     log.error({ pendingId: id, to, err }, "approvePendingEmail failed");
     return { error: err instanceof Error ? err.message : "Fehler beim Senden." };
@@ -52,14 +65,14 @@ export async function approvePendingEmail(
       data: { state: "Sent" },
     }),
     prisma.invoiceSentLog.create({
-      data: { invoiceId: pending.invoiceId, sentTo: to, subject },
+      data: { invoiceId: pending.invoiceId, sentTo: to, subject: finalSubject },
     }),
     prisma.pendingEmail.delete({ where: { id } }),
   ]);
 
-  await logAudit(session, "SEND", "Invoice", pending.invoiceId, pending.invoice.documentNumber, {
+  await logAudit(session, "SEND", "Invoice", pending.invoiceId, documentNumber, {
     to,
-    subject,
+    subject: finalSubject,
   });
 
   revalidatePath("/invoices/pending");
@@ -73,7 +86,7 @@ export async function discardPendingEmail(id: number): Promise<void> {
     where: { id },
     include: { invoice: { select: { id: true, documentNumber: true } } },
   });
-  await logAudit(session, "DELETE", "Invoice", discarded.invoice.id, discarded.invoice.documentNumber, {
+  await logAudit(session, "DELETE", "Invoice", discarded.invoice.id, discarded.invoice.documentNumber ?? undefined, {
     reason: "Pending-E-Mail verworfen",
   });
   revalidatePath("/invoices/pending");
