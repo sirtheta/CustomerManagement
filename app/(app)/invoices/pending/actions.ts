@@ -6,6 +6,7 @@ import { requireEditor } from "@/lib/permissions";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 import type { ActionState } from "@/hooks/use-action-toast";
+import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "invoices.pending" });
@@ -14,7 +15,7 @@ export async function approvePendingEmail(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireEditor();
+  const session = await requireEditor();
 
   const id = parseInt(formData.get("id") as string, 10);
   const to = (formData.get("to") as string).trim();
@@ -56,13 +57,24 @@ export async function approvePendingEmail(
     prisma.pendingEmail.delete({ where: { id } }),
   ]);
 
+  await logAudit(session, "SEND", "Invoice", pending.invoiceId, pending.invoice.documentNumber, {
+    to,
+    subject,
+  });
+
   revalidatePath("/invoices/pending");
   revalidatePath(`/invoices/${pending.invoiceId}`);
   return { success: true, _ts: Date.now() };
 }
 
 export async function discardPendingEmail(id: number): Promise<void> {
-  await requireEditor();
-  await prisma.pendingEmail.delete({ where: { id } });
+  const session = await requireEditor();
+  const discarded = await prisma.pendingEmail.delete({
+    where: { id },
+    include: { invoice: { select: { id: true, documentNumber: true } } },
+  });
+  await logAudit(session, "DELETE", "Invoice", discarded.invoice.id, discarded.invoice.documentNumber, {
+    reason: "Pending-E-Mail verworfen",
+  });
   revalidatePath("/invoices/pending");
 }

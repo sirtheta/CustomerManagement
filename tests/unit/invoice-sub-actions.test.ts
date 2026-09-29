@@ -352,15 +352,51 @@ describe("invoices/pending actions", () => {
       });
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/pending");
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/10");
+      expect(logAudit).toHaveBeenCalledWith(
+        editorSession,
+        "SEND",
+        "Invoice",
+        10,
+        "R-2026-010",
+        { to: "kunde@test.ch", subject: "Rechnung" }
+      );
+    });
+
+    it("does not write an audit entry when sending fails", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({
+        id: 1,
+        invoiceId: 10,
+        invoice: mockInvoice,
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(generateInvoicePdf).mockRejectedValue(new Error("PDF failed"));
+      await approvePendingEmail({}, form({ id: "1", to: "x@x.ch", subject: "s", body: "b" }));
+      expect(logAudit).not.toHaveBeenCalled();
     });
   });
 
   describe("discardPendingEmail", () => {
-    it("deletes pending email and revalidates", async () => {
+    it("deletes pending email, writes an audit entry and revalidates", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.pendingEmail.delete).mockResolvedValue({} as never);
+      vi.mocked(prisma.pendingEmail.delete).mockResolvedValue({
+        id: 5,
+        invoiceId: 10,
+        invoice: { id: 10, documentNumber: "R-2026-010" },
+      } as never);
       await discardPendingEmail(5);
-      expect(prisma.pendingEmail.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+      expect(prisma.pendingEmail.delete).toHaveBeenCalledWith({
+        where: { id: 5 },
+        include: { invoice: { select: { id: true, documentNumber: true } } },
+      });
+      expect(logAudit).toHaveBeenCalledWith(
+        editorSession,
+        "DELETE",
+        "Invoice",
+        10,
+        "R-2026-010",
+        { reason: "Pending-E-Mail verworfen" }
+      );
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/pending");
     });
   });
