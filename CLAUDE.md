@@ -69,7 +69,7 @@ npx vitest run tests/unit/calculations.test.ts
 **Business document workflow:**
 - `Invoice` states: `Draft → Sent → Paid | Overdue | Canceled`
 - `Quote` states: `Draft → Sent → Accepted | Declined | Expired`
-- Document numbers use configurable prefixes (e.g. `I-`, `Q-`) tracked via `lib/document-number.ts`
+- Document numbers use configurable prefixes (e.g. `I-`, `Q-`) tracked via `lib/document-number.ts`. Numbers are assigned on first send / status change out of Draft via `assignDocumentNumber` in that file; drafts have `documentNumber = null` (shown as "Entwurf")
 - `lib/yearly-invoices.ts` handles automatic recurring invoice creation
 - `lib/reminders.ts` + `PendingReminder` model manage overdue payment reminders
 
