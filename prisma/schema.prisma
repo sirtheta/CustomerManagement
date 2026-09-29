@@ -10,9 +10,12 @@ model Customer {
   customerId              Int        @id @default(autoincrement())
   company                 String?
   contactPerson           String
-  address                 String
+  street                  String
+  houseNumber             String?
   city                    String
   zipCode                 String
+  country                 String     @default("CH")
+  addressNeedsReview      Boolean    @default(false)
   email                   String
   phone                   String?
   yearlyInvoice           Boolean    @default(false)
@@ -209,9 +212,12 @@ model CompanyInformation {
   companyInformationId Int                  @id @default(autoincrement())
   companyName          String?
   companyHolderName    String?
-  companyAddress       String?
+  companyStreet        String?
+  companyHouseNumber   String?
   companyZip           String?
   companyCity          String?
+  companyCountry       String               @default("CH")
+  companyAddressNeedsReview Boolean         @default(false)
   companyEmail         String?
   companyPhone         String?
   companyIBAN          String?

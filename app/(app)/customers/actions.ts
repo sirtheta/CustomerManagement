@@ -7,6 +7,7 @@ import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { logAudit } from "@/lib/audit";
 import { z } from "zod";
+import { ADDRESS_LIMITS, isCountryCode } from "@/lib/address";
 
 export type CustomerFormState = {
   error?: string;
@@ -16,9 +17,23 @@ export type CustomerFormState = {
 const customerSchema = z.object({
   company: z.string().nullable(),
   contactPerson: z.string().min(1, "Kontaktperson ist erforderlich."),
-  address: z.string().min(1, "Adresse ist erforderlich."),
-  city: z.string().min(1, "Ort ist erforderlich."),
-  zipCode: z.string().min(1, "PLZ ist erforderlich."),
+  street: z
+    .string()
+    .min(1, "Strasse ist erforderlich.")
+    .max(ADDRESS_LIMITS.street, `Strasse darf maximal ${ADDRESS_LIMITS.street} Zeichen lang sein.`),
+  houseNumber: z
+    .string()
+    .max(ADDRESS_LIMITS.houseNumber, `Hausnummer darf maximal ${ADDRESS_LIMITS.houseNumber} Zeichen lang sein.`)
+    .nullable(),
+  city: z
+    .string()
+    .min(1, "Ort ist erforderlich.")
+    .max(ADDRESS_LIMITS.city, `Ort darf maximal ${ADDRESS_LIMITS.city} Zeichen lang sein.`),
+  zipCode: z
+    .string()
+    .min(1, "PLZ ist erforderlich.")
+    .max(ADDRESS_LIMITS.zip, `PLZ darf maximal ${ADDRESS_LIMITS.zip} Zeichen lang sein.`),
+  country: z.string().refine(isCountryCode, "Ungültiger Ländercode."),
   email: z.string().email("Ungültige E-Mail-Adresse."),
   phone: z.string().nullable(),
 });
@@ -32,9 +47,11 @@ export async function createCustomer(
   const raw = {
     company: (formData.get("company") as string) || null,
     contactPerson: (formData.get("contactPerson") as string) || "",
-    address: (formData.get("address") as string) || "",
-    city: (formData.get("city") as string) || "",
-    zipCode: (formData.get("zipCode") as string) || "",
+    street: ((formData.get("street") as string) || "").trim(),
+    houseNumber: ((formData.get("houseNumber") as string) || "").trim() || null,
+    city: ((formData.get("city") as string) || "").trim(),
+    zipCode: ((formData.get("zipCode") as string) || "").trim(),
+    country: ((formData.get("country") as string) || "CH").trim().toUpperCase(),
     email: (formData.get("email") as string) || "",
     phone: (formData.get("phone") as string) || null,
   };
@@ -49,7 +66,8 @@ export async function createCustomer(
     return { error: "Bitte alle Pflichtfelder korrekt ausfüllen.", fieldErrors };
   }
 
-  const { company, contactPerson, address, city, zipCode, email, phone } = parsed.data;
+  const { company, contactPerson, street, houseNumber, city, zipCode, country, email, phone } =
+    parsed.data;
   const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
   const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
@@ -59,9 +77,13 @@ export async function createCustomer(
     data: {
       company: company || null,
       contactPerson,
-      address,
+      street,
+      houseNumber,
       city,
       zipCode,
+      country,
+      // Saving confirms the address, e.g. after the migration's automatic split.
+      addressNeedsReview: false,
       email,
       phone: phone || null,
       yearlyInvoice,
@@ -84,9 +106,11 @@ export async function updateCustomer(
   const raw = {
     company: (formData.get("company") as string) || null,
     contactPerson: (formData.get("contactPerson") as string) || "",
-    address: (formData.get("address") as string) || "",
-    city: (formData.get("city") as string) || "",
-    zipCode: (formData.get("zipCode") as string) || "",
+    street: ((formData.get("street") as string) || "").trim(),
+    houseNumber: ((formData.get("houseNumber") as string) || "").trim() || null,
+    city: ((formData.get("city") as string) || "").trim(),
+    zipCode: ((formData.get("zipCode") as string) || "").trim(),
+    country: ((formData.get("country") as string) || "CH").trim().toUpperCase(),
     email: (formData.get("email") as string) || "",
     phone: (formData.get("phone") as string) || null,
   };
@@ -101,7 +125,8 @@ export async function updateCustomer(
     return { error: "Bitte alle Pflichtfelder korrekt ausfüllen.", fieldErrors };
   }
 
-  const { company, contactPerson, address, city, zipCode, email, phone } = parsed.data;
+  const { company, contactPerson, street, houseNumber, city, zipCode, country, email, phone } =
+    parsed.data;
   const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
   const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
@@ -112,9 +137,13 @@ export async function updateCustomer(
     data: {
       company: company || null,
       contactPerson,
-      address,
+      street,
+      houseNumber,
       city,
       zipCode,
+      country,
+      // Saving confirms the address, e.g. after the migration's automatic split.
+      addressNeedsReview: false,
       email,
       phone: phone || null,
       yearlyInvoice,

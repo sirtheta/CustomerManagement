@@ -15,14 +15,16 @@ export async function GET() {
     orderBy: { contactPerson: "asc" },
   });
 
-  const headers = ["ID", "Firma", "Kontaktperson", "Adresse", "PLZ", "Ort", "E-Mail", "Telefon", "Jahresrechnung"];
+  const headers = ["ID", "Firma", "Kontaktperson", "Strasse", "Hausnummer", "PLZ", "Ort", "Land", "E-Mail", "Telefon", "Jahresrechnung"];
   const rows = customers.map((c) => [
     c.customerId,
     c.company ?? "",
     c.contactPerson,
-    c.address,
+    c.street,
+    c.houseNumber ?? "",
     c.zipCode,
     c.city,
+    c.country,
     c.email,
     c.phone ?? "",
     c.yearlyInvoice ? "Ja" : "Nein",
