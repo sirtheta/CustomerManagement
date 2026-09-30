@@ -3,8 +3,8 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
-import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
-import { sendInvoiceEmail } from "@/lib/email";
+import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import type { ArchiveResult } from "@/lib/document-archive";
 import { getPaymentSummary } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
@@ -39,10 +39,16 @@ export async function sendReminder(
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
+  let archive: ArchiveResult;
   try {
     const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
-    const pdf = await generateInvoicePdf(reminder.invoice, settings, { qrAmount: remainingRappen / 100 });
-    await sendInvoiceEmail(reminder.invoice, settings, pdf, { to, subject, body });
+    archive = await renderArchiveAndSend({
+      invoice: reminder.invoice,
+      settings,
+      kind: "Reminder",
+      mail: { to, subject, body },
+      pdfOptions: { qrAmount: remainingRappen / 100 },
+    });
   } catch (err) {
     log.error({ reminderId, to, err }, "sendReminder failed");
     return { error: err instanceof Error ? err.message : "Fehler beim Senden." };
@@ -51,7 +57,7 @@ export async function sendReminder(
   const cooldownDays = settings.reminderCooldownDays ?? 14;
   const snoozedUntil = new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000);
 
-  await prisma.$transaction([
+  const [, , sentDocument] = await prisma.$transaction([
     prisma.invoiceSentLog.create({
       data: { invoiceId: reminder.invoiceId, sentTo: to, subject },
     }),
@@ -62,12 +68,25 @@ export async function sendReminder(
         snoozedUntil,
       },
     }),
+    prisma.sentDocument.create({
+      data: sentDocumentData({
+        invoiceId: reminder.invoiceId,
+        documentNumber: reminder.invoice.documentNumber!,
+        kind: "Reminder",
+        reminderLevel: reminder.reminderLevel,
+        archive,
+        sentTo: to,
+        subject,
+        actor: session,
+      }),
+    }),
   ]);
 
   await logAudit(session, "SEND", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
     to,
     level: reminder.reminderLevel,
   });
+  await auditArchived(session, sentDocument, reminder.invoice.documentNumber!, archive);
   revalidatePath("/invoices/reminders");
   return { success: true, _ts: Date.now() };
 }

@@ -8,8 +8,10 @@ import { fillDocumentNumber } from "@/lib/document-display";
 import type { DocumentKind } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
-import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
-import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
+import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
+import { sendQuoteEmail } from "@/lib/email";
+import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import type { ArchiveResult } from "@/lib/document-archive";
 import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
@@ -218,19 +220,20 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     const subject = fillDocumentNumber(input.subject, documentNumber);
     const body = fillDocumentNumber(input.body, documentNumber);
 
+    let archive: ArchiveResult;
     try {
-      const pdf = await generateInvoicePdf(numbered, settings);
-      await sendInvoiceEmail(numbered, settings, pdf, {
-        to: input.to,
-        subject,
-        body,
+      archive = await renderArchiveAndSend({
+        invoice: numbered,
+        settings,
+        kind: "Invoice",
+        mail: { to: input.to, subject, body },
       });
     } catch (err) {
       log.error({ invoiceId: input.id, to: input.to, err }, "sendDocument (invoice) failed");
       return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
     }
 
-    await defaultPrisma.$transaction([
+    const [, , sentDocument] = await defaultPrisma.$transaction([
       // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
       defaultPrisma.invoice.updateMany({
         where: { id: input.id, state: { in: ["Draft", "Sent", "Overdue"] } },
@@ -239,11 +242,23 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
       defaultPrisma.invoiceSentLog.create({
         data: { invoiceId: input.id, sentTo: input.to, subject },
       }),
+      defaultPrisma.sentDocument.create({
+        data: sentDocumentData({
+          invoiceId: input.id,
+          documentNumber,
+          kind: "Invoice",
+          archive,
+          sentTo: input.to,
+          subject,
+          actor: input.actor,
+        }),
+      }),
     ]);
     await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
       ...(invoice.creditNoteForId != null ? { creditNoteFor: invoice.creditNoteForId } : {}),
     });
+    await auditArchived(input.actor, sentDocument, documentNumber, archive);
     if (invoice.creditNoteForId != null) {
       await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });
       revalidatePath(`/invoices/${invoice.creditNoteForId}`);
