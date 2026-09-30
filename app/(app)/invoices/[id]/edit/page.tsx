@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { notFound, redirect } from "next/navigation";
 import InvoiceForm from "../../InvoiceForm";
 
@@ -12,12 +13,11 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
-    const [invoice, customers, services, settings, categories] = await Promise.all([
+    const [invoice, services, settings, categories] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { items: true },
     }),
-    prisma.customer.findMany({ orderBy: { contactPerson: "asc" } }),
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
@@ -27,6 +27,11 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
 
   if (!invoice) notFound();
   if (invoice.state !== "Draft") redirect(`/invoices/${invoice.id}`);
+
+  const customers = await prisma.customer.findMany({
+    where: selectableCustomersWhere(invoice.customerId),
+    orderBy: { contactPerson: "asc" },
+  });
 
   const serializedInvoice = {
     ...invoice,

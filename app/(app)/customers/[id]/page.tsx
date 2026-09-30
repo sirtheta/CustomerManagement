@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import CustomerForm from "../CustomerForm";
 import DeleteCustomerButton from "../DeleteCustomerButton";
+import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import { Button } from "@/components/ui/button";
@@ -122,7 +123,15 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: "Kunden", href: "/customers" }, { label: customerName }]} />
-      <h1 className="text-2xl font-semibold">{customerName}</h1>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">{customerName}</h1>
+          {customer.archivedAt && <Badge variant="outline">Archiviert</Badge>}
+        </div>
+        {canEdit && (
+          <ArchiveCustomerButton customerId={customerId} archived={customer.archivedAt !== null} />
+        )}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <CustomerForm
           key={`${customer.customerId}-${isEditing}`}

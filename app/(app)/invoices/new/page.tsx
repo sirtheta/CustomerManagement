@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { selectableCustomersWhere } from "@/lib/customer-archive";
 import InvoiceForm from "../InvoiceForm";
 
 type Props = {
@@ -10,7 +11,10 @@ export default async function NewInvoicePage({ searchParams }: Props) {
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
     const [customers, services, settings, templates, categories] = await Promise.all([
-    prisma.customer.findMany({ orderBy: { contactPerson: "asc" } }),
+    prisma.customer.findMany({
+      where: defaultCustomerId !== undefined ? selectableCustomersWhere(defaultCustomerId) : { archivedAt: null },
+      orderBy: { contactPerson: "asc" },
+    }),
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),

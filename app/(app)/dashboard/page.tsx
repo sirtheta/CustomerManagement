@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     scheduledCustomerCount,
     scheduledCustomers,
   ] = await Promise.all([
-    prisma.customer.count(),
+    prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
     prisma.quote.count({
       where: { state: { in: [QuoteState.Draft, QuoteState.Sent] } },
@@ -47,10 +47,10 @@ export default async function DashboardPage() {
     prisma.pendingEmail.count(),
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
     prisma.customer.count({
-      where: { yearlyInvoice: true, nextInvoiceDate: { not: null } },
+      where: { yearlyInvoice: true, archivedAt: null, nextInvoiceDate: { not: null } },
     }),
     prisma.customer.findMany({
-      where: { yearlyInvoice: true, nextInvoiceDate: { not: null } },
+      where: { yearlyInvoice: true, archivedAt: null, nextInvoiceDate: { not: null } },
       select: {
         customerId: true,
         company: true,

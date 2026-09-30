@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { notFound } from "next/navigation";
 import QuoteForm from "../../QuoteForm";
 
@@ -12,12 +13,11 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);
 
-    const [quote, customers, services, settings, categories] = await Promise.all([
+    const [quote, services, settings, categories] = await Promise.all([
     prisma.quote.findUnique({
       where: { id: quoteId },
       include: { items: true },
     }),
-    prisma.customer.findMany({ orderBy: { contactPerson: "asc" } }),
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
@@ -26,6 +26,11 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
   ]);
 
   if (!quote) notFound();
+
+  const customers = await prisma.customer.findMany({
+    where: selectableCustomersWhere(quote.customerId),
+    orderBy: { contactPerson: "asc" },
+  });
 
   const serializedQuote = {
     ...quote,

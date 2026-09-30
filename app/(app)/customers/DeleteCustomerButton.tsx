@@ -12,7 +12,7 @@ export default function DeleteCustomerButton({ customerId, size = "default" }: P
   return (
     <ConfirmDialog
       title="Kunde löschen"
-      description="Soll dieser Kunde wirklich gelöscht werden? Alle zugehörigen Daten werden ebenfalls gelöscht."
+      description="Soll dieser Kunde wirklich gelöscht werden? Kunden mit Rechnungen können nicht gelöscht, sondern nur archiviert werden."
       confirmLabel="Löschen"
       triggerSize={size}
       onConfirm={() => deleteCustomer(customerId)}
