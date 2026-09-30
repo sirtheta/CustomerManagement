@@ -226,17 +226,17 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
   - [x] Audit-Log für Pending-E-Mails (U6)
 
 **Phase 2: mittelfristig (3–9 Monate) – Buchhaltungsfähigkeit**
-6. F5 Zahlungen und offene Posten
-7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
-8. F7 Bankabgleich 2.0
-9. F11 flexible Abos
+- [x] 6. F5 Zahlungen und offene Posten
+- [ ] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
+- [ ] 8. F7 Bankabgleich 2.0
+- [ ] 9. F11 flexible Abos
 
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
-10. F8 Mahnwesen mit Mahnbelegen
-11. F9 Belege zu Ausgaben
-12. F10 erweitertes Kundenmodell
-13. F12 Verlauf und Aufgaben
-14. Optional: F13 Online-Bezahlung, F14 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
+- [ ] 10. F8 Mahnwesen mit Mahnbelegen
+- [ ] 11. F9 Belege zu Ausgaben
+- [ ] 12. F10 erweitertes Kundenmodell
+- [ ] 13. F12 Verlauf und Aufgaben
+- [ ] 14. Optional: F13 Online-Bezahlung, F14 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
 
 ---
 
