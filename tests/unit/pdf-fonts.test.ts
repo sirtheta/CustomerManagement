@@ -26,6 +26,7 @@ const doc: RenderDoc = {
     { name: "Pos", description: null, unit: "Hour", quantity: 1, unitPrice: 100, totalAmount: 100 },
   ],
   qr: null,
+  draft: false,
 };
 
 const company = { companyName: "Firma", companyHolderName: "Inhaber" };

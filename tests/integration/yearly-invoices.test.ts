@@ -26,6 +26,9 @@ describe("checkYearlyInvoices", () => {
     expect(invoices[0].totalAmount.toNumber()).toBe(0);
     expect(pending).toHaveLength(1);
     expect(pending[0].to).toBe("jane@clientag.ch");
+    expect(invoices[0].documentNumber).toBeNull();
+    expect(pending[0].subject).toContain("{documentNumber}");
+    expect(pending[0].body).toContain("{documentNumber}");
   });
 
   it("advances nextInvoiceDate by one year", async () => {

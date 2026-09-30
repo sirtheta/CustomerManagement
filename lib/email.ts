@@ -26,13 +26,14 @@ function buildTransport(settings: FullSettings) {
 function resolvePlaceholders(
   template: string,
   invoice: FullInvoice,
+  documentNumber: string,
   settings: FullSettings
 ): string {
   const c = invoice.customer;
   const displayName = customerDisplayName(c);
 
   return template
-    .replace(/\{documentNumber\}/g, invoice.documentNumber)
+    .replace(/\{documentNumber\}/g, documentNumber)
     .replace(/\{contactPerson\}/g, c.contactPerson)
     .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
     .replace(/\{totalAmount\}/g, formatCurrency(invoice.totalAmount.toNumber()))
@@ -52,6 +53,8 @@ export async function sendInvoiceEmail(
   pdf: Buffer,
   overrides?: { to?: string; subject?: string; body?: string }
 ): Promise<void> {
+  const documentNumber = invoice.documentNumber;
+  if (!documentNumber) throw new Error("Rechnung hat noch keine Nummer.");
   if (process.env.DISABLE_EMAIL === 'true') {
     console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
     return;
@@ -64,8 +67,8 @@ export async function sendInvoiceEmail(
   const subjectTemplate = settings.emailSubjectTemplate || DEFAULT_SUBJECT;
   const bodyTemplate = settings.emailBodyTemplate || DEFAULT_BODY;
 
-  const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, settings);
-  const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, settings);
+  const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, documentNumber, settings);
+  const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, documentNumber, settings);
   const to = overrides?.to ?? invoice.customer.email;
   const filename = `rechnung-${invoice.documentNumber}.pdf`;
 
@@ -81,13 +84,14 @@ export async function sendInvoiceEmail(
 function resolveQuotePlaceholders(
   template: string,
   quote: FullQuote,
+  documentNumber: string,
   settings: FullSettings
 ): string {
   const c = quote.customer;
   const displayName = customerDisplayName(c);
 
   return template
-    .replace(/\{documentNumber\}/g, quote.documentNumber)
+    .replace(/\{documentNumber\}/g, documentNumber)
     .replace(/\{contactPerson\}/g, c.contactPerson)
     .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
     .replace(/\{totalAmount\}/g, formatCurrency(quote.totalAmount.toNumber()))
@@ -138,6 +142,8 @@ export async function sendQuoteEmail(
   pdf: Buffer,
   overrides?: { to?: string; subject?: string; body?: string }
 ): Promise<void> {
+  const documentNumber = quote.documentNumber;
+  if (!documentNumber) throw new Error("Offerte hat noch keine Nummer.");
   if (process.env.DISABLE_EMAIL === 'true') {
     console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
     return;
@@ -148,8 +154,8 @@ export async function sendQuoteEmail(
   const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
   const fromAddress = settings.smtpFromAddress || settings.smtpUser;
 
-  const subject = resolveQuotePlaceholders(overrides?.subject ?? DEFAULT_QUOTE_SUBJECT, quote, settings);
-  const text = resolveQuotePlaceholders(overrides?.body ?? DEFAULT_QUOTE_BODY, quote, settings);
+  const subject = resolveQuotePlaceholders(overrides?.subject ?? DEFAULT_QUOTE_SUBJECT, quote, documentNumber, settings);
+  const text = resolveQuotePlaceholders(overrides?.body ?? DEFAULT_QUOTE_BODY, quote, documentNumber, settings);
   const to = overrides?.to ?? quote.customer.email;
   const filename = `offerte-${quote.documentNumber}.pdf`;
 

@@ -20,6 +20,22 @@ const INVOICE_STATES = Object.values(InvoiceState);
 const QUOTE_STATES = Object.values(QuoteState);
 const UNITS = Object.values(Unit);
 
+// Number of pending yearly-invoice mails to seed (see seedPendingYearlyInvoices)
+const PENDING_YEARLY_COUNT = 3;
+
+// Same defaults as lib/yearly-invoices.ts
+const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
+const DEFAULT_BODY =
+  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
+
+function resolveTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
+}
+
+function formatChDate(d: Date): string {
+  return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function yyMM() {
   const now = new Date();
   return `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -107,6 +123,9 @@ async function main() {
   // Customers (50 total)
   const customers = [];
   for (let i = 0; i < 50; i++) {
+    // The first few customers are guaranteed yearly-invoice customers so the
+    // pending yearly mails below always have someone to belong to
+    const forcedYearly = i < PENDING_YEARLY_COUNT;
     const customer = await prisma.customer.create({
       data: {
         company: faker.company.name(),
@@ -117,7 +136,7 @@ async function main() {
         zipCode: swissZip(),
         email: faker.internet.email(),
         phone: faker.phone.number("+41 ## ### ## ##"),
-        yearlyInvoice: faker.datatype.boolean(),
+        yearlyInvoice: forcedYearly || faker.datatype.boolean(),
         nextInvoiceDate: faker.date.future(),
       },
     });
@@ -140,9 +159,12 @@ async function main() {
       // Paid invoices feed the cash-basis accounting module, so they need a paidDate
       const paidDate =
         state === InvoiceState.Paid ? faker.date.between({ from: date, to: new Date() }) : null;
-      const invoiceNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
-      // Non-draft invoices have been sent at least once
+      // Non-draft invoices have been sent at least once and therefore carry a
+      // number; drafts stay unnumbered (and don't consume the counter)
       const invoiceSent = state !== InvoiceState.Draft;
+      const invoiceNumber = invoiceSent
+        ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`
+        : null;
       await prisma.invoice.create({
         data: {
           customerId: customer.customerId,
@@ -154,7 +176,7 @@ async function main() {
           state,
           paidDate,
           items: { create: items },
-          sentLogs: invoiceSent
+          sentLogs: invoiceNumber
             ? { create: buildSentLogs(invoiceNumber, "Rechnung", customer.email, date) }
             : undefined,
         },
@@ -169,10 +191,13 @@ async function main() {
       );
       const items = buildItems(categories);
       const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-      const quoteNumber = `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}`;
       const quoteState = faker.helpers.arrayElement(QUOTE_STATES);
-      // Non-draft quotes have been sent at least once
+      // Non-draft quotes have been sent at least once and therefore carry a
+      // number; drafts stay unnumbered (and don't consume the counter)
       const quoteSent = quoteState !== QuoteState.Draft;
+      const quoteNumber = quoteSent
+        ? `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}`
+        : null;
       await prisma.quote.create({
         data: {
           customerId: customer.customerId,
@@ -184,7 +209,7 @@ async function main() {
           totalAmount: round2(totalAmount),
           state: quoteState,
           items: { create: items },
-          sentLogs: quoteSent
+          sentLogs: quoteNumber
             ? { create: buildSentLogs(quoteNumber, "Offerte", customer.email, date) }
             : undefined,
         },
@@ -246,9 +271,99 @@ async function main() {
     },
   });
 
-  console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses.`,
+  // Pending yearly invoices, exactly as checkYearlyInvoices leaves them
+  const pendingYearly = await seedPendingYearlyInvoices(
+    customers.slice(0, PENDING_YEARLY_COUNT),
+    company.companyName,
+    categories,
+    prefix,
+    invoiceCounter,
   );
+  invoiceCounter = pendingYearly.invoiceCounter;
+
+  console.log(
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending yearly invoice mails.`,
+  );
+}
+
+// Mirrors lib/yearly-invoices.ts: per due yearly customer a Draft invoice
+// (documentNumber null, totalAmount 0, no items) plus a PendingEmail whose
+// subject/body keep the raw {documentNumber} placeholder, and nextInvoiceDate
+// advanced by one year. Each customer also gets a prior numbered, Paid invoice
+// from a year ago so the history looks realistic.
+async function seedPendingYearlyInvoices(
+  yearlyCustomers: { customerId: number; contactPerson: string; email: string }[],
+  companyName: string,
+  categories: { categoryId: number }[],
+  prefix: string,
+  startCounter: number,
+) {
+  let invoiceCounter = startCounter;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const paymentDays = 30;
+  const dueDate = new Date(today);
+  dueDate.setDate(dueDate.getDate() + paymentDays);
+
+  for (const [i, customer] of yearlyCustomers.entries()) {
+    const priorDate = new Date(today);
+    priorDate.setFullYear(priorDate.getFullYear() - 1);
+    priorDate.setDate(priorDate.getDate() - i);
+    const priorDue = new Date(priorDate);
+    priorDue.setDate(priorDue.getDate() + paymentDays);
+    const items = buildItems(categories);
+    const priorNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
+    await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: priorNumber,
+        date: priorDate,
+        dueDate: priorDue,
+        totalAmount: round2(items.reduce((sum, item) => sum + item.totalAmount, 0)),
+        state: InvoiceState.Paid,
+        paidDate: priorDue,
+        items: { create: items },
+        sentLogs: { create: buildSentLogs(priorNumber, "Rechnung", customer.email, priorDate) },
+      },
+    });
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        date: today,
+        dueDate,
+        totalAmount: 0,
+        state: InvoiceState.Draft,
+      },
+    });
+    const vars = {
+      documentNumber: "{documentNumber}",
+      contactPerson: customer.contactPerson,
+      companyName,
+      totalAmount: new Intl.NumberFormat("de-CH", { style: "currency", currency: "CHF" }).format(0),
+      date: formatChDate(today),
+      dueDate: formatChDate(dueDate),
+      customUserText: "",
+    };
+    await prisma.pendingEmail.create({
+      data: {
+        invoiceId: invoice.id,
+        to: customer.email,
+        subject: resolveTemplate(DEFAULT_SUBJECT, vars),
+        body: resolveTemplate(DEFAULT_BODY, vars),
+      },
+    });
+
+    // The job was due today and advanced the date by one year
+    const next = new Date(today);
+    next.setFullYear(next.getFullYear() + 1);
+    await prisma.customer.update({
+      where: { customerId: customer.customerId },
+      data: { nextInvoiceDate: next },
+    });
+  }
+
+  return { count: yearlyCustomers.length, invoiceCounter };
 }
 
 // Generate 1–2 send-history entries (used for non-draft invoices/quotes).

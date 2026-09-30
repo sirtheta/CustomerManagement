@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { QuoteState, UserRole } from "@prisma/client";
 import { z } from "zod";
+import { documentLabel } from "@/lib/document-display";
 
 const stateLabels: Record<string, string> = {
   Draft: "Entwurf",
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
 
   const headers = ["Nummer", "Datum", "Gültig bis", "Kunde", "Betrag (CHF)", "Status"];
   const rows = quotes.map((q) => [
-    q.documentNumber,
+    documentLabel(q.documentNumber),
     q.date.toLocaleDateString("de-CH"),
     q.validUntil.toLocaleDateString("de-CH"),
     q.customer.contactInsteadOfCompany

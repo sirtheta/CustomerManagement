@@ -28,11 +28,16 @@ vi.mock("@/lib/audit", () => ({
   logAudit: vi.fn(),
 }));
 
+vi.mock("@/lib/document-number", () => ({
+  assignDocumentNumber: vi.fn(),
+}));
+
 import { updateInvoiceStatus, updateInvoicePaidDate, deleteInvoice } from "@/app/(app)/invoices/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { logAudit } from "@/lib/audit";
+import { assignDocumentNumber } from "@/lib/document-number";
 
 const editorSession = {
   user: { id: "1", name: "Editor User", email: "editor@example.com", role: "Editor" },
@@ -78,6 +83,56 @@ describe("updateInvoiceStatus", () => {
       where: { id: 1 },
       data: { state: "Sent", paidDate: null },
     });
+  });
+
+  it("assigns a number when a draft leaves Draft", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Draft", documentNumber: null } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+    await updateInvoiceStatus(10, "Sent");
+    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
+    expect(vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(prisma.invoice.update).mock.invocationCallOrder[0]
+    );
+    expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Invoice", 10, "R-26090001", {
+      from: "Draft",
+      to: "Sent",
+    });
+  });
+
+  it.each(["Overdue", "Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Draft", documentNumber: null } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+    await updateInvoiceStatus(10, state);
+    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
+  });
+
+  it("does not assign a number when a draft is canceled", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Draft", documentNumber: null } as never);
+    await updateInvoiceStatus(10, "Canceled");
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+  });
+
+  it("assigns a number when a canceled, unnumbered invoice is sent", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Canceled", documentNumber: null } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+    await updateInvoiceStatus(10, "Sent");
+    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
+    expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Invoice", 10, "R-26090001", {
+      from: "Canceled",
+      to: "Sent",
+    });
+  });
+
+  it("does not assign a number when an unnumbered canceled invoice stays canceled", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Canceled", documentNumber: null } as never);
+    await updateInvoiceStatus(10, "Canceled");
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+  });
+
+  it("does not assign a number when a non-draft changes state", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Sent", documentNumber: "R-26090001" } as never);
+    await updateInvoiceStatus(10, "Paid");
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
   });
 
   it("does not touch paidDate for other transitions", async () => {

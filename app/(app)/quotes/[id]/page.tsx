@@ -20,6 +20,7 @@ import ConvertToInvoiceButton from "../ConvertToInvoiceButton";
 import SendQuoteButton from "../SendQuoteButton";
 import type { QuoteState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { documentLabel } from "@/lib/document-display";
 
 const stateLabels: Record<QuoteState, string> = {
   Draft: "Entwurf",
@@ -61,8 +62,10 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   if (!quote) notFound();
 
   const companyName = settings?.companyInfo.companyName ?? "";
-  const defaultSubject = `Offerte Nr. ${quote.documentNumber} – ${companyName}`;
-  const defaultBody = `Guten Tag ${quote.customer.contactPerson}\n\nanbei erhalten Sie die Offerte Nr. ${quote.documentNumber} vom ${formatDate(quote.date)} über ${formatCurrency(quote.totalAmount.toNumber())}.\n${quote.customUserText ? `\n${quote.customUserText}\n` : ""}\nGültig bis: ${formatDate(quote.validUntil)}\n\nMit freundlichen Grüssen\n${companyName}`;
+  // Drafts have no number yet: keep the placeholder so it is filled in when sent.
+  const numberOrPlaceholder = quote.documentNumber ?? "{documentNumber}";
+  const defaultSubject = `Offerte Nr. ${numberOrPlaceholder} – ${companyName}`;
+  const defaultBody = `Guten Tag ${quote.customer.contactPerson}\n\nanbei erhalten Sie die Offerte Nr. ${numberOrPlaceholder} vom ${formatDate(quote.date)} über ${formatCurrency(quote.totalAmount.toNumber())}.\n${quote.customUserText ? `\n${quote.customUserText}\n` : ""}\nGültig bis: ${formatDate(quote.validUntil)}\n\nMit freundlichen Grüssen\n${companyName}`;
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/quotes";
@@ -70,15 +73,15 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
     ? quote.customer.contactPerson
     : (quote.customer.company || quote.customer.contactPerson);
   const breadcrumbItems = fromCustomer
-    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: quote.documentNumber }]
-    : [{ label: "Offerten", href: "/quotes" }, { label: quote.documentNumber }];
+    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(quote.documentNumber) }]
+    : [{ label: "Offerten", href: "/quotes" }, { label: documentLabel(quote.documentNumber) }];
 
   return (
     <div className="space-y-4">
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">{quote.documentNumber}</h1>
+          <h1 className="text-2xl font-semibold">{documentLabel(quote.documentNumber)}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             <Link
               href={`/customers/${quote.customer.customerId}`}

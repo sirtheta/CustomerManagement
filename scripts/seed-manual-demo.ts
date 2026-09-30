@@ -108,7 +108,9 @@ async function main() {
   for (const plan of invoicePlans) {
     const date = pastDate(plan.daysAgo);
     const dueDate = new Date(date.getTime() + plan.dueInDays * 24 * 60 * 60 * 1000);
-    const documentNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
+    // Drafts stay unnumbered until first send (and don't consume the counter)
+    const documentNumber =
+      plan.state !== InvoiceState.Draft ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}` : null;
     const invoiceItems = items(websites.categoryId);
     const totalAmount = invoiceItems.reduce((sum, i) => sum + i.totalAmount, 0);
     const paidDate = plan.state === InvoiceState.Paid ? new Date(date.getTime() + 12 * 24 * 60 * 60 * 1000) : null;
@@ -124,7 +126,7 @@ async function main() {
         paidDate,
         items: { create: invoiceItems },
         sentLogs:
-          plan.state !== InvoiceState.Draft
+          documentNumber
             ? { create: [{ sentTo: plan.customer.email, subject: `Rechnung Nr. ${documentNumber}`, sentAt: date }] }
             : undefined,
       },
@@ -162,7 +164,8 @@ async function main() {
   for (const plan of quotePlans) {
     const date = pastDate(plan.daysAgo);
     const validUntil = new Date(date.getTime() + plan.validForDays * 24 * 60 * 60 * 1000);
-    const documentNumber = `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}`;
+    const documentNumber =
+      plan.state !== QuoteState.Draft ? `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}` : null;
     const quoteItems = items(support.categoryId);
     const totalAmount = quoteItems.reduce((sum, i) => sum + i.totalAmount, 0);
 
@@ -176,7 +179,7 @@ async function main() {
         state: plan.state,
         items: { create: quoteItems },
         sentLogs:
-          plan.state !== QuoteState.Draft
+          documentNumber
             ? { create: [{ sentTo: plan.customer.email, subject: `Offerte Nr. ${documentNumber}`, sentAt: date }] }
             : undefined,
       },

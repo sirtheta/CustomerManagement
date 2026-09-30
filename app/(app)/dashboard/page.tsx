@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { InvoiceState, QuoteState } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
+import { documentLabel } from "@/lib/document-display";
 
 export default async function DashboardPage() {
   await auth();
@@ -225,7 +226,7 @@ export default async function DashboardPage() {
                       href={`/invoices/${inv.id}`}
                       className="font-medium text-sm hover:underline"
                     >
-                      {inv.documentNumber}
+                      {documentLabel(inv.documentNumber)}
                     </Link>
                     <p className="text-xs text-gray-500">
                       {inv.customer.contactInsteadOfCompany

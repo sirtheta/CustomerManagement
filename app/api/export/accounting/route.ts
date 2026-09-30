@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { auth } from "@/lib/auth";
+import { documentLabel } from "@/lib/document-display";
 import { hasRole } from "@/lib/permissions";
 import { InvoiceState, UserRole } from "@prisma/client";
 
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
     ...paidInvoices.map((inv) => ({
       date: inv.paidDate!,
       type: "Einnahme" as const,
-      description: inv.documentNumber,
+      description: documentLabel(inv.documentNumber),
       category: "",
       amount: inv.totalAmount.toNumber(),
     })),

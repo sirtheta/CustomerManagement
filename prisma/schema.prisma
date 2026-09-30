@@ -33,7 +33,7 @@ model Customer {
 model Invoice {
   id             Int              @id @default(autoincrement())
   customerId     Int
-  documentNumber String
+  documentNumber String?
   customUserText String?
   date           DateTime
   version        Int              @default(1)
@@ -88,7 +88,7 @@ model PendingEmail {
 model Quote {
   id             Int        @id @default(autoincrement())
   customerId     Int
-  documentNumber String
+  documentNumber String?
   customUserText String?
   date           DateTime
   version        Int        @default(1)

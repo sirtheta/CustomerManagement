@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { generateInvoiceNumber } from "@/lib/document-number";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
@@ -40,12 +39,9 @@ export async function checkYearlyInvoices(prisma: PrismaClient): Promise<void> {
     // leave nextInvoiceDate un-advanced, so the next cron run would bill the
     // same customer again for the same period.
     await prisma.$transaction(async (tx) => {
-      const documentNumber = await generateInvoiceNumber(tx);
-
       const invoice = await tx.invoice.create({
         data: {
           customerId: customer.customerId,
-          documentNumber,
           date: today,
           dueDate,
           totalAmount: 0,
@@ -54,7 +50,8 @@ export async function checkYearlyInvoices(prisma: PrismaClient): Promise<void> {
       });
 
       const vars = {
-        documentNumber,
+        // Kept as placeholder: the number is only assigned when the mail is approved.
+        documentNumber: "{documentNumber}",
         contactPerson: customer.contactPerson,
         companyName,
         totalAmount: formatCurrency(0),

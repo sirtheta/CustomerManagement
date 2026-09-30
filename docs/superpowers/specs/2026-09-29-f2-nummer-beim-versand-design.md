@@ -18,7 +18,7 @@ Rechnungen und Offerten haben als Entwurf keine Nummer. Die Nummer wird beim ers
 
 ## Kern: `assignDocumentNumber`
 
-In `lib/document-number.ts`: `assignDocumentNumber(tx, kind, id)`.
+In `lib/document-number.ts`: `assignDocumentNumber(kind, id, { actor?, client? })` (eigene Transaktion, ein Retry bei Kollision).
 
 - Idempotent: hat das Dokument schon eine Nummer, wird sie unverändert zurückgegeben.
 - Berechnung und Setzen laufen in derselben Transaktion. Bei einer Kollision (`isDocumentNumberCollision`) gibt es einen Retry wie heute in `createDocumentWithItems`.
@@ -42,6 +42,8 @@ In `lib/document-number.ts`: `assignDocumentNumber(tx, kind, id)`.
 - Listen, Detailseiten, Suche, Dashboard, Kundenseite und Exporte zeigen „Entwurf“, wenn die Nummer `null` ist. Die Suche ignoriert `null`.
 - PDF-Routen für Entwürfe ohne Nummer: Vorschau mit Wasserzeichen „ENTWURF“, Dateiname `entwurf-<id>.pdf`.
 - Audit-Log: `entityRef` ist bei Entwürfen `null`. Die Vergabe wird als `UPDATE` mit `{ documentNumber }` protokolliert.
+- PDF-Cache-Key enthält die Nummer (`n<Nummer>` bzw. `ndraft`).
+- Entwürfe ohne Nummer erhalten keinen QR-Zahlteil.
 - Bankimport (`lib/import/matching.ts`, `lib/payment-matching.ts`): offene Rechnungen haben immer eine Nummer. Zeilen mit `null` werden defensiv übersprungen.
 
 ## Nicht enthalten

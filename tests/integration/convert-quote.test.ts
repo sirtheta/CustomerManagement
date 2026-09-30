@@ -45,7 +45,6 @@ describe("QuoteToInvoice Workflow", () => {
       return tx.invoice.create({
         data: {
           customerId: quote.customerId,
-          documentNumber: "I-25060001",
           date: new Date(),
           dueDate: new Date(Date.now() + 30 * 86_400_000),
           totalAmount: quote.totalAmount,
@@ -67,7 +66,7 @@ describe("QuoteToInvoice Workflow", () => {
 
     // Assert invoice
     expect(invoice).not.toBeNull();
-    expect(invoice.documentNumber).toMatch(/^I-/);
+    expect(invoice.documentNumber).toBeNull();
     expect(invoice.state).toBe("Draft");
     expect(invoice.items).toHaveLength(quote.items.length);
     expect(Number(invoice.totalAmount)).toBe(Number(quote.totalAmount));
