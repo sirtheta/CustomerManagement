@@ -4,7 +4,7 @@ import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { auth } from "@/lib/auth";
 import { documentLabel } from "@/lib/document-display";
 import { hasRole } from "@/lib/permissions";
-import { InvoiceState, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -18,10 +18,10 @@ export async function GET(request: Request) {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [paidInvoices, expenses] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-      include: { customer: true },
+  const [payments, expenses] = await Promise.all([
+    prisma.payment.findMany({
+      where: { date: { gte: yearStart, lt: yearEnd } },
+      include: { invoice: { select: { documentNumber: true } } },
     }),
     prisma.expense.findMany({
       where: { date: { gte: yearStart, lt: yearEnd } },
@@ -32,12 +32,12 @@ export async function GET(request: Request) {
   type Row = { date: Date; type: "Einnahme" | "Ausgabe"; description: string; category: string; amount: number };
 
   const rows: Row[] = [
-    ...paidInvoices.map((inv) => ({
-      date: inv.paidDate!,
+    ...payments.map((p) => ({
+      date: p.date,
       type: "Einnahme" as const,
-      description: documentLabel(inv.documentNumber),
+      description: documentLabel(p.invoice.documentNumber),
       category: "",
-      amount: inv.totalAmount.toNumber(),
+      amount: p.amount.toNumber(),
     })),
     ...expenses.map((exp) => ({
       date: exp.date,
