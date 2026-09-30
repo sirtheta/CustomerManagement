@@ -135,4 +135,35 @@ describe("DocumentStateManager", () => {
       checkAndUpdateDocumentStates(prisma, [], [])
     ).resolves.toBeUndefined();
   });
+
+  it("never marks a credit note as Overdue", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const original = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-1",
+        date: pastDate(60),
+        dueDate: futureDate(30),
+        totalAmount: 100,
+        state: "Sent",
+      },
+    });
+    const credit = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-2",
+        date: pastDate(60),
+        dueDate: pastDate(30),
+        totalAmount: -100,
+        state: "Sent",
+        creditNoteForId: original.id,
+      },
+    });
+
+    await checkAndUpdateDocumentStates(prisma, [credit.id], []);
+
+    const after = await prisma.invoice.findUniqueOrThrow({ where: { id: credit.id } });
+    expect(after.state).toBe("Sent");
+  });
 });

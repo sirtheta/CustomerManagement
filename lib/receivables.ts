@@ -42,6 +42,7 @@ export type ReceivableInput = {
     contactInsteadOfCompany: boolean;
   };
   payments: { date: Date; amount: { toNumber(): number } }[];
+  creditNotes?: { date: Date; totalAmount: { toNumber(): number } }[];
 };
 
 export type ReceivableRow = {
@@ -75,14 +76,20 @@ export function buildReceivables(invoices: ReceivableInput[], asOf: Date): Recei
   const customers = new Map<number, { customerName: string; openRappen: number; creditRappen: number }>();
 
   for (const inv of invoices) {
-    if (inv.state === "Draft" || inv.state === "Canceled") continue;
+    const creditNotes = inv.creditNotes ?? [];
+    if (inv.state === "Draft") continue;
+    // Legacy: a manually canceled invoice has no credit notes and never counts.
+    if (inv.state === "Canceled" && creditNotes.length === 0) continue;
     if (inv.date.getTime() > asOf.getTime()) continue;
 
     const totalRappen = toRappen(inv.totalAmount);
     const paidRappen = inv.payments
       .filter((p) => p.date.getTime() <= asOf.getTime())
       .reduce((sum, p) => sum + toRappen(p.amount), 0);
-    const rest = totalRappen - paidRappen;
+    const creditNoteRappen = creditNotes
+      .filter((c) => c.date.getTime() <= asOf.getTime())
+      .reduce((sum, c) => sum + Math.abs(toRappen(c.totalAmount)), 0);
+    const rest = totalRappen - paidRappen - creditNoteRappen;
     if (rest === 0) continue;
 
     const openRappen = Math.max(rest, 0);
@@ -126,7 +133,8 @@ export function buildReceivables(invoices: ReceivableInput[], asOf: Date): Recei
 export async function fetchReceivables(prisma: PrismaClient, asOf: Date): Promise<ReceivablesReport> {
   const invoices = await prisma.invoice.findMany({
     where: {
-      state: { notIn: ["Draft", "Canceled"] },
+      state: { not: "Draft" },
+      creditNoteForId: null,
       date: { lte: asOf },
     },
     orderBy: [{ dueDate: "asc" }, { id: "asc" }],
@@ -141,6 +149,7 @@ export async function fetchReceivables(prisma: PrismaClient, asOf: Date): Promis
         select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true },
       },
       payments: { select: { date: true, amount: true } },
+      creditNotes: { where: { state: { not: "Draft" } }, select: { date: true, totalAmount: true } },
     },
   });
   return buildReceivables(invoices, asOf);

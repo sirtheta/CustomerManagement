@@ -13,11 +13,19 @@ import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { PaymentError, recordPayment, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
+import { canTransitionInvoice } from "@/lib/state-manager";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
+  DocumentLockedError,
   sendDocument,
 } from "@/lib/document-actions";
+import {
+  CreditNoteError,
+  assertCreditWithinOriginal,
+  createCreditNoteDraft,
+  negateDocumentInput,
+} from "@/lib/credit-notes";
 
 const log = logger.child({ module: "invoices" });
 
@@ -79,16 +87,24 @@ export async function updateInvoice(
   formData: FormData
 ): Promise<InvoiceFormState> {
   const session = await requireEditor();
+  const existing = await prisma.invoice.findUnique({
+    where: { id },
+    select: { creditNoteForId: true, customerId: true },
+  });
+  if (!existing) return { error: "Rechnung nicht gefunden." };
+  const isCreditNote = existing.creditNoteForId != null;
   const customerIdRaw = formData.get("customerId") as string;
   const customUserText = formData.get("customUserText") as string | null;
   const dateRaw = formData.get("date") as string;
   const dueDateRaw = formData.get("dueDate") as string;
 
-  if (!customerIdRaw || !dateRaw || !dueDateRaw) {
+  if (!customerIdRaw || !dateRaw || (!isCreditNote && !dueDateRaw)) {
     return { error: "Bitte alle Pflichtfelder ausfüllen." };
   }
 
-  const customerId = parseInt(customerIdRaw, 10);
+  // A credit note always belongs to the customer of its original; the form
+  // only sends a hidden field, which must not be trusted.
+  const customerId = isCreditNote ? existing.customerId : parseInt(customerIdRaw, 10);
 
   let items: ItemData[];
   let totalAmount: number;
@@ -100,18 +116,37 @@ export async function updateInvoice(
     return { error: "Ungültige Positionsdaten." };
   }
 
+  let input = {
+    kind: "invoice" as const,
+    customerId,
+    customUserText: customUserText || null,
+    date: new Date(dateRaw),
+    dueDate: isCreditNote ? new Date(dateRaw) : new Date(dueDateRaw),
+    totalAmount,
+    discountPercent,
+    items,
+  };
+  if (isCreditNote) {
+    if (items.length === 0 || items.some((item) => item.quantity <= 0)) {
+      return { error: "Eine Gutschrift braucht mindestens eine Position mit positiver Menge." };
+    }
+    input = negateDocumentInput(input);
+    try {
+      await assertCreditWithinOriginal(prisma, {
+        id,
+        creditNoteForId: existing.creditNoteForId!,
+        totalAmount: input.totalAmount,
+      });
+    } catch (err) {
+      if (err instanceof CreditNoteError) return { error: err.message };
+      throw err;
+    }
+  }
+
   try {
-    await updateDocumentWithItems(id, {
-      kind: "invoice",
-      customerId,
-      customUserText: customUserText || null,
-      date: new Date(dateRaw),
-      dueDate: new Date(dueDateRaw),
-      totalAmount,
-      discountPercent,
-      items,
-    });
+    await updateDocumentWithItems(id, input);
   } catch (err) {
+    if (err instanceof DocumentLockedError) return { error: err.message };
     log.error({ id, err }, "updateInvoice failed");
     return { error: "Rechnung konnte nicht gespeichert werden." };
   }
@@ -134,10 +169,13 @@ export async function updateInvoiceStatus(
 
   const current = await prisma.invoice.findUnique({
     where: { id },
-    select: { state: true, documentNumber: true, totalAmount: true },
+    select: { state: true, documentNumber: true, totalAmount: true, creditNoteForId: true },
   });
   if (!current) return { error: "Rechnung nicht gefunden." };
   if (current.state === state) return {};
+  if (current.creditNoteForId != null) {
+    return { error: "Der Status einer Gutschrift ergibt sich aus dem Versand." };
+  }
   // PartiallyPaid results from payments only. Leaving Paid/PartiallyPaid
   // works by deleting the payments, so state and payments never disagree.
   if (state === "PartiallyPaid") {
@@ -149,6 +187,9 @@ export async function updateInvoiceStatus(
   }
   if (state === "Paid" && current.state === "Canceled") {
     return { error: "Stornierte Rechnungen können nicht als bezahlt markiert werden." };
+  }
+  if (!canTransitionInvoice(current.state, state)) {
+    return { error: "Dieser Statuswechsel ist nicht erlaubt." };
   }
   // Checked before any change: a zero invoice has nothing to pay, and a
   // Draft must not be turned Sent/numbered for a Paid that then fails.
@@ -284,7 +325,16 @@ export async function markInvoicesPaidFromImport(
 
 export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
-  const inv = await prisma.invoice.findUnique({ where: { id }, select: { documentNumber: true } });
+  const inv = await prisma.invoice.findUnique({
+    where: { id },
+    select: { documentNumber: true, state: true },
+  });
+  if (!inv) return { error: "Rechnung nicht gefunden." };
+  if (inv.state !== "Draft") {
+    return {
+      error: "Versendete Rechnungen können nicht gelöscht werden. Stattdessen eine Gutschrift erstellen.",
+    };
+  }
   const paymentCount = await prisma.payment.count({ where: { invoiceId: id } });
   if (paymentCount > 0) {
     return { error: "Die Rechnung hat erfasste Zahlungen. Bitte zuerst die Zahlungen löschen." };
@@ -296,10 +346,26 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber ?? undefined);
+  await logAudit(session, "DELETE", "Invoice", id, inv.documentNumber ?? undefined);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");
+}
+
+export async function createCreditNote(invoiceId: number): Promise<{ error?: string }> {
+  const session = await requireEditor();
+  let creditId: number;
+  try {
+    creditId = await createCreditNoteDraft(invoiceId);
+  } catch (err) {
+    if (err instanceof CreditNoteError) return { error: err.message };
+    log.error({ invoiceId, err }, "createCreditNote failed");
+    return { error: "Gutschrift konnte nicht erstellt werden." };
+  }
+  await logAudit(session, "CREATE", "Invoice", creditId, undefined, { creditNoteFor: invoiceId });
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices");
+  redirect(`/invoices/${creditId}/edit`);
 }
 
 export async function sendInvoice(

@@ -58,7 +58,12 @@ const adminSession = {
   user: { id: "2", name: "Admin User", email: "admin@example.com", role: "Admin" },
 } as never;
 
-function mockInvoice(state: string, documentNumber: string | null, totalAmount = 100) {
+function mockInvoice(
+  state: string,
+  documentNumber: string | null,
+  totalAmount = 100,
+  creditNoteForId: number | null = null
+) {
   // Payments exist exactly for Paid/PartiallyPaid invoices in these scenarios.
   vi.mocked(prisma.payment.count).mockResolvedValue(
     state === "Paid" || state === "PartiallyPaid" ? 1 : 0
@@ -67,6 +72,7 @@ function mockInvoice(state: string, documentNumber: string | null, totalAmount =
     state,
     documentNumber,
     totalAmount,
+    creditNoteForId,
   } as never);
 }
 
@@ -203,7 +209,7 @@ describe("updateInvoiceStatus", () => {
     });
   });
 
-  it.each(["Overdue", "Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {
+  it.each(["Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {
     mockInvoice("Draft", null);
     vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
 
@@ -212,23 +218,20 @@ describe("updateInvoiceStatus", () => {
     expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
   });
 
-  it("does not assign a number when a draft is canceled", async () => {
+  it("refuses Draft -> Canceled and assigns no number", async () => {
     mockInvoice("Draft", null);
-    await updateInvoiceStatus(10, "Canceled");
+    const res = await updateInvoiceStatus(10, "Canceled");
+    expect(res.error).toBeTruthy();
     expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
-  it("assigns a number when a canceled, unnumbered invoice is sent", async () => {
+  it("refuses to reopen a canceled invoice", async () => {
     mockInvoice("Canceled", null);
-    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
-
-    await updateInvoiceStatus(10, "Sent");
-
-    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
-    expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Invoice", 10, "R-26090001", {
-      from: "Canceled",
-      to: "Sent",
-    });
+    const res = await updateInvoiceStatus(10, "Sent");
+    expect(res.error).toBeTruthy();
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
   it("does not assign a number when an unnumbered canceled invoice stays canceled", async () => {
@@ -255,6 +258,20 @@ describe("updateInvoiceStatus", () => {
     expect(prisma.pendingReminder.deleteMany).not.toHaveBeenCalled();
   });
 
+  it("refuses Sent -> Canceled and Sent -> Draft", async () => {
+    mockInvoice("Sent", "R-26090001");
+    expect((await updateInvoiceStatus(1, "Canceled")).error).toBeTruthy();
+    expect((await updateInvoiceStatus(1, "Draft")).error).toBeTruthy();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses any manual status change on a credit note", async () => {
+    mockInvoice("Sent", "R-26090002", -50, 1);
+    const res = await updateInvoiceStatus(2, "Overdue");
+    expect(res).toEqual({ error: "Der Status einer Gutschrift ergibt sich aus dem Versand." });
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
   it("returns an error when the invoice does not exist", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue(null);
 
@@ -276,6 +293,7 @@ describe("deleteInvoice", () => {
   it("returns an error and does not delete when payments exist", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060007",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.payment.count).mockResolvedValue(2 as never);
 
@@ -289,6 +307,7 @@ describe("deleteInvoice", () => {
   it("deletes the invoice, writes an audit log, and redirects", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060005",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockResolvedValue({} as never);
     vi.mocked(redirect).mockImplementation(() => {
@@ -303,6 +322,7 @@ describe("deleteInvoice", () => {
   it("returns an error instead of throwing when the delete fails", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060006",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockRejectedValue(new Error("FOREIGN KEY constraint failed"));
 
@@ -312,4 +332,22 @@ describe("deleteInvoice", () => {
     expect(redirect).not.toHaveBeenCalled();
     expect(logAudit).not.toHaveBeenCalled();
   });
+
+  it.each(["Sent", "Overdue", "PartiallyPaid", "Paid", "Canceled"])(
+    "refuses to delete a %s invoice",
+    async (state) => {
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        documentNumber: "I-25060008",
+        state,
+      } as never);
+
+      const result = await deleteInvoice(1);
+
+      expect(result.error).toBe(
+        "Versendete Rechnungen können nicht gelöscht werden. Stattdessen eine Gutschrift erstellen."
+      );
+      expect(prisma.invoice.delete).not.toHaveBeenCalled();
+      expect(redirect).not.toHaveBeenCalled();
+    }
+  );
 });

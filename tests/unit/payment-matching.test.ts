@@ -16,7 +16,7 @@ import prisma from "@/lib/prisma";
 import { getPaymentSummary, recordPayment } from "@/lib/payments";
 
 function summary(remainingRappen: number) {
-  return { totalRappen: 0, paidRappen: 0, remainingRappen, overpaidRappen: 0 };
+  return { totalRappen: 0, paidRappen: 0, creditedRappen: 0, remainingRappen, overpaidRappen: 0 };
 }
 
 describe("matchAndMarkPaid", () => {

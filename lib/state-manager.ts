@@ -1,4 +1,27 @@
-import type { PrismaClient } from "@prisma/client";
+import type { InvoiceState, PrismaClient } from "@prisma/client";
+
+/**
+ * Manual status changes an invoice may go through. Choosing Paid books the
+ * remaining amount as a payment (see updateInvoiceStatus); PartiallyPaid
+ * follows from payments and Canceled from credit notes, so neither is a
+ * manual target.
+ */
+const INVOICE_TRANSITIONS: Record<InvoiceState, readonly InvoiceState[]> = {
+  Draft: ["Sent", "Paid"],
+  Sent: ["Overdue", "Paid"],
+  Overdue: ["Sent", "Paid"],
+  PartiallyPaid: ["Paid"],
+  Paid: [],
+  Canceled: [],
+};
+
+export function canTransitionInvoice(from: InvoiceState, to: InvoiceState): boolean {
+  return from === to || INVOICE_TRANSITIONS[from].includes(to);
+}
+
+export function allowedInvoiceTargets(from: InvoiceState): InvoiceState[] {
+  return [from, ...INVOICE_TRANSITIONS[from]];
+}
 
 /**
  * Marks overdue invoices (state=Sent, dueDate < now) as Overdue,
@@ -20,6 +43,7 @@ export async function checkAndUpdateDocumentStates(
         id: { in: invoiceIds },
         state: "Sent",
         dueDate: { lt: now },
+        creditNoteForId: null,
       },
       data: { state: "Overdue" },
     });
@@ -41,7 +65,7 @@ export async function checkAndUpdateAllDocumentStates(prisma: PrismaClient): Pro
   const now = new Date();
   await Promise.all([
     prisma.invoice.updateMany({
-      where: { state: "Sent", dueDate: { lt: now } },
+      where: { state: "Sent", dueDate: { lt: now }, creditNoteForId: null },
       data: { state: "Overdue" },
     }),
     prisma.quote.updateMany({

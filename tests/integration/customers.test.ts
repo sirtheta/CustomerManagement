@@ -72,8 +72,7 @@ describe("CustomerRepository", () => {
     expect(found).toBeNull();
   });
 
-  // Equivalent: CustomerRepository_DeleteCustomer_ShouldCascadeToInvoices
-  it("should cascade-delete invoices when customer is deleted", async () => {
+  it("should refuse to delete a customer that still has invoices", async () => {
     const { prisma } = db;
     const customer = await prisma.customer.create({
       data: createValidTestCustomer(),
@@ -90,10 +89,12 @@ describe("CustomerRepository", () => {
       },
     });
 
-    await prisma.customer.delete({ where: { customerId: customer.customerId } });
+    await expect(
+      prisma.customer.delete({ where: { customerId: customer.customerId } })
+    ).rejects.toThrow();
 
     const found = await prisma.invoice.findUnique({ where: { id: invoice.id } });
-    expect(found).toBeNull();
+    expect(found).not.toBeNull();
   });
 
   it("should list all customers", async () => {

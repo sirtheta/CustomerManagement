@@ -14,6 +14,7 @@ import type {
 export type InvoiceWithDetails = Invoice & {
   customer: Customer;
   items: Item[];
+  creditNoteFor?: { documentNumber: string | null } | null;
 };
 
 export type QuoteWithDetails = Quote & {
@@ -27,7 +28,9 @@ type Settings = ApplicationSettings & {
 
 export async function generateInvoicePdf(
   invoice: InvoiceWithDetails,
-  settings: Settings
+  settings: Settings,
+  /** qrAmount: CHF amount requested on the QR slip, defaults to the invoice total (reminders pass the open remainder). */
+  options: { qrAmount?: number } = {}
 ): Promise<Buffer> {
   const company = settings.companyInfo;
   const discountPercent = Number(invoice.discountPercent ?? 0);
@@ -41,21 +44,26 @@ export async function generateInvoicePdf(
   );
 
   const draft = !invoice.documentNumber;
-  const qr = draft
+  const isCreditNote = invoice.creditNoteForId != null;
+  const qr = draft || isCreditNote
     ? null
     : buildQrBillData({
-        invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
+        invoice: { documentNumber: invoice.documentNumber, totalAmount: options.qrAmount ?? total },
         company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
         customer: invoice.customer,
       });
 
   const doc: RenderDoc = {
     kind: "invoice",
-    title: "Rechnung",
+    title: isCreditNote ? "Gutschrift" : "Rechnung",
     documentNumber: documentLabel(invoice.documentNumber),
-    numberLabel: "Rechnungs-Nr.:",
+    numberLabel: isCreditNote ? "Gutschrift-Nr.:" : "Rechnungs-Nr.:",
     date: invoice.date,
-    dueDate: invoice.dueDate,
+    dueDate: isCreditNote ? null : invoice.dueDate,
+    referenceLine:
+      isCreditNote && invoice.creditNoteFor
+        ? `Zu Rechnung ${documentLabel(invoice.creditNoteFor.documentNumber)}`
+        : undefined,
     dueLabel: "Fälligkeit:",
     closingNoteLabel: "Zahlbar bis:",
     customUserText: invoice.customUserText,

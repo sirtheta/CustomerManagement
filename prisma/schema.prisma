@@ -21,6 +21,7 @@ model Customer {
   yearlyInvoice           Boolean    @default(false)
   contactInsteadOfCompany Boolean    @default(false)
   nextInvoiceDate         DateTime?
+  archivedAt              DateTime?
   invoices                Invoice[]
   quotes                  Quote[]
   documents               Document[]
@@ -28,6 +29,7 @@ model Customer {
 
   @@index([email])
   @@index([nextInvoiceDate])
+  @@index([archivedAt])
 }
 
 model Invoice {
@@ -42,7 +44,10 @@ model Invoice {
   discountPercent Decimal  @default(0)
   state          InvoiceState     @default(Draft)
   paidDate       DateTime?
-  customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  creditNoteForId Int?
+  customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  creditNoteFor  Invoice?         @relation("CreditNotes", fields: [creditNoteForId], references: [id], onDelete: Restrict)
+  creditNotes    Invoice[]        @relation("CreditNotes")
   items           Item[]
   pendingEmail    PendingEmail?
   sentLogs        InvoiceSentLog[]
@@ -55,6 +60,7 @@ model Invoice {
   @@index([state])
   @@index([dueDate])
   @@index([paidDate])
+  @@index([creditNoteForId])
 }
 
 model Payment {

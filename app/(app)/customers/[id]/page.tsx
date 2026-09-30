@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import CustomerForm from "../CustomerForm";
 import DeleteCustomerButton from "../DeleteCustomerButton";
+import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import { Button } from "@/components/ui/button";
@@ -122,7 +123,15 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: "Kunden", href: "/customers" }, { label: customerName }]} />
-      <h1 className="text-2xl font-semibold">{customerName}</h1>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold">{customerName}</h1>
+          {customer.archivedAt && <Badge variant="outline">Archiviert</Badge>}
+        </div>
+        {canEdit && (
+          <ArchiveCustomerButton customerId={customerId} archived={customer.archivedAt !== null} />
+        )}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <CustomerForm
           key={`${customer.customerId}-${isEditing}`}
@@ -176,9 +185,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                         <Link href={`/invoices/${inv.id}?from=customers/${customerId}`} className="hover:underline">
                           {documentLabel(inv.documentNumber)}
                         </Link>
+                        {inv.creditNoteForId !== null && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                        )}
                       </TableCell>
                       <TableCell>{formatDate(inv.date)}</TableCell>
-                      <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                      <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
                       <TableCell>{formatCurrency(inv.totalAmount.toNumber())}</TableCell>
                       <TableCell>
                         <Badge variant={invoiceStateVariants[inv.state]}>
@@ -273,7 +285,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
       {canDelete && (
         <div className="flex justify-start">
-          <DeleteCustomerButton customerId={customerId} />
+          <DeleteCustomerButton
+            customerId={customerId}
+            hasInvoices={invoiceCount > 0}
+            archived={customer.archivedAt !== null}
+          />
         </div>
       )}
     </div>

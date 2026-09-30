@@ -162,6 +162,9 @@ async function InvoicesTable({
                     <Link href={`/invoices/${inv.id}`} className="hover:underline">
                       {documentLabel(inv.documentNumber)}
                     </Link>
+                    {inv.creditNoteForId !== null && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Link href={`/customers/${inv.customer.customerId}`} className="hover:underline">
@@ -171,7 +174,7 @@ async function InvoicesTable({
                     </Link>
                   </TableCell>
                   <TableCell>{formatDate(inv.date)}</TableCell>
-                  <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                  <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
                   <TableCell>{formatCurrency(inv.totalAmount.toNumber())}</TableCell>
                   <TableCell>
                     <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>

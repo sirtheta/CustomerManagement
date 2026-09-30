@@ -18,6 +18,7 @@ export async function checkYearlyInvoices(prisma: PrismaClient): Promise<void> {
     prisma.customer.findMany({
       where: {
         yearlyInvoice: true,
+        archivedAt: null,
         nextInvoiceDate: { lte: today },
       },
     }),

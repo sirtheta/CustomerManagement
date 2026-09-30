@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { logAudit } from "@/lib/audit";
@@ -160,16 +160,35 @@ export async function updateCustomer(
 
 export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
-  // Payments cascade with the invoices; recorded payments must be removed on purpose.
-  const paymentCount = await prisma.payment.count({ where: { invoice: { customerId: id } } });
-  if (paymentCount > 0) {
-    return {
-      error: "Der Kunde hat Rechnungen mit erfassten Zahlungen. Bitte zuerst die Zahlungen löschen.",
-    };
+  // Invoices are booking records: they stay, so the customer is archived instead.
+  const invoiceCount = await prisma.invoice.count({ where: { customerId: id } });
+  if (invoiceCount > 0) {
+    return { error: "Der Kunde hat Rechnungen und kann nicht gelöscht werden. Bitte archivieren." };
   }
   await prisma.customer.delete({ where: { customerId: id } });
   await logAudit(session, "DELETE", "Customer", id);
-  // Cascade-deletes the customer's invoices, which feed the revenue figures.
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/customers");
+}
+
+export async function archiveCustomer(id: number): Promise<{ error?: string }> {
+  const session = await requireEditor();
+  await prisma.customer.update({ where: { customerId: id }, data: { archivedAt: new Date() } });
+  await logAudit(session, "UPDATE", "Customer", id, undefined, { archived: true });
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${id}`);
+  revalidatePath("/dashboard");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
+  return {};
+}
+
+export async function restoreCustomer(id: number): Promise<{ error?: string }> {
+  const session = await requireEditor();
+  await prisma.customer.update({ where: { customerId: id }, data: { archivedAt: null } });
+  await logAudit(session, "UPDATE", "Customer", id, undefined, { archived: false });
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${id}`);
+  revalidatePath("/dashboard");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
+  return {};
 }

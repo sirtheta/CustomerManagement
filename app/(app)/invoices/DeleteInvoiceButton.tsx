@@ -5,17 +5,20 @@ import { deleteInvoice } from "./actions";
 
 type Props = {
   invoiceId: number;
+  isCreditNote?: boolean;
 };
 
-export default function DeleteInvoiceButton({ invoiceId }: Props) {
+export default function DeleteInvoiceButton({ invoiceId, isCreditNote = false }: Props) {
+  const noun = isCreditNote ? "Gutschrift" : "Rechnung";
+  const demonstrative = isCreditNote ? "diese Gutschrift" : "diese Rechnung";
   return (
     <ConfirmDialog
-      title="Rechnung löschen"
-      description="Soll diese Rechnung wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden."
+      title={`${noun} löschen`}
+      description={`Soll ${demonstrative} wirklich gelöscht werden? Dieser Vorgang kann nicht rückgängig gemacht werden.`}
       confirmLabel="Löschen"
       onConfirm={() => deleteInvoice(invoiceId)}
     >
-      Rechnung löschen
+      {noun} löschen
     </ConfirmDialog>
   );
 }

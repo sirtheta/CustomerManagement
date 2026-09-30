@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateInvoiceStatus } from "./actions";
+import { allowedInvoiceTargets } from "@/lib/state-manager";
 import type { InvoiceState } from "@prisma/client";
 
 const stateOptions: { value: InvoiceState; label: string }[] = [
@@ -52,19 +53,13 @@ export default function InvoiceStatusSelect({ invoiceId, currentState }: Props) 
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {stateOptions.map((opt) => (
-            <SelectItem
-              key={opt.value}
-              value={opt.value}
-              disabled={
-                opt.value === "PartiallyPaid"
-                  ? opt.value !== currentState
-                  : locked && opt.value !== "Paid" && opt.value !== (currentState as string)
-              }
-            >
-              {opt.label}
-            </SelectItem>
-          ))}
+          {stateOptions
+            .filter((opt) => allowedInvoiceTargets(currentState).includes(opt.value))
+            .map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
         </SelectContent>
       </Select>
       {locked && (

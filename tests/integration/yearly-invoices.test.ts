@@ -70,6 +70,20 @@ describe("checkYearlyInvoices", () => {
     expect(await db.prisma.invoice.count()).toBe(0);
   });
 
+  it("skips archived customers", async () => {
+    const customer = await db.prisma.customer.create({
+      data: {
+        ...createValidTestCustomer(),
+        yearlyInvoice: true,
+        nextInvoiceDate: yesterday,
+        archivedAt: new Date(),
+      },
+    });
+    await checkYearlyInvoices(db.prisma);
+
+    expect(await db.prisma.invoice.count({ where: { customerId: customer.customerId } })).toBe(0);
+  });
+
   it("is idempotent – does not create duplicates on second call", async () => {
     await seedDueCustomer();
     await checkYearlyInvoices(db.prisma);

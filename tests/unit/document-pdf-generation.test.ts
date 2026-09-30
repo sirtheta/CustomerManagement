@@ -78,6 +78,30 @@ describe("generateDocumentPdf byte assembly", () => {
     expect(pageText[0]).toContain("100.00");
   });
 
+  it("renders a credit note without due date and without a QR bill page", async () => {
+    const buf = await generateDocumentPdf(
+      baseDoc({
+        title: "Gutschrift",
+        numberLabel: "Gutschrift-Nr.:",
+        documentNumber: "I-26010002",
+        referenceLine: "Zu Rechnung I-26010001",
+        dueDate: null,
+        totalAmount: -180,
+        qr: null,
+      }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { numPages, pageText } = await extractText(buf);
+    const text = pageText.join(" ");
+    expect(numPages).toBe(1);
+    expect(text).toContain("Gutschrift");
+    expect(text).toContain("Zu Rechnung I-26010001");
+    expect(text).not.toContain("Fälligkeit");
+    expect(text).not.toContain("Zahlbar bis");
+  });
+
   it("adds no QR page for a quote (qr: null)", async () => {
     const buf = await generateDocumentPdf(
       baseDoc({ kind: "quote", title: "Offerte", qr: null }),
@@ -263,6 +287,16 @@ describe("generateInvoicePdf drafts", () => {
     expect(pageText[0]).not.toContain("ENTWURF");
     expect(pageText[1]).toContain("Zahlteil");
   });
+
+  it("uses qrAmount instead of the invoice total on the QR slip", async () => {
+    const full = await extractText(await generateInvoicePdf(invoiceFor("I-26010001"), settings));
+    expect(full.pageText[1]).toContain("100.00");
+    const partial = await extractText(
+      await generateInvoicePdf(invoiceFor("I-26010001"), settings, { qrAmount: 60 })
+    );
+    expect(partial.pageText[1]).toContain("60.00");
+    expect(partial.pageText[1]).not.toContain("100.00");
+  });
 });
 
 describe("generateQuotePdf", () => {
@@ -295,6 +329,7 @@ describe("generateQuotePdf", () => {
           yearlyInvoice: false,
           contactInsteadOfCompany: false,
           nextInvoiceDate: null,
+          archivedAt: null,
         },
         items: [
           {

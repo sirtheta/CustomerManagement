@@ -119,6 +119,28 @@ describe("checkOverdueInvoices", () => {
     const count = await prisma.pendingReminder.count();
     expect(count).toBe(0);
   });
+
+  it("creates no PendingReminder for a credit note", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const original = await seedOverdueInvoice(customer.customerId, "R-240010");
+    const credit = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-240011",
+        date: pastDate(40),
+        dueDate: pastDate(5),
+        totalAmount: -100,
+        state: "Overdue",
+        creditNoteForId: original.id,
+      },
+    });
+
+    await checkOverdueInvoices(prisma);
+
+    expect(await prisma.pendingReminder.findUnique({ where: { invoiceId: credit.id } })).toBeNull();
+    expect(await prisma.pendingReminder.findUnique({ where: { invoiceId: original.id } })).not.toBeNull();
+  });
 });
 
 describe("snoozedUntil filter logic", () => {

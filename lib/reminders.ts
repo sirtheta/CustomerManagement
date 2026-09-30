@@ -12,6 +12,7 @@ export async function checkOverdueInvoices(prisma: PrismaClient): Promise<void> 
     where: {
       state: "Overdue",
       pendingReminder: null,
+      creditNoteForId: null,
     },
     select: { id: true },
   });

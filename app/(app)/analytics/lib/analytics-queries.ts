@@ -84,7 +84,7 @@ export async function fetchDrilldownInvoices(
   if (month !== undefined) {
     const { start: monthStart, end: monthEnd } = monthBounds(year, month);
     const invoices = await prisma.invoice.findMany({
-      where: { state: { notIn: [InvoiceState.Draft] }, date: { gte: monthStart, lt: monthEnd } },
+      where: { state: { notIn: [InvoiceState.Draft] }, creditNoteForId: null, date: { gte: monthStart, lt: monthEnd } },
       orderBy: { date: "desc" },
       select: DRILLDOWN_SELECT,
     });
@@ -94,7 +94,7 @@ export async function fetchDrilldownInvoices(
   if (status) {
     if (!Object.values(InvoiceState).includes(status as InvoiceState)) return [];
     const invoices = await prisma.invoice.findMany({
-      where: { state: status as InvoiceState, date: { gte: yearStart, lt: yearEnd } },
+      where: { state: status as InvoiceState, creditNoteForId: null, date: { gte: yearStart, lt: yearEnd } },
       orderBy: { date: "desc" },
       select: DRILLDOWN_SELECT,
     });
@@ -103,7 +103,7 @@ export async function fetchDrilldownInvoices(
 
   if (customerId !== undefined) {
     const invoices = await prisma.invoice.findMany({
-      where: { customerId, state: { notIn: [InvoiceState.Draft] }, date: { gte: yearStart, lt: yearEnd } },
+      where: { customerId, state: { notIn: [InvoiceState.Draft] }, creditNoteForId: null, date: { gte: yearStart, lt: yearEnd } },
       orderBy: { date: "desc" },
       select: DRILLDOWN_SELECT,
     });
@@ -307,7 +307,7 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
     }),
     sumOpenAmount(prisma),
     prisma.invoice.findMany({
-      where: { state: { notIn: [InvoiceState.Draft] }, date: { gte: yearStart, lt: yearEnd } },
+      where: { state: { notIn: [InvoiceState.Draft] }, creditNoteForId: null, date: { gte: yearStart, lt: yearEnd } },
       select: { state: true, totalAmount: true },
     }),
     prisma.payment.findMany({
