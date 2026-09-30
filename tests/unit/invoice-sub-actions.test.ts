@@ -17,6 +17,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn() }));
+vi.mock("@/lib/document-number", () => ({ assignDocumentNumber: vi.fn() }));
 vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
 }));
@@ -37,6 +38,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
+import { assignDocumentNumber } from "@/lib/document-number";
 
 const editorSession = {
   user: { id: "1", name: "Editor", email: "editor@test.ch", role: "Editor" },
@@ -312,12 +314,69 @@ describe("invoices/pending actions", () => {
         invoice: mockInvoice,
       } as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-2026-010");
       vi.mocked(generateInvoicePdf).mockRejectedValue(new Error("PDF failed"));
       const result = await approvePendingEmail(
         {},
         form({ id: "1", to: "x@x.ch", subject: "s", body: "b" })
       );
       expect(result.error).toBe("PDF failed");
+    });
+
+    it("assigns the number before rendering and fills placeholders", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({
+        id: 1,
+        invoiceId: 10,
+        invoice: { ...mockInvoice, documentNumber: null },
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+      vi.mocked(prisma.$transaction).mockImplementation((arg: ((tx: typeof prisma) => Promise<unknown>) | Promise<unknown>[]) =>
+        Array.isArray(arg) ? Promise.all(arg) as never : arg(prisma) as never
+      );
+
+      await approvePendingEmail(
+        {},
+        form({ id: "1", to: "k@test.ch", subject: "Rechnung {documentNumber}", body: "Nr. {documentNumber}" })
+      );
+
+      expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
+      expect(vi.mocked(generateInvoicePdf).mock.calls[0][0]).toMatchObject({ documentNumber: "R-26090001" });
+      expect(sendInvoiceEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ documentNumber: "R-26090001" }),
+        expect.anything(),
+        expect.anything(),
+        { to: "k@test.ch", subject: "Rechnung R-26090001", body: "Nr. R-26090001" }
+      );
+      expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({
+        data: { invoiceId: 10, sentTo: "k@test.ch", subject: "Rechnung R-26090001" },
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "SEND", "Invoice", 10, "R-26090001", {
+        to: "k@test.ch",
+        subject: "Rechnung R-26090001",
+      });
+    });
+
+    it("returns error and sends nothing when number assignment fails", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({
+        id: 1,
+        invoiceId: 10,
+        invoice: { ...mockInvoice, documentNumber: null },
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockRejectedValue(new Error("boom"));
+
+      const result = await approvePendingEmail(
+        {},
+        form({ id: "1", to: "k@test.ch", subject: "s", body: "b" })
+      );
+
+      expect(result.error).toBe("Rechnungsnummer konnte nicht vergeben werden.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
     });
 
     it("sends email, updates invoice state to Sent, and returns success", async () => {
@@ -328,6 +387,7 @@ describe("invoices/pending actions", () => {
         invoice: mockInvoice,
       } as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-2026-010");
       vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);

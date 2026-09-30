@@ -91,7 +91,7 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
 
 export type IncomeRow = {
   id: number;
-  documentNumber: string;
+  documentNumber: string | null;
   customerName: string;
   paidDate: string;
   totalAmount: number;

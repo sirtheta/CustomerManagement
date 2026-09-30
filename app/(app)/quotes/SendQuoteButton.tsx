@@ -16,11 +16,12 @@ import { sendQuote } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { SendIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { documentLabel } from "@/lib/document-display";
 
 type Props = {
   quoteId: number;
   customerEmail: string;
-  documentNumber: string;
+  documentNumber: string | null;
   defaultSubject: string;
   defaultBody: string;
 };
@@ -43,7 +44,7 @@ export default function SendQuoteButton({
     {}
   );
 
-  useActionToast(state, `Offerte ${documentNumber} versendet`);
+  useActionToast(state, `Offerte ${documentLabel(documentNumber)} versendet`);
 
   // Close the dialog once a send succeeds, derived from the action result
   // timestamp during render rather than in an effect.

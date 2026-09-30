@@ -11,12 +11,12 @@ import { parseDocumentItems } from "@/lib/form-parsers";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
+import { assignDocumentNumber } from "@/lib/document-number";
 import { markInvoicePaid } from "@/lib/payment-matching";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
   sendDocument,
-  isDocumentNumberCollision,
 } from "@/lib/document-actions";
 
 const log = logger.child({ module: "invoices" });
@@ -52,9 +52,8 @@ export async function createInvoice(
   }
 
   let newInvoiceId: number;
-  let documentNumber: string;
   try {
-    ({ id: newInvoiceId, documentNumber } = await createDocumentWithItems({
+    ({ id: newInvoiceId } = await createDocumentWithItems({
       kind: "invoice",
       customerId,
       customUserText: customUserText || null,
@@ -65,15 +64,11 @@ export async function createInvoice(
       items,
     }));
   } catch (err) {
-    if (isDocumentNumberCollision(err)) {
-      log.error({ err }, "createInvoice failed after retry");
-      return { error: "Rechnungsnummer war belegt, bitte erneut versuchen." };
-    }
     log.error({ err }, "createInvoice failed");
     return { error: "Rechnung konnte nicht erstellt werden." };
   }
 
-  await logAudit(session, "CREATE", "Invoice", newInvoiceId, documentNumber);
+  await logAudit(session, "CREATE", "Invoice", newInvoiceId);
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect(`/invoices/${newInvoiceId}`);
 }
@@ -140,6 +135,12 @@ export async function updateInvoiceStatus(
   });
   if (!current) return;
 
+  const NUMBERED_STATES: InvoiceState[] = ["Sent", "Overdue", "Paid"];
+  let documentNumber = current.documentNumber;
+  if (!current.documentNumber && NUMBERED_STATES.includes(state)) {
+    documentNumber = await assignDocumentNumber("invoice", id, { actor: session });
+  }
+
   const becomingPaid = state === "Paid" && current.state !== "Paid";
   const leavingPaid = state !== "Paid" && current.state === "Paid";
 
@@ -158,7 +159,7 @@ export async function updateInvoiceStatus(
     await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
   }
 
-  await logAudit(session, "STATUS", "Invoice", id, current.documentNumber, {
+  await logAudit(session, "STATUS", "Invoice", id, documentNumber ?? undefined, {
     from: current.state,
     to: state,
   });
@@ -185,7 +186,7 @@ export async function updateInvoicePaidDate(
     select: { documentNumber: true },
   });
 
-  await logAudit(session, "UPDATE", "Invoice", id, invoice.documentNumber, { paidDate });
+  await logAudit(session, "UPDATE", "Invoice", id, invoice.documentNumber ?? undefined, { paidDate });
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/accounting");
@@ -261,7 +262,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber);
+  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber ?? undefined);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");

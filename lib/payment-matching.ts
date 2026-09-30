@@ -23,7 +23,7 @@ export type PaymentMatchResult =
 export async function markInvoicePaid(
   params: {
     invoiceId: number;
-    documentNumber: string;
+    documentNumber: string | null;
     previousState: string;
     paidDate: Date;
     actor: Session;
@@ -46,7 +46,7 @@ export async function markInvoicePaid(
     "STATUS",
     "Invoice",
     params.invoiceId,
-    params.documentNumber,
+    params.documentNumber ?? undefined,
     {
       from: params.previousState,
       to: "Paid",

@@ -16,11 +16,12 @@ import { sendInvoice } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { SendIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { documentLabel } from "@/lib/document-display";
 
 type Props = {
   invoiceId: number;
   customerEmail: string;
-  documentNumber: string;
+  documentNumber: string | null;
   defaultSubject: string;
   defaultBody: string;
 };
@@ -43,7 +44,7 @@ export default function SendInvoiceButton({
     {}
   );
 
-  useActionToast(state, `Rechnung ${documentNumber} versendet`);
+  useActionToast(state, `Rechnung ${documentLabel(documentNumber)} versendet`);
 
   // Close the dialog once a send succeeds, derived from the action result
   // timestamp during render rather than in an effect.

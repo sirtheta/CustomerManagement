@@ -21,6 +21,7 @@ import {
 import { YearSelector } from "./components/year-selector";
 import { ProfitLossChart } from "./components/profit-loss-chart";
 import DeleteExpenseButton from "./DeleteExpenseButton";
+import { documentLabel } from "@/lib/document-display";
 
 type Props = {
   searchParams: Promise<{ year?: string }>;
@@ -225,7 +226,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                         <TableCell>{formatDate(inv.paidDate)}</TableCell>
                         <TableCell>
                           <Link href={`/invoices/${inv.id}`} className="underline">
-                            {inv.documentNumber}
+                            {documentLabel(inv.documentNumber)}
                           </Link>
                         </TableCell>
                         <TableCell>{inv.customerName}</TableCell>

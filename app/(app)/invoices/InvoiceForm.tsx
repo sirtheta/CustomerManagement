@@ -18,6 +18,7 @@ import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/date";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
+import { documentLabel } from "@/lib/document-display";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -143,7 +144,7 @@ export default function InvoiceForm({
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
-          {invoice ? `Rechnung ${invoice.documentNumber}` : "Neue Rechnung"}
+          {invoice ? `Rechnung ${documentLabel(invoice.documentNumber)}` : "Neue Rechnung"}
         </h1>
         <Button variant="outline" render={<Link href={cancelHref} />}>
           Abbrechen

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { customerDisplayName, type GlobalSearchResults } from "@/lib/search";
+import { documentLabel } from "@/lib/document-display";
 
 export type SearchDropdownItem = {
   key: string;
@@ -116,7 +117,7 @@ export function GlobalSearchDropdown({
           {invoices.map((inv, i) => (
             <div key={inv.id} {...optionProps(invoicesStart + i, `/invoices/${inv.id}`)} className={optionClass}>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{inv.documentNumber}</span>
+                <span className="block truncate text-sm font-medium">{documentLabel(inv.documentNumber)}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {inv.customerName} · {formatDate(inv.date)}
                 </span>
@@ -131,7 +132,7 @@ export function GlobalSearchDropdown({
           {quotes.map((q, i) => (
             <div key={q.id} {...optionProps(quotesStart + i, `/quotes/${q.id}`)} className={optionClass}>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{q.documentNumber}</span>
+                <span className="block truncate text-sm font-medium">{documentLabel(q.documentNumber)}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {q.customerName} · {formatDate(q.date)}
                 </span>

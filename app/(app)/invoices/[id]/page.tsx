@@ -21,6 +21,7 @@ import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
 import type { InvoiceState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { documentLabel } from "@/lib/document-display";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -67,17 +68,19 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     ? invoice.customer.contactPerson
     : (invoice.customer.company || invoice.customer.contactPerson);
   const breadcrumbItems = fromCustomer
-    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: invoice.documentNumber }]
-    : [{ label: "Rechnungen", href: "/invoices" }, { label: invoice.documentNumber }];
+    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(invoice.documentNumber) }]
+    : [{ label: "Rechnungen", href: "/invoices" }, { label: documentLabel(invoice.documentNumber) }];
 
   const companyName = settings?.companyInfo.companyName ?? "";
+  // Drafts have no number yet: keep the placeholder so it is filled in when sent.
+  const numberOrPlaceholder = invoice.documentNumber ?? "{documentNumber}";
   const defaultSubject =
-    settings?.emailSubjectTemplate?.replace(/\{documentNumber\}/g, invoice.documentNumber).replace(/\{companyName\}/g, companyName)
-    ?? `Rechnung Nr. ${invoice.documentNumber} – ${companyName}`;
-  const DEFAULT_BODY = `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. ${invoice.documentNumber} vom ${formatDate(invoice.date)} über ${formatCurrency(invoice.totalAmount.toNumber())}.\n${invoice.customUserText ? `\n${invoice.customUserText}\n` : ""}\nZahlbar bis: ${formatDate(invoice.dueDate)}\n\nMit freundlichen Grüssen\n${companyName}`;
+    settings?.emailSubjectTemplate?.replace(/\{documentNumber\}/g, numberOrPlaceholder).replace(/\{companyName\}/g, companyName)
+    ?? `Rechnung Nr. ${numberOrPlaceholder} – ${companyName}`;
+  const DEFAULT_BODY = `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. ${numberOrPlaceholder} vom ${formatDate(invoice.date)} über ${formatCurrency(invoice.totalAmount.toNumber())}.\n${invoice.customUserText ? `\n${invoice.customUserText}\n` : ""}\nZahlbar bis: ${formatDate(invoice.dueDate)}\n\nMit freundlichen Grüssen\n${companyName}`;
   const defaultBody = settings?.emailBodyTemplate
     ? settings.emailBodyTemplate
-        .replace(/\{documentNumber\}/g, invoice.documentNumber)
+        .replace(/\{documentNumber\}/g, numberOrPlaceholder)
         .replace(/\{contactPerson\}/g, invoice.customer.contactPerson)
         .replace(/\{companyName\}/g, companyName)
         .replace(/\{totalAmount\}/g, formatCurrency(invoice.totalAmount.toNumber()))
@@ -91,7 +94,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">{invoice.documentNumber}</h1>
+          <h1 className="text-2xl font-semibold">{documentLabel(invoice.documentNumber)}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             <Link
               href={`/customers/${invoice.customer.customerId}`}

@@ -3,7 +3,9 @@ import { Prisma } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
-import { generateInvoiceNumber, generateQuoteNumber } from "@/lib/document-number";
+import { assignDocumentNumber } from "@/lib/document-number";
+import { fillDocumentNumber } from "@/lib/document-display";
+import type { DocumentKind } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
@@ -19,16 +21,6 @@ const log = logger.child({ module: "document-actions" });
  * see review finding #10. Branching on `kind` instead of a Prisma generic
  * keeps each side's `data` object plainly typed against its own delegate.
  */
-type DocumentKind = "invoice" | "quote";
-
-export function isDocumentNumberCollision(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === "P2002" &&
-    ((err.meta?.target as string[] | undefined)?.includes("documentNumber") ?? false)
-  );
-}
-
 async function createItems(
   tx: Prisma.TransactionClient,
   kind: DocumentKind,
@@ -66,57 +58,45 @@ export type CreateDocumentInput = {
 
 export async function createDocumentWithItems(
   input: CreateDocumentInput
-): Promise<{ id: number; documentNumber: string }> {
-  let id!: number;
-  let documentNumber!: string;
+): Promise<{ id: number; documentNumber: null }> {
+  // Drafts are created without a number; assignDocumentNumber hands it out
+  // when the document first leaves Draft.
+  const id = await defaultPrisma.$transaction(async (tx) => {
+    let documentId: number;
+    if (input.kind === "invoice") {
+      const invoice = await tx.invoice.create({
+        data: {
+          customerId: input.customerId,
+          customUserText: input.customUserText,
+          date: input.date,
+          dueDate: input.dueDate!,
+          totalAmount: input.totalAmount,
+          discountPercent: input.discountPercent,
+          state: "Draft",
+        },
+      });
+      documentId = invoice.id;
+    } else {
+      const quote = await tx.quote.create({
+        data: {
+          customerId: input.customerId,
+          customUserText: input.customUserText,
+          date: input.date,
+          validUntil: input.validUntil!,
+          totalAmount: input.totalAmount,
+          discountPercent: input.discountPercent,
+          state: "Draft",
+        },
+      });
+      documentId = quote.id;
+    }
 
-  const attempt = () =>
-    defaultPrisma.$transaction(async (tx) => {
-      if (input.kind === "invoice") {
-        documentNumber = await generateInvoiceNumber(tx);
-        const invoice = await tx.invoice.create({
-          data: {
-            customerId: input.customerId,
-            documentNumber,
-            customUserText: input.customUserText,
-            date: input.date,
-            dueDate: input.dueDate!,
-            totalAmount: input.totalAmount,
-            discountPercent: input.discountPercent,
-            state: "Draft",
-          },
-        });
-        id = invoice.id;
-      } else {
-        documentNumber = await generateQuoteNumber(tx);
-        const quote = await tx.quote.create({
-          data: {
-            customerId: input.customerId,
-            documentNumber,
-            customUserText: input.customUserText,
-            date: input.date,
-            validUntil: input.validUntil!,
-            totalAmount: input.totalAmount,
-            discountPercent: input.discountPercent,
-            state: "Draft",
-          },
-        });
-        id = quote.id;
-      }
+    await saveItemsToCatalog(tx, input.items);
+    await createItems(tx, input.kind, documentId, input.items);
+    return documentId;
+  });
 
-      await saveItemsToCatalog(tx, input.items);
-      await createItems(tx, input.kind, id, input.items);
-    });
-
-  try {
-    await attempt();
-  } catch (err) {
-    if (!isDocumentNumberCollision(err)) throw err;
-    log.warn({ documentNumber, kind: input.kind }, "document number collision, retrying");
-    await attempt();
-  }
-
-  return { id, documentNumber };
+  return { id, documentNumber: null };
 }
 
 export type UpdateDocumentInput = {
@@ -195,12 +175,23 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     });
     if (!invoice) return { error: "Rechnung nicht gefunden." };
 
+    let documentNumber: string;
     try {
-      const pdf = await generateInvoicePdf(invoice, settings);
-      await sendInvoiceEmail(invoice, settings, pdf, {
+      documentNumber = await assignDocumentNumber("invoice", input.id, { actor: input.actor });
+    } catch (err) {
+      log.error({ invoiceId: input.id, err }, "sendDocument (invoice): number assignment failed");
+      return { error: "Rechnungsnummer konnte nicht vergeben werden." };
+    }
+    const numbered = { ...invoice, documentNumber };
+    const subject = fillDocumentNumber(input.subject, documentNumber);
+    const body = fillDocumentNumber(input.body, documentNumber);
+
+    try {
+      const pdf = await generateInvoicePdf(numbered, settings);
+      await sendInvoiceEmail(numbered, settings, pdf, {
         to: input.to,
-        subject: input.subject,
-        body: input.body,
+        subject,
+        body,
       });
     } catch (err) {
       log.error({ invoiceId: input.id, to: input.to, err }, "sendDocument (invoice) failed");
@@ -210,10 +201,10 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     await defaultPrisma.$transaction([
       defaultPrisma.invoice.update({ where: { id: input.id }, data: { state: "Sent" } }),
       defaultPrisma.invoiceSentLog.create({
-        data: { invoiceId: input.id, sentTo: input.to, subject: input.subject },
+        data: { invoiceId: input.id, sentTo: input.to, subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Invoice", input.id, invoice.documentNumber, {
+    await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
     });
     revalidatePath(`/invoices/${input.id}`);
@@ -225,12 +216,23 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     });
     if (!quote) return { error: "Offerte nicht gefunden." };
 
+    let documentNumber: string;
     try {
-      const pdf = await generateQuotePdf(quote, settings);
-      await sendQuoteEmail(quote, settings, pdf, {
+      documentNumber = await assignDocumentNumber("quote", input.id, { actor: input.actor });
+    } catch (err) {
+      log.error({ quoteId: input.id, err }, "sendDocument (quote): number assignment failed");
+      return { error: "Offertennummer konnte nicht vergeben werden." };
+    }
+    const numbered = { ...quote, documentNumber };
+    const subject = fillDocumentNumber(input.subject, documentNumber);
+    const body = fillDocumentNumber(input.body, documentNumber);
+
+    try {
+      const pdf = await generateQuotePdf(numbered, settings);
+      await sendQuoteEmail(numbered, settings, pdf, {
         to: input.to,
-        subject: input.subject,
-        body: input.body,
+        subject,
+        body,
       });
     } catch (err) {
       log.error({ quoteId: input.id, to: input.to, err }, "sendDocument (quote) failed");
@@ -240,10 +242,10 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     await defaultPrisma.$transaction([
       defaultPrisma.quote.update({ where: { id: input.id }, data: { state: "Sent" } }),
       defaultPrisma.quoteSentLog.create({
-        data: { quoteId: input.id, sentTo: input.to, subject: input.subject },
+        data: { quoteId: input.id, sentTo: input.to, subject },
       }),
     ]);
-    await logAudit(input.actor, "SEND", "Quote", input.id, quote.documentNumber, {
+    await logAudit(input.actor, "SEND", "Quote", input.id, documentNumber, {
       to: input.to,
     });
     revalidatePath(`/quotes/${input.id}`);

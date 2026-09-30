@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { GlobalSearch } from "@/components/global-search";
 import { customerDisplayName, EMPTY_SEARCH_RESULTS, searchGlobal } from "@/lib/search";
 import type { InvoiceState, QuoteState } from "@prisma/client";
+import { documentLabel } from "@/lib/document-display";
 
 const invoiceStateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -113,7 +114,7 @@ export default async function SearchPage({ searchParams }: Props) {
                 className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <div>
-                  <p className="font-medium text-sm">{inv.documentNumber}</p>
+                  <p className="font-medium text-sm">{documentLabel(inv.documentNumber)}</p>
                   <p className="text-xs text-muted-foreground">
                     {inv.customerName}
                     {" · "}
@@ -146,7 +147,7 @@ export default async function SearchPage({ searchParams }: Props) {
                 className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <div>
-                  <p className="font-medium text-sm">{q.documentNumber}</p>
+                  <p className="font-medium text-sm">{documentLabel(q.documentNumber)}</p>
                   <p className="text-xs text-muted-foreground">
                     {q.customerName}
                     {" · "}
