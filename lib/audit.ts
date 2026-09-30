@@ -6,7 +6,7 @@ import type { Session } from "next-auth";
 const log = logger.child({ module: "audit" });
 
 export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "SEND" | "STATUS";
-export type AuditEntity = "Customer" | "Invoice" | "Quote" | "Reminder" | "Service" | "User" | "Settings" | "CustomerNote" | "Expense";
+export type AuditEntity = "Customer" | "Invoice" | "Quote" | "Reminder" | "Service" | "User" | "Settings" | "CustomerNote" | "Expense" | "Payment";
 
 export async function logAudit(
   session: Session,
