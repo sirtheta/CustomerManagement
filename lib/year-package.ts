@@ -101,7 +101,14 @@ async function selectDocuments(prisma: PrismaClient, year: number, openInvoiceId
   ];
 
   const docs = await prisma.sentDocument.findMany({
-    where: { OR: [{ createdAt: { gte: yearStart, lt: yearEnd } }, { invoiceId: { in: candidateIds } }] },
+    // Earlier PDFs of a candidate invoice stay in (a December invoice paid in
+    // January); later ones do not, so a closed year's package never changes.
+    where: {
+      OR: [
+        { createdAt: { gte: yearStart, lt: yearEnd } },
+        { invoiceId: { in: candidateIds }, createdAt: { lt: yearEnd } },
+      ],
+    },
     orderBy: { id: "asc" },
   });
   const archivedInvoiceIds = new Set(docs.map((d) => d.invoiceId));

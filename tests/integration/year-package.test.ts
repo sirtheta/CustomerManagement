@@ -27,7 +27,7 @@ describe("buildYearPackage", () => {
   async function invoice(
     number: string,
     date: string,
-    extra: { state?: "Sent" | "Paid" | "Canceled"; creditNoteForId?: number; totalAmount?: number } = {}
+    extra: { state?: "Draft" | "Sent" | "Paid" | "Canceled"; creditNoteForId?: number; totalAmount?: number } = {}
   ) {
     const customer =
       (await db.prisma.customer.findFirst()) ?? (await db.prisma.customer.create({ data: createValidTestCustomer() }));
@@ -170,6 +170,46 @@ describe("buildYearPackage", () => {
     const { byName, summary } = await run(2026);
     expect(text(byName("pruefsummen.csv")!)).toContain("I-PRE,,,ohne archiviertes PDF");
     expect(summary.withoutPdf).toBe(1);
+  });
+
+  it("lists an invoice selected only by its send-log entry without an archived PDF", async () => {
+    // Sent 2026 (log only, no SentDocument), paid in full in 2025: no payment in the
+    // year and not open at either cut-off, so only the send-log criterion selects it.
+    const inv = await invoice("I-SLONLY", "2025-03-01", { state: "Paid" });
+    await db.prisma.payment.create({ data: { invoiceId: inv.id, date: new Date("2025-04-01T10:00:00Z"), amount: 100 } });
+    await db.prisma.invoiceSentLog.create({
+      data: { invoiceId: inv.id, sentAt: new Date("2026-02-01T10:00:00Z"), sentTo: "k@test.ch", subject: "Rechnung" },
+    });
+
+    const { byName, summary } = await run(2026);
+    expect(text(byName("pruefsummen.csv")!)).toContain("I-SLONLY,,,ohne archiviertes PDF");
+    expect(summary.withoutPdf).toBe(1);
+  });
+
+  it("does not list draft invoices without an archived PDF", async () => {
+    const draft = await invoice("I-DRAFT", "2026-05-01", { state: "Draft" });
+    await db.prisma.invoiceSentLog.create({
+      data: { invoiceId: draft.id, sentAt: new Date("2026-05-02T10:00:00Z"), sentTo: "k@test.ch", subject: "Rechnung" },
+    });
+    await db.prisma.payment.create({ data: { invoiceId: draft.id, date: new Date("2026-05-03T10:00:00Z"), amount: 10 } });
+
+    const { byName, summary } = await run(2026);
+    expect(text(byName("pruefsummen.csv")!)).not.toContain("I-DRAFT");
+    expect(summary.withoutPdf).toBe(0);
+  });
+
+  it("leaves PDFs created after the year out of the package", async () => {
+    const open = await invoice("I-NEXT", "2026-03-01");
+    const inDoc = await archive(open.id, "I-NEXT", "2026-03-01T10:00:00Z");
+    const inReminder = await archive(open.id, "I-NEXT", "2026-11-01T10:00:00Z", "Reminder");
+    const laterReminder = await archive(open.id, "I-NEXT", "2027-02-01T10:00:00Z", "Reminder");
+
+    const { names, byName, summary } = await run(2026);
+    expect(names).toContain(`jahrespaket-2026/rechnungen/${inDoc.fileName}`);
+    expect(names).toContain(`jahrespaket-2026/rechnungen/${inReminder.fileName}`);
+    expect(names.some((n) => n.includes(laterReminder.fileName))).toBe(false);
+    expect(text(byName("pruefsummen.csv")!)).not.toContain(laterReminder.fileName);
+    expect(summary.pdfOk).toBe(2);
   });
 
   it("includes credit notes sent in the year", async () => {
