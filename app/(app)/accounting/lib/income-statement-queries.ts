@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { InvoiceState } from "@prisma/client";
 import { customerDisplayName } from "@/lib/customer-display";
 
 export type MonthlyResult = {
@@ -28,26 +27,22 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const [paidInvoices, expenses, paidDateRange, expenseDateRange] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-      select: { paidDate: true, totalAmount: true },
+  const [payments, expenses, paymentDateRange, expenseDateRange] = await Promise.all([
+    prisma.payment.findMany({
+      where: { date: { gte: yearStart, lt: yearEnd } },
+      select: { date: true, amount: true },
     }),
     prisma.expense.findMany({
       where: { date: { gte: yearStart, lt: yearEnd } },
       select: { date: true, amount: true },
     }),
-    prisma.invoice.aggregate({
-      where: { state: InvoiceState.Paid, paidDate: { not: null } },
-      _min: { paidDate: true },
-      _max: { paidDate: true },
-    }),
+    prisma.payment.aggregate({ _min: { date: true }, _max: { date: true } }),
     prisma.expense.aggregate({ _min: { date: true }, _max: { date: true } }),
   ]);
 
   const incomeByMonth = new Array(12).fill(0) as number[];
-  for (const inv of paidInvoices) {
-    incomeByMonth[inv.paidDate!.getMonth()] += inv.totalAmount.toNumber();
+  for (const pay of payments) {
+    incomeByMonth[pay.date.getMonth()] += pay.amount.toNumber();
   }
 
   const expensesByMonth = new Array(12).fill(0) as number[];
@@ -67,8 +62,8 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
   const totalExpenses = expensesByMonth.reduce((sum, v) => sum + v, 0);
 
   const years = new Set<number>();
-  if (paidDateRange._min.paidDate) years.add(paidDateRange._min.paidDate.getFullYear());
-  if (paidDateRange._max.paidDate) years.add(paidDateRange._max.paidDate.getFullYear());
+  if (paymentDateRange._min.date) years.add(paymentDateRange._min.date.getFullYear());
+  if (paymentDateRange._max.date) years.add(paymentDateRange._max.date.getFullYear());
   if (expenseDateRange._min.date) years.add(expenseDateRange._min.date.getFullYear());
   if (expenseDateRange._max.date) years.add(expenseDateRange._max.date.getFullYear());
   years.add(new Date().getFullYear());
@@ -91,34 +86,41 @@ export async function fetchIncomeStatement(prisma: PrismaClient, year: number): 
 
 export type IncomeRow = {
   id: number;
+  invoiceId: number;
   documentNumber: string | null;
   customerName: string;
   paidDate: string;
-  totalAmount: number;
+  amount: number;
 };
 
-export async function fetchPaidInvoicesForYear(prisma: PrismaClient, year: number): Promise<IncomeRow[]> {
+export async function fetchPaymentsForYear(prisma: PrismaClient, year: number): Promise<IncomeRow[]> {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year + 1, 0, 1);
 
-  const invoices = await prisma.invoice.findMany({
-    where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-    orderBy: { paidDate: "desc" },
+  const payments = await prisma.payment.findMany({
+    where: { date: { gte: yearStart, lt: yearEnd } },
+    orderBy: [{ date: "desc" }, { id: "desc" }],
     select: {
       id: true,
-      documentNumber: true,
-      paidDate: true,
-      totalAmount: true,
-      customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
+      date: true,
+      amount: true,
+      invoice: {
+        select: {
+          id: true,
+          documentNumber: true,
+          customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
+        },
+      },
     },
   });
 
-  return invoices.map((inv) => ({
-    id: inv.id,
-    documentNumber: inv.documentNumber,
-    customerName: customerDisplayName(inv.customer),
-    paidDate: inv.paidDate!.toISOString(),
-    totalAmount: inv.totalAmount.toNumber(),
+  return payments.map((p) => ({
+    id: p.id,
+    invoiceId: p.invoice.id,
+    documentNumber: p.invoice.documentNumber,
+    customerName: customerDisplayName(p.invoice.customer),
+    paidDate: p.date.toISOString(),
+    amount: p.amount.toNumber(),
   }));
 }
 

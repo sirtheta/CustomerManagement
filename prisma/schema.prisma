@@ -47,6 +47,7 @@ model Invoice {
   pendingEmail    PendingEmail?
   sentLogs        InvoiceSentLog[]
   pendingReminder PendingReminder?
+  payments        Payment[]
 
   @@unique([documentNumber])
   @@index([customerId])
@@ -54,6 +55,20 @@ model Invoice {
   @@index([state])
   @@index([dueDate])
   @@index([paidDate])
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  invoiceId     Int
+  date          DateTime
+  amount        Decimal
+  source        String   @default("manual") // manual | camt-import | budget-import | migration
+  bankReference String?
+  createdAt     DateTime @default(now())
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([date])
 }
 
 model InvoiceSentLog {
@@ -321,6 +336,7 @@ enum UserRole {
 enum InvoiceState {
   Draft
   Sent
+  PartiallyPaid
   Paid
   Overdue
   Canceled

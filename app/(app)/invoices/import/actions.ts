@@ -5,6 +5,7 @@ import { requireEditor } from "@/lib/permissions";
 import { parseCamt053 } from "@/lib/import/camt";
 import { matchStatementToInvoices, type MatchedTransaction } from "@/lib/import/matching";
 import { checkStatementAccount } from "@/lib/import/statement-checks";
+import { toRappen } from "@/lib/payments";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "invoices.import" });
@@ -17,7 +18,7 @@ export type ParseStatementState = {
 
 /**
  * Parses an uploaded CAMT.053 file and matches its incoming payments against
- * currently open invoices (`Sent`/`Overdue`). Nothing is written to the
+ * currently open invoices (`Sent`/`Overdue`/`PartiallyPaid`). Nothing is written to the
  * database here — matches only become a state change once the user reviews
  * and confirms them via `markInvoicesPaidFromImport`.
  */
@@ -45,8 +46,13 @@ export async function parseStatement(
 
   const [openInvoices, settings] = await Promise.all([
     prisma.invoice.findMany({
-      where: { state: { in: ["Sent", "Overdue"] } },
-      select: { id: true, documentNumber: true, totalAmount: true },
+      where: { state: { in: ["Sent", "Overdue", "PartiallyPaid"] } },
+      select: {
+        id: true,
+        documentNumber: true,
+        totalAmount: true,
+        payments: { select: { amount: true } },
+      },
     }),
     prisma.applicationSettings.findFirst({
       select: { invoiceNumberPrefix: true, companyInfo: { select: { companyIBAN: true } } },
@@ -57,11 +63,14 @@ export async function parseStatement(
     statement.transactions,
     openInvoices
       .filter((invoice): invoice is typeof invoice & { documentNumber: string } => invoice.documentNumber !== null)
-      .map((invoice) => ({
-        id: invoice.id,
-        documentNumber: invoice.documentNumber,
-        totalAmount: invoice.totalAmount.toNumber(),
-      })),
+      .map((invoice) => {
+        const paidRappen = invoice.payments.reduce((s, p) => s + toRappen(p.amount), 0);
+        return {
+          id: invoice.id,
+          documentNumber: invoice.documentNumber,
+          openAmount: Math.max(toRappen(invoice.totalAmount) - paidRappen, 0) / 100,
+        };
+      }),
     settings?.invoiceNumberPrefix ?? "R-"
   );
 

@@ -3,15 +3,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     applicationSettings: { findFirst: vi.fn() },
-    invoice: { findFirst: vi.fn(), update: vi.fn() },
-    pendingReminder: { deleteMany: vi.fn() },
+    invoice: { findFirst: vi.fn() },
   },
 }));
-vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
+vi.mock("@/lib/payments", () => ({
+  getPaymentSummary: vi.fn(),
+  recordPayment: vi.fn(),
+}));
 
-import { matchAndMarkPaid, markInvoicePaid } from "@/lib/payment-matching";
+import { matchAndMarkPaid } from "@/lib/payment-matching";
 import prisma from "@/lib/prisma";
-import { logAudit } from "@/lib/audit";
+import { getPaymentSummary, recordPayment } from "@/lib/payments";
+
+function summary(remainingRappen: number) {
+  return { totalRappen: 0, paidRappen: 0, remainingRappen, overpaidRappen: 0 };
+}
 
 describe("matchAndMarkPaid", () => {
   beforeEach(() => {
@@ -21,33 +27,45 @@ describe("matchAndMarkPaid", () => {
     } as never);
   });
 
-  it("marks the invoice Paid on an exact documentNumber + amount match", async () => {
-    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({
-      id: 10,
-      state: "Sent",
-      totalAmount: 123.45,
-    } as never);
-    vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
+  it("records a budget-import payment on an exact documentNumber + remaining amount match", async () => {
+    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({ id: 10, state: "Sent" } as never);
+    vi.mocked(getPaymentSummary).mockResolvedValue(summary(12345));
 
     const result = await matchAndMarkPaid({
       description: "Zahlung Rechnung R-26070042 danke",
       amountRappen: 12345,
+      bookingDate: "2026-07-05",
     });
 
     expect(result).toEqual({ matched: true, invoiceId: 10, documentNumber: "R-26070042" });
-    expect(prisma.invoice.update).toHaveBeenCalledWith({
-      where: { id: 10 },
-      data: { state: "Paid", paidDate: expect.any(Date) },
-    });
-    expect(logAudit).toHaveBeenCalled();
+    expect(recordPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoiceId: 10,
+        amount: 123.45,
+        date: new Date("2026-07-05"),
+        source: "budget-import",
+      }),
+      prisma
+    );
   });
 
-  it("does not mark paid when the amount does not match", async () => {
-    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({
-      id: 10,
-      state: "Sent",
-      totalAmount: 999.0,
-    } as never);
+  it("falls back to today when the booking date is invalid", async () => {
+    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({ id: 10, state: "Sent" } as never);
+    vi.mocked(getPaymentSummary).mockResolvedValue(summary(12345));
+
+    await matchAndMarkPaid({
+      description: "Zahlung Rechnung R-26070042",
+      amountRappen: 12345,
+      bookingDate: "not-a-date",
+    });
+
+    const call = vi.mocked(recordPayment).mock.calls[0][0];
+    expect(isNaN(call.date.getTime())).toBe(false);
+  });
+
+  it("does not record a payment when the remaining amount does not match", async () => {
+    vi.mocked(prisma.invoice.findFirst).mockResolvedValue({ id: 10, state: "Sent" } as never);
+    vi.mocked(getPaymentSummary).mockResolvedValue(summary(99900));
 
     const result = await matchAndMarkPaid({
       description: "Zahlung Rechnung R-26070042 danke",
@@ -55,8 +73,7 @@ describe("matchAndMarkPaid", () => {
     });
 
     expect(result).toEqual({ matched: false });
-    expect(prisma.invoice.update).not.toHaveBeenCalled();
-    expect(logAudit).not.toHaveBeenCalled();
+    expect(recordPayment).not.toHaveBeenCalled();
   });
 
   it("returns unmatched when no candidate documentNumber is found in the description", async () => {
@@ -69,7 +86,7 @@ describe("matchAndMarkPaid", () => {
     expect(prisma.invoice.findFirst).not.toHaveBeenCalled();
   });
 
-  it("ignores invoices that are already Paid", async () => {
+  it("only considers Sent, Overdue and PartiallyPaid invoices", async () => {
     vi.mocked(prisma.invoice.findFirst).mockResolvedValue(null);
 
     const result = await matchAndMarkPaid({
@@ -78,29 +95,11 @@ describe("matchAndMarkPaid", () => {
     });
 
     expect(prisma.invoice.findFirst).toHaveBeenCalledWith({
-      where: { documentNumber: "R-26070042", state: { not: "Paid" } },
+      where: {
+        documentNumber: "R-26070042",
+        state: { in: ["Sent", "Overdue", "PartiallyPaid"] },
+      },
     });
     expect(result).toEqual({ matched: false });
-  });
-});
-
-describe("markInvoicePaid", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("removes the pending reminder of the invoice", async () => {
-    vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
-
-    await markInvoicePaid({
-      invoiceId: 10,
-      documentNumber: "R-26070042",
-      previousState: "Overdue",
-      paidDate: new Date("2026-09-01"),
-      actor: { user: { id: "1", name: "E", email: "e@x" } } as never,
-      source: "camt-import",
-    });
-
-    expect(prisma.pendingReminder.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 10 } });
   });
 });
