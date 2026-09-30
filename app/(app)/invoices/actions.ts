@@ -13,6 +13,7 @@ import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { PaymentError, recordPayment, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
+import { canTransitionInvoice } from "@/lib/state-manager";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
@@ -134,10 +135,13 @@ export async function updateInvoiceStatus(
 
   const current = await prisma.invoice.findUnique({
     where: { id },
-    select: { state: true, documentNumber: true, totalAmount: true },
+    select: { state: true, documentNumber: true, totalAmount: true, creditNoteForId: true },
   });
   if (!current) return { error: "Rechnung nicht gefunden." };
   if (current.state === state) return {};
+  if (current.creditNoteForId != null) {
+    return { error: "Der Status einer Gutschrift ergibt sich aus dem Versand." };
+  }
   // PartiallyPaid results from payments only. Leaving Paid/PartiallyPaid
   // works by deleting the payments, so state and payments never disagree.
   if (state === "PartiallyPaid") {
@@ -149,6 +153,9 @@ export async function updateInvoiceStatus(
   }
   if (state === "Paid" && current.state === "Canceled") {
     return { error: "Stornierte Rechnungen können nicht als bezahlt markiert werden." };
+  }
+  if (!canTransitionInvoice(current.state, state)) {
+    return { error: "Dieser Statuswechsel ist nicht erlaubt." };
   }
   // Checked before any change: a zero invoice has nothing to pay, and a
   // Draft must not be turned Sent/numbered for a Paid that then fails.

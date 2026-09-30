@@ -58,7 +58,12 @@ const adminSession = {
   user: { id: "2", name: "Admin User", email: "admin@example.com", role: "Admin" },
 } as never;
 
-function mockInvoice(state: string, documentNumber: string | null, totalAmount = 100) {
+function mockInvoice(
+  state: string,
+  documentNumber: string | null,
+  totalAmount = 100,
+  creditNoteForId: number | null = null
+) {
   // Payments exist exactly for Paid/PartiallyPaid invoices in these scenarios.
   vi.mocked(prisma.payment.count).mockResolvedValue(
     state === "Paid" || state === "PartiallyPaid" ? 1 : 0
@@ -67,6 +72,7 @@ function mockInvoice(state: string, documentNumber: string | null, totalAmount =
     state,
     documentNumber,
     totalAmount,
+    creditNoteForId,
   } as never);
 }
 
@@ -203,7 +209,7 @@ describe("updateInvoiceStatus", () => {
     });
   });
 
-  it.each(["Overdue", "Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {
+  it.each(["Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {
     mockInvoice("Draft", null);
     vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
 
@@ -212,23 +218,20 @@ describe("updateInvoiceStatus", () => {
     expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
   });
 
-  it("does not assign a number when a draft is canceled", async () => {
+  it("refuses Draft -> Canceled and assigns no number", async () => {
     mockInvoice("Draft", null);
-    await updateInvoiceStatus(10, "Canceled");
+    const res = await updateInvoiceStatus(10, "Canceled");
+    expect(res.error).toBeTruthy();
     expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
-  it("assigns a number when a canceled, unnumbered invoice is sent", async () => {
+  it("refuses to reopen a canceled invoice", async () => {
     mockInvoice("Canceled", null);
-    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
-
-    await updateInvoiceStatus(10, "Sent");
-
-    expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
-    expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Invoice", 10, "R-26090001", {
-      from: "Canceled",
-      to: "Sent",
-    });
+    const res = await updateInvoiceStatus(10, "Sent");
+    expect(res.error).toBeTruthy();
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
   it("does not assign a number when an unnumbered canceled invoice stays canceled", async () => {
@@ -253,6 +256,20 @@ describe("updateInvoiceStatus", () => {
     mockInvoice("Sent", "I-25060004");
     await updateInvoiceStatus(1, "Overdue");
     expect(prisma.pendingReminder.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("refuses Sent -> Canceled and Sent -> Draft", async () => {
+    mockInvoice("Sent", "R-26090001");
+    expect((await updateInvoiceStatus(1, "Canceled")).error).toBeTruthy();
+    expect((await updateInvoiceStatus(1, "Draft")).error).toBeTruthy();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses any manual status change on a credit note", async () => {
+    mockInvoice("Sent", "R-26090002", -50, 1);
+    const res = await updateInvoiceStatus(2, "Overdue");
+    expect(res).toEqual({ error: "Der Status einer Gutschrift ergibt sich aus dem Versand." });
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
   it("returns an error when the invoice does not exist", async () => {
