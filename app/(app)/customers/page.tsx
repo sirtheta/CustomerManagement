@@ -55,6 +55,7 @@ async function CustomersTable({ term, yearlyOnly, archivedOnly, currentPage, sor
       orderBy: { [sortField]: sortOrder },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+      include: { _count: { select: { invoices: true } } },
     }),
     prisma.customer.count({ where }),
   ]);
@@ -126,7 +127,12 @@ async function CustomersTable({ term, yearlyOnly, archivedOnly, currentPage, sor
                   <TableCell>{c.email}</TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   <TableCell>
-                    <DeleteCustomerButton customerId={c.customerId} size="sm" />
+                    <DeleteCustomerButton
+                      customerId={c.customerId}
+                      size="sm"
+                      hasInvoices={c._count.invoices > 0}
+                      archived={archivedOnly}
+                    />
                   </TableCell>
                 </TableRow>
               ))

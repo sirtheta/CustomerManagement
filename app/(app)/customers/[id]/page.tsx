@@ -285,7 +285,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
       {canDelete && (
         <div className="flex justify-start">
-          <DeleteCustomerButton customerId={customerId} />
+          <DeleteCustomerButton
+            customerId={customerId}
+            hasInvoices={invoiceCount > 0}
+            archived={customer.archivedAt !== null}
+          />
         </div>
       )}
     </div>
