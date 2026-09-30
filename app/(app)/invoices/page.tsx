@@ -174,7 +174,7 @@ async function InvoicesTable({
                     </Link>
                   </TableCell>
                   <TableCell>{formatDate(inv.date)}</TableCell>
-                  <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                  <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
                   <TableCell>{formatCurrency(inv.totalAmount.toNumber())}</TableCell>
                   <TableCell>
                     <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>

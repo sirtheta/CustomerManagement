@@ -242,6 +242,7 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     ]);
     await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
+      ...(invoice.creditNoteForId != null ? { creditNoteFor: invoice.creditNoteForId } : {}),
     });
     if (invoice.creditNoteForId != null) {
       await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });

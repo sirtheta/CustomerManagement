@@ -18,6 +18,7 @@ export async function saveAsTemplate(
     include: { items: true },
   });
   if (!invoice) return { error: "Rechnung nicht gefunden." };
+  if (invoice.creditNoteForId != null) return { error: "Aus einer Gutschrift kann keine Vorlage erstellt werden." };
   if (invoice.items.length === 0) return { error: "Die Rechnung hat keine Positionen." };
 
   await prisma.invoiceTemplate.create({

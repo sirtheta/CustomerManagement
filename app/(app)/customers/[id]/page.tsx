@@ -190,7 +190,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                         )}
                       </TableCell>
                       <TableCell>{formatDate(inv.date)}</TableCell>
-                      <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                      <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
                       <TableCell>{formatCurrency(inv.totalAmount.toNumber())}</TableCell>
                       <TableCell>
                         <Badge variant={invoiceStateVariants[inv.state]}>

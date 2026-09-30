@@ -49,6 +49,7 @@ import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
 import { assertCreditWithinOriginal, CreditNoteError } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
+import { logAudit } from "@/lib/audit";
 
 const actor = { user: { id: "1", name: "Editor", email: "editor@test.ch", role: "Editor" } } as never;
 
@@ -204,6 +205,10 @@ describe("sendDocument", () => {
     expect(result.success).toBe(true);
     expect(assertCreditWithinOriginal).toHaveBeenCalled();
     expect(syncInvoiceState).toHaveBeenCalledWith({ invoiceId: 1, actor, source: "credit-note" });
+    expect(logAudit).toHaveBeenCalledWith(actor, "SEND", "Invoice", 5, "I-2026-002", {
+      to: "a@b.ch",
+      creditNoteFor: 1,
+    });
     // the send must not have assigned a number before the check passed
     expect(vi.mocked(assertCreditWithinOriginal).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]

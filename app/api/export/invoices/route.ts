@@ -59,7 +59,7 @@ export async function GET(request: Request) {
   const rows = invoices.map((inv) => [
     documentLabel(inv.documentNumber),
     inv.date.toLocaleDateString("de-CH"),
-    inv.dueDate.toLocaleDateString("de-CH"),
+    inv.creditNoteForId != null ? "" : inv.dueDate.toLocaleDateString("de-CH"),
     inv.customer.contactInsteadOfCompany
       ? inv.customer.contactPerson
       : (inv.customer.company || inv.customer.contactPerson),
