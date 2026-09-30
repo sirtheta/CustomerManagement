@@ -254,26 +254,31 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount />
+            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Rabatt auf Gesamtrechnung</CardTitle></CardHeader>
-          <CardContent className="space-y-1.5">
-            <Label htmlFor="discountPercent">Rabatt (%)</Label>
-            <input
-              id="discountPercent"
-              name="discountPercent"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              defaultValue={invoice?.discountPercent?.toString() ?? "0"}
-              className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            />
-          </CardContent>
-        </Card>
+        {creditNoteFor ? (
+          // A credit note keeps the original's discount so a full credit matches the original amount.
+          <input type="hidden" name="discountPercent" value={invoice?.discountPercent?.toString() ?? "0"} />
+        ) : (
+          <Card>
+            <CardHeader><CardTitle>Rabatt auf Gesamtrechnung</CardTitle></CardHeader>
+            <CardContent className="space-y-1.5">
+              <Label htmlFor="discountPercent">Rabatt (%)</Label>
+              <input
+                id="discountPercent"
+                name="discountPercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue={invoice?.discountPercent?.toString() ?? "0"}
+                className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" render={<Link href={cancelHref} />}>
