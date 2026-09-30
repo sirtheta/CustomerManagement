@@ -6,16 +6,17 @@ import { extractDocumentNumberCandidates } from "@/lib/import/document-reference
  * be reviewed and confirmed as payments without a bookkeeping ledger.
  *
  * There is no stored transaction history to dedupe against (the CRM has no
- * accounts): once an invoice is marked `Paid` it drops out of the candidate
+ * accounts): once an invoice is fully paid it drops out of the candidate
  * pool, so re-uploading the same statement simply produces no further
- * matches for it — that's the whole duplicate-prevention story.
+ * matches for it. A partial payment is recognised by its `bankReference`
+ * when the import is confirmed.
  */
 
 export interface OpenInvoice {
   id: number;
   documentNumber: string;
-  /** Francs, as read from `Invoice.totalAmount`. */
-  totalAmount: number;
+  /** Francs still open: total minus recorded payments. */
+  openAmount: number;
 }
 
 export interface MatchCandidate {
@@ -70,7 +71,7 @@ function findReferencedInvoice(
 
 /**
  * Matches every incoming (credit) statement entry against the given open
- * invoices (callers should pass invoices with `state` in `Sent`/`Overdue`
+ * invoices (callers should pass invoices with `state` in `Sent`/`Overdue`/`PartiallyPaid`
  * only). Outgoing entries are dropped — they can never be an invoice payment.
  * `prefix` is `ApplicationSettings.invoiceNumberPrefix`.
  */
@@ -84,12 +85,12 @@ export function matchStatementToInvoices(
     .map((transaction) => {
       const referenced = findReferencedInvoice(transaction, openInvoices, prefix);
       const amountMatches = openInvoices.filter(
-        (invoice) => centsOf(invoice.totalAmount) === transaction.amountCents
+        (invoice) => centsOf(invoice.openAmount) === transaction.amountCents
       );
 
       // Reference and amount both line up on the same invoice: safe to
       // pre-select, the user only has to confirm.
-      if (referenced && centsOf(referenced.totalAmount) === transaction.amountCents) {
+      if (referenced && centsOf(referenced.openAmount) === transaction.amountCents) {
         return {
           transaction,
           candidates: [toCandidate(referenced)],

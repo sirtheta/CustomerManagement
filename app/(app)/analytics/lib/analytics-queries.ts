@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { InvoiceState } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
+import { sumOpenAmount } from "@/lib/payments";
 import { customerDisplayName } from "@/lib/customer-display";
 import { documentLabel } from "@/lib/document-display";
 export { categoryParamValue } from "./analytics-utils";
@@ -293,37 +294,25 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
 
   const [
     annualRevenueResult,
-    outstandingResult,
+    openResult,
     allNonDraftInvoices,
     paidInYear,
-    topCustomerGroups,
     invoiceDateRange,
     incomeItems,
     expenseRows,
   ] = await Promise.all([
-    prisma.invoice.aggregate({
-      where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-      _sum: { totalAmount: true },
+    prisma.payment.aggregate({
+      where: { date: { gte: yearStart, lt: yearEnd } },
+      _sum: { amount: true },
     }),
-    prisma.invoice.aggregate({
-      where: { state: { in: [InvoiceState.Sent, InvoiceState.Overdue] } },
-      _sum: { totalAmount: true },
-      _count: true,
-    }),
+    sumOpenAmount(prisma),
     prisma.invoice.findMany({
       where: { state: { notIn: [InvoiceState.Draft] }, date: { gte: yearStart, lt: yearEnd } },
       select: { state: true, totalAmount: true },
     }),
-    prisma.invoice.findMany({
-      where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-      select: { paidDate: true, totalAmount: true },
-    }),
-    prisma.invoice.groupBy({
-      by: ["customerId"],
-      where: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-      _sum: { totalAmount: true },
-      orderBy: { _sum: { totalAmount: "desc" } },
-      take: 5,
+    prisma.payment.findMany({
+      where: { date: { gte: yearStart, lt: yearEnd } },
+      select: { date: true, amount: true, invoice: { select: { customerId: true } } },
     }),
     prisma.invoice.aggregate({ _min: { date: true }, _max: { date: true } }),
     prisma.item.findMany({
@@ -342,9 +331,9 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
     }),
   ]);
 
-  const annualRevenue = annualRevenueResult._sum.totalAmount?.toNumber() ?? 0;
-  const outstanding = outstandingResult._sum.totalAmount?.toNumber() ?? 0;
-  const outstandingCount = outstandingResult._count;
+  const annualRevenue = annualRevenueResult._sum.amount?.toNumber() ?? 0;
+  const outstanding = openResult.amount;
+  const outstandingCount = openResult.count;
 
   const nonCanceled = allNonDraftInvoices.filter((i) => i.state !== InvoiceState.Canceled);
   const paid = allNonDraftInvoices.filter((i) => i.state === InvoiceState.Paid);
@@ -355,9 +344,18 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
   const paymentRate = nonCanceled.length > 0 ? (paid.length / nonCanceled.length) * 100 : 0;
 
   const monthlyMap = new Array(12).fill(0) as number[];
-  for (const inv of paidInYear) {
-    monthlyMap[new Date(inv.paidDate!).getMonth()] += inv.totalAmount.toNumber();
+  for (const p of paidInYear) {
+    monthlyMap[new Date(p.date).getMonth()] += p.amount.toNumber();
   }
+
+  const totalsByCustomer = new Map<number, number>();
+  for (const p of paidInYear) {
+    totalsByCustomer.set(p.invoice.customerId, (totalsByCustomer.get(p.invoice.customerId) ?? 0) + p.amount.toNumber());
+  }
+  const topCustomerGroups = [...totalsByCustomer.entries()]
+    .map(([customerId, total]) => ({ customerId, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
   const monthlyRevenue: MonthlyRevenue[] = MONTH_LABELS.map((month, i) => ({
     month,
     monthIndex: i,
@@ -389,7 +387,7 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
   const topCustomers: TopCustomer[] = topCustomerGroups.map((g) => {
     const c = customerMap.get(g.customerId);
     const name = c ? customerDisplayName(c) : `Kunde #${g.customerId}`;
-    return { customerId: g.customerId, name, total: g._sum.totalAmount?.toNumber() ?? 0 };
+    return { customerId: g.customerId, name, total: g.total };
   });
 
   const availableYears = yearRangeDescending(

@@ -124,6 +124,9 @@ async function main() {
         totalAmount,
         state: plan.state,
         paidDate,
+        payments: paidDate
+          ? { create: [{ date: paidDate, amount: totalAmount, source: "manual" }] }
+          : undefined,
         items: { create: invoiceItems },
         sentLogs:
           documentNumber

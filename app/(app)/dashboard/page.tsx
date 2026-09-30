@@ -7,6 +7,7 @@ import Link from "next/link";
 import { InvoiceState, QuoteState } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
+import { sumOpenAmount } from "@/lib/payments";
 
 export default async function DashboardPage() {
   await auth();
@@ -25,11 +26,7 @@ export default async function DashboardPage() {
     scheduledCustomers,
   ] = await Promise.all([
     prisma.customer.count(),
-    prisma.invoice.aggregate({
-      where: { state: { in: [InvoiceState.Sent, InvoiceState.Overdue] } },
-      _sum: { totalAmount: true },
-      _count: true,
-    }),
+    sumOpenAmount(prisma),
     prisma.quote.count({
       where: { state: { in: [QuoteState.Draft, QuoteState.Sent] } },
     }),
@@ -38,15 +35,14 @@ export default async function DashboardPage() {
       orderBy: { date: "desc" },
       include: { customer: true },
     }),
-    prisma.invoice.aggregate({
+    prisma.payment.aggregate({
       where: {
-        state: InvoiceState.Paid,
-        paidDate: {
+        date: {
           gte: new Date(`${currentYear}-01-01`),
           lt: new Date(`${currentYear + 1}-01-01`),
         },
       },
-      _sum: { totalAmount: true },
+      _sum: { amount: true },
     }),
     prisma.pendingEmail.count(),
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
@@ -129,9 +125,9 @@ export default async function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{openInvoices._count}</p>
+              <p className="text-3xl font-bold">{openInvoices.count}</p>
               <p className="text-sm text-gray-500 mt-1">
-                {formatCurrency(openInvoices._sum.totalAmount?.toNumber() ?? 0)}
+                {formatCurrency(openInvoices.amount)}
               </p>
             </CardContent>
           </Card>
@@ -159,9 +155,9 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
-                {formatCurrency(currentYearRevenue._sum.totalAmount?.toNumber() ?? 0)}
+                {formatCurrency(currentYearRevenue._sum.amount?.toNumber() ?? 0)}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Bezahlte Rechnungen</p>
+              <p className="text-sm text-gray-500 mt-1">Zahlungseingänge</p>
             </CardContent>
           </Card>
         </Link>

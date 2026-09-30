@@ -79,6 +79,7 @@ export function ImportWizard() {
       .map(({ match, selection }) => ({
         invoiceId: selection.invoiceId as number,
         paidDate: match.transaction.date,
+        amountCents: match.transaction.amountCents,
         bankReference: match.transaction.bankReference,
       }));
 
@@ -96,8 +97,8 @@ export function ImportWizard() {
       const count = result.paidCount ?? 0;
       toast.success(
         count === 1
-          ? "1 Rechnung als bezahlt markiert."
-          : `${count} Rechnungen als bezahlt markiert.`
+          ? "1 Zahlung verbucht."
+          : `${count} Zahlungen verbucht.`
       );
       router.push("/invoices");
     });

@@ -15,8 +15,8 @@ function tx(overrides: Partial<ParsedTransaction> = {}): ParsedTransaction {
   };
 }
 
-const INVOICE_A: OpenInvoice = { id: 1, documentNumber: "I-26010042", totalAmount: 123.45 };
-const INVOICE_B: OpenInvoice = { id: 2, documentNumber: "I-26010099", totalAmount: 123.45 };
+const INVOICE_A: OpenInvoice = { id: 1, documentNumber: "I-26010042", openAmount: 123.45 };
+const INVOICE_B: OpenInvoice = { id: 2, documentNumber: "I-26010099", openAmount: 123.45 };
 
 describe("matchStatementToInvoices", () => {
   it("pre-selects when the documentNumber in the description and the amount both match", () => {
@@ -43,7 +43,7 @@ describe("matchStatementToInvoices", () => {
   it("does not pre-select when the referenced invoice's amount differs", () => {
     const [result] = matchStatementToInvoices(
       [tx({ description: "Zahlung Rechnung I-26010042", amountCents: 5000 })],
-      [{ ...INVOICE_A, totalAmount: 999 }],
+      [{ ...INVOICE_A, openAmount: 999 }],
       PREFIX
     );
     expect(result.confidence).toBe("amount");

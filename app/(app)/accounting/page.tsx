@@ -15,7 +15,7 @@ import {
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import {
   fetchIncomeStatement,
-  fetchPaidInvoicesForYear,
+  fetchPaymentsForYear,
   fetchExpensesForYear,
 } from "./lib/income-statement-queries";
 import { YearSelector } from "./components/year-selector";
@@ -34,9 +34,9 @@ export default async function AccountingPage({ searchParams }: Props) {
   const parsedYear = year ? parseInt(year, 10) : NaN;
   const selectedYear = Number.isInteger(parsedYear) ? parsedYear : new Date().getFullYear();
 
-  const [statement, paidInvoices, expenses] = await Promise.all([
+  const [statement, payments, expenses] = await Promise.all([
     fetchIncomeStatement(prisma, selectedYear),
-    fetchPaidInvoicesForYear(prisma, selectedYear),
+    fetchPaymentsForYear(prisma, selectedYear),
     fetchExpensesForYear(prisma, selectedYear),
   ]);
 
@@ -47,6 +47,9 @@ export default async function AccountingPage({ searchParams }: Props) {
         <div className="flex items-center gap-3">
           <YearSelector availableYears={statement.availableYears} selectedYear={statement.selectedYear} />
           <Button render={<Link href="/accounting/new" />}>Neue Ausgabe</Button>
+          <Button variant="outline" render={<Link href="/accounting/receivables" />}>
+            Offene Posten
+          </Button>
           <Button
             variant="outline"
             render={<Link href={`/api/export/accounting?year=${selectedYear}`} />}
@@ -200,7 +203,7 @@ export default async function AccountingPage({ searchParams }: Props) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Bezahlte Rechnungen {statement.selectedYear}</CardTitle>
+            <CardTitle className="text-base">Zahlungseingänge {statement.selectedYear}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -214,23 +217,23 @@ export default async function AccountingPage({ searchParams }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paidInvoices.length === 0 ? (
+                  {payments.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-gray-500 py-8">
-                        Keine bezahlten Rechnungen vorhanden.
+                        Keine Zahlungseingänge vorhanden.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paidInvoices.map((inv) => (
+                    payments.map((inv) => (
                       <TableRow key={inv.id}>
                         <TableCell>{formatDate(inv.paidDate)}</TableCell>
                         <TableCell>
-                          <Link href={`/invoices/${inv.id}`} className="underline">
+                          <Link href={`/invoices/${inv.invoiceId}`} className="underline">
                             {documentLabel(inv.documentNumber)}
                           </Link>
                         </TableCell>
                         <TableCell>{inv.customerName}</TableCell>
-                        <TableCell>{formatCurrency(inv.totalAmount)}</TableCell>
+                        <TableCell>{formatCurrency(inv.amount)}</TableCell>
                       </TableRow>
                     ))
                   )}

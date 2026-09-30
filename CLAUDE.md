@@ -67,9 +67,10 @@ npx vitest run tests/unit/calculations.test.ts
 - `hasRole(session, roles)` — synchronous check for UI rendering
 
 **Business document workflow:**
-- `Invoice` states: `Draft → Sent → Paid | Overdue | Canceled`
+- `Invoice` states: `Draft → Sent → PartiallyPaid → Paid | Overdue | Canceled`
 - `Quote` states: `Draft → Sent → Accepted | Declined | Expired`
 - Document numbers use configurable prefixes (e.g. `I-`, `Q-`) tracked via `lib/document-number.ts`. Numbers are assigned on first send / status change out of Draft via `assignDocumentNumber` in that file; drafts have `documentNumber = null` (shown as "Entwurf")
+- **Payments** (`lib/payments.ts`): the `Payment` model is the source of truth for what has been paid. `recordPayment` / `recordRemainingPayment` / `deletePayment` recalculate `Invoice.state` (→ `PartiallyPaid` → `Paid`) and `paidDate` from the payments; manual, CAMT and Budget payments all go through it. Income in the income statement, analytics and export follows `Payment.date`. The open items list (OP-Liste, age structure, CSV export) lives at `accounting/receivables` (`lib/receivables.ts`)
 - `lib/yearly-invoices.ts` handles automatic recurring invoice creation
 - `lib/reminders.ts` + `PendingReminder` model manage overdue payment reminders
 
