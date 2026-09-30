@@ -45,6 +45,17 @@ describe("fingerprint", () => {
   });
 });
 
+describe("blank bank reference", () => {
+  it("behaves exactly like a missing reference", () => {
+    const a = fingerprint(IBAN, tx({ bankReference: "  ", description: "A" }), 0);
+    const b = fingerprint(IBAN, tx({ bankReference: "  ", description: "B" }), 0);
+    expect(a).not.toBe(b);
+    expect(fingerprint(IBAN, tx({ bankReference: "  " }), 0)).toBe(fingerprint(IBAN, tx(), 0));
+    const [first, second] = withFingerprints(IBAN, [tx({ bankReference: " " }), tx({ bankReference: " " })]);
+    expect(first.fingerprint).not.toBe(second.fingerprint);
+  });
+});
+
 describe("withFingerprints", () => {
   it("numbers identical bookings so both import, and is stable across runs", () => {
     const list = [tx(), tx(), tx({ description: "Anderes" })];

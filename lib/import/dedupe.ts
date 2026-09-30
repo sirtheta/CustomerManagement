@@ -26,8 +26,9 @@ export function fingerprint(
   transaction: ParsedTransaction,
   occurrence: number
 ): string {
-  const parts = transaction.bankReference
-    ? [normalizeIban(iban), transaction.bankReference.trim()]
+  const reference = transaction.bankReference?.trim();
+  const parts = reference
+    ? [normalizeIban(iban), reference]
     : [
         normalizeIban(iban),
         transaction.date,
@@ -55,7 +56,7 @@ export function withFingerprints(
     // Rows with a bank reference are fingerprinted by it and must not shift
     // the counter of reference-less twins (another export may omit the reference).
     let occurrence = 0;
-    if (!transaction.bankReference) {
+    if (!transaction.bankReference?.trim()) {
       occurrence = seen.get(key) ?? 0;
       seen.set(key, occurrence + 1);
     }
