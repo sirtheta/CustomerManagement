@@ -1,10 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 
-export function getDbPath() {
-  const url = process.env.DATABASE_URL ?? "file:./data/customermanagement.db";
-  return url.replace(/^file:/, "");
-}
+import { getDbPath } from "@/lib/db-path";
+
+export { getDbPath };
 
 function createPrismaClient() {
   const adapter = new PrismaBetterSqlite3({ url: getDbPath() });

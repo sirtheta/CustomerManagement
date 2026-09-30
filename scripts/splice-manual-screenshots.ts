@@ -30,7 +30,7 @@ const ALT_MATCH: Record<string, string> = {
   "settings-users": "Benutzerverwaltung mit Rolle und Zwei-Faktor-Status",
   "two-factor-dialog": "Dialog Zwei-Faktor-Authentifizierung einrichten mit QR-Code",
   "settings-audit": "Aktivitätsprotokoll mit Filtern nach Aktion und Benutzer",
-  "settings-logs": "Logs mit Download der aktuellen und archivierten Tagesdateien",
+  "settings-logs": "Logs & Backups mit Download der Log-Dateien und Datenbank-Backups",
 };
 
 function main() {
