@@ -33,4 +33,37 @@ describe("fetchReceivables against a real database", () => {
     const later = await fetchReceivables(prisma, new Date("2027-03-01"));
     expect(later.rows).toEqual([]);
   });
+
+  it("respects credit note dates against the cut-off", async () => {
+    const { prisma } = db;
+    const customer = await prisma.customer.create({ data: createValidTestCustomer() });
+    const original = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-2",
+        date: new Date("2026-01-10"),
+        dueDate: new Date("2026-02-10"),
+        totalAmount: 100,
+        state: "Canceled",
+      },
+    });
+    await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "G-1",
+        date: new Date("2026-03-01"),
+        dueDate: new Date("2026-03-01"),
+        totalAmount: -100,
+        state: "Sent",
+        creditNoteForId: original.id,
+      },
+    });
+
+    const after = await fetchReceivables(prisma, new Date("2026-12-31"));
+    expect(after.rows).toEqual([]);
+
+    const before = await fetchReceivables(prisma, new Date("2026-02-15"));
+    expect(before.rows).toHaveLength(1);
+    expect(before.rows[0]).toMatchObject({ documentNumber: "R-2", openRappen: 10000 });
+  });
 });

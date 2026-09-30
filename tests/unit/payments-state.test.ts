@@ -44,4 +44,20 @@ describe("computeInvoiceState", () => {
   it("does not mark a zero-total invoice Paid without a payment", () => {
     expect(computeInvoiceState({ ...base, totalRappen: 0, state: "Sent", paidRappen: 0 })).toBe("Sent");
   });
+  it("is Canceled when credit notes cover the total and nothing was paid", () => {
+    expect(computeInvoiceState({ ...base, state: "Sent", paidRappen: 0, creditedRappen: 10000 })).toBe("Canceled");
+    expect(computeInvoiceState({ ...base, state: "Overdue", paidRappen: 0, creditedRappen: 12000 })).toBe("Canceled");
+  });
+  it("is Paid when payments plus credit notes cover the total", () => {
+    expect(computeInvoiceState({ ...base, state: "Sent", paidRappen: 7000, creditedRappen: 3000 })).toBe("Paid");
+  });
+  it("is Paid when a paid invoice is fully credited (overpaid, refund due)", () => {
+    expect(computeInvoiceState({ ...base, state: "Paid", paidRappen: 10000, creditedRappen: 10000 })).toBe("Paid");
+  });
+  it("stays Sent for a partial credit without payments", () => {
+    expect(computeInvoiceState({ ...base, state: "Sent", paidRappen: 0, creditedRappen: 4000 })).toBe("Sent");
+  });
+  it("is PartiallyPaid when payments plus credit do not cover the total", () => {
+    expect(computeInvoiceState({ ...base, state: "Sent", paidRappen: 3000, creditedRappen: 4000 })).toBe("PartiallyPaid");
+  });
 });
