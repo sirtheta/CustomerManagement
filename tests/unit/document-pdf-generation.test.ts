@@ -287,6 +287,16 @@ describe("generateInvoicePdf drafts", () => {
     expect(pageText[0]).not.toContain("ENTWURF");
     expect(pageText[1]).toContain("Zahlteil");
   });
+
+  it("uses qrAmount instead of the invoice total on the QR slip", async () => {
+    const full = await extractText(await generateInvoicePdf(invoiceFor("I-26010001"), settings));
+    expect(full.pageText[1]).toContain("100.00");
+    const partial = await extractText(
+      await generateInvoicePdf(invoiceFor("I-26010001"), settings, { qrAmount: 60 })
+    );
+    expect(partial.pageText[1]).toContain("60.00");
+    expect(partial.pageText[1]).not.toContain("100.00");
+  });
 });
 
 describe("generateQuotePdf", () => {

@@ -28,7 +28,9 @@ type Settings = ApplicationSettings & {
 
 export async function generateInvoicePdf(
   invoice: InvoiceWithDetails,
-  settings: Settings
+  settings: Settings,
+  /** qrAmount: CHF amount requested on the QR slip, defaults to the invoice total (reminders pass the open remainder). */
+  options: { qrAmount?: number } = {}
 ): Promise<Buffer> {
   const company = settings.companyInfo;
   const discountPercent = Number(invoice.discountPercent ?? 0);
@@ -46,7 +48,7 @@ export async function generateInvoicePdf(
   const qr = draft || isCreditNote
     ? null
     : buildQrBillData({
-        invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
+        invoice: { documentNumber: invoice.documentNumber, totalAmount: options.qrAmount ?? total },
         company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
         customer: invoice.customer,
       });
