@@ -12,6 +12,7 @@ import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkYearlyInvoices } from "@/lib/yearly-invoices";
 import { sendAdminNotifications } from "@/lib/notifications";
+import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
 const log = logger.child({ module: "settings" });
@@ -24,6 +25,14 @@ export async function saveSettings(
   const settings = await prisma.applicationSettings.findFirst({
     include: { companyInfo: true },
   });
+
+  let companyIBAN: string | null = null;
+  const ibanRaw = ((formData.get("companyIBAN") as string) ?? "").trim();
+  if (ibanRaw) {
+    const ibanCheck = validateIban(ibanRaw);
+    if (!ibanCheck.valid) return { error: `Ungültige IBAN: ${ibanCheck.error}` };
+    companyIBAN = ibanCheck.iban;
+  }
 
   const logoFile = formData.get("logo") as File | null;
   let logoBytes: Uint8Array<ArrayBuffer> | null = null;
@@ -62,7 +71,7 @@ export async function saveSettings(
     companyAddressNeedsReview: false,
     companyEmail: (formData.get("companyEmail") as string) || null,
     companyPhone: (formData.get("companyPhone") as string) || null,
-    companyIBAN: (formData.get("companyIBAN") as string) || null,
+    companyIBAN,
     ...(logoBytes ? { companyLogo: logoBytes } : {}),
   };
 

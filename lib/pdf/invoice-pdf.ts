@@ -1,6 +1,7 @@
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateDocumentPdf, type RenderDoc } from "@/lib/pdf/document-pdf";
 import { calculateInvoiceTotal } from "@/lib/calculations";
+import { documentLabel } from "@/lib/document-display";
 import type {
   Invoice,
   Quote,
@@ -39,16 +40,19 @@ export async function generateInvoicePdf(
     discountPercent
   );
 
-  const qr = buildQrBillData({
-    invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
-    company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
-    customer: invoice.customer,
-  });
+  const draft = !invoice.documentNumber;
+  const qr = draft
+    ? null
+    : buildQrBillData({
+        invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
+        company: { ...company, useHolderNameOnQR: settings.useHolderNameOnQR },
+        customer: invoice.customer,
+      });
 
   const doc: RenderDoc = {
     kind: "invoice",
     title: "Rechnung",
-    documentNumber: invoice.documentNumber,
+    documentNumber: documentLabel(invoice.documentNumber),
     numberLabel: "Rechnungs-Nr.:",
     date: invoice.date,
     dueDate: invoice.dueDate,
@@ -60,6 +64,7 @@ export async function generateInvoicePdf(
     customer: invoice.customer,
     items: invoice.items,
     qr,
+    draft,
   };
 
   return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);
@@ -74,7 +79,7 @@ export async function generateQuotePdf(
   const doc: RenderDoc = {
     kind: "quote",
     title: "Offerte",
-    documentNumber: quote.documentNumber,
+    documentNumber: documentLabel(quote.documentNumber),
     numberLabel: "Offerten-Nr.:",
     date: quote.date,
     dueDate: quote.validUntil,
@@ -86,6 +91,7 @@ export async function generateQuotePdf(
     customer: quote.customer,
     items: quote.items,
     qr: null, // quotes carry no Swiss QR payment slip
+    draft: !quote.documentNumber,
   };
 
   return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);

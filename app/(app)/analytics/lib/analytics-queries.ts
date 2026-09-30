@@ -3,6 +3,7 @@ import { InvoiceState } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { customerDisplayName } from "@/lib/customer-display";
+import { documentLabel } from "@/lib/document-display";
 export { categoryParamValue } from "./analytics-utils";
 
 export function yearBounds(year: number): { start: Date; end: Date } {
@@ -45,7 +46,7 @@ function formatDateIso(date: Date): string {
 
 function mapInvoice(inv: {
   id: number;
-  documentNumber: string;
+  documentNumber: string | null;
   customerId: number;
   date: Date;
   totalAmount: { toNumber(): number };
@@ -54,7 +55,7 @@ function mapInvoice(inv: {
 }): DrilldownInvoice {
   return {
     id: inv.id,
-    invoiceNumber: inv.documentNumber,
+    invoiceNumber: documentLabel(inv.documentNumber),
     customerId: inv.customerId,
     customerName: customerDisplayName(inv.customer),
     date: formatDateIso(inv.date),
@@ -160,7 +161,7 @@ export async function fetchDrilldownIncomeItems(
   return items.map((item) => ({
     id: item.id,
     invoiceId: item.invoice!.id,
-    invoiceNumber: item.invoice!.documentNumber,
+    invoiceNumber: documentLabel(item.invoice!.documentNumber),
     customerName: customerDisplayName(item.invoice!.customer),
     date: formatDateIso(item.invoice!.date),
     name: item.name,

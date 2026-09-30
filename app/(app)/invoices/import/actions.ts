@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/permissions";
 import { parseCamt053 } from "@/lib/import/camt";
 import { matchStatementToInvoices, type MatchedTransaction } from "@/lib/import/matching";
+import { checkStatementAccount } from "@/lib/import/statement-checks";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "invoices.import" });
@@ -47,18 +48,24 @@ export async function parseStatement(
       where: { state: { in: ["Sent", "Overdue"] } },
       select: { id: true, documentNumber: true, totalAmount: true },
     }),
-    prisma.applicationSettings.findFirst({ select: { invoiceNumberPrefix: true } }),
+    prisma.applicationSettings.findFirst({
+      select: { invoiceNumberPrefix: true, companyInfo: { select: { companyIBAN: true } } },
+    }),
   ]);
 
   const matches = matchStatementToInvoices(
     statement.transactions,
-    openInvoices.map((invoice) => ({
-      id: invoice.id,
-      documentNumber: invoice.documentNumber,
-      totalAmount: invoice.totalAmount.toNumber(),
-    })),
+    openInvoices
+      .filter((invoice): invoice is typeof invoice & { documentNumber: string } => invoice.documentNumber !== null)
+      .map((invoice) => ({
+        id: invoice.id,
+        documentNumber: invoice.documentNumber,
+        totalAmount: invoice.totalAmount.toNumber(),
+      })),
     settings?.invoiceNumberPrefix ?? "R-"
   );
 
-  return { matches, warnings: statement.warnings };
+  const accountWarnings = checkStatementAccount(statement, settings?.companyInfo?.companyIBAN ?? null);
+
+  return { matches, warnings: [...accountWarnings, ...statement.warnings] };
 }

@@ -20,6 +20,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { documentLabel } from "@/lib/document-display";
 
 const PAGE_SIZE = 25;
 
@@ -156,7 +157,7 @@ async function InvoicesTable({
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium">
                     <Link href={`/invoices/${inv.id}`} className="hover:underline">
-                      {inv.documentNumber}
+                      {documentLabel(inv.documentNumber)}
                     </Link>
                   </TableCell>
                   <TableCell>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import path from "path";
 import { generateDocumentPdf, type RenderDoc, type RenderItem } from "@/lib/pdf/document-pdf";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
-import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
+import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 
 // Real byte-level assertions on pdfkit's output (page count, embedded text,
 // the Swiss QR bill page) — the existing pdf-fonts.test.ts only checks
@@ -58,6 +58,7 @@ function baseDoc(overrides: Partial<RenderDoc> = {}): RenderDoc {
       { name: "Pos 1", description: null, unit: "Hour", quantity: 1, unitPrice: 100, totalAmount: 100 },
     ],
     qr: null,
+    draft: false,
     ...overrides,
   };
 }
@@ -151,6 +152,116 @@ describe("generateDocumentPdf byte assembly", () => {
     const { pageText } = await extractText(buf);
     expect(pageText[0]).toContain("Rabatt");
     expect(pageText[0]).toContain("Zwischensumme");
+  });
+});
+
+describe("draft watermark", () => {
+  it("draws no ENTWURF watermark on a numbered document", async () => {
+    const buf = await generateDocumentPdf(baseDoc(), company, "de-CH", undefined);
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).not.toContain("ENTWURF");
+  });
+
+  it("draws the ENTWURF watermark without adding pages", async () => {
+    const buf = await generateDocumentPdf(
+      baseDoc({ draft: true, documentNumber: "Entwurf" }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { numPages, pageText } = await extractText(buf);
+    expect(numPages).toBe(1);
+    expect(pageText[0]).toContain("ENTWURF");
+  });
+
+  it("repeats the watermark on every page of a multi-page draft", async () => {
+    const items: RenderItem[] = Array.from({ length: 40 }, (_, i) => ({
+      name: `Position ${i + 1}`,
+      description: "Eine etwas längere Beschreibung, die Platz braucht.",
+      unit: "Hour" as const,
+      quantity: 1,
+      unitPrice: 10,
+      totalAmount: 10,
+    }));
+    const buf = await generateDocumentPdf(
+      baseDoc({ draft: true, documentNumber: "Entwurf", items, totalAmount: 400 }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { numPages, pageText } = await extractText(buf);
+    expect(numPages).toBeGreaterThan(1);
+    for (const t of pageText) expect(t).toContain("ENTWURF");
+  });
+});
+
+describe("generateInvoicePdf drafts", () => {
+  const decimal = (n: number) => n as unknown as import("@prisma/client").Prisma.Decimal;
+  const invoiceFor = (documentNumber: string | null) =>
+    ({
+      id: 5,
+      customerId: 1,
+      documentNumber,
+      date: new Date("2026-01-01"),
+      dueDate: new Date("2026-01-31"),
+      version: 1,
+      state: "Draft",
+      discountPercent: decimal(0),
+      customUserText: null,
+      customer: {
+        customerId: 1,
+        company: "Muster AG",
+        contactPerson: "Anna Beispiel",
+        street: "Weg",
+        houseNumber: "1",
+        country: "CH",
+        zipCode: "8000",
+        city: "Zürich",
+        contactInsteadOfCompany: false,
+      },
+      items: [
+        {
+          id: 1,
+          name: "Pos 1",
+          description: null,
+          unit: "Hour",
+          unitPrice: decimal(100),
+          quantity: decimal(1),
+          discountPercent: decimal(0),
+          totalAmount: decimal(100),
+        },
+      ],
+    }) as never;
+  const settings = {
+    companyInfo: {
+      companyName: "Firma AG",
+      companyHolderName: "Inhaber",
+      companyStreet: "Bahnhofstrasse",
+      companyHouseNumber: "1",
+      companyZip: "8000",
+      companyCity: "Zürich",
+      companyIBAN: "CH9300762011623852957",
+    },
+    numberFormat: "de-CH",
+    pdfTheme: null,
+    useHolderNameOnQR: false,
+  } as never;
+
+  it("renders an unnumbered invoice as watermarked draft without QR page", async () => {
+    const buf = await generateInvoicePdf(invoiceFor(null), settings);
+    const { numPages, pageText } = await extractText(buf);
+    expect(numPages).toBe(1);
+    expect(pageText[0]).toContain("ENTWURF");
+    expect(pageText[0]).toContain("Entwurf");
+    expect(pageText[0]).not.toContain("Zahlteil");
+  });
+
+  it("renders a numbered invoice with QR page and no watermark", async () => {
+    const buf = await generateInvoicePdf(invoiceFor("I-26010001"), settings);
+    const { numPages, pageText } = await extractText(buf);
+    expect(numPages).toBe(2);
+    expect(pageText[0]).not.toContain("ENTWURF");
+    expect(pageText[1]).toContain("Zahlteil");
   });
 });
 

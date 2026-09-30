@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
     customer: SAMPLE_CUSTOMER,
     items: SAMPLE_ITEMS.map((i) => ({ ...i })),
     qr,
+    draft: false,
   };
 
   const pdf = await generateDocumentPdf(doc, company, locale, body.theme);

@@ -1,6 +1,6 @@
 export type QrBillInput = {
   invoice: {
-    documentNumber: string;
+    documentNumber: string | null;
     totalAmount: number;
   };
   company: {
@@ -46,7 +46,7 @@ export type QrBillData = {
     city: string;
     country: string;
   };
-  message: string;
+  message?: string;
 };
 
 // The building number is optional; an empty string would still be emitted as a
@@ -98,6 +98,6 @@ export function buildQrBillData({
       city: customer.city,
       country: customer.country || "CH",
     },
-    message: invoice.documentNumber,
+    message: invoice.documentNumber ?? undefined,
   };
 }

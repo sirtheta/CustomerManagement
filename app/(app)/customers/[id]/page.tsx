@@ -21,6 +21,7 @@ import { InvoiceState, QuoteState, UserRole } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { auth } from "@/lib/auth";
 import { decryptSecret } from "@/lib/crypto";
+import { documentLabel } from "@/lib/document-display";
 
 const invoiceStateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -171,7 +172,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     <TableRow key={inv.id}>
                       <TableCell className="font-medium">
                         <Link href={`/invoices/${inv.id}?from=customers/${customerId}`} className="hover:underline">
-                          {inv.documentNumber}
+                          {documentLabel(inv.documentNumber)}
                         </Link>
                       </TableCell>
                       <TableCell>{formatDate(inv.date)}</TableCell>
@@ -237,7 +238,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     <TableRow key={q.id}>
                       <TableCell className="font-medium">
                         <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="hover:underline">
-                          {q.documentNumber}
+                          {documentLabel(q.documentNumber)}
                         </Link>
                       </TableCell>
                       <TableCell>{formatDate(q.date)}</TableCell>
