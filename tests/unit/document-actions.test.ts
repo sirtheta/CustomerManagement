@@ -249,5 +249,37 @@ describe("sendDocument", () => {
     expect(result.error).toBe("SMTP down");
     expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 2, { actor });
     expect(prisma.quote.update).not.toHaveBeenCalled();
+    expect(prisma.quoteSentLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["invoice", "Rechnungsnummer konnte nicht vergeben werden."],
+    ["quote", "Offertennummer konnte nicht vergeben werden."],
+  ] as const)("returns an error and sends nothing when number assignment fails (%s)", async (kind, message) => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 1,
+      documentNumber: null,
+      customer: {},
+      items: [],
+    } as never);
+    vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+      id: 1,
+      documentNumber: null,
+      customer: {},
+      items: [],
+    } as never);
+    vi.mocked(assignDocumentNumber).mockRejectedValue(new Error("DB down"));
+
+    const result = await sendDocument({ kind, id: 1, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(result.error).toBe(message);
+    expect(result.success).toBeUndefined();
+    expect(generateInvoicePdf).not.toHaveBeenCalled();
+    expect(generateQuotePdf).not.toHaveBeenCalled();
+    expect(sendInvoiceEmail).not.toHaveBeenCalled();
+    expect(sendQuoteEmail).not.toHaveBeenCalled();
+    expect(prisma.invoiceSentLog.create).not.toHaveBeenCalled();
+    expect(prisma.quoteSentLog.create).not.toHaveBeenCalled();
   });
 });

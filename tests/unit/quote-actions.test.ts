@@ -246,9 +246,10 @@ describe("quote actions", () => {
 
     it("updates quote state", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Sent" } as never);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ state: "Sent", documentNumber: "O-1" } as never);
       vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
       await updateQuoteStatus(3, "Accepted");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
       expect(prisma.quote.update).toHaveBeenCalledWith({
         where: { id: 3 },
         data: { state: "Accepted" },
@@ -270,6 +271,9 @@ describe("quote actions", () => {
       vi.mocked(assignDocumentNumber).mockResolvedValue("O-26090001");
       await updateQuoteStatus(3, state);
       expect(assignDocumentNumber).toHaveBeenCalledWith("quote", 3, { actor: editorSession });
+      expect(vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(prisma.quote.update).mock.invocationCallOrder[0]
+      );
       expect(prisma.quote.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { state } });
     });
 

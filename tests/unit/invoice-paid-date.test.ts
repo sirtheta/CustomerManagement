@@ -90,6 +90,9 @@ describe("updateInvoiceStatus", () => {
     vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
     await updateInvoiceStatus(10, "Sent");
     expect(assignDocumentNumber).toHaveBeenCalledWith("invoice", 10, { actor: editorSession });
+    expect(vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(prisma.invoice.update).mock.invocationCallOrder[0]
+    );
     expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Invoice", 10, "R-26090001", {
       from: "Draft",
       to: "Sent",
