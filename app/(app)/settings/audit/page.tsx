@@ -21,6 +21,7 @@ const actionLabels: Record<string, string> = {
   DELETE: "Gelöscht",
   SEND: "Versendet",
   STATUS: "Status geändert",
+  EXPORT: "Exportiert",
 };
 
 const actionVariants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -29,6 +30,7 @@ const actionVariants: Record<string, "default" | "secondary" | "destructive" | "
   DELETE: "destructive",
   SEND: "outline",
   STATUS: "secondary",
+  EXPORT: "outline",
 };
 
 type Props = {
