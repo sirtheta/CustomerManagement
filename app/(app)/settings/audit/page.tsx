@@ -35,20 +35,20 @@ type Props = {
   searchParams: Promise<{ page?: string; head?: string }>;
 };
 
-const brokenReasons: Record<Extract<ChainVerification, { ok: false }>["reason"], string> = {
-  "missing-hash": "Eintrag ohne Prüfsumme nach Beginn der Kette",
-  "prev-mismatch": "Verkettung unterbrochen (Eintrag fehlt oder wurde eingefügt)",
-  "hash-mismatch": "Inhalt des Eintrags wurde nachträglich verändert",
+const brokenReasons: Record<Extract<ChainVerification, { ok: false }>["reason"], (id: number) => string> = {
+  "missing-hash": (id) => `Eintrag Nr. ${id} hat keine Prüfsumme, obwohl die Prüfung bereits aktiv war.`,
+  "prev-mismatch": (id) => `Eintrag Nr. ${id} fehlt oder wurde nachträglich eingefügt.`,
+  "hash-mismatch": (id) => `Eintrag Nr. ${id} wurde nachträglich geändert.`,
 };
 
 function ChainStatus({ chain }: { chain: ChainVerification }) {
   if (!chain.ok) {
     return (
       <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
-        <p className="font-medium text-destructive">Integritätsprüfung fehlgeschlagen</p>
+        <p className="font-medium text-destructive">⚠ Das Protokoll wurde verändert</p>
+        <p className="mt-1">{brokenReasons[chain.reason](chain.brokenAtId)}</p>
         <p className="mt-1">
-          Eintrag Nr. {chain.brokenAtId}: {brokenReasons[chain.reason]}. Das Protokoll wurde
-          möglicherweise manipuliert. Bitte Datenbank-Backup sichern und prüfen.
+          Bitte sichern Sie sofort ein Datenbank-Backup und informieren Sie Ihren Administrator.
         </p>
       </div>
     );
@@ -56,21 +56,30 @@ function ChainStatus({ chain }: { chain: ChainVerification }) {
   if (chain.checked === 0) {
     return (
       <div className="rounded-md border p-3 text-sm text-muted-foreground">
-        Noch keine verketteten Einträge. Neue Einträge werden ab sofort mit einer Prüfsumme gesichert.
+        Noch keine geprüften Einträge. Neue Einträge werden ab sofort gegen nachträgliche Änderungen gesichert.
       </div>
     );
   }
   return (
     <div className="rounded-md border p-3 text-sm">
-      <p className="font-medium">Integritätsprüfung bestanden</p>
+      <p className="font-medium">✓ Protokoll unverändert</p>
       <p className="mt-1 text-muted-foreground">
-        {chain.checked} verkettete Einträge geprüft
-        {chain.legacy > 0 ? `, ${chain.legacy} ältere Einträge ohne Prüfsumme` : ""}.
-        Aktueller Kopf-Hash (extern aufbewahren):{" "}
-        <span className="font-mono break-all">{chain.head}</span>. Die Prüfung erkennt Änderungen
-        und Löschungen einzelner Einträge, nicht aber eine vollständige Neuberechnung der Kette
-        durch jemanden mit Zugriff auf die Datenbankdatei.
+        {chain.legacy > 0
+          ? `Alle ${chain.checked} neuen Einträge sind unverändert. ${chain.legacy} ältere Einträge stammen aus der Zeit vor der Prüfung und können nicht geprüft werden.`
+          : `Alle ${chain.checked} Einträge sind lückenlos und wurden nicht nachträglich verändert.`}
       </p>
+      <details className="mt-2 text-muted-foreground">
+        <summary className="cursor-pointer">Technische Details</summary>
+        <p className="mt-1">
+          Prüfcode: <span className="font-mono break-all">{chain.head}</span>
+        </p>
+        <p className="mt-1">
+          Wer diesen Code an einem sicheren Ort notiert, kann später nachweisen, dass keine Einträge
+          entfernt wurden (Adresse mit <span className="font-mono">?head=&lt;Prüfcode&gt;</span> aufrufen).
+          Die Prüfung erkennt einzelne Änderungen und Löschungen. Wer direkten Zugriff auf die
+          Datenbankdatei hat, könnte das Protokoll aber komplett neu aufbauen.
+        </p>
+      </details>
     </div>
   );
 }
@@ -122,15 +131,15 @@ export default async function AuditLogPage({ searchParams }: Props) {
 
       {chainError && (
         <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
-          Die Integritätsprüfung konnte nicht ausgeführt werden. Details im Anwendungslog.
+          Die Prüfung des Protokolls konnte nicht ausgeführt werden. Details im Anwendungslog.
         </div>
       )}
       {chain && <ChainStatus chain={chain} />}
       {headKnown !== null && (
         <div className="rounded-md border p-3 text-sm">
           {headKnown
-            ? "Der angefragte Hash kommt in der Kette vor: Einträge bis dahin sind noch vorhanden."
-            : "Der angefragte Hash kommt in der Kette nicht vor: Einträge wurden entfernt oder verändert."}
+            ? "Der angegebene Prüfcode ist im Protokoll vorhanden: Die Einträge bis dahin sind noch vollständig."
+            : "Der angegebene Prüfcode ist im Protokoll nicht vorhanden: Einträge wurden entfernt oder verändert."}
         </div>
       )}
 
