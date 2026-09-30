@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Prisma } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { generateInvoiceNumber, generateQuoteNumber } from "@/lib/document-number";
+import { generateInvoiceNumber, generateQuoteNumber, isDocumentNumberCollision } from "@/lib/document-number";
 
 // Finding #1/#14: the documentNumber race and its unique-constraint fix were
 // only ever verified against a mocked Prisma client. These run the actual
@@ -41,6 +41,37 @@ describe("document number uniqueness against a real database", () => {
         },
       })
     ).rejects.toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+  });
+
+  // The driver adapter reports the violated column in
+  // meta.driverAdapterError.cause.constraint.fields, not in meta.target, so
+  // this must be checked against the error a real database produces.
+  it("recognises a real duplicate documentNumber as a collision", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const data = {
+      customerId: customer.customerId,
+      documentNumber: "I-26010002",
+      date: new Date(),
+      dueDate: new Date(),
+      totalAmount: 100,
+      state: "Draft" as const,
+    };
+    await prisma.invoice.create({ data });
+
+    const err = await prisma.invoice.create({ data }).catch((e: unknown) => e);
+    expect(isDocumentNumberCollision(err)).toBe(true);
+  });
+
+  it("does not treat a duplicate on another column as a document number collision", async () => {
+    const { prisma } = db;
+    await prisma.user.create({ data: { email: "dup@test.ch", name: "A", passwordHash: "x", role: "Editor" } });
+
+    const err = await prisma.user
+      .create({ data: { email: "dup@test.ch", name: "B", passwordHash: "x", role: "Editor" } })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
+    expect(isDocumentNumberCollision(err)).toBe(false);
   });
 
   it("rejects a second quote with a duplicate documentNumber at the DB level", async () => {
