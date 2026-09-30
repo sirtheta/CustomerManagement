@@ -271,7 +271,7 @@ export default function SettingsForm(props: Props) {
               id="smtpFromAddress"
               name="smtpFromAddress"
               type="email"
-              placeholder={props.smtpUser || "sanitaet@firma.ch"}
+              placeholder={props.smtpUser || "rechnung@example.com"}
               defaultValue={props.smtpFromAddress}
             />
             <p className="text-xs text-muted-foreground">
