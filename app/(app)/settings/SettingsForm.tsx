@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,14 @@ export default function SettingsForm(props: Props) {
     useActionState<ActionState, FormData>(testEmailNotification, {});
   const [testTelegramState, testTelegramAction, testTelegramPending] =
     useActionState<ActionState, FormData>(testTelegramNotification, {});
+  const [, startTransition] = useTransition();
+  // Test buttons must not use formAction: React 19 resets the form after any form
+  // action, which would wipe unsaved input. Dispatch with the current FormData instead.
+  const runTest = (action: (payload: FormData) => void) => (e: MouseEvent<HTMLButtonElement>) => {
+    if (!e.currentTarget.form) return;
+    const data = new FormData(e.currentTarget.form);
+    startTransition(() => action(data));
+  };
   useActionToast(state, "Einstellungen gespeichert");
   useActionToast(testState, "SMTP-Verbindung erfolgreich");
   useActionToast(testEmailNotifState, "Test-E-Mail erfolgreich gesendet");
@@ -305,8 +313,8 @@ export default function SettingsForm(props: Props) {
 
           <div className="flex items-center gap-3 pt-1 border-t">
             <Button
-              type="submit"
-              formAction={testFormAction}
+              type="button"
+              onClick={runTest(testFormAction)}
               variant="outline"
               size="sm"
               disabled={testPending}
@@ -418,8 +426,8 @@ export default function SettingsForm(props: Props) {
           <div className="flex flex-wrap items-center gap-4 pt-1 border-t">
             <div className="flex items-center gap-3">
               <Button
-                type="submit"
-                formAction={testEmailNotifAction}
+                type="button"
+                onClick={runTest(testEmailNotifAction)}
                 variant="outline"
                 size="sm"
                 disabled={testEmailNotifPending}
@@ -435,8 +443,8 @@ export default function SettingsForm(props: Props) {
             </div>
             <div className="flex items-center gap-3">
               <Button
-                type="submit"
-                formAction={testTelegramAction}
+                type="button"
+                onClick={runTest(testTelegramAction)}
                 variant="outline"
                 size="sm"
                 disabled={testTelegramPending}
