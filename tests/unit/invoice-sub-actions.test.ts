@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => ({
     pendingReminder: { findUnique: vi.fn(), update: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
+    sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }) },
     invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     pendingEmail: { findUnique: vi.fn(), delete: vi.fn() },
     invoiceTemplate: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -14,6 +15,9 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/document-archive", () => ({
+  archivePdf: vi.fn().mockResolvedValue({ path: "2026/x.pdf", sha256: "a".repeat(64), size: 3 }),
+}));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn() }));
@@ -37,6 +41,7 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
+import { archivePdf } from "@/lib/document-archive";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 import { getPaymentSummary } from "@/lib/payments";
@@ -129,7 +134,7 @@ describe("invoices/reminders actions", () => {
       vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 60000 } as never);
       vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
-      vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+      vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}, { id: 1 }] as never);
       await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
       expect(generateInvoicePdf).toHaveBeenCalledWith(mockInvoice, mockSettings, { qrAmount: 600 });
     });
@@ -168,6 +173,46 @@ describe("invoices/reminders actions", () => {
         expect.any(Object)
       );
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/reminders");
+    });
+
+    it("archives the reminder PDF and records a SentDocument with the reminder level", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1,
+        invoiceId: 10,
+        reminderLevel: 2,
+        invoice: { ...mockInvoice, documentNumber: "R-2026-010" },
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+      vi.mocked(prisma.$transaction).mockImplementation((arg: unknown) => Promise.all(arg as Promise<unknown>[]) as never);
+
+      const result = await sendReminder({}, form({ reminderId: "1", to: "kunde@test.ch", subject: "Mahnung", body: "Text" }));
+
+      expect(result.success).toBe(true);
+      expect(archivePdf).toHaveBeenCalledWith(expect.objectContaining({ documentNumber: "R-2026-010", kind: "Reminder" }));
+      expect(prisma.sentDocument.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ invoiceId: 10, kind: "Reminder", reminderLevel: 2 }),
+      });
+    });
+
+    it("keeps the reminder untouched and does not send when archiving fails", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1, invoiceId: 10, reminderLevel: 1,
+        invoice: { ...mockInvoice, documentNumber: "R-2026-010" },
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(archivePdf).mockRejectedValueOnce(new Error("EACCES"));
+
+      const result = await sendReminder({}, form({ reminderId: "1", to: "k@test.ch", subject: "M", body: "T" }));
+
+      expect(result.error).toBe("PDF konnte nicht archiviert werden. Die E-Mail wurde nicht versendet.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+      expect(prisma.pendingReminder.update).not.toHaveBeenCalled();
+      expect(prisma.sentDocument.create).not.toHaveBeenCalled();
     });
   });
 
@@ -484,6 +529,39 @@ describe("invoices/pending actions", () => {
       vi.mocked(generateInvoicePdf).mockRejectedValue(new Error("PDF failed"));
       await approvePendingEmail({}, form({ id: "1", to: "x@x.ch", subject: "s", body: "b" }));
       expect(logAudit).not.toHaveBeenCalled();
+    });
+
+    it("keeps the pending e-mail and does not send when archiving fails", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({ id: 1, invoiceId: 10, invoice: mockInvoice } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-2026-010");
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(archivePdf).mockRejectedValueOnce(new Error("EACCES"));
+
+      const result = await approvePendingEmail({}, form({ id: "1", to: "x@x.ch", subject: "s", body: "b" }));
+
+      expect(result.error).toBe("PDF konnte nicht archiviert werden. Die E-Mail wurde nicht versendet.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+      expect(prisma.pendingEmail.delete).not.toHaveBeenCalled();
+      expect(prisma.sentDocument.create).not.toHaveBeenCalled();
+    });
+
+    it("records a SentDocument when the pending e-mail is approved", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({ id: 1, invoiceId: 10, invoice: mockInvoice } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-2026-010");
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+      vi.mocked(prisma.$transaction).mockImplementation((arg: unknown) => Promise.all(arg as Promise<unknown>[]) as never);
+
+      const result = await approvePendingEmail({}, form({ id: "1", to: "x@x.ch", subject: "s", body: "b" }));
+
+      expect(result.success).toBe(true);
+      expect(prisma.sentDocument.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ invoiceId: 10, kind: "Invoice", documentNumber: "R-2026-010" }),
+      });
     });
   });
 

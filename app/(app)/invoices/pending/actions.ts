@@ -3,8 +3,8 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
-import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
-import { sendInvoiceEmail } from "@/lib/email";
+import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import type { ArchiveResult } from "@/lib/document-archive";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber } from "@/lib/document-display";
 import type { ActionState } from "@/hooks/use-action-toast";
@@ -51,15 +51,20 @@ export async function approvePendingEmail(
   const finalSubject = fillDocumentNumber(subject, documentNumber);
   const finalBody = fillDocumentNumber(body, documentNumber);
 
+  let archive: ArchiveResult;
   try {
-    const pdf = await generateInvoicePdf(invoice, settings);
-    await sendInvoiceEmail(invoice, settings, pdf, { to, subject: finalSubject, body: finalBody });
+    archive = await renderArchiveAndSend({
+      invoice,
+      settings,
+      kind: "Invoice",
+      mail: { to, subject: finalSubject, body: finalBody },
+    });
   } catch (err) {
     log.error({ pendingId: id, to, err }, "approvePendingEmail failed");
     return { error: err instanceof Error ? err.message : "Fehler beim Senden." };
   }
 
-  await prisma.$transaction([
+  const [, , , sentDocument] = await prisma.$transaction([
     // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
     prisma.invoice.updateMany({
       where: { id: pending.invoiceId, state: { in: ["Draft", "Sent", "Overdue"] } },
@@ -69,12 +74,24 @@ export async function approvePendingEmail(
       data: { invoiceId: pending.invoiceId, sentTo: to, subject: finalSubject },
     }),
     prisma.pendingEmail.delete({ where: { id } }),
+    prisma.sentDocument.create({
+      data: sentDocumentData({
+        invoiceId: pending.invoiceId,
+        documentNumber,
+        kind: "Invoice",
+        archive,
+        sentTo: to,
+        subject: finalSubject,
+        actor: session,
+      }),
+    }),
   ]);
 
   await logAudit(session, "SEND", "Invoice", pending.invoiceId, documentNumber, {
     to,
     subject: finalSubject,
   });
+  await auditArchived(session, sentDocument, documentNumber, archive);
 
   revalidatePath("/invoices/pending");
   revalidatePath(`/invoices/${pending.invoiceId}`);

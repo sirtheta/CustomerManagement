@@ -9,6 +9,7 @@ import { validatePasswordPolicy } from "@/lib/password";
 import { isRateLimited, recordFailedAttempt } from "@/lib/rate-limit";
 import { clientIp } from "@/lib/client-ip";
 import { consumePasswordResetToken } from "@/lib/password-reset";
+import { logAuditEntry } from "@/lib/audit";
 
 const log = logger.child({ module: "password-reset" });
 
@@ -53,23 +54,17 @@ export async function resetPasswordAction(
   });
   log.info({ userId }, "password reset completed");
 
-  // No session exists here (anonymous request) — write the AuditLog row
-  // directly, same never-throw contract as lib/audit.ts's logAudit.
-  try {
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        userName: user.name,
-        action: "UPDATE",
-        entityType: "User",
-        entityId: userId,
-        entityRef: user.email,
-        details: JSON.stringify({ action: "password-reset-self-service" }),
-      },
-    });
-  } catch (err) {
-    log.error({ err, userId }, "Failed to write audit log for password reset");
-  }
+  // No session exists here (anonymous request), so write the entry directly.
+  // logAuditEntry never throws and chains the row like every other entry.
+  await logAuditEntry({
+    userId,
+    userName: user.name,
+    action: "UPDATE",
+    entityType: "User",
+    entityId: userId,
+    entityRef: user.email,
+    details: JSON.stringify({ action: "password-reset-self-service" }),
+  });
 
   return { success: true };
 }

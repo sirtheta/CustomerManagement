@@ -4,9 +4,9 @@ vi.mock("next/headers", () => ({ headers: vi.fn().mockResolvedValue(new Headers(
 vi.mock("@/lib/prisma", () => ({
   default: {
     user: { update: vi.fn() },
-    auditLog: { create: vi.fn() },
   },
 }));
+vi.mock("@/lib/audit", () => ({ logAuditEntry: vi.fn() }));
 vi.mock("@/lib/password", () => ({ validatePasswordPolicy: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimited: vi.fn(), recordFailedAttempt: vi.fn() }));
 vi.mock("@/lib/client-ip", () => ({ clientIp: vi.fn().mockReturnValue(null) }));
@@ -15,6 +15,7 @@ vi.mock("bcryptjs", () => ({ hash: vi.fn() }));
 
 import { resetPasswordAction } from "@/app/(auth)/reset-password/actions";
 import prisma from "@/lib/prisma";
+import { logAuditEntry } from "@/lib/audit";
 import { validatePasswordPolicy } from "@/lib/password";
 import { isRateLimited, recordFailedAttempt } from "@/lib/rate-limit";
 import { consumePasswordResetToken } from "@/lib/password-reset";
@@ -98,10 +99,8 @@ describe("resetPasswordAction", () => {
       where: { id: 42 },
       data: { passwordHash: "$2b$10$newhash", sessionEpoch: { increment: 1 } },
     });
-    expect(prisma.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ userId: 42, entityType: "User", action: "UPDATE" }),
-      })
+    expect(logAuditEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 42, entityType: "User", action: "UPDATE" })
     );
   });
 });

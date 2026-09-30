@@ -123,6 +123,13 @@ Der Ordner muss für den Container-Benutzer (`nextjs`, UID 1001) beschreibbar se
 
 Ein Backup enthält alle Daten inklusive Passwort-Hashes und SMTP-Zugang. Nur an vertrauenswürdigen Orten ablegen.
 
+### PDF-Archiv
+
+- Versendete Rechnungs- und Mahnungs-PDFs liegen unter `data/archive/<Jahr>/` im Datenvolume (überschreibbar per `ARCHIVE_DIR`); die Prüfsumme (SHA-256) steht in der Datenbank. Offerten werden nicht archiviert.
+- Der Ordner gehört zu den aufzubewahrenden Daten: zusammen mit der Datenbanksicherung auch `data/archive/` ausser Haus sichern, z. B. `rsync -a data/archive/ <Ziel>/archive/`. Die Dateien werden nie verändert, ein inkrementelles Kopieren genügt. Die Datenbank-Backups enthalten das Archiv nicht.
+- Ist das Archiv nicht beschreibbar (Platte voll, Rechte), versendet die App keine Rechnungen und Mahnungen mehr; die Fehlermeldung erscheint beim Versand.
+- Scheitert ein Versand nach dem Archivieren (z. B. SMTP-Fehler), bleibt die Datei ohne Datenbankeintrag liegen. Solche verwaisten Dateien sind harmlos und können bei Bedarf gelöscht werden.
+
 ### Wiederherstellen
 
 ```bash

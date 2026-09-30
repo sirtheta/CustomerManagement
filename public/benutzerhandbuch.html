@@ -431,6 +431,7 @@
             <tr><td>Dashboard, Kunden, Rechnungen, Offerten, Leistungen, Auswertung ansehen</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center yes">✓</td></tr>
             <tr><td>Kunden anlegen, bearbeiten, Notizen &amp; Dokumente hinzufügen</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center no">–</td></tr>
             <tr><td>Rechnungen und Offerten erstellen, bearbeiten, versenden, Status ändern</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center no">–</td></tr>
+            <tr><td>Archivierte Rechnungs-PDFs öffnen (Versendete Dokumente)</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center no">–</td></tr>
             <tr><td>Leistungskatalog pflegen</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center no">–</td></tr>
             <tr><td>Buchhaltung: Ausgaben erfassen, Erfolgsrechnung einsehen</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center no">–</td></tr>
             <tr><td>Eigenes Profil, Passwort, Zwei-Faktor-Authentifizierung</td><td class="center yes">✓</td><td class="center yes">✓</td><td class="center yes">✓</td></tr>
@@ -587,11 +588,28 @@
         <div><strong>Rückzahlungen</strong> Eine Gutschrift verändert die Einnahmen der Buchhaltung nicht. Ein Betrag, den du der Kundschaft zurückzahlst, wird derzeit nicht erfasst.</div>
       </div>
 
+      <h3 class="sub" id="archiv">Versendete Dokumente &amp; Archiv</h3>
+      <p>Jedes Mal, wenn eine Rechnung oder eine Mahnung per E-Mail verschickt wird, speichert das System das <strong>exakte PDF</strong> mit einer Prüfsumme (SHA-256) im Archiv. So lässt sich später belegen, was wann an wen ging und dass die Datei seither nicht verändert wurde. Offerten werden nicht archiviert.</p>
+      <ul>
+        <li><strong>Liste</strong> – auf der Rechnungsseite zeigt die Karte «Versendete Dokumente» Datum, Art (Rechnung oder Mahnung mit Stufe), Empfänger und die ersten Zeichen der Prüfsumme.</li>
+        <li><strong>Öffnen</strong> – der Link «Öffnen» lädt das archivierte PDF. Vorher wird die Prüfsumme kontrolliert. Sichtbar und abrufbar ist das für Editor und Admin, nicht für Viewer.</li>
+        <li><strong>Mehrfacher Versand</strong> – wird dieselbe Rechnung erneut verschickt, entsteht ein eigener Archiveintrag pro Versand.</li>
+        <li><strong>Löschen</strong> – Rechnungen mit archivierten Dokumenten und Kunden mit solchen Rechnungen lassen sich nicht löschen; das Archiv bleibt vollständig.</li>
+      </ul>
+      <div class="callout warn">
+        <div class="ic">⚠️</div>
+        <div><strong>Archiv nicht schreibbar</strong> Kann das PDF nicht archiviert werden (z.&nbsp;B. Datenträger voll), wird die E-Mail <strong>nicht versendet</strong> und es erscheint eine Fehlermeldung. Rechnung, ausstehende E-Mail oder Mahnung bleiben unverändert und lassen sich nach der Behebung erneut versenden.</div>
+      </div>
+      <div class="callout warn">
+        <div class="ic">⚠️</div>
+        <div><strong>Meldung «Prüfsumme stimmt nicht überein»</strong> Beim Öffnen bedeutet dies, dass die Archivdatei verändert wurde oder fehlt. Bitte den Administrator informieren und die Datei aus einer Datensicherung wiederherstellen.</div>
+      </div>
+
       <h3 class="sub">Ausstehende E-Mails, Mahnungen &amp; Vorlagen</h3>
       <p>Drei weitere Unterseiten unter «Rechnungen» unterstützen den laufenden Betrieb:</p>
       <ul>
         <li><strong>Ausstehende E-Mails</strong> – Rechnungen, deren Versand per E-Mail noch in der Warteschlange steht (z.&nbsp;B. weil SMTP kurzfristig nicht erreichbar war).</li>
-        <li><strong>Ausstehende Mahnungen</strong> – überfällige Rechnungen, für die automatisch eine Zahlungserinnerung vorgeschlagen wird; einzeln versenden oder für eine gewisse Zeit zurückstellen («snoozen»).</li>
+        <li><strong>Ausstehende Mahnungen</strong> – überfällige Rechnungen, für die automatisch eine Zahlungserinnerung vorgeschlagen wird; einzeln versenden oder für eine gewisse Zeit zurückstellen («snoozen»). Auch verschickte Mahnungen und freigegebene E-Mails werden archiviert (siehe «Versendete Dokumente &amp; Archiv»).</li>
         <li><strong>Rechnungsvorlagen</strong> – wiederkehrende Rechnungsinhalte als Vorlage speichern, z.&nbsp;B. für die jährliche Rechnung an einen Abo-Kunden.</li>
       </ul>
       <p><strong>Zahlungen importieren</strong> gleicht eine CSV-Datei mit Zahlungseingängen (z.&nbsp;B. Kontoauszug) gegen offene Rechnungen ab. Bestätigte Treffer werden als Zahlung in der Höhe der Bankbewegung gebucht – ein kleinerer Betrag ergibt eine Teilzahlung, dieselbe Bankbewegung wird nicht doppelt gebucht.</p>
@@ -768,6 +786,7 @@
         <figcaption><span class="tag">/settings/audit</span> Aktivitätsprotokoll</figcaption>
       </figure>
       <p>Jeder Eintrag zeigt Zeitpunkt, Benutzer, betroffenes Objekt und Art der Änderung (Anlegen, Bearbeiten, Löschen, Versenden, Statuswechsel). Über die Filter lässt sich nach Aktion oder Benutzer eingrenzen.</p>
+      <p>Neue Einträge werden gegen nachträgliche Änderungen gesichert. Über dem Protokoll zeigt die Seite das Ergebnis der Prüfung an: „Protokoll unverändert“ bedeutet, dass alle Einträge lückenlos und unverändert sind. Erscheint die Meldung „Das Protokoll wurde verändert“, wurde ein Eintrag nachträglich geändert, eingefügt oder entfernt: Datenbank-Backup sichern und den Administrator informieren. Unter „Technische Details“ steht ein Prüfcode. Wer ihn notiert oder ausdruckt und später als Adresszusatz <code>?head=…</code> eingibt, sieht, ob die bis dahin geschriebenen Einträge noch vorhanden sind. Die Prüfung erkennt einzelne Änderungen und Löschungen, kann aber nicht ausschliessen, dass jemand mit Zugriff auf die Datenbankdatei das ganze Protokoll neu aufbaut. Einträge aus der Zeit vor dieser Funktion können nicht geprüft werden.</p>
     </section>
 
     <!-- ══════════════════════ ADMIN: LOGS ══════════════════════ -->

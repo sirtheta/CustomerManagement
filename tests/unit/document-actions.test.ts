@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
     quote: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     item: { createMany: vi.fn(), deleteMany: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
+    sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }) },
     quoteSentLog: { create: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
   },
@@ -31,6 +32,9 @@ vi.mock("@/lib/email", () => ({
   sendInvoiceEmail: vi.fn(),
   sendQuoteEmail: vi.fn(),
 }));
+vi.mock("@/lib/document-archive", () => ({
+  archivePdf: vi.fn().mockResolvedValue({ path: "2026/x.pdf", sha256: "a".repeat(64), size: 3 }),
+}));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/lib/logger", () => ({
@@ -50,6 +54,7 @@ import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
 import { assertCreditWithinOriginal, CreditNoteError } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
+import { archivePdf } from "@/lib/document-archive";
 
 const actor = { user: { id: "1", name: "Editor", email: "editor@test.ch", role: "Editor" } } as never;
 
@@ -384,5 +389,36 @@ describe("sendDocument", () => {
     expect(sendQuoteEmail).not.toHaveBeenCalled();
     expect(prisma.invoiceSentLog.create).not.toHaveBeenCalled();
     expect(prisma.quoteSentLog.create).not.toHaveBeenCalled();
+  });
+
+  it("archives the invoice PDF and records a SentDocument in the same transaction", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [] } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("I-1");
+    vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+    vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+    vi.mocked(prisma.$transaction).mockImplementation((arg: unknown) => Promise.all(arg as Promise<unknown>[]) as never);
+
+    await sendDocument({ kind: "invoice", id: 1, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(archivePdf).toHaveBeenCalledWith(expect.objectContaining({ documentNumber: "I-1", kind: "Invoice" }));
+    expect(prisma.sentDocument.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ invoiceId: 1, kind: "Invoice", sha256: "a".repeat(64), createdById: 1 }),
+    });
+  });
+
+  it("does not send or change state when archiving fails", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [] } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("I-1");
+    vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+    vi.mocked(archivePdf).mockRejectedValueOnce(new Error("EACCES"));
+
+    const result = await sendDocument({ kind: "invoice", id: 1, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(result.error).toBe("PDF konnte nicht archiviert werden. Die E-Mail wurde nicht versendet.");
+    expect(sendInvoiceEmail).not.toHaveBeenCalled();
+    expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+    expect(prisma.sentDocument.create).not.toHaveBeenCalled();
   });
 });
