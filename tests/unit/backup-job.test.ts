@@ -73,6 +73,7 @@ describe("runBackupJob", () => {
     const notify = vi.fn();
 
     expect(await runBackupJob({ create, prune, notify })).toBe(true);
+    expect(prune).toHaveBeenCalledOnce();
     expect(notify).not.toHaveBeenCalled();
   });
 });

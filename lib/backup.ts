@@ -1,3 +1,6 @@
+// Note: this module is loaded by the logs page and the download route, so it
+// must not import lib/prisma or lib/notifications statically. Prisma and
+// notifyAdmins are only imported lazily, in the failure path.
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "fs";
 import { dirname, join } from "path";
@@ -120,8 +123,8 @@ export function resolveBackupFilePath(filename: string, dir: string = getBackupD
 }
 
 async function loadSettings(): Promise<FullSettings | null> {
-  // Lazy import: see the note at the top on why this module must not pull in
-  // lib/prisma at import time.
+  // Lazy import: see the module comment at the top on why this module must not pull
+  // in lib/prisma at import time.
   const { default: prisma } = await import("@/lib/prisma");
   return prisma.applicationSettings.findFirst({ include: { companyInfo: true } });
 }
@@ -137,7 +140,8 @@ async function defaultNotify(...args: Parameters<NotifyAdmins>): Promise<boolean
  * Tells the admins that a backup failed, over the same channels as the daily
  * notifications (notify e-mail address, Telegram). Runs at most once per
  * nightly job, so no extra throttling. Never throws: a broken notification
- * setup must not affect the job. Returns whether a message went out.
+ * setup must not affect the job. Returns whether at least one admin channel is configured (delivery
+ * errors are swallowed per channel).
  */
 export async function notifyBackupFailure(
   err: unknown,

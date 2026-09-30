@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, existsSync, rmSync, readdirSync } from "fs";
+import { mkdtempSync, writeFileSync, rmSync, readdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import Database from "better-sqlite3";
@@ -171,7 +171,7 @@ describe("resolveBackupFilePath", () => {
     expect(resolveBackupFilePath("db-2026-09-30.db", "/x")).toBe(join("/x", "db-2026-09-30.db"));
     for (const bad of [
       "../db-2026-09-30.db",
-      "..\db-2026-09-30.db",
+      "..\\db-2026-09-30.db",
       "/etc/passwd",
       "db-2026-09-30.db.tmp",
       "db-2026-9-30.db",

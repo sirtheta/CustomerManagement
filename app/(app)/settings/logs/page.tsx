@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/permissions";
 import { listLogFiles } from "@/lib/logs";
 import { listBackups, type BackupFileInfo } from "@/lib/backup";
+import logger from "@/lib/logger";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+const log = logger.child({ module: "backup" });
 
 function formatDateCH(str: string): string {
   const [y, m, d] = str.split("-");
@@ -35,7 +38,8 @@ export default async function LogsPage() {
   let backupsUnreadable = false;
   try {
     backups = listBackups();
-  } catch {
+  } catch (err) {
+    log.warn({ err }, "Could not list backups");
     backupsUnreadable = true;
   }
 
@@ -45,7 +49,7 @@ export default async function LogsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Anwendungs-Logs zum Herunterladen — bisher nur über <code>docker logs</code> einsehbar.
+            Anwendungs-Logs und Datenbank-Backups zum Herunterladen — Logs waren bisher nur über <code>docker logs</code> einsehbar.
             Die laufende Datei wird täglich abgeschnitten; ältere Tage bleiben so lange, wie die
             Aufbewahrungsfrist es erlaubt.
           </p>

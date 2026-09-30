@@ -106,6 +106,21 @@ Schlägt ein Backup fehl, geht eine Meldung an die Benachrichtigungs-Kanäle aus
 # 0 5 * * * rsync -a ~/customer-management/data/backups/ nas:/backups/customer-management/
 ```
 
+**Eigenes `BACKUP_DIR`:** Ein Pfad ausserhalb des gemounteten `data`-Volumes liegt im Dateisystem des Containers und geht beim Neuanlegen des Containers verloren. Den Ordner deshalb in der `docker-compose.yml` unter `volumes:` einbinden und in der `.env` darauf zeigen:
+
+```yaml
+    volumes:
+      - ./data:/app/data
+      - /mnt/usb/cm-backups:/backups
+```
+
+```bash
+# .env
+BACKUP_DIR=/backups
+```
+
+Der Ordner muss für den Container-Benutzer (`nextjs`, UID 1001) beschreibbar sein, z. B. `sudo chown 1001:1001 /mnt/usb/cm-backups`.
+
 Ein Backup enthält alle Daten inklusive Passwort-Hashes und SMTP-Zugang. Nur an vertrauenswürdigen Orten ablegen.
 
 ### Wiederherstellen
