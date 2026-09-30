@@ -295,6 +295,12 @@ model AuditLog {
   entityRef  String?
   details    String?
   createdAt  DateTime @default(now())
+  // Hash chain (F4 part B): null on rows written before the chain existed.
+  // prevHash is unique so every hash has at most one successor; the first
+  // chained row uses the "GENESIS" sentinel instead of null (SQLite allows
+  // many NULLs in a unique index).
+  prevHash   String?  @unique
+  hash       String?
 
   @@index([createdAt])
 }
