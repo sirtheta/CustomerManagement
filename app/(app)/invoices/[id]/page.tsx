@@ -26,6 +26,7 @@ import { documentLabel } from "@/lib/document-display";
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
   Sent: "Versendet",
+  PartiallyPaid: "Teilbezahlt",
   Paid: "Bezahlt",
   Overdue: "Überfällig",
   Canceled: "Storniert",
@@ -37,6 +38,7 @@ const stateVariants: Record<
 > = {
   Draft: "secondary",
   Sent: "default",
+  PartiallyPaid: "secondary",
   Paid: "outline",
   Overdue: "destructive",
   Canceled: "outline",
