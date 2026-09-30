@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/permissions";
 import { listLogFiles } from "@/lib/logs";
+import { listBackups, type BackupFileInfo } from "@/lib/backup";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +29,21 @@ export default async function LogsPage() {
 
   const files = listLogFiles();
 
+  // A BACKUP_DIR that exists but isn't readable (e.g. a mount with the wrong
+  // owner) must not take the whole logs page down with it.
+  let backups: BackupFileInfo[] = [];
+  let backupsUnreadable = false;
+  try {
+    backups = listBackups();
+  } catch {
+    backupsUnreadable = true;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Logs</h1>
+          <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Anwendungs-Logs zum Herunterladen — bisher nur über <code>docker logs</code> einsehbar.
             Die laufende Datei wird täglich abgeschnitten; ältere Tage bleiben so lange, wie die
@@ -92,6 +103,59 @@ export default async function LogsPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="space-y-2 pt-6">
+        <h2 className="text-lg font-semibold">Backups</h2>
+        <p className="text-sm text-muted-foreground">
+          Jede Nacht wird ein Snapshot der Datenbank gespeichert. Ein Backup enthält alle Daten,
+          auch Passwort-Hashes und SMTP-Zugangsdaten — sicher aufbewahren. Für eine Kopie ausser
+          Haus das Backup-Verzeichnis (<code>BACKUP_DIR</code>) extern sichern.
+        </p>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Datum</TableHead>
+                <TableHead>Datei</TableHead>
+                <TableHead>Grösse</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {backups.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    {backupsUnreadable
+                      ? "Backup-Verzeichnis ist nicht lesbar (Berechtigungen von BACKUP_DIR prüfen)."
+                      : "Noch kein Backup vorhanden."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                backups.map((backup) => (
+                  <TableRow key={backup.name}>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {formatDateCH(backup.date)}
+                    </TableCell>
+                    <TableCell className="text-sm">{backup.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatSize(backup.sizeBytes)}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        render={<a href={`/api/backups/${encodeURIComponent(backup.name)}`} />}
+                      >
+                        Herunterladen
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   );
