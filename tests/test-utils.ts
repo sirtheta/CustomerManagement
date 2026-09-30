@@ -62,6 +62,9 @@ export function createTestDatabase() {
     await p.quote.deleteMany();
     await p.document.deleteMany();
     await p.service.deleteMany();
+    await p.subscription.deleteMany();
+    await p.templateItem.deleteMany();
+    await p.invoiceTemplate.deleteMany();
     await p.customer.deleteMany();
     await p.expense.deleteMany();
     await p.category.deleteMany();
@@ -92,7 +95,6 @@ export function createValidTestCustomer() {
     city: "Zürich",
     email: "jane@clientag.ch",
     phone: "+41 44 987 65 43",
-    yearlyInvoice: false,
     contactInsteadOfCompany: false,
   };
 }
