@@ -74,6 +74,7 @@ npx vitest run tests/unit/calculations.test.ts
 - **Payments** (`lib/payments.ts`): the `Payment` model is the source of truth for what has been paid. `recordPayment` / `recordRemainingPayment` / `deletePayment` recalculate `Invoice.state` (→ `PartiallyPaid` → `Paid`) and `paidDate` from the payments; manual, CAMT and Budget payments all go through it. Income in the income statement, analytics and export follows `Payment.date`. The open items list (OP-Liste, age structure, CSV export) lives at `accounting/receivables` (`lib/receivables.ts`)
 - `lib/yearly-invoices.ts` handles automatic recurring invoice creation
 - `lib/reminders.ts` + `PendingReminder` model manage overdue payment reminders
+- **PDF archive** (`lib/document-archive.ts`, `lib/invoice-dispatch.ts`): every invoice and reminder mail goes through `renderArchiveAndSend` — render the PDF once, write those exact bytes to `data/archive/<year>/` (`wx`, read-only), then attach the same bytes. If archiving fails nothing is sent. The `SentDocument` row (path, SHA-256, size) is created in the send transaction next to `InvoiceSentLog`, with `onDelete: Restrict` on the invoice, and an audit entry `CREATE SentDocument` records hash and path. Quotes are not archived. `GET /api/invoices/[id]/archive/[docId]` verifies the hash before serving (409 on mismatch or missing file)
 
 **PDF generation** (`lib/pdf/`): Server-side only, using `pdfkit` + `swissqrbill` for Swiss QR payment slips. Triggered via `GET /api/invoices/[id]/pdf`.
 
@@ -98,6 +99,7 @@ npx vitest run tests/unit/calculations.test.ts
 | `ADMIN_PASSWORD_HASH` | First run | Pre-hashed bcrypt alternative to `ADMIN_PASSWORD` |
 | `LOG_ROTATE_CRON_SCHEDULE` / `LOG_MAX_KEEP_DAYS` | No | Nightly log rotation schedule (default `35 2 * * *`) and retention in days (default `14`, `0` = keep all) |
 | `BACKUP_DIR` / `BACKUP_CRON_SCHEDULE` / `BACKUP_KEEP_DAYS` / `DISABLE_BACKUP` | No | Nightly DB backup: target directory (default `<data>/backups`), schedule in server time (default `15 2 * * *`; the container is UTC unless `TZ` is set), retention in days (default `30`, `0` = keep all), `true` turns the job off |
+| `ARCHIVE_DIR` | No | Root of the PDF archive, defaults to an `archive` folder next to the SQLite file (`data/archive`) |
 
 ### Testing
 

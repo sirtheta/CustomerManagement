@@ -30,7 +30,7 @@ Neues Modell `SentDocument`:
 | `kind` | String | `Invoice` oder `Reminder` |
 | `reminderLevel` | Int? | nur bei `Reminder` (Stufe zum Versandzeitpunkt) |
 | `documentNumber` | String | Rechnungsnummer zum Versandzeitpunkt |
-| `path` | String | relativ zu `data/archive/`, z. B. `2026/I-2609001_Invoice_20260930T101500Z.pdf` |
+| `path` | String | relativ zu `data/archive/`, z. B. `2026/I-2609001_Invoice_20260930T101500123Z.pdf` |
 | `sha256` | String | Hex, 64 Zeichen |
 | `size` | Int | Bytes |
 | `sentTo` | String | Empfänger |
@@ -38,16 +38,16 @@ Neues Modell `SentDocument`:
 | `createdAt` | DateTime, default now | |
 | `createdById` | Int | Nutzer, der den Versand ausgelöst hat |
 
-Index auf `invoiceId`. `InvoiceSentLog` bleibt unverändert; ein `SentDocument` und der zugehörige Log-Eintrag werden in derselben Transaktion geschrieben. Gelöscht werden dürfen Rechnungen mit Archiv nicht (`Restrict`); F3 sperrt das für Nicht-Entwürfe ohnehin.
+Index auf `invoiceId`. `InvoiceSentLog` bleibt unverändert; ein `SentDocument` und der zugehörige Log-Eintrag werden in derselben Transaktion geschrieben. Gelöscht werden dürfen Rechnungen mit Archiv nicht (`Restrict`); `deleteInvoice` fängt den FK-Fehler ab; `deleteCustomer` sperrt Kunden mit Rechnungen bereits seit F3 (`Invoice.customerId` ist `Restrict`).
 
 `AuditEntity` (`lib/audit.ts`) wird um `"SentDocument"` erweitert.
 
 ### `lib/document-archive.ts` (neu)
 
 - `archiveRootDir()`: `data/archive/` neben der DB-Datei (gleiche Ableitung wie `getDbPath()` bzw. Backup-Ordner), Override per `ARCHIVE_DIR` (optional, z. B. für Tests und externe Laufwerke).
-- `archivePdf({ invoice, kind, pdf, now? })`: berechnet SHA-256 über die Bytes, die später auch angehängt werden. Der Pfad wird aus Jahr, Dokumentnummer (auf `[A-Za-z0-9_-]` normalisiert), `kind` und UTC-Zeitstempel gebaut, nie aus Nutzereingaben. Schreiben mit `flag: "wx"` (nie überschreiben), danach `chmod 0444`. Liefert `{ path, sha256, size }`. Ordner werden bei Bedarf angelegt.
+- `archivePdf({ documentNumber, kind, pdf, now? })`: berechnet SHA-256 über die Bytes, die später auch angehängt werden. Der Pfad wird aus Jahr, Dokumentnummer (auf `[A-Za-z0-9_-]` normalisiert), `kind` und UTC-Zeitstempel gebaut, nie aus Nutzereingaben. Schreiben mit `flag: "wx"` (nie überschreiben), danach `chmod 0444`. Liefert `{ path, sha256, size }`. Ordner werden bei Bedarf angelegt.
 - `resolveArchivePath(relPath)`: löst gegen das Root auf und liefert `null`, wenn das Ergebnis ausserhalb liegt (Traversal-Schutz beim Lesen).
-- `verifyArchived(id)`: liest die Datei, vergleicht Hash und Grösse. Ergebnis `{ ok: true } | { ok: false, reason: "missing" | "mismatch" }`.
+- `verifyArchived({ path, sha256, size })`: liest die Datei, vergleicht Hash und Grösse. Ergebnis `{ ok: true, data } | { ok: false, reason: "missing" | "mismatch" }`. Beide Signaturen nehmen keine Rechnung bzw. ID, damit das Modul ohne Prisma auskommt.
 
 ### Gemeinsamer Versand-Helfer
 
@@ -56,7 +56,7 @@ Alle drei Rechnungs-Versandpfade rufen denselben Helfer auf: `sendDocument` (Rec
 1. PDF erzeugen (`generateInvoicePdf`),
 2. `archivePdf`,
 3. `sendInvoiceEmail` mit exakt diesen Bytes,
-4. Rückgabe von `{ archive }`, den die Aufrufer in ihre bestehende Transaktion einbauen (`sentDocument.create` neben `invoiceSentLog.create`).
+4. Rückgabe des `ArchiveResult` (`{ path, sha256, size }`), den die Aufrufer in ihre bestehende Transaktion einbauen (`sentDocument.create` neben `invoiceSentLog.create`).
 
 Offerten (`sendDocument` mit `kind: "quote"`) bleiben unverändert.
 
@@ -69,7 +69,7 @@ Offerten (`sendDocument` mit `kind: "quote"`) bleiben unverändert.
 ### UI und API
 
 - Rechnungs-Detailseite: Abschnitt „Versendete Dokumente“ mit Datum, Art (Rechnung/Mahnung Stufe n), Empfänger, Kurz-Hash (erste 12 Zeichen) und Download-Link. Sichtbar für Editor und Admin.
-- `GET /api/invoices/[id]/archive/[docId]`: Session erforderlich, Rolle Editor oder Admin (Viewer 403). Prüft, dass `docId` zu `id` gehört, löst den Pfad über `resolveArchivePath` auf, verifiziert den Hash vor dem Ausliefern. Bei Abweichung oder fehlender Datei `409` (mit klarer Meldung), sonst `application/pdf` mit `Cache-Control: no-store` und Dateiname `<Nr>_<Datum>.pdf`.
+- `GET /api/invoices/[id]/archive/[docId]`: Session erforderlich, Rolle Editor oder Admin (Viewer 403). Prüft, dass `docId` zu `id` gehört, löst den Pfad über `resolveArchivePath` auf, verifiziert den Hash vor dem Ausliefern. Bei Abweichung oder fehlender Datei `409` (mit klarer Meldung), sonst `application/pdf` mit `Cache-Control: no-store` und Dateiname `<Nr>_<Art>_<Datum>.pdf` (z. B. `I-26090001_Invoice_2026-09-30.pdf`).
 
 ### Backup
 
@@ -95,7 +95,7 @@ Unit (`tests/unit/document-archive.test.ts`):
 - `resolveArchivePath`: Traversal (`../`, absolute Pfade) ergibt `null`.
 - `verifyArchived`: `ok`, `missing`, `mismatch` (Datei nach dem Archivieren manipuliert).
 
-Integration (`tests/integration/document-archive.test.ts`, Temp-DB und Temp-Archivordner):
+Integration (`tests/integration/invoice-dispatch.test.ts`; der `Restrict`-Fall in `tests/integration/sent-document.test.ts`, Temp-DB und Temp-Archivordner):
 - Für alle drei Versandpfade: Erfolg legt Datei, `SentDocument` und `InvoiceSentLog` an; das gesendete Attachment hat denselben Hash wie das Archiv.
 - Archivordner nicht beschreibbar: kein E-Mail-Versand, kein `SentDocument`, Zustand unverändert (Pending-E-Mail bzw. Mahnstufe bleiben).
 - Versand scheitert nach Archivierung: kein DB-Eintrag.
