@@ -11,6 +11,7 @@ Der Import eines CAMT.053-Kontoauszugs verbucht Zahlungseingänge zuverlässiger
 - **Umfang:** Bewegungen speichern, Duplikatschutz, Saldoprüfung, besseres Matching, Ausgaben als `Expense` übernehmen, ganzen Import rückgängig machen. camt.054 ist nicht Teil davon (camt.053 deckt dasselbe ab).
 - **Eigenständig:** Das CRM muss ohne die Budget-App funktionieren. Wer beide nutzt, bekommt die Zahlungen weiter über `POST /api/external/payments`. Diese Schnittstelle bleibt abwärtskompatibel.
 - **Vorbild:** Die Duplikaterkennung folgt `lib/import/dedupe.ts` der Budget-App (`C:\Projects\budget`), weil sie dort erprobt ist.
+- **Ein gemischtes Konto:** Geschäft und Privat laufen über dasselbe Konto, und privat wird zusätzlich in der Budget-App verwaltet. Darum landet nie etwas automatisch als Ausgabe im CRM: Ausgaben entstehen nur im CRM-Import und nur für ausdrücklich angekreuzte Zeilen. Die Budget-App schickt nur Zahlungseingänge, die zu offenen Rechnungen passen.
 - **Keine Buchhaltung:** Es bleibt eine Einnahmen-/Ausgabenrechnung. Es gibt keine Konten, keine Kontierung und keine freie Einnahmenbuchung ohne Rechnung.
 - **Status abgeleitet:** Ob eine Bewegung offen, verbucht oder ignoriert ist, ergibt sich aus `paymentId`, `expenseId` und `ignored`. Es gibt kein Statusfeld, das von den Zahlungen abweichen könnte.
 
@@ -52,7 +53,10 @@ Die Migration ist reines SQL (Produktion wendet Migrationen über `scripts/start
 1. **Hochladen** (`parseStatement`, `requireEditor`): Die Datei wird geparst, `BankStatementImport` und die neuen `BankTransaction`-Zeilen werden in einer Transaktion gespeichert, bekannte Bewegungen übersprungen. Das Ergebnis zeigt Warnungen (Saldo, IBAN, Währung) und die Zahl neuer und übersprungener Bewegungen.
 2. **Offene Bewegungen** (alle Importe, nicht nur der letzte, damit man später weitermachen kann):
    - **Eingänge:** wie heute mit Kandidaten und Vorauswahl. Zusätzlich „Ignorieren“. Ein Eingang ohne offene Rechnung kann nur ignoriert werden. Ein Hinweis erklärt, dass er schon über die Budget-App verbucht sein kann.
-   - **Ausgaben:** je Zeile Datum, Betrag, Gegenpartei, Text und eine Kategorie-Auswahl (leer erlaubt). Die Kategorie wird vorbelegt mit der zuletzt verwendeten Kategorie für dieselbe normalisierte Gegenpartei, abgeleitet aus bestehenden `BankTransaction`-Zeilen mit `expenseId` (keine eigene Regel-Tabelle). Ebenfalls „Ignorieren“.
+   - **Ausgaben:** je Zeile ein Kontrollkästchen, Datum, Betrag, Gegenpartei, Text und eine Kategorie-Auswahl (leer erlaubt). Geschäft und Privat laufen über ein Konto, daher ist **nichts vorausgewählt**: Nur angekreuzte Zeilen werden beim Bestätigen zu Ausgaben, der Rest bleibt offen und unverändert. Eine Ausgabe entsteht nie ohne diese ausdrückliche Wahl.
+     - **Bekannte Empfänger:** Hat eine normalisierte Gegenpartei schon eine übernommene Ausgabe (`BankTransaction.expenseId` gesetzt), ist die Zeile vorausgewählt und die Kategorie vorbelegt (zuletzt verwendete Kategorie). Hat sie nur ignorierte Bewegungen, steht die Zeile ausgegraut in einem eingeklappten Bereich „Bisher ignoriert“. So bleibt die Liste nach den ersten Monaten kurz, ohne eigene Regel-Tabelle.
+     - **Sammelaktion:** „Alle sichtbaren ignorieren“ für den Rest, der privat ist.
+     - Ausgaben werden **nicht** automatisch vorausgewählt, wenn die Gegenpartei neu ist.
 3. **Bestätigen:**
    - Eingang → `recordPayment` (`source = "camt-import"`, `bankReference` der Bewegung), dann `BankTransaction.paymentId` setzen. Der Betrag ist der der Bewegung, nicht der Restbetrag (Vorschau bietet auch abweichende Beträge an, wie in F5).
    - Ausgabe → `Expense` mit Datum, Beschreibung (Gegenpartei und Text), Betrag als Absolutwert und Kategorie anlegen, dann `expenseId` setzen.
@@ -71,7 +75,7 @@ Die Migration ist reines SQL (Produktion wendet Migrationen über `scripts/start
 
 ## Tests
 
-- **Unit:** Fingerprint (Referenz vorrangig, Zähler für identische Buchungen, stabil bei erneutem Import), Saldoprüfung (stimmt, weicht ab, Salden fehlen, Kontinuität), Matching (Nummer mit Leerzeichen, ohne Präfix, Ziffern in längerer Zahl kein Treffer, Kundenname nur Kandidat, Vorauswahl nur bei Nummer plus Betrag), Kategorie-Vorschlag.
+- **Unit:** Fingerprint (Referenz vorrangig, Zähler für identische Buchungen, stabil bei erneutem Import), Saldoprüfung (stimmt, weicht ab, Salden fehlen, Kontinuität), Matching (Nummer mit Leerzeichen, ohne Präfix, Ziffern in längerer Zahl kein Treffer, Kundenname nur Kandidat, Vorauswahl nur bei Nummer plus Betrag), Kategorie-Vorschlag, Vorauswahl nur bei bekannter Gegenpartei (neue Gegenpartei nie vorausgewählt, nur ignorierte Gegenpartei eingeklappt).
 - **Integration** (Muster `tests/integration/camt-import-payments.test.ts`): Upload speichert und überspringt Duplikate, überlappende Auszüge, parallele Uploads (P2002), Eingang verbuchen setzt `paymentId` und Status, Ausgabe legt `Expense` an, Löschen der `Payment` macht die Bewegung wieder offen, Rückgängig nur ohne verbuchte Bewegungen, Schnittstelle mit und ohne `bankReference`.
 
 ## Dokumentation
