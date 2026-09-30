@@ -140,9 +140,12 @@ async function main() {
       // Paid invoices feed the cash-basis accounting module, so they need a paidDate
       const paidDate =
         state === InvoiceState.Paid ? faker.date.between({ from: date, to: new Date() }) : null;
-      const invoiceNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
-      // Non-draft invoices have been sent at least once
+      // Non-draft invoices have been sent at least once and therefore carry a
+      // number; drafts stay unnumbered (and don't consume the counter)
       const invoiceSent = state !== InvoiceState.Draft;
+      const invoiceNumber = invoiceSent
+        ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`
+        : null;
       await prisma.invoice.create({
         data: {
           customerId: customer.customerId,
@@ -154,7 +157,7 @@ async function main() {
           state,
           paidDate,
           items: { create: items },
-          sentLogs: invoiceSent
+          sentLogs: invoiceNumber
             ? { create: buildSentLogs(invoiceNumber, "Rechnung", customer.email, date) }
             : undefined,
         },
@@ -169,10 +172,13 @@ async function main() {
       );
       const items = buildItems(categories);
       const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-      const quoteNumber = `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}`;
       const quoteState = faker.helpers.arrayElement(QUOTE_STATES);
-      // Non-draft quotes have been sent at least once
+      // Non-draft quotes have been sent at least once and therefore carry a
+      // number; drafts stay unnumbered (and don't consume the counter)
       const quoteSent = quoteState !== QuoteState.Draft;
+      const quoteNumber = quoteSent
+        ? `Q-${prefix}${String(quoteCounter++).padStart(4, "0")}`
+        : null;
       await prisma.quote.create({
         data: {
           customerId: customer.customerId,
@@ -184,7 +190,7 @@ async function main() {
           totalAmount: round2(totalAmount),
           state: quoteState,
           items: { create: items },
-          sentLogs: quoteSent
+          sentLogs: quoteNumber
             ? { create: buildSentLogs(quoteNumber, "Offerte", customer.email, date) }
             : undefined,
         },
