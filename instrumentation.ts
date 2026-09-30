@@ -23,6 +23,9 @@ export async function register() {
     const { startLogRotationScheduler } = await import("@/lib/logs");
     startLogRotationScheduler();
 
+    const { startBackupScheduler } = await import("@/lib/backup");
+    startBackupScheduler();
+
     // Checkpoint WAL on shutdown so SQLite WAL changes flush to main .db file.
     // NEXT_MANUAL_SIG_HANDLE=true (set in the Dockerfile) disables Next's own
     // SIGTERM/SIGINT handler, which used to race this one and could call

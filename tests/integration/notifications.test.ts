@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { sendAdminNotifications } from "@/lib/notifications";
+import { notifyAdmins, sendAdminNotifications } from "@/lib/notifications";
 
 vi.mock("node-cron", () => ({ default: { schedule: vi.fn(), validate: vi.fn(() => true) } }));
 
@@ -373,5 +373,45 @@ describe("startNotificationScheduler", () => {
     startNotificationScheduler();
     startNotificationScheduler();
     expect(cronMock.schedule).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("notifyAdmins", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch);
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+    mockSendMail.mockClear();
+    mockFetch.mockClear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends to e-mail and Telegram when both are configured", async () => {
+    expect(await notifyAdmins(baseSettings(), "Backup fehlgeschlagen", "disk full", "/settings/logs")).toBe(true);
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockSendMail.mock.calls[0][0].subject).toBe("Backup fehlgeschlagen");
+    expect(mockSendMail.mock.calls[0][0].text).toContain("disk full");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses Telegram alone when no notify e-mail address is set", async () => {
+    const settings = { ...baseSettings(), notifyEmailAddress: null };
+    expect(await notifyAdmins(settings, "S", "M", "/")).toBe(true);
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns false when no channel is configured", async () => {
+    const settings = {
+      ...baseSettings(),
+      notifyEmailAddress: null,
+      notifyTelegramBotToken: null,
+      notifyTelegramChatId: null,
+    };
+    expect(await notifyAdmins(settings, "S", "M", "/")).toBe(false);
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
