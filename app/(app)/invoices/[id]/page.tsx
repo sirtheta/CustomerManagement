@@ -344,7 +344,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        {invoice.state === "Draft" ? <DeleteInvoiceButton invoiceId={invoice.id} /> : <span />}
+        {invoice.state === "Draft" ? <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} /> : <span />}
         <div className="flex items-center gap-2 flex-wrap">
           <SendInvoiceButton
             invoiceId={invoice.id}
