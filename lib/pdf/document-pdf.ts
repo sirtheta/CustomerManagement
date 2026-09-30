@@ -33,7 +33,8 @@ export type RenderDoc = {
   documentNumber: string;
   numberLabel: string; // "Rechnungs-Nr.:" | "Offerten-Nr.:"
   date: Date | string;
-  dueDate: Date | string; // dueDate for invoices, validUntil for quotes
+  dueDate: Date | string | null; // dueDate for invoices, validUntil for quotes; null for credit notes
+  referenceLine?: string; // e.g. "Zu Rechnung R-…" (credit notes)
   dueLabel: string; // "Fälligkeit:" | "Gültig bis:"
   closingNoteLabel: string; // "Zahlbar bis:" | "Gültig bis:"
   customUserText: string | null;
@@ -243,11 +244,12 @@ export async function generateDocumentPdf(
     y += TITLE + 10;
 
     pdf.fontSize(BASE).fillColor(TEXT_COLOR);
-    const detailRows = [
+    const detailRows: string[][] = [
       [doc.numberLabel, doc.documentNumber],
       ["Datum:", fmtDate(doc.date, locale)],
-      [doc.dueLabel, fmtDate(doc.dueDate, locale)],
     ];
+    if (doc.dueDate !== null) detailRows.push([doc.dueLabel, fmtDate(doc.dueDate, locale)]);
+    if (doc.referenceLine) detailRows.push(["Bezug:", doc.referenceLine]);
     detailRows.forEach(([label, value]) => {
       pdf.font(BOLD).text(label, MARGIN, y);
       pdf.font(FONT).text(value, MARGIN + 90, y);
@@ -387,8 +389,10 @@ export async function generateDocumentPdf(
     }
 
     pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
-    pdf.text(`${doc.closingNoteLabel} ${fmtDate(doc.dueDate, locale)}`, MARGIN, y);
-    y += LINE_HEIGHT + 20;
+    if (doc.dueDate !== null) {
+      pdf.text(`${doc.closingNoteLabel} ${fmtDate(doc.dueDate, locale)}`, MARGIN, y);
+      y += LINE_HEIGHT + 20;
+    }
 
     if (theme.showFooter) {
       if (theme.closingSalutation) {

@@ -19,7 +19,11 @@ export async function GET(
   const [invoice, settings] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
+      include: {
+        customer: true,
+        items: { orderBy: { id: "asc" } },
+        creditNoteFor: { select: { documentNumber: true } },
+      },
     }),
     prisma.applicationSettings.findFirst({
       include: { companyInfo: true },
@@ -29,8 +33,9 @@ export async function GET(
   if (!invoice) return Response.json({ error: "Not Found" }, { status: 404 });
   if (!settings) return Response.json({ error: "Company settings not configured" }, { status: 500 });
 
+  const prefix = invoice.creditNoteForId != null ? "gutschrift" : "rechnung";
   const filename = invoice.documentNumber
-    ? `rechnung-${invoice.documentNumber}.pdf`
+    ? `${prefix}-${invoice.documentNumber}.pdf`
     : `entwurf-${invoice.id}.pdf`;
   const cacheKey = `inv-${invoiceId}-v${invoice.version}-n${invoice.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}`;
   const cached = await readCache(cacheKey);

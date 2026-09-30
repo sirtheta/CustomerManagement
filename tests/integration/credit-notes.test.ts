@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer, createValidItemList } from "../test-utils";
+import type { Session } from "next-auth";
+import { syncInvoiceState, getPaymentSummary } from "@/lib/payments";
 import { createCreditNoteDraft, assertCreditWithinOriginal, CreditNoteError } from "@/lib/credit-notes";
+
+const actor = { user: { id: "1", name: "Tester", email: "t@example.ch" } } as Session;
 
 describe("credit notes against a real database", () => {
   const db = createTestDatabase();
@@ -110,5 +114,26 @@ describe("credit notes against a real database", () => {
     await expect(
       assertCreditWithinOriginal(db.prisma, { id: draft.id, creditNoteForId: original.id, totalAmount: 0 })
     ).rejects.toThrow("Die Gutschrift muss einen Betrag haben.");
+  });
+
+  it("a sent full credit note cancels the unpaid original; a partial one lowers the open amount", async () => {
+    const full = await seedInvoice("Sent", 100);
+    await db.prisma.invoice.create({
+      data: {
+        customerId: full.customerId, documentNumber: "R-CN-F", date: new Date(), dueDate: new Date(),
+        totalAmount: -100, state: "Sent", creditNoteForId: full.id,
+      },
+    });
+    expect((await syncInvoiceState({ invoiceId: full.id, actor, source: "credit-note" }, db.prisma)).state).toBe("Canceled");
+
+    const partial = await seedInvoice("Sent", 100);
+    await db.prisma.invoice.create({
+      data: {
+        customerId: partial.customerId, documentNumber: "R-CN-P", date: new Date(), dueDate: new Date(),
+        totalAmount: -25, state: "Sent", creditNoteForId: partial.id,
+      },
+    });
+    expect((await syncInvoiceState({ invoiceId: partial.id, actor, source: "credit-note" }, db.prisma)).state).toBe("Sent");
+    expect((await getPaymentSummary(partial.id, db.prisma)).remainingRappen).toBe(7500);
   });
 });

@@ -78,6 +78,30 @@ describe("generateDocumentPdf byte assembly", () => {
     expect(pageText[0]).toContain("100.00");
   });
 
+  it("renders a credit note without due date and without a QR bill page", async () => {
+    const buf = await generateDocumentPdf(
+      baseDoc({
+        title: "Gutschrift",
+        numberLabel: "Gutschrift-Nr.:",
+        documentNumber: "I-26010002",
+        referenceLine: "Zu Rechnung I-26010001",
+        dueDate: null,
+        totalAmount: -180,
+        qr: null,
+      }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { numPages, pageText } = await extractText(buf);
+    const text = pageText.join(" ");
+    expect(numPages).toBe(1);
+    expect(text).toContain("Gutschrift");
+    expect(text).toContain("Zu Rechnung I-26010001");
+    expect(text).not.toContain("Fälligkeit");
+    expect(text).not.toContain("Zahlbar bis");
+  });
+
   it("adds no QR page for a quote (qr: null)", async () => {
     const buf = await generateDocumentPdf(
       baseDoc({ kind: "quote", title: "Offerte", qr: null }),

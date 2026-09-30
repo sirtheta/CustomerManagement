@@ -10,6 +10,8 @@ import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
+import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
+import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
 
@@ -182,9 +184,28 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
   if (input.kind === "invoice") {
     const invoice = await defaultPrisma.invoice.findUnique({
       where: { id: input.id },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
+      include: {
+        customer: true,
+        items: { orderBy: { id: "asc" } },
+        creditNoteFor: { select: { documentNumber: true } },
+      },
     });
     if (!invoice) return { error: "Rechnung nicht gefunden." };
+
+    // Drafts are not counted when a credit note is saved, so this is the real
+    // enforcement of the credit limit. It must run before a number is assigned.
+    if (invoice.creditNoteForId != null) {
+      try {
+        await assertCreditWithinOriginal(defaultPrisma, {
+          id: invoice.id,
+          creditNoteForId: invoice.creditNoteForId,
+          totalAmount: invoice.totalAmount,
+        });
+      } catch (err) {
+        if (err instanceof CreditNoteError) return { error: err.message };
+        throw err;
+      }
+    }
 
     let documentNumber: string;
     try {
@@ -222,6 +243,12 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
     });
+    if (invoice.creditNoteForId != null) {
+      await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });
+      revalidatePath(`/invoices/${invoice.creditNoteForId}`);
+      revalidatePath("/accounting/receivables");
+      revalidatePath("/dashboard");
+    }
     revalidatePath(`/invoices/${input.id}`);
     revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   } else {

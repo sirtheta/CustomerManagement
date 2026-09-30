@@ -14,6 +14,7 @@ import type {
 export type InvoiceWithDetails = Invoice & {
   customer: Customer;
   items: Item[];
+  creditNoteFor?: { documentNumber: string | null } | null;
 };
 
 export type QuoteWithDetails = Quote & {
@@ -41,7 +42,8 @@ export async function generateInvoicePdf(
   );
 
   const draft = !invoice.documentNumber;
-  const qr = draft
+  const isCreditNote = invoice.creditNoteForId != null;
+  const qr = draft || isCreditNote
     ? null
     : buildQrBillData({
         invoice: { documentNumber: invoice.documentNumber, totalAmount: total },
@@ -51,11 +53,15 @@ export async function generateInvoicePdf(
 
   const doc: RenderDoc = {
     kind: "invoice",
-    title: "Rechnung",
+    title: isCreditNote ? "Gutschrift" : "Rechnung",
     documentNumber: documentLabel(invoice.documentNumber),
-    numberLabel: "Rechnungs-Nr.:",
+    numberLabel: isCreditNote ? "Gutschrift-Nr.:" : "Rechnungs-Nr.:",
     date: invoice.date,
-    dueDate: invoice.dueDate,
+    dueDate: isCreditNote ? null : invoice.dueDate,
+    referenceLine:
+      isCreditNote && invoice.creditNoteFor
+        ? `Zu Rechnung ${documentLabel(invoice.creditNoteFor.documentNumber)}`
+        : undefined,
     dueLabel: "Fälligkeit:",
     closingNoteLabel: "Zahlbar bis:",
     customUserText: invoice.customUserText,
