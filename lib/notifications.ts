@@ -157,6 +157,23 @@ function buildTelegramText(subject: string, message: string, path: string): stri
   return `${escHtml(subject)}\n\n${escHtml(message)}${link}`;
 }
 
+/**
+ * Sends one message to every configured admin channel (notify e-mail address,
+ * Telegram) — the same channels as the daily overdue/pending notifications.
+ * Each channel logs and swallows its own delivery errors. Returns whether at
+ * least one channel is configured.
+ */
+export async function notifyAdmins(
+  settings: FullSettings,
+  subject: string,
+  message: string,
+  path: string
+): Promise<boolean> {
+  const tasks = buildChannelTasks(settings, subject, message, path);
+  await Promise.allSettled(tasks);
+  return tasks.length > 0;
+}
+
 function buildChannelTasks(
   settings: FullSettings,
   subject: string,

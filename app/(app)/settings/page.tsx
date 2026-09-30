@@ -25,7 +25,7 @@ export default async function SettingsPage() {
             Aktivitätsprotokoll
           </Button>
           <Button variant="outline" size="sm" render={<Link href="/settings/logs" />}>
-            Logs
+            Logs &amp; Backups
           </Button>
           <Button variant="outline" size="sm" render={<Link href="/settings/users" />}>
             Benutzer verwalten
