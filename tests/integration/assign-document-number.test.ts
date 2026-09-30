@@ -97,7 +97,12 @@ describe("assignDocumentNumber", () => {
     return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
       code: "P2002",
       clientVersion: "test",
-      meta: { target: ["documentNumber"] },
+      // Shape produced by the better-sqlite3 driver adapter
+      meta: {
+        driverAdapterError: {
+          cause: { kind: "UniqueConstraintViolation", constraint: { fields: ["documentNumber"] } },
+        },
+      },
     });
   }
 
