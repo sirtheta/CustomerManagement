@@ -352,6 +352,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             documentNumber={invoice.documentNumber}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}
+            isCreditNote={isCreditNote}
           />
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
             <CreateCreditNoteButton invoiceId={invoice.id} />
