@@ -97,7 +97,7 @@ model Subscription {
 - [ ] **Step 2: Migration erzeugen und Datenkopie einfügen**
 
 Run: `npx prisma migrate dev --name subscriptions --create-only`
-Das legt `prisma/migrations/<timestamp>_subscriptions/migration.sql` an. Den Ordner in `20260930160000_subscriptions` umbenennen, falls der Timestamp kleiner ist als `20260930150000_sent_document` (Reihenfolge muss stimmen). Im generierten SQL direkt **nach** dem `CREATE TABLE "Subscription" (…)`-Statement und **vor** dem ersten `PRAGMA`/`CREATE TABLE "new_Customer"` einfügen:
+Das legt `prisma/migrations/<timestamp>_subscriptions/migration.sql` an. Den Ordner **immer** in genau `20260930160000_subscriptions` umbenennen (der Migrationstest referenziert diesen Namen, und er sortiert nach `20260930150000_sent_document`). Im generierten SQL direkt **nach** dem `CREATE TABLE "Subscription" (…)`-Statement und **vor** dem ersten `PRAGMA`/`CREATE TABLE "new_Customer"` einfügen:
 
 ```sql
 -- Existing yearly customers become one Yearly subscription each (no template,
@@ -183,7 +183,9 @@ In `tests/test-utils.ts`: `yearlyInvoice: false,` aus `createValidTestCustomer` 
 
 In `tests/unit/document-pdf-generation.test.ts` und `tests/unit/qrbill-data.test.ts` die Felder `yearlyInvoice`/`nextInvoiceDate` aus den Kunden-Objekten entfernen. `tests/unit/customer-actions.test.ts` bleibt in dieser Task unverändert (gemockte Prisma-Calls, läuft zur Laufzeit weiter grün); er wird in Task 5 zusammen mit der Action angepasst. `npx tsc --noEmit` meldet bis Task 6 Fehler in noch nicht angepassten Dateien, das ist erwartet.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Alten Jobtest entfernen** (er nutzt die entfernten Spalten; `tests/integration/subscriptions.test.ts` in Task 3 ersetzt ihn): `git rm tests/integration/yearly-invoices.test.ts`
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add prisma tests
@@ -320,7 +322,7 @@ git commit -m "feat(subscriptions): add interval date calculation"
 
 **Files:**
 - Create: `lib/subscriptions.ts`
-- Delete: `lib/yearly-invoices.ts`, `tests/integration/yearly-invoices.test.ts`
+- Delete: `lib/yearly-invoices.ts` (der alte Test wird schon in Task 1 entfernt)
 - Modify: `lib/notifications.ts:9,34`, `app/(app)/settings/actions.ts:13,288`, `app/(app)/settings/DevToolsCard.tsx:41`, `tests/unit/settings-actions.test.ts:29`, `tests/integration/notifications.test.ts` (Treffer für `checkYearlyInvoices`/`yearly` anpassen)
 - Test: `tests/integration/subscriptions.test.ts`
 
@@ -331,7 +333,7 @@ git commit -m "feat(subscriptions): add interval date calculation"
 - [ ] **Step 1: Failing tests** (`tests/integration/subscriptions.test.ts`)
 
 ```ts
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { checkSubscriptions } from "@/lib/subscriptions";
 
@@ -393,6 +395,7 @@ describe("checkSubscriptions", () => {
     expect(pending[0].to).toBe("jane@clientag.ch");
     expect(pending[0].subject).toContain("{documentNumber}");
     expect(pending[0].body).toContain("{documentNumber}");
+    // Default body contains {totalAmount}; formatCurrency(246) renders "246.00" (check lib/utils.ts if the locale format differs).
     expect(pending[0].body).toContain("246");
   });
 
@@ -469,6 +472,21 @@ describe("checkSubscriptions", () => {
     expect(entries[0].details).toContain(`"subscriptionId":${sub.id}`);
   });
 
+  it("creates nothing when the subscription was paused after the due list was read", async () => {
+    const sub = await seedSubscription();
+    // Simulates the window between reading the due list and the transaction.
+    const realFindMany = db.prisma.subscription.findMany.bind(db.prisma.subscription);
+    const spy = vi.spyOn(db.prisma.subscription, "findMany").mockImplementation(((args: never) =>
+      realFindMany(args).then(async (rows: unknown) => {
+        await db.prisma.subscription.update({ where: { id: sub.id }, data: { active: false } });
+        return rows;
+      })) as never);
+    await checkSubscriptions(db.prisma);
+    spy.mockRestore();
+    expect(await db.prisma.invoice.count()).toBe(0);
+    expect(await db.prisma.pendingEmail.count()).toBe(0);
+  });
+
   it("cascade-deletes the pending email when the invoice is deleted", async () => {
     await seedSubscription();
     await checkSubscriptions(db.prisma);
@@ -497,13 +515,19 @@ const log = logger.child({ module: "subscriptions" });
 
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
+  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
 
 /** Actor for documents the job sends on its own (autoSend); audit and archive rows need a user id. */
 export const SYSTEM_ACTOR: Session = {
   user: { id: "0", name: "System (Abo)", email: "", role: "Admin" },
   expires: "9999-12-31T23:59:59.999Z",
 } as Session;
+
+class SubscriptionChangedError extends Error {
+  constructor() {
+    super("Abo wurde seit dem Laden verändert oder pausiert.");
+  }
+}
 
 function resolve(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
@@ -588,12 +612,15 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
           },
         });
 
-        await tx.subscription.update({
-          where: { id: sub.id },
+        // Guarded against a pause/edit or an overlapping second run since the due
+        // list was read: no match rolls the whole transaction back.
+        const advanced = await tx.subscription.updateMany({
+          where: { id: sub.id, active: true, nextInvoiceDate: sub.nextInvoiceDate },
           data: {
             nextInvoiceDate: advancePast(sub.nextInvoiceDate, sub.interval as SubscriptionIntervalName, today),
           },
         });
+        if (advanced.count === 0) throw new SubscriptionChangedError();
 
         return { invoiceId: invoice.id };
       });
@@ -612,7 +639,11 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
       );
     } catch (err) {
       // One broken subscription must not block the others; it is retried on the next run.
-      log.error({ err, subscriptionId: sub.id }, "Creating the subscription invoice failed");
+      if (err instanceof SubscriptionChangedError) {
+        log.warn({ subscriptionId: sub.id }, "Subscription changed while the job ran, skipped");
+      } else {
+        log.error({ err, subscriptionId: sub.id }, "Creating the subscription invoice failed");
+      }
     }
   }
 }
@@ -623,7 +654,7 @@ Hinweis: `Item.unit` ist ein Prisma-Enum; `TemplateItem.unit` hat denselben Typ,
 - [ ] **Step 4: Alte Dateien entfernen und umverdrahten**
 
 ```bash
-git rm lib/yearly-invoices.ts tests/integration/yearly-invoices.test.ts
+git rm lib/yearly-invoices.ts
 ```
 
 - `lib/notifications.ts`: Import → `import { checkSubscriptions } from "@/lib/subscriptions";`, Schritt → `["checkSubscriptions", () => checkSubscriptions(prisma)],`.
@@ -791,7 +822,7 @@ Import ergänzen: `import { sendPendingInvoice } from "@/lib/pending-email-send"
 Run: `npx vitest run tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts`
 Expected: PASS ohne Änderungen an diesen Tests. Schlägt ein Test wegen Mock-Pfaden fehl (z. B. weil er `@/lib/logger` oder `@/lib/invoice-dispatch` mockt), den Mock belassen: Module-IDs sind dieselben; nur den Fehler analysieren, nicht die Tests umschreiben.
 
-- [ ] **Step 4: Schema-Feld `autoSend` ist schon vorhanden.** Failing test für den Job schreiben (`tests/integration/subscriptions-autosend.test.ts`):
+- [ ] **Step 4: Failing tests für den Job schreiben** (das Schema-Feld `autoSend` existiert seit Task 1). Datei `tests/integration/subscriptions-autosend.test.ts`:
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -799,6 +830,8 @@ import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 
 const sendPendingInvoice = vi.fn();
 vi.mock("@/lib/pending-email-send", () => ({ sendPendingInvoice: (...a: unknown[]) => sendPendingInvoice(...a) }));
+const notifyAdmins = vi.fn();
+vi.mock("@/lib/notifications", () => ({ notifyAdmins: (...a: unknown[]) => notifyAdmins(...a) }));
 
 import { checkSubscriptions, SYSTEM_ACTOR } from "@/lib/subscriptions";
 
@@ -806,14 +839,26 @@ describe("checkSubscriptions with autoSend", () => {
   const db = createTestDatabase();
   const yesterday = new Date(Date.now() - 86_400_000);
 
-  beforeEach(() => sendPendingInvoice.mockReset());
+  beforeEach(async () => {
+    sendPendingInvoice.mockReset();
+    notifyAdmins.mockReset();
+    // notifyAdmins is only called when settings exist
+    await db.prisma.applicationSettings.create({ data: { companyInfo: { create: {} } } });
+  });
 
-  async function seed(opts: { autoSend: boolean; withTemplate: boolean }) {
-    const template = opts.withTemplate
-      ? await db.prisma.invoiceTemplate.create({
-          data: { name: "T", items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 50, quantity: 1 }] } },
-        })
-      : null;
+  async function seed(opts: { autoSend: boolean; template: "items" | "empty" | "none" }) {
+    const template =
+      opts.template === "none"
+        ? null
+        : await db.prisma.invoiceTemplate.create({
+            data: {
+              name: "T",
+              items:
+                opts.template === "items"
+                  ? { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 50, quantity: 1 }] }
+                  : undefined,
+            },
+          });
     const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
     return db.prisma.subscription.create({
       data: {
@@ -828,7 +873,7 @@ describe("checkSubscriptions with autoSend", () => {
 
   it("sends the pending invoice as the system actor", async () => {
     sendPendingInvoice.mockResolvedValue({ invoiceId: 1 });
-    await seed({ autoSend: true, withTemplate: true });
+    await seed({ autoSend: true, template: "items" });
     await checkSubscriptions(db.prisma);
 
     const pending = await db.prisma.pendingEmail.findFirstOrThrow();
@@ -840,42 +885,141 @@ describe("checkSubscriptions with autoSend", () => {
       body: pending.body,
       actor: SYSTEM_ACTOR,
     });
+    expect(notifyAdmins).not.toHaveBeenCalled();
   });
 
-  it("keeps draft and pending email when sending fails, and does not retry the period", async () => {
+  it("keeps draft and pending email and notifies the admins when sending fails", async () => {
     sendPendingInvoice.mockResolvedValue({ error: "SMTP down" });
-    const sub = await seed({ autoSend: true, withTemplate: true });
+    const sub = await seed({ autoSend: true, template: "items" });
     await checkSubscriptions(db.prisma);
 
     expect(await db.prisma.invoice.count()).toBe(1);
     expect(await db.prisma.pendingEmail.count()).toBe(1);
     const updated = await db.prisma.subscription.findUniqueOrThrow({ where: { id: sub.id } });
     expect(updated.nextInvoiceDate.getTime()).toBeGreaterThan(Date.now());
+    expect(notifyAdmins).toHaveBeenCalledTimes(1);
+    expect(notifyAdmins.mock.calls[0][2]).toContain("SMTP down");
+    expect(notifyAdmins.mock.calls[0][3]).toBe("/invoices/pending");
   });
 
-  it("does not throw when sending throws", async () => {
+  it("does not throw, keeps the pending email and notifies when sending throws", async () => {
     sendPendingInvoice.mockRejectedValue(new Error("boom"));
-    await seed({ autoSend: true, withTemplate: true });
+    await seed({ autoSend: true, template: "items" });
     await expect(checkSubscriptions(db.prisma)).resolves.toBeUndefined();
     expect(await db.prisma.pendingEmail.count()).toBe(1);
+    expect(notifyAdmins).toHaveBeenCalledTimes(1);
   });
 
   it("never auto-sends without a template", async () => {
-    await seed({ autoSend: true, withTemplate: false });
+    await seed({ autoSend: true, template: "none" });
+    await checkSubscriptions(db.prisma);
+    expect(sendPendingInvoice).not.toHaveBeenCalled();
+    expect(await db.prisma.pendingEmail.count()).toBe(1);
+  });
+
+  it("never auto-sends a template without items (CHF 0 invoice)", async () => {
+    await seed({ autoSend: true, template: "empty" });
     await checkSubscriptions(db.prisma);
     expect(sendPendingInvoice).not.toHaveBeenCalled();
     expect(await db.prisma.pendingEmail.count()).toBe(1);
   });
 
   it("does not auto-send when autoSend is off", async () => {
-    await seed({ autoSend: false, withTemplate: true });
+    await seed({ autoSend: false, template: "items" });
     await checkSubscriptions(db.prisma);
     expect(sendPendingInvoice).not.toHaveBeenCalled();
   });
 });
 ```
 
-- [ ] **Step 5: Run, expect FAIL** (`npx vitest run tests/integration/subscriptions-autosend.test.ts`: `sendPendingInvoice` wird nie aufgerufen).
+Zusätzlich ein End-to-End-Test **ohne** Mock von `sendPendingInvoice`, der Archiv, `SentDocument` und Status prüft. Datei `tests/integration/subscriptions-send-e2e.test.ts` (Mocks und Prisma-Proxy wie in `tests/integration/invoice-dispatch.test.ts:1-50`):
+
+```ts
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { createTestDatabase, createValidTestCustomer } from "../test-utils";
+
+const holder = vi.hoisted(() => ({ prisma: null as unknown }));
+vi.mock("@/lib/prisma", () => ({
+  default: new Proxy(
+    {},
+    {
+      get: (_t, prop) => {
+        const target = holder.prisma as Record<string | symbol, unknown>;
+        const value = target[prop];
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }
+  ),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
+vi.mock("@/lib/logger", () => ({
+  default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
+}));
+vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn(), generateQuotePdf: vi.fn() }));
+vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn(), sendQuoteEmail: vi.fn() }));
+
+import { checkSubscriptions } from "@/lib/subscriptions";
+import { verifyArchived, sha256Hex } from "@/lib/document-archive";
+import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
+import { sendInvoiceEmail } from "@/lib/email";
+
+describe("autoSend end to end", () => {
+  const db = createTestDatabase();
+  let dir: string;
+
+  beforeEach(async () => {
+    holder.prisma = db.prisma;
+    vi.clearAllMocks();
+    vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("%PDF-1.4 subscription bytes"));
+    vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+    dir = mkdtempSync(join(tmpdir(), "subscription-send-"));
+    process.env.ARCHIVE_DIR = dir;
+    await db.prisma.applicationSettings.create({ data: { companyInfo: { create: {} } } });
+  });
+
+  afterEach(() => {
+    delete process.env.ARCHIVE_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("numbers, archives, mails and marks the invoice as Sent", async () => {
+    const template = await db.prisma.invoiceTemplate.create({
+      data: { name: "T", items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 50, quantity: 1 }] } },
+    });
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+    await db.prisma.subscription.create({
+      data: {
+        customerId: customer.customerId,
+        templateId: template.id,
+        interval: "Yearly",
+        nextInvoiceDate: new Date(Date.now() - 86_400_000),
+        autoSend: true,
+      },
+    });
+
+    await checkSubscriptions(db.prisma);
+
+    const invoice = await db.prisma.invoice.findFirstOrThrow();
+    expect(invoice.state).toBe("Sent");
+    expect(invoice.documentNumber).not.toBeNull();
+    expect(await db.prisma.pendingEmail.count()).toBe(0);
+    expect(await db.prisma.invoiceSentLog.count()).toBe(1);
+
+    const rows = await db.prisma.sentDocument.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].createdById).toBe(0);
+    const attached = vi.mocked(sendInvoiceEmail).mock.calls[0][2];
+    expect(rows[0].sha256).toBe(sha256Hex(attached));
+    expect(readFileSync(join(dir, rows[0].path))).toEqual(attached);
+    expect((await verifyArchived(rows[0])).ok).toBe(true);
+  });
+});
+```
+
+- [ ] **Step 5: Run, expect FAIL** (`npx vitest run tests/integration/subscriptions-autosend.test.ts tests/integration/subscriptions-send-e2e.test.ts`: `sendPendingInvoice` wird nie aufgerufen).
 
 - [ ] **Step 6: Implementierung in `lib/subscriptions.ts`**
 
@@ -885,28 +1029,58 @@ Die Transaktion gibt zusätzlich die Pending-Daten zurück; nach dem Audit-Eintr
 2. Nach `await logAuditEntry(...)` (noch im `try`) ergänzen:
 
 ```ts
-      if (sub.autoSend && sub.templateId != null) {
-        // Loaded lazily: the PDF/mail stack is only needed when something is actually sent.
-        const { sendPendingInvoice } = await import("@/lib/pending-email-send");
-        const result = await sendPendingInvoice({
-          pendingId: pending.id,
-          to: pending.to,
-          subject: pending.subject,
-          body: pending.body,
-          actor: SYSTEM_ACTOR,
-        });
-        if ("error" in result) {
-          // Draft and PendingEmail stay; the existing pending-mail admin notification picks them up.
-          log.error({ subscriptionId: sub.id, invoiceId, error: result.error }, "Auto-send failed, invoice waits for manual approval");
+      // Only a template with items is sent unattended, never a CHF 0 invoice.
+      if (sub.autoSend && items.length > 0) {
+        try {
+          // Loaded lazily: the PDF/mail stack is only needed when something is actually sent.
+          const { sendPendingInvoice } = await import("@/lib/pending-email-send");
+          const result = await sendPendingInvoice({
+            pendingId: pending.id,
+            to: pending.to,
+            subject: pending.subject,
+            body: pending.body,
+            actor: SYSTEM_ACTOR,
+          });
+          if ("error" in result) await reportAutoSendFailure(settings, sub.id, invoiceId, result.error);
+        } catch (err) {
+          await reportAutoSendFailure(settings, sub.id, invoiceId, err instanceof Error ? err.message : "Unbekannter Fehler");
         }
       }
 ```
 
-Ein Wurf von `sendPendingInvoice` wird vom äusseren `catch` abgefangen (Test «does not throw»).
+3. Den Helfer oberhalb von `resolve` einfügen (lazy Import von `@/lib/notifications`, weil dieses Modul `checkSubscriptions` importiert und ein statischer Import zyklisch wäre):
+
+```ts
+type JobSettings = NonNullable<Awaited<ReturnType<PrismaClient["applicationSettings"]["findFirst"]>>>;
+
+/** Logs and tells the admins (notify e-mail / Telegram); draft and PendingEmail stay for manual approval. */
+async function reportAutoSendFailure(
+  settings: (JobSettings & { companyInfo: unknown }) | null,
+  subscriptionId: number,
+  invoiceId: number,
+  error: string
+): Promise<void> {
+  log.error({ subscriptionId, invoiceId, error }, "Auto-send failed, invoice waits for manual approval");
+  if (!settings) return;
+  try {
+    const { notifyAdmins } = await import("@/lib/notifications");
+    await notifyAdmins(
+      settings as Parameters<typeof notifyAdmins>[0],
+      "Abo-Rechnung konnte nicht versendet werden",
+      `Die Abo-Rechnung (Entwurf ${invoiceId}) konnte nicht automatisch versendet werden: ${error}. Sie wartet auf die manuelle Freigabe.`,
+      "/invoices/pending"
+    );
+  } catch (err) {
+    log.error({ err, subscriptionId }, "Notifying the admins about the failed auto-send failed");
+  }
+}
+```
+
+Ein Wurf von `sendPendingInvoice` wird vom inneren `catch` abgefangen und gemeldet (Test «does not throw»).
 
 - [ ] **Step 7: Run, expect PASS**
 
-Run: `npx vitest run tests/integration/subscriptions.test.ts tests/integration/subscriptions-autosend.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts`
+Run: `npx vitest run tests/integration/subscriptions.test.ts tests/integration/subscriptions-autosend.test.ts tests/integration/subscriptions-send-e2e.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts`
 
 - [ ] **Step 8: Commit**
 
@@ -938,15 +1112,15 @@ git commit -m "feat(subscriptions): auto-send subscription invoices via shared p
 - [ ] **Step 2: Failing unit tests** (`tests/unit/subscription-actions.test.ts`; Muster aus `tests/unit/customer-actions.test.ts` für `auth`/`prisma`/`next/cache`-Mocks übernehmen, vorher `sed -n 1,60p tests/unit/customer-actions.test.ts` lesen und dieselben Mocks/Session-Fixtures verwenden):
 
 Zu prüfende Fälle (je ein `it`):
-1. `createSubscription` mit gültigen Daten ruft `prisma.subscription.create` mit `{ customerId, interval: "Quarterly", nextInvoiceDate: new Date("2027-01-01"), templateId: 5, autoSend: true, active: true }` auf (Vorlage via gemocktem `prisma.invoiceTemplate.findUnique` → `{ id: 5 }`), schreibt `logAudit(session, "CREATE", "Subscription", id, …)`, liefert `{ success: true }`.
+1. `createSubscription` mit gültigen Daten ruft `prisma.subscription.create` mit `{ customerId, interval: "Quarterly", nextInvoiceDate: new Date(2027, 0, 1), templateId: 5, autoSend: true, active: true }` auf (Vorlage via gemocktem `prisma.invoiceTemplate.findUnique` → `{ id: 5 }`), schreibt `logAudit(session, "CREATE", "Subscription", id, …)`, liefert `{ success: true }`.
 2. Ungültiges Intervall (`"Weekly"`) → `{ error: "Ungültiges Intervall." }`, kein `create`.
 3. Fehlendes/ungültiges Datum → `{ error: "Bitte ein gültiges Datum angeben." }`.
 4. `autoSend: "on"` ohne `templateId` → `{ error: "Automatischer Versand braucht eine Vorlage." }`.
 5. Unbekannte Vorlage (`findUnique` → `null`) → `{ error: "Vorlage nicht gefunden." }`.
 6. Viewer (Rolle ohne Editor-Recht) → `requireEditor` wirft bzw. leitet um (gleiches Verhalten wie im bestehenden Customer-Test prüfen).
-7. `setSubscriptionActive(1, 7, false)` ruft `prisma.subscription.update({ where: { id: 7 }, data: { active: false } })` und `logAudit(session, "UPDATE", "Subscription", 7, …)`.
-8. `deleteSubscription` ruft `prisma.subscription.delete({ where: { id: 7 } })` und `logAudit(session, "DELETE", "Subscription", 7, …)`; nutzt `requireEditor` (nicht nur Admin).
-9. `updateSubscription` validiert wie `create`, ruft `prisma.subscription.update` mit denselben Feldern.
+7. `setSubscriptionActive(1, 7, false)` ruft `prisma.subscription.updateMany({ where: { id: 7, customerId: 1 }, data: { active: false } })` und `logAudit(session, "UPDATE", "Subscription", 7, …)`; bei `count: 0` (falscher Kunde) wird nichts geschrieben und kein Audit-Eintrag erzeugt.
+8. `deleteSubscription(1, 7)` ruft `prisma.subscription.deleteMany({ where: { id: 7, customerId: 1 } })` und `logAudit(session, "DELETE", "Subscription", 7, …)`; nutzt `requireEditor` (nicht nur Admin).
+9. `updateSubscription` validiert wie `create`, ruft `prisma.subscription.updateMany({ where: { id, customerId }, data })`; `count: 0` → `{ error: "Abo nicht gefunden." }`.
 
 - [ ] **Step 3: Run, expect FAIL** (`npx vitest run tests/unit/subscription-actions.test.ts`).
 
@@ -961,6 +1135,7 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import { requireEditor } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
+import { isValidDateString, parseDate } from "@/lib/date";
 
 type SubscriptionFields = {
   interval: SubscriptionIntervalName;
@@ -975,11 +1150,11 @@ async function parseSubscriptionForm(
   const interval = formData.get("interval") as string;
   if (!Object.hasOwn(INTERVAL_LABELS, interval)) return { error: "Ungültiges Intervall." };
 
+  // Local-time parsing (lib/date.ts): `new Date("YYYY-MM-DD")` would be UTC midnight and
+  // shift the day around DST changes and for the job's local-midnight comparison.
   const dateRaw = (formData.get("nextInvoiceDate") as string) || "";
-  const nextInvoiceDate = new Date(dateRaw);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw) || Number.isNaN(nextInvoiceDate.getTime())) {
-    return { error: "Bitte ein gültiges Datum angeben." };
-  }
+  const nextInvoiceDate = isValidDateString(dateRaw) ? parseDate(dateRaw) : undefined;
+  if (!nextInvoiceDate) return { error: "Bitte ein gültiges Datum angeben." };
 
   const templateRaw = (formData.get("templateId") as string) || "";
   const templateId = templateRaw ? parseInt(templateRaw, 10) : null;
@@ -1028,7 +1203,11 @@ export async function updateSubscription(
   const parsed = await parseSubscriptionForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
-  await prisma.subscription.update({ where: { id: subscriptionId }, data: parsed.data });
+  const { count } = await prisma.subscription.updateMany({
+    where: { id: subscriptionId, customerId },
+    data: parsed.data,
+  });
+  if (count === 0) return { error: "Abo nicht gefunden." };
   await logAudit(session, "UPDATE", "Subscription", subscriptionId, INTERVAL_LABELS[parsed.data.interval], {
     customerId,
     templateId: parsed.data.templateId,
@@ -1045,7 +1224,8 @@ export async function setSubscriptionActive(
   active: boolean
 ): Promise<void> {
   const session = await requireEditor();
-  await prisma.subscription.update({ where: { id: subscriptionId }, data: { active } });
+  const { count } = await prisma.subscription.updateMany({ where: { id: subscriptionId, customerId }, data: { active } });
+  if (count === 0) return;
   await logAudit(session, "UPDATE", "Subscription", subscriptionId, undefined, { customerId, active });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
@@ -1053,14 +1233,15 @@ export async function setSubscriptionActive(
 
 export async function deleteSubscription(customerId: number, subscriptionId: number): Promise<void> {
   const session = await requireEditor();
-  await prisma.subscription.delete({ where: { id: subscriptionId } });
+  const { count } = await prisma.subscription.deleteMany({ where: { id: subscriptionId, customerId } });
+  if (count === 0) return;
   await logAudit(session, "DELETE", "Subscription", subscriptionId, undefined, { customerId });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
 }
 ```
 
-Datumsformat: Die Jahres-Migration und der Job rechnen in Lokalzeit; `new Date("2027-01-01")` ist UTC-Mitternacht (wie vorher beim Kundenformular). In der Schweiz (UTC+1/+2) liegt das am selben Kalendertag, `setHours(0,0,0,0)` im Job vergleicht gegen lokale Mitternacht: ein heutiges Datum gilt als fällig. Das entspricht dem bisherigen Verhalten; nicht ändern.
+Datumsformat: Job und `addInterval` rechnen in Lokalzeit. Formularwerte werden deshalb mit `parseDate` (lokale Mitternacht) gespeichert und mit `toDateString` (lokale Getter) angezeigt, nie mit `new Date("YYYY-MM-DD")` oder `toISOString()` (UTC würde den Tag an DST-Grenzen verschieben). Migrierte Altwerte (UTC-Mitternacht, in der Schweiz 01:00/02:00 lokal) zeigen lokal denselben Kalendertag.
 
 - [ ] **Step 5: Run, expect PASS** (`npx vitest run tests/unit/subscription-actions.test.ts`).
 
@@ -1100,7 +1281,7 @@ Aufbau:
 - Ist `!canEdit`, nur eine Read-only-Liste (Intervall, nächstes Datum, Vorlage, Auto-Versand) ohne Formulare/Buttons.
 - Leerzustand: «Noch keine Abos vorhanden.»
 
-- [ ] **Step 8: Seite einbinden** (`app/(app)/customers/[id]/page.tsx`)
+- [ ] **Step 8: Seite einbinden** (`app/(app)/customers/[id]/page.tsx`; Import `import { toDateString } from "@/lib/date";`)
 
 Im `Promise.all` zwei Abfragen ergänzen und Destructuring erweitern (`subscriptions`, `templates`):
 
@@ -1123,7 +1304,7 @@ Import `SubscriptionsSection from "../SubscriptionsSection"`; in der rechten Spa
             subscriptions={subscriptions.map((s) => ({
               id: s.id,
               interval: s.interval,
-              nextInvoiceDate: s.nextInvoiceDate.toISOString().split("T")[0],
+              nextInvoiceDate: toDateString(s.nextInvoiceDate),
               autoSend: s.autoSend,
               active: s.active,
               templateId: s.templateId,
@@ -1199,19 +1380,26 @@ Query-Parameter umbenennen: in `Props`, Destructuring und beiden `p.set(...)` `y
 Import `INTERVAL_LABELS` aus `@/lib/subscription-dates`. Falls ein Test den Export prüft (`grep -rn "Jahresrechnung" tests`), auf «Abos» und das neue Format anpassen.
 
 - [ ] **Step 4: Seeds.**
-- `prisma/seed.ts` Zeilen 139-140: entfernen. Stattdessen nach dem Anlegen der Kunden (Zeile 143 `customers.push(customer)`) pro Kunde: `if (forcedYearly || faker.datatype.boolean()) await prisma.subscription.create({ data: { customerId: customer.customerId, interval: faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"]), nextInvoiceDate: faker.date.future() } })`.
+- `prisma/seed.ts` Zeilen 139-140: entfernen. Stattdessen nach dem Anlegen der Kunden (Zeile 143 `customers.push(customer)`) pro Kunde: `if (forcedYearly || faker.datatype.boolean()) await prisma.subscription.create({ data: { customerId: customer.customerId, interval: forcedYearly ? "Yearly" : faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"]), nextInvoiceDate: faker.date.future() } })`. Die `forcedYearly`-Kunden bekommen bewusst `Yearly`, weil `seedPendingYearlyInvoices` ihr Datum um ein Jahr weiterschiebt.
 - `seedPendingYearlyInvoices` (ab Zeile 306): Kommentar auf Abos umstellen, das Draft-`totalAmount: 0` durch die Summe der `items` (`priorTotal`-ähnlich, Items per `items: { create: buildItems(categories) }`) ersetzen, `totalAmount` in den Mail-Variablen entsprechend formatieren, und statt `prisma.customer.update({ … nextInvoiceDate: next })` die Subscription des Kunden um ein Jahr weiterschieben: `prisma.subscription.updateMany({ where: { customerId: customer.customerId }, data: { nextInvoiceDate: next } })`. Die ersten `PENDING_YEARLY_COUNT` Kunden erhalten garantiert ein Abo (`forcedYearly`). Im Seed-Logtext «pending yearly invoice mails» → «pending subscription invoice mails».
 - `scripts/seed-manual-demo.ts` Zeilen 72-79: in den Kunden-Literalen `yearlyInvoice`/`nextInvoiceDate` entfernen und für die drei bisherigen Jahreskunden (Bergland Bäckerei, Optik Sonnenschein, Confiserie Mathez) nach dem Anlegen je ein Abo mit dem bisherigen Datum (`daysFromNow(45|120|200)`) und Intervall `Yearly` bzw. `Quarterly`/`Monthly` zur Demonstration anlegen (Code an der Stelle lesen, an der die Kunden erzeugt werden, und dort `prisma.subscription.create` ergänzen).
 - `scripts/migrate-data.mjs` Zeilen 137-139: die Felder `yearlyInvoice`/`nextInvoiceDate` aus dem Kunden-Insert entfernen; danach im selben Skript (nach dem Kunden-Insert) pro Quellzeile mit `toBool(r.YearlyInvoice) && toDate(r.NextInvoiceDate)` ein `subscription`-Insert mit `interval: "Yearly"` ergänzen (an den umgebenden Code-Stil anpassen).
 
-- [ ] **Step 5: Verifizieren**
+- [ ] **Step 5: Übrige «Jahresrechnung»-Texte anpassen.** `grep -rn "Jahresrechnung" app lib scripts README.md marketing --include=*.ts --include=*.tsx --include=*.md --include=*.html | cut -c1-200` zeigt die Stellen (nie die ganze Zeile von `public/benutzerhandbuch.html` ausgeben, sie enthält Base64-Bilder). Bekannte Treffer und ihre neue Formulierung:
+  - `app/(app)/dashboard/page.tsx:79-80`, `app/(app)/invoices/page.tsx:321-322`, `app/(app)/invoices/pending/page.tsx:20`: «Jahresrechnung(en)» → «Abo-Rechnung(en)» (sinngemäss; die Seiten zeigen Entwürfe aus dem Abo-Job).
+  - `lib/notifications.ts:109-110`: Betreff `Abo-Rechnungen zur Überprüfung – ${n} neue Rechnung(en)` und Text `${n} neue Abo-Rechnung(en) warten auf Überprüfung.`
+  - `app/(app)/settings/SettingsForm.tsx:376`, `scripts/splice-manual-screenshots.ts:20`, `README.md:21`, `marketing/features-section.html:93`: Wortlaut auf «Abos» bzw. «wiederkehrende Rechnungen (monatlich, quartalsweise, jährlich)» ändern.
+  - `ApplicationSettings.defaultYearlyInvoice` (Schema, `settings/actions.ts:101`) ist schon heute ungenutzt und bleibt ausdrücklich ausserhalb dieses Features.
+  Falls ein Test auf die alten Texte prüft (`grep -rn "Jahresrechnung" tests`), anpassen.
+
+- [ ] **Step 6: Verifizieren**
 
 Run: `npx tsc --noEmit`, `npm run lint`, `npm test` → alles grün. `npm run db:seed` gegen eine frische Dev-DB lokal prüfen (`DATABASE_URL=file:./data/seed-check.db npx prisma migrate deploy && DATABASE_URL=file:./data/seed-check.db npm run db:seed`, danach die Datei löschen).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add -A app prisma scripts tests
+git add app lib prisma scripts tests README.md marketing
 git commit -m "feat(subscriptions): show subscriptions in dashboard, customer list, export and seeds"
 ```
 
@@ -1225,14 +1413,14 @@ git commit -m "feat(subscriptions): show subscriptions in dashboard, customer li
 - [ ] **Step 1: CLAUDE.md.** Den Stichpunkt `lib/yearly-invoices.ts handles automatic recurring invoice creation` ersetzen durch:
 
 ```
-- **Subscriptions** (`lib/subscriptions.ts`, `lib/subscription-dates.ts`): a `Subscription` (several per customer; interval Monthly/Quarterly/Yearly, `InvoiceTemplate`, `nextInvoiceDate`, `autoSend`, `active`) replaces the old `Customer.yearlyInvoice`. The daily job `checkSubscriptions` creates a Draft with the template's items (no template → empty draft) plus a `PendingEmail` and advances the date in one transaction (catch-up: one invoice per run). `autoSend` (template required) then sends through `sendPendingInvoice` (`lib/pending-email-send.ts`, shared with `approvePendingEmail`) as `SYSTEM_ACTOR`; on failure the draft and pending mail stay for manual approval. A day that does not exist in the target month is clamped (31 Jan → 28 Feb) and stays clamped
+- **Subscriptions** (`lib/subscriptions.ts`, `lib/subscription-dates.ts`): a `Subscription` (several per customer; interval Monthly/Quarterly/Yearly, `InvoiceTemplate`, `nextInvoiceDate`, `autoSend`, `active`) replaces the old `Customer.yearlyInvoice`. The daily job `checkSubscriptions` creates a Draft with the template's items (no template → empty draft) plus a `PendingEmail` and advances the date in one transaction (catch-up: one invoice per run). `autoSend` (template with at least one item required) then sends through `sendPendingInvoice` (`lib/pending-email-send.ts`, shared with `approvePendingEmail`) as `SYSTEM_ACTOR`; on failure the draft and pending mail stay for manual approval and the admins are notified via `notifyAdmins`. A day that does not exist in the target month is clamped (31 Jan → 28 Feb) and stays clamped
 ```
 
 - [ ] **Step 2: `FEATURE_ANALYSE.md:232`:** `- [ ] 9. F11 flexible Abos` → `- [x] 9. F11 flexible Abos`.
 
 - [ ] **Step 3: Handbuch.** `grep -n "Jahresrechnung" public/benutzerhandbuch.html | cut -c1-200` zeigt die Stellen (die Datei enthält eingebettete Base64-Bilder; nie die ganze Zeile ausgeben). Den Abschnitt um «Geplante Jahresrechnungen» (Zeile ~508) auf «Abos» umschreiben: Abos werden auf der Kundenseite angelegt (Intervall, nächstes Datum, Vorlage, optional automatischer Versand, Pausieren); ohne Vorlage entsteht ein leerer Entwurf.
 
-- [ ] **Step 4: Spec abgleichen.** In der Spec unter «Job» den Punkt zu `autoSend` präzisieren: «Bei Fehler bleiben Entwurf und `PendingEmail` bestehen; die Admin-Benachrichtigung läuft über den bestehenden Pending-E-Mail-Kanal (`notifyPendingEnabled`).»
+- [ ] **Step 4: Spec abgleichen.** In der Spec unter «Job» präzisieren: «`autoSend` sendet nur Vorlagen mit mindestens einer Position. Bei Fehler bleiben Entwurf und `PendingEmail` bestehen, und die Admins werden über `notifyAdmins` (Notify-E-Mail, Telegram) benachrichtigt.» Zusätzlich im Abschnitt UI «Datumswerte werden lokal geparst (`lib/date.ts`)» ergänzen.
 
 - [ ] **Step 5: Gesamtprüfung**
 
@@ -1241,6 +1429,6 @@ Run: `npm test`, `npm run lint`, `npx tsc --noEmit`, `npm run build`. Alle müss
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A
+git add CLAUDE.md FEATURE_ANALYSE.md public/benutzerhandbuch.html docs/superpowers/specs/2026-09-30-f11-flexible-abos-design.md
 git commit -m "docs(subscriptions): document flexible subscriptions and mark F11 done"
 ```
