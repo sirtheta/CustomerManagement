@@ -53,6 +53,7 @@ model Invoice {
   sentLogs        InvoiceSentLog[]
   pendingReminder PendingReminder?
   payments        Payment[]
+  sentDocuments   SentDocument[]
 
   @@unique([documentNumber])
   @@index([customerId])
@@ -84,6 +85,24 @@ model InvoiceSentLog {
   sentTo    String
   subject   String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model SentDocument {
+  id             Int      @id @default(autoincrement())
+  invoiceId      Int
+  kind           String // Invoice | Reminder
+  reminderLevel  Int?
+  documentNumber String
+  path           String // relative to the archive root, e.g. 2026/I-26090001_Invoice_20260930T101500123Z.pdf
+  sha256         String
+  size           Int
+  sentTo         String
+  subject        String
+  createdAt      DateTime @default(now())
+  createdById    Int
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
 }
 
 model QuoteSentLog {
