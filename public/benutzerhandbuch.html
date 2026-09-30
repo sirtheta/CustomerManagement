@@ -768,6 +768,7 @@
         <figcaption><span class="tag">/settings/audit</span> Aktivitätsprotokoll</figcaption>
       </figure>
       <p>Jeder Eintrag zeigt Zeitpunkt, Benutzer, betroffenes Objekt und Art der Änderung (Anlegen, Bearbeiten, Löschen, Versenden, Statuswechsel). Über die Filter lässt sich nach Aktion oder Benutzer eingrenzen.</p>
+      <p>Jeder neue Eintrag wird mit einer Prüfsumme gesichert, die auch die Prüfsumme des vorherigen Eintrags enthält. Über dem Protokoll zeigt die Seite das Ergebnis der Integritätsprüfung an. Erscheint die Meldung „Integritätsprüfung fehlgeschlagen“, wurde ein Eintrag nachträglich verändert oder entfernt: Datenbank-Backup sichern und den Administrator bzw. Entwickler informieren. Der angezeigte Kopf-Hash lässt sich notieren oder ausdrucken. Gibt man ihn später als Adresszusatz <code>?head=…</code> ein, prüft die Seite, ob dieser Hash noch in der Kette vorkommt, also ob die bis dahin geschriebenen Einträge noch vorhanden sind. Die Prüfung erkennt Änderungen und Löschungen einzelner Einträge, kann aber nicht ausschliessen, dass jemand mit Zugriff auf die Datenbankdatei die ganze Kette neu berechnet. Einträge aus der Zeit vor dieser Funktion haben keine Prüfsumme.</p>
     </section>
 
     <!-- ══════════════════════ ADMIN: LOGS ══════════════════════ -->

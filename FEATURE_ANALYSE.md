@@ -58,7 +58,7 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 | U3 | **Wird ein Kunde gelöscht, werden alle seine Rechnungen per Cascade mitgelöscht.** | [Code] `schema.prisma` `Invoice.customer … onDelete: Cascade`, `app/(app)/customers/actions.ts` Z. 132–136 |
 | U4 | **Storno ist nur ein Statuswert.** Es gibt keine Gutschrift und keinen Stornobeleg. Der Status lässt sich beliebig zurücksetzen, auch von „Bezahlt“ auf „Entwurf“. | [Code] `updateInvoiceStatus` in `invoices/actions.ts`, `InvoiceStatusSelect.tsx` |
 | U5 | **Das versendete PDF wird nicht archiviert.** Es wird bei jedem Abruf neu aus den aktuellen Daten erzeugt. | [Code] `lib/pdf/invoice-pdf.ts`, `app/api/invoices/[id]/pdf/route.ts`. `InvoiceSentLog` speichert nur Empfänger und Betreff. |
-| U6 | **Das Audit-Log ist eine normale, veränderbare Tabelle.** Fehler beim Schreiben werden abgefangen (dann fehlt der Eintrag). Einige Aktionen werden gar nicht protokolliert: `approvePendingEmail`, `discardPendingEmail`. | [Code] `lib/audit.ts` (try/catch), Suche `logAudit` in `app/(app)/invoices/pending/`: keine Treffer |
+| U6 | **Das Audit-Log ist eine normale, veränderbare Tabelle.** Fehler beim Schreiben werden abgefangen (dann fehlt der Eintrag). Einige Aktionen werden gar nicht protokolliert: `approvePendingEmail`, `discardPendingEmail`. Hash-Kette umgesetzt (F4 B): Änderungen und Löschungen einzelner Einträge sind erkennbar, eine vollständige Neuberechnung der Kette durch Personen mit Dateizugriff nicht. | [Code] `lib/audit.ts` (try/catch), Suche `logAudit` in `app/(app)/invoices/pending/`: keine Treffer |
 
 **Einordnung:** Geschäftsbücher und Buchungsbelege sind 10 Jahre aufzubewahren (Art. 958f OR). Die Geschäftsbücherverordnung (GeBüV, SR 221.431) verlangt Integrität und Nachvollziehbarkeit [bitte prüfen, ob die App im konkreten Fall als „Geschäftsbuch“ gilt]. Mit U1–U5 lässt sich kaum belegen, *welche* Rechnung dem Kunden tatsächlich zugestellt wurde.
 
@@ -217,10 +217,10 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung (#114)
 - [ ] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
 - [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
-- [ ] 4. F4 Belegarchiv und automatisches Backup (Teil C Backup erledigt; offen: kein PDF-Archiv mit Hash, keine Hash-Kette im Audit-Log)
+- [ ] 4. F4 Belegarchiv und automatisches Backup (Teil C Backup und Teil B Hash-Kette erledigt; offen: kein PDF-Archiv mit Hash)
   - [x] C Automatisches nächtliches Backup (`lib/backup.ts`)
   - [ ] A PDF-Archiv mit SHA-256-Hash
-  - [ ] B Hash-Kette im Audit-Log
+  - [x] B Hash-Kette im Audit-Log
 - [x] 5. Kleine Fixes (#113)
   - [x] Import prüft Währung und IBAN (Z3)
   - [x] Audit-Log für Pending-E-Mails (U6)
