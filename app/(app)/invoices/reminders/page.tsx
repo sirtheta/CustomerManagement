@@ -93,7 +93,7 @@ export default async function RemindersPage({ searchParams }: Props) {
                 key={r.id}
                 reminderId={r.id}
                 invoiceId={inv.id}
-                documentNumber={documentLabel(inv.documentNumber)}
+                documentNumber={inv.documentNumber}
                 customerName={customerName}
                 totalAmount={inv.totalAmount.toNumber()}
                 dueDate={formatDate(inv.dueDate)}
