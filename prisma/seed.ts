@@ -158,7 +158,18 @@ async function main() {
       const state = faker.helpers.arrayElement(INVOICE_STATES);
       // Paid invoices feed the cash-basis accounting module, so they need a paidDate
       const paidDate =
-        state === InvoiceState.Paid ? faker.date.between({ from: date, to: new Date() }) : null;
+        state === InvoiceState.Paid || state === InvoiceState.PartiallyPaid
+          ? faker.date.between({ from: date, to: new Date() })
+          : null;
+      const invoiceTotal = round2(totalAmount);
+      // Payment is the source of truth: Paid invoices get one full payment, PartiallyPaid
+      // invoices half of the total (and no paidDate, which is only set once fully paid)
+      const payments =
+        state === InvoiceState.Paid && paidDate
+          ? [{ date: paidDate, amount: invoiceTotal, source: "manual" }]
+          : state === InvoiceState.PartiallyPaid && paidDate
+            ? [{ date: paidDate, amount: round2(invoiceTotal / 2), source: "manual" }]
+            : [];
       // Non-draft invoices have been sent at least once and therefore carry a
       // number; drafts stay unnumbered (and don't consume the counter)
       const invoiceSent = state !== InvoiceState.Draft;
@@ -172,9 +183,10 @@ async function main() {
           customUserText: faker.lorem.paragraph(),
           date,
           dueDate,
-          totalAmount: round2(totalAmount),
+          totalAmount: invoiceTotal,
           state,
-          paidDate,
+          paidDate: state === InvoiceState.Paid ? paidDate : null,
+          payments: payments.length > 0 ? { create: payments } : undefined,
           items: { create: items },
           sentLogs: invoiceNumber
             ? { create: buildSentLogs(invoiceNumber, "Rechnung", customer.email, date) }
@@ -312,6 +324,7 @@ async function seedPendingYearlyInvoices(
     const priorDue = new Date(priorDate);
     priorDue.setDate(priorDue.getDate() + paymentDays);
     const items = buildItems(categories);
+    const priorTotal = round2(items.reduce((sum, item) => sum + item.totalAmount, 0));
     const priorNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
     await prisma.invoice.create({
       data: {
@@ -319,9 +332,10 @@ async function seedPendingYearlyInvoices(
         documentNumber: priorNumber,
         date: priorDate,
         dueDate: priorDue,
-        totalAmount: round2(items.reduce((sum, item) => sum + item.totalAmount, 0)),
+        totalAmount: priorTotal,
         state: InvoiceState.Paid,
         paidDate: priorDue,
+        payments: { create: [{ date: priorDue, amount: priorTotal, source: "manual" }] },
         items: { create: items },
         sentLogs: { create: buildSentLogs(priorNumber, "Rechnung", customer.email, priorDate) },
       },
