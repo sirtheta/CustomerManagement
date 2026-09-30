@@ -84,13 +84,59 @@ docker run -d \
 
 ## 3. Daten & Backup
 
+Die App sichert die Datenbank **automatisch jede Nacht um 02:15 Serverzeit** nach `data/backups/db-JJJJ-MM-TT.db` und behält 30 Tage. Die Dateien lassen sich unter *Einstellungen → Logs & Backups* herunterladen.
+
+| Variable | Standard | Bedeutung |
+|---|---|---|
+| `BACKUP_DIR` | `data/backups` | Zielordner, z. B. ein gemounteter USB-Stick oder NAS |
+| `BACKUP_CRON_SCHEDULE` | `15 2 * * *` | Zeitplan (Serverzeit) |
+| `BACKUP_KEEP_DAYS` | `30` | Aufbewahrung in Tagen, `0` = alles behalten |
+| `DISABLE_BACKUP` | – | `true` schaltet das automatische Backup ab |
+
+**Zeitzone:** Der Container läuft ohne weitere Angabe in UTC, 02:15 ist dann 03:15 (Winter) bzw. 04:15 (Sommer) Schweizer Zeit, und das Datum im Dateinamen ist ein UTC-Datum. Für Schweizer Zeit in der `.env` `TZ=Europe/Zurich` setzen (gilt auch für die Log-Rotation und die täglichen Benachrichtigungen).
+
+Schlägt ein Backup fehl, geht eine Meldung an die Benachrichtigungs-Kanäle aus den Einstellungen (Benachrichtigungs-E-Mail und/oder Telegram).
+
+**Speicherplatz:** Jedes Backup ist eine vollständige Kopie der Datenbank, inklusive Dateianhängen und Logo. 30 Backups brauchen also rund 30-mal die Grösse von `customermanagement.db`. Grösse prüfen (`du -sh data/customermanagement.db data/backups`) und `BACKUP_KEEP_DAYS` bei Bedarf senken.
+
+**Wichtig:** Liegt `data/backups` auf derselben SD-Karte wie die Datenbank, schützt es nicht vor einem Kartendefekt. Deshalb `BACKUP_DIR` auf ein externes Laufwerk legen oder das Verzeichnis regelmässig ausser Haus kopieren, z. B. per Cron:
+
 ```bash
-# SQLite-Backup
+# Täglich um 05:00 auf ein NAS spiegeln (nach dem Backup, auch bei UTC im Container)
+# 0 5 * * * rsync -a ~/customer-management/data/backups/ nas:/backups/customer-management/
+```
+
+Ein Backup enthält alle Daten inklusive Passwort-Hashes und SMTP-Zugang. Nur an vertrauenswürdigen Orten ablegen.
+
+### Wiederherstellen
+
+```bash
+cd ~/customer-management
+docker compose down
+# Kaputte DB beiseitelegen (als Kopie, damit die Originaldatei mit ihren
+# Rechten bestehen bleibt und gleich überschrieben werden kann)
+cp data/customermanagement.db data/customermanagement.db.defekt
+# Alte WAL-Dateien MÜSSEN weg: SQLite würde sie sonst in das
+# wiederhergestellte Backup einspielen und es beschädigen
+rm -f data/customermanagement.db-wal data/customermanagement.db-shm
+cp data/backups/db-2026-09-30.db data/customermanagement.db
+docker compose up -d
+```
+
+Beim Start spielt die App fehlende Migrationen automatisch ein, ein Backup einer älteren Version lässt sich also direkt verwenden.
+
+### Manuelles Backup
+
+Bei laufender App **nicht** die DB-Datei mit `cp` kopieren: ohne die `-wal`-Datei ist die Kopie unvollständig oder inkonsistent. Stattdessen:
+
+- in der App unter *Einstellungen → Datenbank exportieren* (konsistenter Snapshot, gleiche Technik wie das nächtliche Backup), oder
+- mit gestoppter App kopieren:
+
+```bash
+docker compose down
 cp ~/customer-management/data/customermanagement.db \
    ~/customer-management/data/backup-$(date +%Y%m%d-%H%M).db
-
-# Oder per Cron täglich sichern:
-# 0 2 * * * cp ~/customer-management/data/customermanagement.db ~/backups/cm-$(date +\%Y\%m\%d).db
+docker compose up -d
 ```
 
 ---
