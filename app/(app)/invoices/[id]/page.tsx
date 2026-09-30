@@ -18,7 +18,11 @@ import InvoiceStatusSelect from "../InvoiceStatusSelect";
 import DeleteInvoiceButton from "../DeleteInvoiceButton";
 import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
-import type { InvoiceState } from "@prisma/client";
+import { UserRole, type InvoiceState } from "@prisma/client";
+import PaymentsPanel from "../PaymentsPanel";
+import { toRappen } from "@/lib/payments";
+import { auth } from "@/lib/auth";
+import { hasRole } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 
@@ -53,15 +57,32 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
+  const session = await auth();
+  const canEdit = session ? hasRole(session, [UserRole.Admin, UserRole.Editor]) : false;
+
   const [invoice, settings] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
-      include: { customer: true, items: true, sentLogs: { orderBy: { sentAt: "desc" } } },
+      include: {
+        customer: true,
+        items: true,
+        sentLogs: { orderBy: { sentAt: "desc" } },
+        payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
+      },
     }),
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
   ]);
 
   if (!invoice) notFound();
+
+  const totalRappen = toRappen(invoice.totalAmount);
+  const paidRappen = invoice.payments.reduce((sum, p) => sum + toRappen(p.amount), 0);
+  const summary = {
+    total: totalRappen / 100,
+    paid: paidRappen / 100,
+    remaining: Math.max(totalRappen - paidRappen, 0) / 100,
+    overpaid: Math.max(paidRappen - totalRappen, 0) / 100,
+  };
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/invoices";
@@ -215,6 +236,29 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {invoice.state !== "Draft" && invoice.state !== "Canceled" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Zahlungen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PaymentsPanel
+              key={`${invoice.payments.length}-${summary.remaining}`}
+              invoiceId={invoice.id}
+              state={invoice.state}
+              canEdit={canEdit}
+              summary={summary}
+              payments={invoice.payments.map((p) => ({
+                id: p.id,
+                date: p.date.toISOString(),
+                amount: p.amount.toNumber(),
+                source: p.source,
+              }))}
+            />
           </CardContent>
         </Card>
       )}
