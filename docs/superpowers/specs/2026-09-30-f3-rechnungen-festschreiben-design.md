@@ -61,7 +61,7 @@ Eine Tabelle erlaubter Übergänge in `lib/state-manager.ts`, geprüft in `updat
 - `computeInvoiceState` und `getPaymentSummary` (`lib/payments.ts`) bekommen `creditedRappen` (Summe der versendeten Gutschriften, als positiver Betrag). Gesetzt ist `settled = paid + credited`.
   - `settled >= total` und `credited > 0` und `paid = 0` → `Canceled`.
   - `settled >= total` sonst → `Paid`.
-  - `0 < settled < total` → `PartiallyPaid`.
+  - `paid > 0` (und `settled < total`) → `PartiallyPaid`. Eine teilweise gutgeschriebene Rechnung ohne Zahlungen behält `Sent` bzw. `Overdue` und wird damit weiterhin gemahnt (Mahnbetrag und QR-Zahlteil = Restbetrag).
 - Nach Versand einer Gutschrift läuft `recalculateInvoiceState` für das Original.
 - `sumOpenAmount` und `lib/receivables.ts` nutzen den Restbetrag inklusive Gutschriften. Ist `paid > total − credited`, erscheint der Überschuss wie in F5 als Guthaben. Gutschriften sind keine eigenen Zeilen.
 - Alle Stellen mit Rechnungs-Queries werden geprüft, damit negative Beträge keine Summen verfälschen: `analytics-queries.ts`, `dashboard/page.tsx`, `invoices/page.tsx`, `customers/[id]/page.tsx`, `invoices/import/actions.ts`, `lib/search.ts`, `lib/reminders.ts`, `lib/receivables.ts`, `income-statement-queries.ts`, `api/export/invoices/route.ts`. Der Rechnungs-CSV-Export bekommt die Spalte „Gutschrift zu“.
