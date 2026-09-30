@@ -466,7 +466,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `lib/receivables.ts` (Typen `ReceivableInput`, `ReceivableRow`, Zeile im `rows.push`, Select in `fetchReceivables`)
 - Create: `lib/receivables-csv.ts`
 - Modify: `app/api/export/receivables/route.ts`
-- Test: `tests/unit/receivables.test.ts` (erweitern), `tests/unit/receivables-csv.test.ts` (neu)
+- Test: `tests/unit/receivables.test.ts` (erweitern), `tests/unit/receivables-csv.test.ts` (neu), `tests/unit/export-csv-routes.test.ts` (neu, Regression beider CSV-Routen)
 
 **Interfaces:**
 - Consumes: `COUNTRIES` (`lib/address.ts`), `documentLabel`, `buildCsv`, `AGE_BUCKETS`.
@@ -621,7 +621,7 @@ describe("receivablesCsv", () => {
     const lines = receivablesCsv(report).split("\n");
     expect(lines[0]).toBe(RECEIVABLES_HEADERS.join(","));
     expect(lines[1]).toBe(
-      "I-26010001,Muster AG,Seestrasse 100,3011,Bern,Schweiz,10.01.2026,10.02.2026,100.00,30.00,70.00,0.00,über 90 Tage"
+      "I-26010001,Muster AG,Seestrasse 100,3011,Bern,Schweiz,10.1.2026,10.2.2026,100.00,30.00,70.00,0.00,über 90 Tage"
     );
   });
 
@@ -630,6 +630,8 @@ describe("receivablesCsv", () => {
   });
 });
 ```
+
+Hinweis zum Datumsformat: `toLocaleDateString("de-CH")` liefert in Node (ICU) Tag und Monat **ohne** führende Null (`10.1.2026`), genau wie der bestehende OP- und Buchhaltungs-Export. Die Erwartung oben ist darauf abgestimmt; nicht auf `10.01.2026` "korrigieren".
 
 - [ ] **Step 6: Test laufen lassen, muss fehlschlagen**
 
@@ -708,15 +710,74 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 9: Alles prüfen**
+- [ ] **Step 9: Regressionstest für beide CSV-Routen**
 
-Run: `npx tsc --noEmit && npx vitest run tests/unit/receivables.test.ts tests/unit/receivables-csv.test.ts tests/integration/receivables.test.ts`
-Expected: keine Typfehler (falls eine Seite `ReceivableRow` konstruiert, `customerAddress` dort ergänzen), alles grün.
+Die Spec verlangt eine Regression für den `accounting`- und den OP-Export mit den neuen Spalten. `tests/unit/export-csv-routes.test.ts`:
 
-- [ ] **Step 10: Commit**
+```ts
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Session } from "next-auth";
+
+let currentSession: Session | null;
+vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => currentSession) }));
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  }),
+}));
+vi.mock("@/lib/journal", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/journal")>()),
+  fetchJournal: vi.fn(async () => []),
+}));
+vi.mock("@/lib/receivables", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/receivables")>();
+  return { ...actual, fetchReceivables: vi.fn(async (_prisma, asOf: Date) => actual.buildReceivables([], asOf)) };
+});
+
+import { GET as accountingGET } from "@/app/api/export/accounting/route";
+import { GET as receivablesGET } from "@/app/api/export/receivables/route";
+import { fetchJournal } from "@/lib/journal";
+
+const session = (role: "Admin" | "Editor" | "Viewer") =>
+  ({ user: { id: "1", name: "Test", email: "t@example.com", role }, expires: "2099-01-01" }) as Session;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  currentSession = session("Editor");
+});
+
+describe("CSV export routes (regression)", () => {
+  it("accounting export uses the journal columns and the requested year", async () => {
+    const res = await accountingGET(new Request("http://localhost/api/export/accounting?year=2025"));
+    expect(await res.text()).toBe("Datum,Beleg-Nr.,Typ,Kunde,Kategorie,Text,Betrag (CHF)");
+    expect(vi.mocked(fetchJournal).mock.calls[0][1]).toBe(2025);
+  });
+
+  it("receivables export has the address columns", async () => {
+    const res = await receivablesGET(new Request("http://localhost/api/export/receivables?asOf=2026-12-31"));
+    expect(await res.text()).toBe(
+      "Rechnung,Kunde,Strasse,PLZ,Ort,Land,Rechnungsdatum,Fällig,Total (CHF),Bezahlt (CHF),Offen (CHF),Guthaben (CHF),Alter"
+    );
+    expect(res.headers.get("Content-Disposition")).toContain("offene-posten-2026-12-31.csv");
+  });
+
+  it("still redirects a viewer", async () => {
+    currentSession = session("Viewer");
+    await expect(accountingGET(new Request("http://localhost/api/export/accounting"))).rejects.toThrow("REDIRECT:/dashboard");
+    await expect(receivablesGET(new Request("http://localhost/api/export/receivables"))).rejects.toThrow("REDIRECT:/dashboard");
+  });
+});
+```
+
+- [ ] **Step 10: Alles prüfen**
+
+Run: `npx tsc --noEmit && npx vitest run tests/unit/receivables.test.ts tests/unit/receivables-csv.test.ts tests/unit/export-csv-routes.test.ts tests/integration/receivables.test.ts`
+Expected: keine Typfehler (derzeit konstruiert keine Seite `ReceivableRow` selbst; falls doch, `customerAddress` dort ergänzen), alles grün.
+
+- [ ] **Step 11: Commit**
 
 ```bash
-git add lib/receivables.ts lib/receivables-csv.ts app/api/export/receivables/route.ts tests/unit/receivables.test.ts tests/unit/receivables-csv.test.ts
+git add lib/receivables.ts lib/receivables-csv.ts app/api/export/receivables/route.ts tests/unit/receivables.test.ts tests/unit/receivables-csv.test.ts tests/unit/export-csv-routes.test.ts
 git commit -m "feat(receivables): add customer address to open items export
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
@@ -739,12 +800,17 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
     fileCount: number; pdfOk: number; pdfMissing: number; pdfMismatch: number; withoutPdf: number;
   };
   export function parseYearParam(raw: string | null, now: Date): number | null;
+  export function stichtage(year: number, now: Date): { prev: Date; end: Date };
+  export function overviewCsv(
+    journal: JournalRow[], prev: ReceivablesReport, end: ReceivablesReport, prevLabel: string, endLabel: string
+  ): string;
   export function buildYearPackage(
     prisma: PrismaClient, year: number, now: Date,
     emit: (entry: PackageEntry) => void | Promise<void>
   ): Promise<PackageSummary>;
   ```
   Die Namen in `PackageEntry` beginnen mit `jahrespaket-<Jahr>/`. PDFs liegen unter `jahrespaket-<Jahr>/rechnungen/`.
+  Bewusste Abweichung vom Wortlaut der Spec: Die Einnahmen/Ausgaben der Jahresübersicht werden aus dem Journal summiert, nicht über `fetchIncomeStatement`. Beide lesen dieselben Zahlungen und Ausgaben (gleicher lokaler Jahresfilter), das Journal rechnet aber in Rappen und bleibt so mit `journal-<Jahr>.csv` deckungsgleich.
 
 - [ ] **Step 1: Failing Unit-Test für Jahr-Parser, Stichtage und Jahresübersicht**
 
@@ -890,7 +956,10 @@ export function overviewCsv(
     else byCategory.set(row.category, (byCategory.get(row.category) ?? 0) + row.amountRappen);
   }
   const expenses = [...byCategory.values()].reduce((s, v) => s + v, 0);
-  const categories = [...byCategory.entries()].sort(([a], [b]) => a.localeCompare(b, "de"));
+  // Named categories alphabetically, expenses without category last.
+  const categories = [...byCategory.entries()].sort(
+    ([a], [b]) => Number(a === "") - Number(b === "") || a.localeCompare(b, "de")
+  );
 
   return buildCsv(
     ["Position", "Betrag (CHF)"],
@@ -1121,6 +1190,10 @@ describe("buildYearPackage", () => {
     const openDoc = await archive(open.id, "I-OPEN", "2026-03-01T10:00:00Z");
     const openReminder = await archive(open.id, "I-OPEN", "2026-05-01T10:00:00Z", "Reminder");
 
+    // Only criterion "open at the cut-off": sent 2025, no payment, still open on 31.12.2026.
+    const late = await invoice("I-LATE", "2025-10-01");
+    const lateDoc = await archive(late.id, "I-LATE", "2025-10-01T10:00:00Z");
+
     const old = await invoice("I-OLD", "2024-05-01", { state: "Paid" });
     const oldDoc = await archive(old.id, "I-OLD", "2024-05-01T10:00:00Z");
     await db.prisma.payment.create({ data: { invoiceId: old.id, date: new Date("2024-06-01T10:00:00Z"), amount: 100 } });
@@ -1130,8 +1203,11 @@ describe("buildYearPackage", () => {
     expect(names).toContain(`jahrespaket-2026/rechnungen/${decDoc.fileName}`);
     expect(names).toContain(`jahrespaket-2026/rechnungen/${openDoc.fileName}`);
     expect(names).toContain(`jahrespaket-2026/rechnungen/${openReminder.fileName}`);
+    expect(names).toContain(`jahrespaket-2026/rechnungen/${lateDoc.fileName}`);
     expect(names.some((n) => n.includes(oldDoc.fileName))).toBe(false);
-    expect(summary).toMatchObject({ pdfOk: 3, pdfMissing: 0, pdfMismatch: 0, withoutPdf: 0 });
+    // I-OPEN is both sent in the year and open: every document only once.
+    expect(new Set(names).size).toBe(names.length);
+    expect(summary).toMatchObject({ pdfOk: 4, pdfMissing: 0, pdfMismatch: 0, withoutPdf: 0 });
   });
 
   it("emits the fixed files with the expected names and stichtage", async () => {
@@ -1258,7 +1334,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `zipStream`, `ZipAdd` (Task 1); `buildYearPackage`, `parseYearParam`, `PackageSummary` (Task 4); `logAudit` (`lib/audit.ts`).
-- Produces: `GET /api/export/year-package?year=YYYY` liefert `application/zip`, `Content-Disposition: attachment; filename="jahrespaket-YYYY.zip"`. Audit: Aktion `EXPORT`, Entität `YearPackage`, `entityRef` = Jahr, Details = `PackageSummary`.
+- Produces: `GET /api/export/year-package?year=YYYY` liefert `application/zip`, `Content-Disposition: attachment; filename="jahrespaket-YYYY.zip"`, `Cache-Control: private, no-store`. Audit: Aktion `EXPORT`, Entität `YearPackage`, `entityRef` = Jahr, Details = `PackageSummary`.
 
 - [ ] **Step 1: Audit-Typen und Labels erweitern**
 
@@ -1269,7 +1345,7 @@ export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "SEND" | "STATUS" | "
 export type AuditEntity = "Customer" | "Invoice" | "Quote" | "Reminder" | "Service" | "User" | "Settings" | "CustomerNote" | "Expense" | "Payment" | "SentDocument" | "YearPackage";
 ```
 
-`app/(app)/settings/audit/page.tsx`: in `actionLabels` nach `STATUS` ergänzen `EXPORT: "Exportiert",` und in `actionVariants` `EXPORT: "outline",`. Danach in derselben Datei prüfen, ob es eine Liste oder Map der Entitätsnamen gibt (Suche nach `SentDocument`); falls ja, dort `YearPackage: "Jahrespaket"` ergänzen, sonst nichts weiter.
+`app/(app)/settings/audit/page.tsx`: in `actionLabels` nach `STATUS` ergänzen `EXPORT: "Exportiert",` und in `actionVariants` `EXPORT: "outline",`. Eine Map der Entitätsnamen gibt es dort nicht (`log.entityType` wird roh angezeigt), für `YearPackage` ist also nichts weiter nötig. Andere Stellen, die `AuditAction`/`AuditEntity` aufzählen, gibt es nicht.
 
 - [ ] **Step 2: Failing Route-Test schreiben**
 
@@ -1338,6 +1414,7 @@ describe("GET /api/export/year-package", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/zip");
     expect(res.headers.get("Content-Disposition")).toBe('attachment; filename="jahrespaket-2026.zip"');
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
 
     const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
     expect(Object.keys(files).sort()).toEqual([
@@ -1416,6 +1493,8 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="jahrespaket-${year}.zip"`,
+      // Customer names, addresses and invoices: never cache (same as the archive route).
+      "Cache-Control": "private, no-store",
     },
   });
 }
@@ -1469,7 +1548,7 @@ In `app/(app)/accounting/page.tsx` nach dem bestehenden "CSV-Export"-Button einf
 `CLAUDE.md`, im Abschnitt "Business document workflow" nach dem Absatz **PDF archive** einfügen:
 
 ```
-- **Year package** (`lib/year-package.ts`, `lib/zip.ts`, `lib/journal.ts`): `GET /api/export/year-package?year=YYYY` (Admin/Editor) streams a ZIP for the selected year: journal (payments by `Payment.date`, expenses), yearly overview, open items at 31.12. of the previous year and of the year (customer name and address per invoice), the archived PDFs from `SentDocument` (sent in the year, paid in the year, or open at the cut-off), `pruefsummen.csv` and `LIESMICH.txt`. PDFs are read sequentially through `verifyArchived`; a missing or tampered file is left out and reported, never regenerated. The route writes an `EXPORT YearPackage` audit entry after the stream. `zipStream` (fflate) applies backpressure, so the archive does not pile up in memory. No chart of accounts or target format on purpose: there is no trustee (see `FEATURE_ANALYSE.md` F6).
+- **Year package** (`lib/year-package.ts`, `lib/zip.ts`, `lib/journal.ts`): `GET /api/export/year-package?year=YYYY` (Admin/Editor) streams a ZIP for the selected year: journal (payments by `Payment.date`, expenses), yearly overview, open items at 31.12. of the previous year and of the year (customer name and address per invoice), the archived PDFs from `SentDocument` (sent in the year, paid in the year, or open at the cut-off), `pruefsummen.csv` and `LIESMICH.txt`. PDFs are read sequentially through `verifyArchived`; a missing or tampered file is left out and reported, never regenerated. The route writes an `EXPORT YearPackage` audit entry (year, file and PDF counts) once all files are added, outside any transaction; a failed or aborted build writes none. `zipStream` (fflate) applies backpressure, so the archive does not pile up in memory. No chart of accounts or target format on purpose: there is no trustee (see `FEATURE_ANALYSE.md` F6).
 ```
 
 `README.md` bei der Zeile mit "CSV-Export" (Zeile 31) ergänzen:
@@ -1478,7 +1557,7 @@ In `app/(app)/accounting/page.tsx` nach dem bestehenden "CSV-Export"-Button einf
 - 📤 **CSV-Export** von Kunden, Rechnungen und Offerten sowie ein **Jahrespaket (ZIP)** für die Steuererklärung (Journal, Jahresübersicht, offene Posten, archivierte Rechnungs-PDFs)
 ```
 
-`FEATURE_ANALYSE.md`: In der Roadmap die Checkbox der Zeile "F6 Jahresabschluss-Paket" abhaken (Muster der bereits erledigten Zeile F5 übernehmen, vorher `grep -n "F6" FEATURE_ANALYSE.md` ausführen) und im Abschnitt F6 eine Zeile "Status: umgesetzt" nach dem Muster von F5 hinzufügen.
+`FEATURE_ANALYSE.md`: In der Roadmap die Zeile `- [ ] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)` auf `- [x] 7. F6 …` setzen (wie die Zeile `- [x] 6. F5 …` direkt darüber; vorher `grep -n "F6" FEATURE_ANALYSE.md` ausführen). Der Abschnitt F5 hat keine eigene Statuszeile, deshalb im Abschnitt F6 auch keine hinzufügen.
 
 - [ ] **Step 3: Gesamtprüfung**
 
@@ -1488,7 +1567,7 @@ Expected: alles grün, keine neuen Lint-Fehler. Erwartete Log-Zeilen wie "delete
 - [ ] **Step 4: Manuelle Prüfung im laufenden System**
 
 Run: `npm run dev`, dann als Admin einloggen, unter Buchhaltung ein Jahr mit Daten wählen und "Jahrespaket (ZIP)" klicken.
-Expected: Download `jahrespaket-<Jahr>.zip`. Das ZIP entpacken und prüfen: sechs feste Dateien, `rechnungen/` mit PDFs, `pruefsummen.csv` ohne `FEHLT`, Journal öffnet sich in Excel oder LibreOffice korrekt (Umlaute, Kommas in Texten). Danach unter Einstellungen → Aktivitätsprotokoll den Eintrag "Exportiert / YearPackage" und die Kettenprüfung kontrollieren. Ist kein Testdatensatz vorhanden, vorher `npm run db:seed` ausführen und eine Rechnung versenden oder das Testarchiv nutzen. Ist die manuelle Prüfung nicht möglich, das im Abschlussbericht so sagen.
+Expected: Download `jahrespaket-<Jahr>.zip`. Das ZIP entpacken und prüfen: sechs feste Dateien, `rechnungen/` mit PDFs, `pruefsummen.csv` ohne `FEHLT`, Journal öffnet sich in LibreOffice (Import als UTF-8, Trennzeichen Komma) korrekt (Umlaute, Kommas in Texten). Hinweis: Die CSVs sind wie die bestehenden Exporte UTF-8 ohne BOM und kommagetrennt; Excel mit Schweizer Ländereinstellung zeigt sie bei Doppelklick in einer Spalte bzw. mit falschen Umlauten an (nur über Daten → Aus Text/CSV korrekt). Das ist kein Fehler dieses Tasks, im Abschlussbericht erwähnen. Danach unter Einstellungen → Aktivitätsprotokoll den Eintrag "Exportiert / YearPackage" und die Kettenprüfung kontrollieren. Ist kein Testdatensatz vorhanden, vorher `npm run db:seed` ausführen und eine Rechnung versenden oder das Testarchiv nutzen. Ist die manuelle Prüfung nicht möglich, das im Abschlussbericht so sagen.
 
 - [ ] **Step 5: Commit**
 
@@ -1503,6 +1582,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ## Self-Review (vom Planautor ausgeführt)
 
-- **Spec-Abdeckung:** Journal mit Beleg-Nr., Kunde, Zahlungsgrund (Task 2). Jahresübersicht mit Kategorien und Debitorenveränderung (Task 4 `overviewCsv`). OP-Listen zu beiden Stichtagen, mit Adresse, laufendes Jahr = heute (Task 3, Task 4 `stichtage`). PDF-Auswahl in drei Kriterien und Duplikate nur einmal (Task 4 `selectDocuments`, Test "selects PDFs…"). Mängel bricht nicht ab, `FEHLT` / `HASH ABWEICHEND` / `ohne archiviertes PDF` (Task 4, Tests). `LIESMICH.txt` mit Lücken und 10-Jahres-Hinweis (Task 4 `readme`). Rolle und 400 bei ungültigem Jahr, Audit `EXPORT YearPackage`, Stream mit Backpressure (Task 1 und 5). Button, Doku (Task 6). Regression der bestehenden Exporte: beide Routen nutzen die neuen Bausteine (Task 2 und 3), Typcheck und Tests in den jeweiligen Schritten.
+- **Spec-Abdeckung:** Journal mit Beleg-Nr., Kunde, Zahlungsgrund (Task 2). Jahresübersicht mit Kategorien und Debitorenveränderung (Task 4 `overviewCsv`). OP-Listen zu beiden Stichtagen, mit Adresse, laufendes Jahr = heute (Task 3, Task 4 `stichtage`). PDF-Auswahl in drei Kriterien und Duplikate nur einmal (Task 4 `selectDocuments`, Test "selects PDFs…"). Mängel bricht nicht ab, `FEHLT` / `HASH ABWEICHEND` / `ohne archiviertes PDF` (Task 4, Tests). `LIESMICH.txt` mit Lücken und 10-Jahres-Hinweis (Task 4 `readme`). Rolle und 400 bei ungültigem Jahr, Audit `EXPORT YearPackage`, Stream mit Backpressure (Task 1 und 5). Button, Doku (Task 6). Regression der bestehenden Exporte: beide Routen nutzen die neuen Bausteine (Task 2 und 3) und haben einen Routentest mit den neuen Kopfzeilen (Task 3 Schritt 9).
+- **Review-Korrekturen (Plan-Review 2026-09-30):** Datumsformat `de-CH` ohne führende Null in der OP-Erwartung, "ohne Kategorie" in der Jahresübersicht zuletzt sortiert, Auswahltest deckt das Kriterium "offen am Stichtag" allein ab und prüft auf Duplikate, `Cache-Control: private, no-store` für das ZIP, Regressionstest der CSV-Routen, FEATURE_ANALYSE-Anweisung an den tatsächlichen Aufbau angepasst. Der Plancode wurde in einer Wegwerfkopie mit `tsc --noEmit`, ESLint und Vitest (Zeitzonen Europe/Zurich und UTC) grün ausgeführt.
 - **Platzhalter:** keine. Der Hinweis zur Entitätenliste im Audit-Seitenfile (Task 5 Schritt 1) ist eine bedingte Anweisung mit klarem Suchkriterium, keine offene Stelle.
 - **Typkonsistenz:** `ZipAdd`, `PackageEntry`, `PackageSummary`, `JournalRow`, `ReceivableRow.customerAddress`, `stichtage`, `overviewCsv` und `parseYearParam` haben in allen Tasks dieselben Namen und Signaturen. `overviewCsv(journal, prev, end, prevLabel, endLabel)` stimmt mit dem Aufruf in `buildYearPackage` überein.
