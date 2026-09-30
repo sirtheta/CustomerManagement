@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({
     pendingReminder: { findUnique: vi.fn(), update: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
-    invoice: { findUnique: vi.fn(), update: vi.fn() },
+    invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     pendingEmail: { findUnique: vi.fn(), delete: vi.fn() },
     invoiceTemplate: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     templateItem: { deleteMany: vi.fn() },
@@ -323,6 +323,30 @@ describe("invoices/pending actions", () => {
       expect(result.error).toBe("PDF failed");
     });
 
+    it("only moves Draft/Sent/Overdue invoices to Sent, never Paid/PartiallyPaid/Canceled", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({
+        id: 1,
+        invoiceId: 10,
+        invoice: { ...mockInvoice, state: "PartiallyPaid" },
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+      vi.mocked(prisma.$transaction).mockImplementation((arg: ((tx: typeof prisma) => Promise<unknown>) | Promise<unknown>[]) =>
+        Array.isArray(arg) ? Promise.all(arg) as never : arg(prisma) as never
+      );
+
+      await approvePendingEmail({}, form({ id: "1", to: "k@test.ch", subject: "s", body: "b" }));
+
+      expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: { id: 10, state: { in: ["Draft", "Sent", "Overdue"] } },
+        data: { state: "Sent" },
+      });
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+    });
+
     it("assigns the number before rendering and fills placeholders", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValue({
@@ -403,8 +427,8 @@ describe("invoices/pending actions", () => {
       );
       expect(result.success).toBe(true);
       expect(sendInvoiceEmail).toHaveBeenCalled();
-      expect(prisma.invoice.update).toHaveBeenCalledWith({
-        where: { id: 10 },
+      expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: { id: 10, state: { in: ["Draft", "Sent", "Overdue"] } },
         data: { state: "Sent" },
       });
       expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({

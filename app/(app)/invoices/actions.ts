@@ -143,9 +143,12 @@ export async function updateInvoiceStatus(
   if (state === "PartiallyPaid") {
     return { error: "„Teilbezahlt“ ergibt sich aus den erfassten Zahlungen." };
   }
-  const hasPayments = current.state === "Paid" || current.state === "PartiallyPaid";
+  const hasPayments = (await prisma.payment.count({ where: { invoiceId: id } })) > 0;
   if (hasPayments && state !== "Paid") {
     return { error: "Zum Zurücksetzen zuerst die Zahlungen löschen." };
+  }
+  if (state === "Paid" && current.state === "Canceled") {
+    return { error: "Stornierte Rechnungen können nicht als bezahlt markiert werden." };
   }
   // Checked before any change: a zero invoice has nothing to pay, and a
   // Draft must not be turned Sent/numbered for a Paid that then fails.

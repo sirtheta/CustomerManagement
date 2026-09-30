@@ -17,7 +17,10 @@ export type PaymentMatchResult =
 /**
  * Looks for an unpaid invoice whose documentNumber appears in the given
  * description, and whose remaining amount matches the paid amount exactly.
- * Records a payment on a match. Never throws.
+ * Records a payment on a match. Does not swallow errors: database failures
+ * and `recordPayment` rejections (e.g. `PaymentError`) propagate, so callers
+ * must catch them (the external payments route does). Returns
+ * `{ matched: false }` when nothing fits.
  */
 export async function matchAndMarkPaid(
   params: {

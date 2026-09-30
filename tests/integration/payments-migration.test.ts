@@ -49,6 +49,7 @@ describe(`migration ${MIGRATION}`, () => {
     insert.run("R-1", 120.5, "Paid", 1701000000000);
     insert.run("R-2", 80, "Paid", null);
     insert.run("R-3", 50, "Sent", null);
+    insert.run("R-4", 0, "Paid", null);
 
     applyMigration(db, MIGRATION);
 

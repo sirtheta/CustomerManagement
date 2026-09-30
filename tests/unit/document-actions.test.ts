@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     $transaction: vi.fn(),
-    invoice: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
+    invoice: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
     quote: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     item: { createMany: vi.fn(), deleteMany: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
@@ -173,6 +173,28 @@ describe("sendDocument", () => {
       data: { invoiceId: 1, sentTo: "a@b.ch", subject: "s" },
     });
   });
+
+  it.each(["Paid", "PartiallyPaid", "Canceled"])(
+    "resending a %s invoice does not set the state to Sent",
+    async () => {
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        id: 1,
+        documentNumber: "I-2026-001",
+        customer: {},
+        items: [],
+      } as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-001");
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+
+      await sendDocument({ kind: "invoice", id: 1, to: "a@b.ch", subject: "s", body: "b", actor });
+
+      const arg = vi.mocked(prisma.invoice.updateMany).mock.calls[0][0]!;
+      expect(arg.where).toEqual({ id: 1, state: { in: ["Draft", "Sent", "Overdue"] } });
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+    }
+  );
 
   it("sends a quote without touching the analytics cache tag", async () => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);

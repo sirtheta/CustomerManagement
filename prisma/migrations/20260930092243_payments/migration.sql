@@ -20,4 +20,4 @@ CREATE INDEX "Payment_date_idx" ON "Payment"("date");
 INSERT INTO "Payment" ("invoiceId", "date", "amount", "source")
 SELECT "id", COALESCE("paidDate", "date"), "totalAmount", 'migration'
 FROM "Invoice"
-WHERE "state" = 'Paid';
+WHERE "state" = 'Paid' AND "totalAmount" > 0;

@@ -60,8 +60,9 @@ export async function approvePendingEmail(
   }
 
   await prisma.$transaction([
-    prisma.invoice.update({
-      where: { id: pending.invoiceId },
+    // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
+    prisma.invoice.updateMany({
+      where: { id: pending.invoiceId, state: { in: ["Draft", "Sent", "Overdue"] } },
       data: { state: "Sent" },
     }),
     prisma.invoiceSentLog.create({

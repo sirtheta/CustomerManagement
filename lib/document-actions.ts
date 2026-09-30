@@ -199,7 +199,11 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     }
 
     await defaultPrisma.$transaction([
-      defaultPrisma.invoice.update({ where: { id: input.id }, data: { state: "Sent" } }),
+      // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
+      defaultPrisma.invoice.updateMany({
+        where: { id: input.id, state: { in: ["Draft", "Sent", "Overdue"] } },
+        data: { state: "Sent" },
+      }),
       defaultPrisma.invoiceSentLog.create({
         data: { invoiceId: input.id, sentTo: input.to, subject },
       }),

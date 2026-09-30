@@ -59,6 +59,10 @@ const adminSession = {
 } as never;
 
 function mockInvoice(state: string, documentNumber: string | null, totalAmount = 100) {
+  // Payments exist exactly for Paid/PartiallyPaid invoices in these scenarios.
+  vi.mocked(prisma.payment.count).mockResolvedValue(
+    state === "Paid" || state === "PartiallyPaid" ? 1 : 0
+  );
   vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
     state,
     documentNumber,
@@ -102,6 +106,28 @@ describe("updateInvoiceStatus", () => {
 
     expect(res.error).toBeTruthy();
     expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("derives the reset guard from existing payments, not from the state", async () => {
+    mockInvoice("Sent", "I-25060002");
+    vi.mocked(prisma.payment.count).mockResolvedValue(2);
+
+    const res = await updateInvoiceStatus(1, "Overdue");
+
+    expect(res).toEqual({ error: "Zum Zurücksetzen zuerst die Zahlungen löschen." });
+    expect(prisma.payment.count).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses to mark a canceled invoice as paid and assigns no number", async () => {
+    mockInvoice("Canceled", null);
+
+    const res = await updateInvoiceStatus(1, "Paid");
+
+    expect(res).toEqual({ error: "Stornierte Rechnungen können nicht als bezahlt markiert werden." });
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+    expect(recordRemainingPayment).not.toHaveBeenCalled();
   });
 
   it("refuses PartiallyPaid as a target", async () => {
