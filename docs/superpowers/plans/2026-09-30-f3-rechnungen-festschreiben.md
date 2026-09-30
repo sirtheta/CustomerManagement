@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - UI-Texte, Fehlermeldungen und Handbuch sind **Deutsch** (Schweizer Schreibweise, „ss“ statt „ß“).
-- Commit-Messages **Englisch**, Conventional Commits, mit Zeile `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Commit-Messages **Englisch**, Conventional Commits, mit der `Co-Authored-By`-Zeile des ausführenden Modells (in den Beispielen unten steht `Claude Sonnet 5.5` als Platzhalter; durch die eigene Attribution ersetzen).
 - Beträge intern in Rappen (Integer) über `toRappen` aus `lib/payments.ts` vergleichen, nie mit `number`-Gleichheit.
 - Migration ist reines SQL (`scripts/startup.js` wendet sie ohne Prisma CLI an). Tests nutzen `prisma db push` aus `schema.prisma`; ein eigener Migrationstest spielt die SQL-Ordner ab.
 - Nur Rechnungen ändern. Offerten (`Quote`) bleiben unverändert (`Quote.customer` behält `Cascade`).
@@ -48,6 +48,7 @@
 - Create: `prisma/migrations/<timestamp>_invoice_locking_credit_notes/migration.sql` (von Prisma erzeugt)
 - Create: `tests/integration/invoice-locking-migration.test.ts`
 - Modify: `tests/integration/customers.test.ts` (Test „should cascade-delete invoices when customer is deleted“)
+- Modify: `tests/test-utils.ts` (Aufräumreihenfolge: Gutschriften vor den Originalen löschen)
 
 **Interfaces:**
 - Produces: `Invoice.creditNoteForId: number | null`, Relationen `Invoice.creditNoteFor` / `Invoice.creditNotes` (Relationsname `"CreditNotes"`), `Customer.archivedAt: Date | null`. Alle späteren Tasks nutzen diese Namen.
@@ -82,7 +83,7 @@ und bei den Indizes `@@index([creditNoteForId])`.
 
 Run: `npx prisma migrate dev --create-only --name invoice_locking_credit_notes`
 Expected: neuer Ordner unter `prisma/migrations/` mit `migration.sql`. Datei öffnen und prüfen: `ALTER TABLE "Customer" ADD COLUMN "archivedAt" DATETIME;`, ein `RedefineTables`-Block für `Invoice` mit `"creditNoteForId" INTEGER` und beiden Fremdschlüsseln `ON DELETE RESTRICT`, sowie `CREATE INDEX` für `Customer_archivedAt_idx` und `Invoice_creditNoteForId_idx`. Alle bestehenden `Invoice`-Indizes und der Unique-Index auf `documentNumber` müssen im Block neu angelegt werden.
-Danach `npx prisma migrate dev` ausführen, damit die lokale DB und der Client aktuell sind.
+Danach `npx prisma migrate dev` ausführen (lokale DB) und anschliessend `npx prisma generate` (Prisma 7 erzeugt den Client nach `migrate dev` nicht mehr automatisch). Ohne den Client-Lauf kennen die späteren Tasks `creditNoteForId` und `archivedAt` nicht (Typfehler).
 
 - [ ] **Step 3: Migrationstest schreiben**
 
@@ -200,12 +201,24 @@ In `tests/integration/customers.test.ts` den Test `should cascade-delete invoice
 
 Den Kommentar `// Equivalent: CustomerRepository_DeleteCustomer_ShouldCascadeToInvoices` darüber entfernen.
 
-- [ ] **Step 6: Gesamten Integrationslauf prüfen**
+- [ ] **Step 6: Aufräumen in `tests/test-utils.ts` an die Selbstreferenz anpassen**
+
+SQLite prüft `ON DELETE RESTRICT` sofort pro Zeile, nicht am Ende der Anweisung. `invoice.deleteMany()` löscht in Reihenfolge der IDs: das Original (kleinere ID) fällt zuerst, während seine Gutschrift noch darauf zeigt, und die ganze Anweisung scheitert. Das trifft jede Testsuite, die Gutschriften anlegt (ab Task 5). Deshalb in `tests/test-utils.ts` die Zeile `await p.invoice.deleteMany();` ersetzen durch:
+
+```ts
+    // Credit notes reference their original (onDelete: Restrict, checked per row).
+    await p.invoice.deleteMany({ where: { creditNoteForId: { not: null } } });
+    await p.invoice.deleteMany();
+```
+
+Die übrige Reihenfolge stimmt bereits (`invoice.deleteMany()` vor `customer.deleteMany()`).
+
+- [ ] **Step 7: Gesamten Integrationslauf prüfen**
 
 Run: `npm run test:integration`
-Expected: PASS. Falls ein Test beim Aufräumen an der neuen Restrict-Regel scheitert (Kunde vor Rechnung gelöscht), die Reihenfolge in `tests/test-utils.ts` prüfen: `invoice.deleteMany()` steht bereits vor `customer.deleteMany()`.
+Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add prisma tests
@@ -285,9 +298,10 @@ In `lib/state-manager.ts` die Importzeile ersetzen und oben ergänzen:
 import type { InvoiceState, PrismaClient } from "@prisma/client";
 
 /**
- * Manual status changes an invoice may go through. Paid/PartiallyPaid follow
- * from payments and Canceled from credit notes, so none of them is a manual
- * target (Paid is reached through a payment, see updateInvoiceStatus).
+ * Manual status changes an invoice may go through. Choosing Paid books the
+ * remaining amount as a payment (see updateInvoiceStatus); PartiallyPaid
+ * follows from payments and Canceled from credit notes, so neither is a
+ * manual target.
  */
 const INVOICE_TRANSITIONS: Record<InvoiceState, readonly InvoiceState[]> = {
   Draft: ["Sent", "Paid"],
@@ -484,10 +498,10 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `app/(app)/invoices/actions.ts` (`updateInvoice`, `deleteInvoice`)
 - Modify: `app/(app)/invoices/[id]/edit/page.tsx`
 - Modify: `app/(app)/invoices/[id]/page.tsx` (Buttons „Bearbeiten“, `DeleteInvoiceButton`)
-- Test: `tests/unit/document-actions.test.ts`, `tests/unit/invoice-status-actions.test.ts`
+- Test: `tests/unit/document-actions.test.ts`, `tests/unit/invoice-status-actions.test.ts`, `tests/integration/invoices.test.ts`
 
 **Interfaces:**
-- Produces: `export class DocumentLockedError extends Error` in `lib/document-actions.ts`. `updateDocumentWithItems(id, input)` wirft sie für Rechnungen ausserhalb von `Draft`.
+- Produces: `export class DocumentLockedError extends Error` in `lib/document-actions.ts`. `updateDocumentWithItems(id, input, prisma?)` wirft sie für Rechnungen ausserhalb von `Draft`. Der optionale dritte Parameter `prisma: PrismaClient = defaultPrisma` (Muster wie in `lib/payments.ts`) macht die Sperre gegen eine echte Datenbank testbar.
 
 - [ ] **Step 1: Tests für die Sperre**
 
@@ -535,7 +549,18 @@ In `lib/document-actions.ts` vor `updateDocumentWithItems` einfügen:
 export class DocumentLockedError extends Error {}
 ```
 
-und im Invoice-Zweig von `updateDocumentWithItems` ganz am Anfang (vor `tx.item.deleteMany`):
+Die Signatur um einen optionalen Client erweitern (`PrismaClient` als Typ aus `@prisma/client` mitimportieren) und diesen statt `defaultPrisma` für die Transaktion verwenden:
+
+```ts
+export async function updateDocumentWithItems(
+  id: number,
+  input: UpdateDocumentInput,
+  prisma: PrismaClient = defaultPrisma
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+```
+
+Im Invoice-Zweig ganz am Anfang (vor `tx.item.deleteMany`):
 
 ```ts
       const current = await tx.invoice.findUnique({ where: { id }, select: { state: true } });
@@ -548,6 +573,57 @@ und im Invoice-Zweig von `updateDocumentWithItems` ganz am Anfang (vor `tx.item.
 ```
 
 Run: `npx vitest run tests/unit/document-actions.test.ts` → Expected: PASS.
+
+- [ ] **Step 2b: Integrationstest für die Sperre**
+
+In `tests/integration/invoices.test.ts` (innerhalb des bestehenden `describe` mit `createTestDatabase()`; Import `import { updateDocumentWithItems, DocumentLockedError } from "@/lib/document-actions";` ergänzen) anhängen:
+
+```ts
+  it("refuses to edit a sent invoice and leaves items and total unchanged", async () => {
+    const { prisma } = db;
+    const customer = await prisma.customer.create({ data: createValidTestCustomer() });
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-LOCK-1",
+        date: new Date(),
+        dueDate: new Date(Date.now() + 30 * 86_400_000),
+        totalAmount: 200,
+        state: "Sent",
+        items: { create: createValidItemList() },
+      },
+      include: { items: true },
+    });
+
+    await expect(
+      updateDocumentWithItems(
+        invoice.id,
+        {
+          kind: "invoice",
+          customerId: customer.customerId,
+          customUserText: null,
+          date: new Date(),
+          dueDate: new Date(),
+          totalAmount: 1,
+          discountPercent: 0,
+          items: [],
+        },
+        prisma
+      )
+    ).rejects.toBeInstanceOf(DocumentLockedError);
+
+    const after = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      include: { items: true },
+    });
+    expect(after.totalAmount.toNumber()).toBe(200);
+    expect(after.items).toHaveLength(invoice.items.length);
+  });
+```
+
+(Falls `createValidItemList` oder `createValidTestCustomer` im File noch nicht importiert sind, aus `../test-utils` ergänzen.)
+
+Run: `npx vitest run tests/integration/invoices.test.ts` → Expected: PASS.
 
 - [ ] **Step 3: `updateInvoice` meldet die Sperre**
 
@@ -642,7 +718,7 @@ und unten `<DeleteInvoiceButton invoiceId={invoice.id} />` ersetzen durch:
 
 - [ ] **Step 7: Gesamtlauf der betroffenen Tests und Commit**
 
-Run: `npx vitest run tests/unit/document-actions.test.ts tests/unit/invoice-status-actions.test.ts tests/unit/invoice-sub-actions.test.ts`
+Run: `npx vitest run tests/unit/document-actions.test.ts tests/unit/invoice-status-actions.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoices.test.ts`
 Expected: PASS.
 
 ```bash
@@ -808,6 +884,8 @@ export async function archiveCustomer(id: number): Promise<{ error?: string }> {
   await logAudit(session, "UPDATE", "Customer", id, undefined, { archived: true });
   revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
+  revalidatePath("/dashboard");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   return {};
 }
 
@@ -817,6 +895,8 @@ export async function restoreCustomer(id: number): Promise<{ error?: string }> {
   await logAudit(session, "UPDATE", "Customer", id, undefined, { archived: false });
   revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
+  revalidatePath("/dashboard");
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   return {};
 }
 ```
@@ -892,7 +972,7 @@ Picker-Seiten:
 ```
 
   (Der Import: `import { selectableCustomersWhere } from "@/lib/customer-archive";`.) In der Edit-Seite der Rechnung bleibt die `if (!invoice) notFound();`-Prüfung vor dieser Abfrage.
-- `dashboard/page.tsx`: `prisma.customer.count()` → `prisma.customer.count({ where: { archivedAt: null } })`.
+- `dashboard/page.tsx`: `prisma.customer.count()` → `prisma.customer.count({ where: { archivedAt: null } })`. Ausserdem die beiden Abfragen für geplante Jahresrechnungen (`scheduledCustomerCount` und `scheduledCustomers`, jeweils `where: { yearlyInvoice: true, nextInvoiceDate: { not: null } }`) um `archivedAt: null` ergänzen, weil der Jahresjob archivierte Kunden überspringt.
 
 - [ ] **Step 6: Kundenliste mit Archiv-Filter**
 
@@ -1272,7 +1352,7 @@ Unit-Test in `tests/unit/receivables.test.ts` (Helfer `inv`, `dec`, `asOf` sind 
 Run → FAIL. Dann `lib/receivables.ts` ändern:
 
 - `ReceivableInput` um `creditNotes?: { date: Date; totalAmount: { toNumber(): number } }[];`
-- `ReceivableRow` um `creditedRappen: number;`
+- `ReceivableRow` bleibt unverändert. Achtung: Das bestehende Feld `creditRappen` bedeutet **Guthaben** (Überzahlung), nicht Gutschrift. Die Gutschriftssumme heisst in der Schleife deshalb `creditNoteRappen` und wird nicht als eigenes Feld ausgegeben.
 - In `buildReceivables` die ersten beiden Zeilen der Schleife und die Restberechnung ersetzen:
 
 ```ts
@@ -1287,14 +1367,14 @@ Run → FAIL. Dann `lib/receivables.ts` ändern:
     const paidRappen = inv.payments
       .filter((p) => p.date.getTime() <= asOf.getTime())
       .reduce((sum, p) => sum + toRappen(p.amount), 0);
-    const creditedRappen = creditNotes
+    const creditNoteRappen = creditNotes
       .filter((c) => c.date.getTime() <= asOf.getTime())
       .reduce((sum, c) => sum + Math.abs(toRappen(c.totalAmount)), 0);
-    const rest = totalRappen - paidRappen - creditedRappen;
+    const rest = totalRappen - paidRappen - creditNoteRappen;
     if (rest === 0) continue;
 ```
 
-und in `rows.push({ ... })` `creditedRappen,` ergänzen. In `fetchReceivables`: `where: { state: { not: "Draft" }, creditNoteForId: null, date: { lte: asOf } }` und im `select` `creditNotes: { where: { state: { not: "Draft" } }, select: { date: true, totalAmount: true } },` ergänzen.
+`rows.push({ ... })` bleibt unverändert. In `fetchReceivables`: `where: { state: { not: "Draft" }, creditNoteForId: null, date: { lte: asOf } }` und im `select` `creditNotes: { where: { state: { not: "Draft" } }, select: { date: true, totalAmount: true } },` ergänzen.
 
 Integrationstest `tests/integration/receivables.test.ts`: einen Fall ergänzen (Original 100, versendete Gutschrift 100 mit Datum vor dem Stichtag, Stichtag danach → keine Zeile; Stichtag vor dem Gutschriftsdatum → Zeile mit 10000 Rappen offen). Helfer des Files wiederverwenden.
 
@@ -1647,7 +1727,7 @@ export async function createCreditNote(invoiceId: number): Promise<{ error?: str
 ```ts
   const existing = await prisma.invoice.findUnique({
     where: { id },
-    select: { creditNoteForId: true },
+    select: { creditNoteForId: true, customerId: true },
   });
   if (!existing) return { error: "Rechnung nicht gefunden." };
   const isCreditNote = existing.creditNoteForId != null;
@@ -1655,7 +1735,13 @@ export async function createCreditNote(invoiceId: number): Promise<{ error?: str
   if (!customerIdRaw || !dateRaw || (!isCreditNote && !dueDateRaw)) {
     return { error: "Bitte alle Pflichtfelder ausfüllen." };
   }
+
+  // A credit note always belongs to the customer of its original; the form
+  // only sends a hidden field, which must not be trusted.
+  const customerId = isCreditNote ? existing.customerId : parseInt(customerIdRaw, 10);
 ```
+
+(Die bisherige Zeile `const customerId = parseInt(customerIdRaw, 10);` entfällt dafür. `existing.customerId` ist der Kunde des Originals, weil `createCreditNoteDraft` ihn von dort übernimmt.)
 
 Nach dem Parsen der Positionen und vor dem `updateDocumentWithItems`-Aufruf (die `let items/totalAmount/discountPercent` bleiben; `updateDocumentWithItems`-Input wird über eine Zwischenvariable gebaut):
 
