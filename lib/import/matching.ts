@@ -5,11 +5,11 @@ import { extractDocumentNumberCandidates } from "@/lib/import/document-reference
  * Matches CAMT.053 statement entries to open invoices, so a bank export can
  * be reviewed and confirmed as payments without a bookkeeping ledger.
  *
- * There is no stored transaction history to dedupe against (the CRM has no
- * accounts): once an invoice is fully paid it drops out of the candidate
- * pool, so re-uploading the same statement simply produces no further
- * matches for it. A partial payment is recognised by its `bankReference`
- * when the import is confirmed.
+ * Signals, strongest first:
+ *  - the invoice number in the text (`extractDocumentNumberCandidates`, tolerant
+ *    of spaces and a missing prefix) together with the open amount → pre-selected;
+ *  - the open amount alone, or the number with a different amount → manual pick;
+ *  - the customer's name in the counterparty → suggestion only, never pre-selected.
  */
 
 export interface OpenInvoice {
@@ -17,6 +17,8 @@ export interface OpenInvoice {
   documentNumber: string;
   /** Francs still open: total minus recorded payments. */
   openAmount: number;
+  /** Names the customer may appear under on a statement (company, contact person). */
+  customerNames?: string[];
 }
 
 export interface MatchCandidate {
@@ -24,15 +26,17 @@ export interface MatchCandidate {
   documentNumber: string;
 }
 
-export type MatchConfidence = "reference" | "amount" | "none";
+export type MatchConfidence = "reference" | "amount" | "name" | "none";
 
-export interface MatchedTransaction {
-  transaction: ParsedTransaction;
+export interface MatchedTransaction<T extends ParsedTransaction = ParsedTransaction> {
+  transaction: T;
   candidates: MatchCandidate[];
   confidence: MatchConfidence;
   /** Invoice id to pre-check in the preview, only set when confidence is "reference". */
   preselectedInvoiceId: number | null;
 }
+
+const MIN_NAME_LENGTH = 4;
 
 function centsOf(francs: number): number {
   return Math.round(francs * 100);
@@ -42,25 +46,32 @@ function toCandidate(invoice: OpenInvoice): MatchCandidate {
   return { invoiceId: invoice.id, documentNumber: invoice.documentNumber };
 }
 
-/**
- * Finds an open invoice whose `documentNumber` appears in the entry's
- * description or counterparty text.
- *
- * Uses the same `extractDocumentNumberCandidates()` (`lib/payment-matching.ts`)
- * as the automatic Budget-import matcher, so both round-trip the QR-bill
- * payment reference identically: `buildQrBillData()`
- * (`lib/pdf/qrbill-helpers.ts`) puts the invoice's `documentNumber` into the
- * QR message, and a QR-bill payment carries that message back unchanged in
- * `RmtInf/Ustrd`.
- */
+/** Lowercase, without diacritics or punctuation, single-spaced. */
+function nameKey(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function mentionsCustomer(counterparty: string | null, invoice: OpenInvoice): boolean {
+  const haystack = ` ${nameKey(counterparty)} `;
+  if (haystack.trim() === "") return false;
+  return (invoice.customerNames ?? []).some((name) => {
+    const key = nameKey(name);
+    return key.length >= MIN_NAME_LENGTH && haystack.includes(` ${key} `);
+  });
+}
+
 function findReferencedInvoice(
   transaction: ParsedTransaction,
   openInvoices: OpenInvoice[],
   prefix: string
 ): OpenInvoice | null {
   const haystack = `${transaction.description} ${transaction.counterparty ?? ""}`;
-  const candidates = extractDocumentNumberCandidates(haystack, prefix);
-  for (const documentNumber of candidates) {
+  for (const documentNumber of extractDocumentNumberCandidates(haystack, prefix)) {
     const invoice = openInvoices.find(
       (inv) => inv.documentNumber.toUpperCase() === documentNumber.toUpperCase()
     );
@@ -70,57 +81,67 @@ function findReferencedInvoice(
 }
 
 /**
- * Matches every incoming (credit) statement entry against the given open
- * invoices (callers should pass invoices with `state` in `Sent`/`Overdue`/`PartiallyPaid`
+ * Matches every incoming (credit) entry against the given open invoices
+ * (callers pass invoices with `state` in `Sent`/`Overdue`/`PartiallyPaid`
  * only). Outgoing entries are dropped — they can never be an invoice payment.
  * `prefix` is `ApplicationSettings.invoiceNumberPrefix`.
  */
-export function matchStatementToInvoices(
-  transactions: ParsedTransaction[],
+export function matchStatementToInvoices<T extends ParsedTransaction>(
+  transactions: T[],
   openInvoices: OpenInvoice[],
   prefix: string
-): MatchedTransaction[] {
+): MatchedTransaction<T>[] {
   return transactions
     .filter((transaction) => transaction.amountCents > 0)
-    .map((transaction) => {
+    .map((transaction): MatchedTransaction<T> => {
       const referenced = findReferencedInvoice(transaction, openInvoices, prefix);
       const amountMatches = openInvoices.filter(
         (invoice) => centsOf(invoice.openAmount) === transaction.amountCents
       );
+      const nameMatches = openInvoices.filter((invoice) =>
+        mentionsCustomer(transaction.counterparty, invoice)
+      );
 
-      // Reference and amount both line up on the same invoice: safe to
-      // pre-select, the user only has to confirm.
+      // Number and amount line up on the same invoice: safe to pre-select,
+      // the user only has to confirm.
       if (referenced && centsOf(referenced.openAmount) === transaction.amountCents) {
         return {
           transaction,
           candidates: [toCandidate(referenced)],
-          confidence: "reference" as const,
+          confidence: "reference",
           preselectedInvoiceId: referenced.id,
         };
       }
 
-      // Either the reference matched an invoice with a different amount
-      // (partial payment, rounding, typo'd reference), or only the amount
-      // lines up (possibly on more than one invoice) — either way this
-      // needs a manual pick.
-      const candidates = referenced
-        ? [referenced, ...amountMatches.filter((invoice) => invoice.id !== referenced.id)]
-        : amountMatches;
+      const namedIds = new Set(nameMatches.map((invoice) => invoice.id));
+      // Amount matches of a customer named in the text come first.
+      const orderedAmount = [
+        ...amountMatches.filter((invoice) => namedIds.has(invoice.id)),
+        ...amountMatches.filter((invoice) => !namedIds.has(invoice.id)),
+      ];
+      const strong = referenced
+        ? [referenced, ...orderedAmount.filter((invoice) => invoice.id !== referenced.id)]
+        : orderedAmount;
 
-      if (candidates.length > 0) {
+      if (strong.length > 0) {
+        const rest = nameMatches.filter((invoice) => !strong.some((s) => s.id === invoice.id));
         return {
           transaction,
-          candidates: candidates.map(toCandidate),
-          confidence: "amount" as const,
+          candidates: [...strong, ...rest].map(toCandidate),
+          confidence: "amount",
           preselectedInvoiceId: null,
         };
       }
 
-      return {
-        transaction,
-        candidates: [],
-        confidence: "none" as const,
-        preselectedInvoiceId: null,
-      };
+      if (nameMatches.length > 0) {
+        return {
+          transaction,
+          candidates: nameMatches.map(toCandidate),
+          confidence: "name",
+          preselectedInvoiceId: null,
+        };
+      }
+
+      return { transaction, candidates: [], confidence: "none", preselectedInvoiceId: null };
     });
 }
