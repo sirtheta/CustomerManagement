@@ -103,7 +103,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
         <Link href="/customers" className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">
+              <p className="text-2xl 2xl:text-3xl font-bold break-words">
                 {formatCurrency(currentYearRevenue._sum.amount?.toNumber() ?? 0)}
               </p>
               <p className="text-sm text-gray-500 mt-1">Zahlungseingänge</p>
