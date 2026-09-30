@@ -177,7 +177,8 @@ export async function generateDocumentPdf(
       pdf.font(BOLD).fontSize(96).fillColor("#cccccc").fillOpacity(0.35);
       pdf.text("ENTWURF", 0, PAGE_H / 2 - 40, { width: PAGE_W, align: "center", lineBreak: false });
       pdf.restore();
-      pdf.fillOpacity(1).fillColor(TEXT_COLOR);
+      // save/restore does not cover font state; reset to the body defaults.
+      pdf.font(FONT).fontSize(BASE).fillOpacity(1).fillColor(TEXT_COLOR);
     };
     drawWatermark();
     pdf.on("pageAdded", drawWatermark);
