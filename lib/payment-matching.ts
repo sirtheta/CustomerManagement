@@ -1,7 +1,7 @@
 import defaultPrisma from "@/lib/prisma";
 import type { PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
-import { logAudit } from "@/lib/audit";
+import { getPaymentSummary, recordPayment } from "@/lib/payments";
 import { extractDocumentNumberCandidates } from "@/lib/import/document-reference";
 
 // Actor used for audit log entries triggered by the Budget app's import,
@@ -15,52 +15,9 @@ export type PaymentMatchResult =
   | { matched: false };
 
 /**
- * Marks an invoice Paid and writes the audit trail. Shared by the automatic
- * Budget-import matcher below and the interactive CAMT-import UI
- * (`app/(app)/invoices/actions.ts`), which supplies the logged-in user as
- * `actor` instead of `SYSTEM_ACTOR`.
- */
-export async function markInvoicePaid(
-  params: {
-    invoiceId: number;
-    documentNumber: string | null;
-    previousState: string;
-    paidDate: Date;
-    actor: Session;
-    source: "budget-import" | "camt-import";
-    bankReference?: string | null;
-  },
-  prisma: PrismaClient = defaultPrisma
-): Promise<void> {
-  await prisma.invoice.update({
-    where: { id: params.invoiceId },
-    data: { state: "Paid", paidDate: params.paidDate },
-  });
-
-  // A paid invoice no longer needs a reminder; drop the pending one (if any)
-  // so it leaves the Mahnungen list and the header badge immediately.
-  await prisma.pendingReminder.deleteMany({ where: { invoiceId: params.invoiceId } });
-
-  await logAudit(
-    params.actor,
-    "STATUS",
-    "Invoice",
-    params.invoiceId,
-    params.documentNumber ?? undefined,
-    {
-      from: params.previousState,
-      to: "Paid",
-      source: params.source,
-      ...(params.bankReference !== undefined ? { bankReference: params.bankReference } : {}),
-    },
-    prisma
-  );
-}
-
-/**
  * Looks for an unpaid invoice whose documentNumber appears in the given
- * description, and whose totalAmount matches the paid amount exactly.
- * Marks it Paid on a match. Never throws.
+ * description, and whose remaining amount matches the paid amount exactly.
+ * Records a payment on a match. Never throws.
  */
 export async function matchAndMarkPaid(
   params: {
@@ -76,23 +33,23 @@ export async function matchAndMarkPaid(
 
   for (const documentNumber of candidates) {
     const invoice = await prisma.invoice.findFirst({
-      where: { documentNumber, state: { not: "Paid" } },
+      where: { documentNumber, state: { in: ["Sent", "Overdue", "PartiallyPaid"] } },
     });
     if (!invoice) continue;
 
-    const totalAmountRappen = Math.round(Number(invoice.totalAmount) * 100);
-    if (totalAmountRappen !== params.amountRappen) continue;
+    const { remainingRappen } = await getPaymentSummary(invoice.id, prisma);
+    if (remainingRappen !== params.amountRappen) continue;
 
-    const paidDate = params.bookingDate ? new Date(params.bookingDate) : new Date();
+    const parsed = params.bookingDate ? new Date(params.bookingDate) : new Date();
+    const paidDate = isNaN(parsed.getTime()) ? new Date() : parsed;
 
-    await markInvoicePaid(
+    await recordPayment(
       {
         invoiceId: invoice.id,
-        documentNumber,
-        previousState: invoice.state,
-        paidDate,
-        actor: SYSTEM_ACTOR,
+        amount: params.amountRappen / 100,
+        date: paidDate,
         source: "budget-import",
+        actor: SYSTEM_ACTOR,
       },
       prisma
     );

@@ -12,7 +12,7 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
-import { markInvoicePaid } from "@/lib/payment-matching";
+import { PaymentError, recordPayment, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
@@ -116,7 +116,10 @@ export async function updateInvoice(
     return { error: "Rechnung konnte nicht gespeichert werden." };
   }
 
+  await syncInvoiceState({ invoiceId: id, actor: session, source: "edit" });
   await logAudit(session, "UPDATE", "Invoice", id);
+  revalidatePath("/accounting/receivables");
+  revalidatePath("/dashboard");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   const from = formData.get("from") as string | null;
   const fromCustomer = from?.startsWith("customers/") ? from : null;
@@ -126,14 +129,29 @@ export async function updateInvoice(
 export async function updateInvoiceStatus(
   id: number,
   state: InvoiceState
-): Promise<void> {
+): Promise<{ error?: string }> {
   const session = await requireEditor();
 
   const current = await prisma.invoice.findUnique({
     where: { id },
-    select: { state: true, documentNumber: true },
+    select: { state: true, documentNumber: true, totalAmount: true },
   });
-  if (!current) return;
+  if (!current) return { error: "Rechnung nicht gefunden." };
+  if (current.state === state) return {};
+  // PartiallyPaid results from payments only. Leaving Paid/PartiallyPaid
+  // works by deleting the payments, so state and payments never disagree.
+  if (state === "PartiallyPaid") {
+    return { error: "„Teilbezahlt“ ergibt sich aus den erfassten Zahlungen." };
+  }
+  const hasPayments = current.state === "Paid" || current.state === "PartiallyPaid";
+  if (hasPayments && state !== "Paid") {
+    return { error: "Zum Zurücksetzen zuerst die Zahlungen löschen." };
+  }
+  // Checked before any change: a zero invoice has nothing to pay, and a
+  // Draft must not be turned Sent/numbered for a Paid that then fails.
+  if (state === "Paid" && toRappen(current.totalAmount) <= 0) {
+    return { error: "Die Rechnung hat keinen offenen Betrag." };
+  }
 
   const NUMBERED_STATES: InvoiceState[] = ["Sent", "Overdue", "Paid"];
   let documentNumber = current.documentNumber;
@@ -141,17 +159,28 @@ export async function updateInvoiceStatus(
     documentNumber = await assignDocumentNumber("invoice", id, { actor: session });
   }
 
-  const becomingPaid = state === "Paid" && current.state !== "Paid";
-  const leavingPaid = state !== "Paid" && current.state === "Paid";
-
-  await prisma.invoice.update({
-    where: { id },
-    data: {
-      state,
-      ...(becomingPaid ? { paidDate: new Date() } : {}),
-      ...(leavingPaid ? { paidDate: null } : {}),
-    },
-  });
+  if (state === "Paid") {
+    // A Draft must become Sent first: payments are not allowed on drafts.
+    if (current.state === "Draft") {
+      await prisma.invoice.update({ where: { id }, data: { state: "Sent" } });
+      await logAudit(session, "STATUS", "Invoice", id, documentNumber ?? undefined, {
+        from: "Draft",
+        to: "Sent",
+      });
+    }
+    try {
+      await recordRemainingPayment({ invoiceId: id, date: new Date(), source: "manual", actor: session });
+    } catch (err) {
+      if (err instanceof PaymentError) return { error: err.message };
+      throw err;
+    }
+  } else {
+    await prisma.invoice.update({ where: { id }, data: { state } });
+    await logAudit(session, "STATUS", "Invoice", id, documentNumber ?? undefined, {
+      from: current.state,
+      to: state,
+    });
+  }
 
   // Reminders only make sense while the invoice is Overdue; any other
   // state clears the pending one so it disappears from the Mahnungen list.
@@ -159,44 +188,22 @@ export async function updateInvoiceStatus(
     await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
   }
 
-  await logAudit(session, "STATUS", "Invoice", id, documentNumber ?? undefined, {
-    from: current.state,
-    to: state,
-  });
-
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/invoices");
   revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
+  revalidatePath("/accounting/receivables");
+  revalidatePath("/dashboard");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-}
-
-export async function updateInvoicePaidDate(
-  id: number,
-  paidDateRaw: string
-): Promise<void> {
-  const session = await requireEditor();
-
-  const paidDate = new Date(paidDateRaw);
-  if (isNaN(paidDate.getTime())) return;
-
-  const invoice = await prisma.invoice.update({
-    where: { id },
-    data: { paidDate },
-    select: { documentNumber: true },
-  });
-
-  await logAudit(session, "UPDATE", "Invoice", id, invoice.documentNumber ?? undefined, { paidDate });
-
-  revalidatePath(`/invoices/${id}`);
-  revalidatePath("/accounting");
-  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
+  return {};
 }
 
 export type ImportMatch = {
   invoiceId: number;
   /** Booking date from the statement entry, YYYY-MM-DD. */
   paidDate: string;
+  /** Credited amount of the statement entry, in Rappen. */
+  amountCents: number;
   bankReference: string | null;
 };
 
@@ -206,7 +213,7 @@ export type ImportMatchResult = {
 };
 
 /**
- * Marks invoices paid from confirmed CAMT-import matches (see
+ * Records the confirmed statement entries as payments (see
  * `app/(app)/invoices/import/`). Each invoice is re-checked against its
  * current state rather than trusting the preview: two people confirming the
  * same statement, or an invoice edited in between, must not clobber a state
@@ -226,28 +233,47 @@ export async function markInvoicesPaidFromImport(
     const paidDate = new Date(match.paidDate);
     if (isNaN(paidDate.getTime())) continue;
 
+    if (!Number.isInteger(match.amountCents) || match.amountCents <= 0) continue;
+
     const current = await prisma.invoice.findUnique({
       where: { id: match.invoiceId },
-      select: { state: true, documentNumber: true },
+      select: { state: true },
     });
-    if (!current || (current.state !== "Sent" && current.state !== "Overdue")) continue;
+    if (
+      !current ||
+      (current.state !== "Sent" && current.state !== "Overdue" && current.state !== "PartiallyPaid")
+    ) {
+      continue;
+    }
+    if (
+      match.bankReference &&
+      (await prisma.payment.count({
+        where: { invoiceId: match.invoiceId, bankReference: match.bankReference },
+      })) > 0
+    ) {
+      continue;
+    }
 
-    await markInvoicePaid({
-      invoiceId: match.invoiceId,
-      documentNumber: current.documentNumber,
-      previousState: current.state,
-      paidDate,
-      actor: session,
-      source: "camt-import",
-      bankReference: match.bankReference,
-    });
-
-    paidCount++;
+    try {
+      await recordPayment({
+        invoiceId: match.invoiceId,
+        amount: match.amountCents / 100,
+        date: paidDate,
+        source: "camt-import",
+        bankReference: match.bankReference,
+        actor: session,
+      });
+      paidCount++;
+    } catch (err) {
+      if (!(err instanceof PaymentError)) throw err;
+    }
   }
 
   revalidatePath("/invoices");
   revalidatePath("/invoices/reminders");
   revalidatePath("/accounting");
+  revalidatePath("/accounting/receivables");
+  revalidatePath("/dashboard");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 
   return { paidCount };
@@ -256,6 +282,11 @@ export async function markInvoicesPaidFromImport(
 export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
   const inv = await prisma.invoice.findUnique({ where: { id }, select: { documentNumber: true } });
+  const paymentCount = await prisma.payment.count({ where: { invoiceId: id } });
+  if (paymentCount > 0) {
+    return { error: "Die Rechnung hat erfasste Zahlungen. Bitte zuerst die Zahlungen löschen." };
+  }
+
   try {
     await prisma.invoice.delete({ where: { id } });
   } catch (err) {

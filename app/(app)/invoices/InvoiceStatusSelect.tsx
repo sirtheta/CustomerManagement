@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import { updateInvoiceStatus } from "./actions";
 import type { InvoiceState } from "@prisma/client";
 
@@ -32,7 +33,8 @@ export default function InvoiceStatusSelect({ invoiceId, currentState }: Props) 
     if (!value) return;
     startTransition(async () => {
       setOptimisticState(value as InvoiceState);
-      await updateInvoiceStatus(invoiceId, value as InvoiceState);
+      const res = await updateInvoiceStatus(invoiceId, value as InvoiceState);
+      if (res.error) toast.error(res.error);
     });
   }
 

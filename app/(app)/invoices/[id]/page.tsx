@@ -15,7 +15,6 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import ItemsView from "@/components/items-view";
 import InvoiceStatusSelect from "../InvoiceStatusSelect";
-import PaidDateField from "../PaidDateField";
 import DeleteInvoiceButton from "../DeleteInvoiceButton";
 import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
@@ -229,12 +228,6 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             invoiceId={invoice.id}
             currentState={invoice.state}
           />
-          {invoice.state === "Paid" && (
-            <PaidDateField
-              invoiceId={invoice.id}
-              paidDate={invoice.paidDate?.toISOString() ?? null}
-            />
-          )}
         </CardContent>
       </Card>
 
