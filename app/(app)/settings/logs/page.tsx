@@ -49,9 +49,7 @@ export default async function LogsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Anwendungs-Logs und Datenbank-Backups zum Herunterladen — Logs waren bisher nur über <code>docker logs</code> einsehbar.
-            Die laufende Datei wird täglich abgeschnitten; ältere Tage bleiben so lange, wie die
-            Aufbewahrungsfrist es erlaubt.
+            Anwendungs-Logs und Datenbank-Backups zum Herunterladen.
           </p>
         </div>
         <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
@@ -112,9 +110,8 @@ export default async function LogsPage() {
       <div className="space-y-2 pt-6">
         <h2 className="text-lg font-semibold">Backups</h2>
         <p className="text-sm text-muted-foreground">
-          Jede Nacht wird ein Snapshot der Datenbank gespeichert. Ein Backup enthält alle Daten,
-          auch Passwort-Hashes und SMTP-Zugangsdaten — sicher aufbewahren. Für eine Kopie ausser
-          Haus das Backup-Verzeichnis (<code>BACKUP_DIR</code>) extern sichern.
+          Jede Nacht wird ein Backup der Datenbank erstellt. Es enthält alle Daten, auch
+          Passwort-Hashes und SMTP-Zugangsdaten — sicher aufbewahren.
         </p>
         <div className="overflow-x-auto">
           <Table>
