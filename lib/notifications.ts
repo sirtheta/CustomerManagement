@@ -6,7 +6,7 @@ import { config } from "@/lib/config";
 import { decryptSecret } from "@/lib/crypto";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
-import { checkYearlyInvoices } from "@/lib/yearly-invoices";
+import { checkSubscriptions } from "@/lib/subscriptions";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 
@@ -31,7 +31,7 @@ export function startNotificationScheduler(): void {
     const steps: [string, () => Promise<unknown>][] = [
       ["checkAndUpdateAllDocumentStates", () => checkAndUpdateAllDocumentStates(prisma)],
       ["checkOverdueInvoices", () => checkOverdueInvoices(prisma)],
-      ["checkYearlyInvoices", () => checkYearlyInvoices(prisma)],
+      ["checkSubscriptions", () => checkSubscriptions(prisma)],
       [
         "sendAdminNotifications",
         async () => {
