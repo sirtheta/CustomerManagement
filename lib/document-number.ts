@@ -64,12 +64,19 @@ async function generateNumber(
 
 export type DocumentKind = "invoice" | "quote";
 
+/**
+ * True for a unique-constraint violation on documentNumber. With the
+ * better-sqlite3 driver adapter Prisma reports the column under
+ * meta.driverAdapterError.cause.constraint.fields; meta.target (the shape of
+ * the native engines) is kept as a fallback.
+ */
 export function isDocumentNumberCollision(err: unknown): boolean {
-  return (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
-    err.code === "P2002" &&
-    ((err.meta?.target as string[] | undefined)?.includes("documentNumber") ?? false)
-  );
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return false;
+  const meta = err.meta as
+    | { target?: string[]; driverAdapterError?: { cause?: { constraint?: { fields?: string[] } } } }
+    | undefined;
+  const fields = meta?.driverAdapterError?.cause?.constraint?.fields ?? meta?.target;
+  return fields?.includes("documentNumber") ?? false;
 }
 
 /**
