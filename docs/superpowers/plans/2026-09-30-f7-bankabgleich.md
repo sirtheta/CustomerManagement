@@ -80,6 +80,8 @@ model BankStatementImport {
   periodTo             String?   // YYYY-MM-DD
   openingBalanceRappen Int?
   closingBalanceRappen Int?
+  /// Balance warnings shown at upload time, kept for the import history.
+  balanceWarning       String?
   importedCount        Int
   skippedCount         Int
   userId               Int?
@@ -227,6 +229,14 @@ describe("withFingerprints", () => {
     expect(new Set(first.map((t) => t.fingerprint)).size).toBe(3);
   });
 
+  it("counts only reference-less rows, so a referenced twin does not shift the counter", () => {
+    const plain = tx();
+    const withRef = tx({ bankReference: "REF-9" });
+    const [alone] = withFingerprints(IBAN, [plain]);
+    const [, afterTwin] = withFingerprints(IBAN, [withRef, plain]);
+    expect(afterTwin.fingerprint).toBe(alone.fingerprint);
+  });
+
   it("keeps the parsed fields", () => {
     const [first] = withFingerprints(IBAN, [tx({ bankReference: "R" })]);
     expect(first.description).toBe("Kaffee");
@@ -297,8 +307,13 @@ export function withFingerprints(
       normalize(transaction.description),
       normalize(transaction.counterparty),
     ].join("|");
-    const occurrence = seen.get(key) ?? 0;
-    seen.set(key, occurrence + 1);
+    // Rows with a bank reference are fingerprinted by it and must not shift
+    // the counter of reference-less twins (another export may omit the reference).
+    let occurrence = 0;
+    if (!transaction.bankReference) {
+      occurrence = seen.get(key) ?? 0;
+      seen.set(key, occurrence + 1);
+    }
     return { ...transaction, fingerprint: fingerprint(iban, transaction, occurrence) };
   });
 }
@@ -503,10 +518,13 @@ describe("extractDocumentNumberCandidates", () => {
     expect(extractDocumentNumberCandidates("Ref 1260100421", P)).toEqual([]);
   });
 
-  it("only takes the prefix form when the prefix is not the tail of another word", () => {
-    // "I" is part of "BILDI", so only the bare-digits form can match here.
-    expect(extractDocumentNumberCandidates("BILDI-26010042", P)).toEqual(["I-26010042"]);
-    expect(extractDocumentNumberCandidates("BILDI-2601", P)).toEqual([]);
+  it("does not match a prefix that is the tail of another word", () => {
+    expect(extractDocumentNumberCandidates("BILDI-26010042", P)).toEqual([]);
+  });
+
+  it("does not take the digits of another document type such as a quote number", () => {
+    expect(extractDocumentNumberCandidates("Offerte Q-26010003", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Offerte Q26010003", P)).toEqual([]);
   });
 
   it("returns each number once, prefix form first", () => {
@@ -564,7 +582,9 @@ export function extractDocumentNumberCandidates(description: string, prefix: str
     for (const match of description.matchAll(withPrefix)) add(match[1]);
   }
 
-  for (const match of description.matchAll(/(?<!\d)\d{8}(?!\d)/g)) add(match[0]);
+  // Bare digits: delimited by non-digits and not directly behind a letter
+  // ("Q-26010003" is a quote number, not an invoice number).
+  for (const match of description.matchAll(/(?<![A-Za-z][.\-_]?)(?<!\d)\d{8}(?!\d)/g)) add(match[0]);
 
   return found;
 }
@@ -709,7 +729,7 @@ function nameKey(value: string | null | undefined): string {
   return (value ?? "")
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -1015,6 +1035,50 @@ describe("bank import service against a real database", () => {
       db.prisma
     );
     expect(result.warnings.some((w) => w.includes("Saldo"))).toBe(true);
+    const stored = await db.prisma.bankStatementImport.findUniqueOrThrow({ where: { id: result.importId! } });
+    expect(stored.balanceWarning).toContain("Saldo");
+  });
+
+  it("does not leave an empty import behind when two uploads of the same file run at once", async () => {
+    const file = statement([tx({ bankReference: "P1" }), tx({ bankReference: "P2" })]);
+    const [a, b] = await Promise.all([
+      importStatement({ statement: file, filename: "p.xml", actor }, db.prisma),
+      importStatement({ statement: file, filename: "p.xml", actor }, db.prisma),
+    ]);
+    expect(a.importedCount + b.importedCount).toBe(2);
+    expect(a.skippedCount + b.skippedCount).toBe(2);
+    expect(await db.prisma.bankTransaction.count()).toBe(2);
+    expect(await db.prisma.bankStatementImport.count()).toBe(1);
+  });
+
+  it("skips the continuity check when an overlapping import exists", async () => {
+    await importStatement(
+      {
+        statement: statement([tx({ bankReference: "A" })], {
+          periodFrom: "2026-03-01",
+          periodTo: "2026-03-31",
+          openingBalanceCents: 10000,
+          closingBalanceCents: 9550,
+        }),
+        filename: "mar.xml",
+        actor,
+      },
+      db.prisma
+    );
+    const overlap = await importStatement(
+      {
+        statement: statement([tx({ bankReference: "B", amountCents: -100 })], {
+          periodFrom: "2026-03-15",
+          periodTo: "2026-04-15",
+          openingBalanceCents: 7000,
+          closingBalanceCents: 6900,
+        }),
+        filename: "overlap.xml",
+        actor,
+      },
+      db.prisma
+    );
+    expect(overlap.warnings).toEqual([]);
   });
 
   it("warns when the opening balance does not continue the previous import", async () => {
@@ -1219,7 +1283,16 @@ export async function importStatement(
     return { importId: null, importedCount: 0, skippedCount: hashed.length, warnings: [] };
   }
 
-  const previous = statement.iban
+  // With an overlapping import for the same account the "previous" import is
+  // ambiguous, so the continuity check is skipped rather than raising a false alarm.
+  const overlapping =
+    statement.iban && statement.periodFrom
+      ? await prisma.bankStatementImport.findFirst({
+          where: { iban: statement.iban, periodTo: { gt: statement.periodFrom } },
+          select: { id: true },
+        })
+      : null;
+  const previous = statement.iban && !overlapping
     ? await prisma.bankStatementImport.findFirst({
         where: {
           iban: statement.iban,
@@ -1246,6 +1319,7 @@ export async function importStatement(
           periodTo: statement.periodTo,
           openingBalanceRappen: statement.openingBalanceCents,
           closingBalanceRappen: statement.closingBalanceCents,
+          balanceWarning: warnings.length > 0 ? warnings.join(" ") : null,
           importedCount: 0,
           skippedCount: 0,
           userId: parseInt(actor.user.id, 10) || null,
@@ -1328,10 +1402,19 @@ export async function undoImport(
     );
   }
 
-  await prisma.$transaction([
-    prisma.bankTransaction.deleteMany({ where: { importId: existing.id } }),
-    prisma.bankStatementImport.delete({ where: { id: existing.id } }),
-  ]);
+  // The check above is only for the message; the delete re-checks inside the
+  // transaction so an entry booked in between is never silently unlinked.
+  await prisma.$transaction(async (tx) => {
+    const removed = await tx.bankTransaction.deleteMany({
+      where: { importId: existing.id, paymentId: null, expenseId: null },
+    });
+    if (removed.count !== existing.transactions.length) {
+      throw new BankImportError(
+        "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen."
+      );
+    }
+    await tx.bankStatementImport.delete({ where: { id: existing.id } });
+  });
   await logAudit(
     params.actor,
     "DELETE",
@@ -1420,7 +1503,12 @@ export async function expenseHints(
   prisma: PrismaClient = defaultPrisma
 ): Promise<Record<number, ExpenseHint>> {
   const rows = await prisma.bankTransaction.findMany({
-    where: { counterparty: { not: null }, OR: [{ expenseId: { not: null } }, { ignored: true }] },
+    // Outgoing only: an ignored incoming payment says nothing about expenses.
+    where: {
+      counterparty: { not: null },
+      amountRappen: { lt: 0 },
+      OR: [{ expenseId: { not: null } }, { ignored: true }],
+    },
     select: {
       counterparty: true,
       ignored: true,
@@ -1462,11 +1550,12 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 **Files:**
 - Create: `lib/import/queries.ts`
 - Modify: `app/(app)/invoices/import/actions.ts` (komplett ersetzen)
+- Modify: `lib/payments.ts` (`RecordParams` um `onCreated` erweitern, in `createPayment` aufrufen)
 - Modify: `app/(app)/invoices/actions.ts` (Zeilen ab `export type ImportMatch` bis Ende von `markInvoicesPaidFromImport` entfernen; Import von `PaymentError` bleibt, wenn sonst noch genutzt, sonst entfernen)
 - Modify: `tests/integration/camt-import-payments.test.ts` (ersetzen)
 
 **Interfaces:**
-- Consumes: `importStatement`, `undoImport`, `BankImportError`, `listOpenTransactions`, `expenseHints` (Task 5), `matchStatementToInvoices` (Task 4), `checkStatementAccount`, `recordPayment`, `deletePayment`, `PaymentError`, `toRappen`, `customerDisplayName`.
+- Consumes: `importStatement`, `undoImport`, `BankImportError`, `listOpenTransactions`, `expenseHints` (Task 5), `matchStatementToInvoices` (Task 4), `checkStatementAccount`, `recordPayment` (mit neuem `onCreated`), `PaymentError`, `toRappen`, `customerDisplayName`.
 - Produces (Server Actions, alle `requireEditor`):
   - `uploadStatement(_prev: UploadStatementState, formData: FormData): Promise<UploadStatementState>` mit `UploadStatementState = { error?: string; warnings?: string[]; importedCount?: number; skippedCount?: number }`
   - `bookPayments(items: { transactionId: number; invoiceId: number }[]): Promise<{ error?: string; paidCount?: number }>`
@@ -1483,7 +1572,7 @@ export interface ImportOverview {
   imports: Array<{
     id: number; filename: string; iban: string | null; periodFrom: string | null;
     periodTo: string | null; importedCount: number; skippedCount: number;
-    bookedCount: number; createdAt: string;
+    bookedCount: number; balanceWarning: string | null; createdAt: string;
   }>;
 }
 ```
@@ -1555,6 +1644,7 @@ export interface ImportOverview {
     importedCount: number;
     skippedCount: number;
     bookedCount: number;
+    balanceWarning: string | null;
     createdAt: string;
   }>;
 }
@@ -1596,6 +1686,7 @@ export async function loadImportOverview(
       importedCount: row.importedCount,
       skippedCount: row.skippedCount,
       bookedCount: bookedByImport.get(row.id) ?? 0,
+      balanceWarning: row.balanceWarning,
       createdAt: row.createdAt.toISOString(),
     })),
   };
@@ -1826,6 +1917,39 @@ describe("CAMT import actions against a real database", () => {
 Run: `npx vitest run tests/integration/camt-import-payments.test.ts`
 Expected: FAIL (Actions nicht exportiert).
 
+- [ ] **Step 3b: Hook in `lib/payments.ts`**
+
+Damit Zahlung und Verknüpfung mit der Bankbewegung **atomar** entstehen (kein Absturz dazwischen, kein Doppelbuchen, kein Audit-Rauschen), bekommt `createPayment` einen optionalen Rückruf innerhalb der Transaktion.
+
+In `RecordParams` ergänzen:
+
+```ts
+  /** Runs inside the payment transaction right after the payment row exists; throw to roll back. */
+  onCreated?: (tx: Parameters<typeof recalculateInvoiceState>[0], paymentId: number) => Promise<void>;
+```
+
+In `createPayment` direkt nach `const payment = await tx.payment.create({ … });` einfügen:
+
+```ts
+    await params.onCreated?.(tx, payment.id);
+```
+
+Zusätzlicher Test in `tests/integration/camt-import-payments.test.ts` (im `describe` ergänzen):
+
+```ts
+  it("books an entry only once when two confirmations run at the same time", async () => {
+    const inv = await seedInvoice();
+    const { ids } = await seedTransactions([{ amountCents: 4000 }]);
+
+    const results = await Promise.all([
+      bookPayments([{ transactionId: ids[0], invoiceId: inv.id }]),
+      bookPayments([{ transactionId: ids[0], invoiceId: inv.id }]),
+    ]);
+    expect(results.map((r) => r.paidCount).sort()).toEqual([0, 1]);
+    expect(await db.prisma.payment.count({ where: { invoiceId: inv.id } })).toBe(1);
+  });
+```
+
 - [ ] **Step 4: Actions implementieren** – `app/(app)/invoices/import/actions.ts` komplett ersetzen:
 
 ```ts
@@ -1839,7 +1963,7 @@ import { logAudit } from "@/lib/audit";
 import { parseCamt053 } from "@/lib/import/camt";
 import { BankImportError, importStatement, undoImport } from "@/lib/import/bank-import";
 import { checkStatementAccount } from "@/lib/import/statement-checks";
-import { PaymentError, deletePayment, recordPayment } from "@/lib/payments";
+import { PaymentError, recordPayment } from "@/lib/payments";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "invoices.import" });
@@ -1944,25 +2068,26 @@ export async function bookPayments(
     }
 
     try {
-      const { paymentId } = await recordPayment({
+      await recordPayment({
         invoiceId: item.invoiceId,
         amount: entry.amountRappen / 100,
         date: entry.date,
         source: "camt-import",
         bankReference: entry.bankReference,
         actor: session,
+        // Claim the entry inside the payment transaction: a concurrent second
+        // confirmation matches no row, throws, and its payment is rolled back.
+        onCreated: async (tx, paymentId) => {
+          const claimed = await tx.bankTransaction.updateMany({
+            where: { id: entry.id, ...isOpen },
+            data: { paymentId },
+          });
+          if (claimed.count === 0) throw new AlreadyBooked();
+        },
       });
-      const claimed = await prisma.bankTransaction.updateMany({
-        where: { id: entry.id, ...isOpen },
-        data: { paymentId },
-      });
-      if (claimed.count === 0) {
-        // Lost a race with a second confirmation of the same entry: undo ours.
-        await deletePayment({ paymentId, actor: session });
-        continue;
-      }
       paidCount++;
     } catch (err) {
+      if (err instanceof AlreadyBooked) continue;
       if (!(err instanceof PaymentError)) throw err;
     }
   }
@@ -2128,7 +2253,12 @@ export default async function InvoicesImportPage() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Zahlungseingänge</h2>
-        <IncomingTable rows={overview.incoming} />
+        {/* Keyed on the row ids: the tables derive their initial selection from the rows,
+            so a new upload or a booking must remount them instead of keeping stale state. */}
+        <IncomingTable
+          key={overview.incoming.map((r) => r.transaction.id).join(",")}
+          rows={overview.incoming}
+        />
       </section>
 
       <section className="space-y-2">
@@ -2136,7 +2266,11 @@ export default async function InvoicesImportPage() {
         <p className="text-sm text-muted-foreground">
           Es werden nur angekreuzte Zeilen als Ausgabe übernommen. Privates lässt du offen oder ignorierst es.
         </p>
-        <ExpensesTable rows={overview.expenses} categories={overview.categories} />
+        <ExpensesTable
+          key={overview.expenses.map((r) => r.transaction.id).join(",")}
+          rows={overview.expenses}
+          categories={overview.categories}
+        />
       </section>
 
       <section className="space-y-2">
@@ -2441,6 +2575,13 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
     });
   }
 
+  function ignoreOne(id: number) {
+    startTransition(async () => {
+      const result = await ignoreTransactions([id]);
+      if (result.error) toast.error(result.error);
+    });
+  }
+
   function renderRow({ transaction }: Row) {
     const selection = selections[transaction.id];
     return (
@@ -2487,6 +2628,11 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
             </SelectContent>
           </Select>
         </TableCell>
+        <TableCell>
+          <Button variant="ghost" size="sm" disabled={isPending} onClick={() => ignoreOne(transaction.id)}>
+            Ignorieren
+          </Button>
+        </TableCell>
       </TableRow>
     );
   }
@@ -2499,6 +2645,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         <TableHead>Empfänger</TableHead>
         <TableHead>Betrag</TableHead>
         <TableHead>Kategorie</TableHead>
+        <TableHead className="w-24"></TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -2580,6 +2727,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
             <TableHead>Zeitraum</TableHead>
             <TableHead>Bewegungen</TableHead>
             <TableHead>Verbucht</TableHead>
+            <TableHead>Saldoprüfung</TableHead>
             <TableHead className="w-28"></TableHead>
           </TableRow>
         </TableHeader>
@@ -2595,6 +2743,13 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
               </TableCell>
               <TableCell>{entry.importedCount}</TableCell>
               <TableCell>{entry.bookedCount}</TableCell>
+              <TableCell className="max-w-xs text-xs" title={entry.balanceWarning ?? undefined}>
+                {entry.balanceWarning ? (
+                  <span className="text-destructive">Warnung: {entry.balanceWarning}</span>
+                ) : (
+                  <span className="text-muted-foreground">in Ordnung</span>
+                )}
+              </TableCell>
               <TableCell>
                 <Button
                   variant="ghost"
@@ -2650,7 +2805,7 @@ Rechnung: 1000.00 + 100.00 + 50.00 − 89.90 − 21.00 = 1039.10.
 - [ ] **Step 8: Manuelle Prüfung im Browser**
 
 Run: `npm run dev`, als Admin anmelden, eine `Sent`-Rechnung mit Nummer `R-26030001` über CHF 100 anlegen (oder per Prisma Studio), unter Rechnungen → „Zahlungen importieren“ die Fixture hochladen. Erwartet:
-- Meldung „4 neue Bewegungen importiert“, **keine** Saldowarnung.
+- Meldung „4 neue Bewegungen importiert“, **keine** Saldowarnung (Verlauf: „in Ordnung“). Die Vorauswahlen sind direkt nach dem Upload ohne Seitenreload gesetzt (Regression: Tabellen werden über den Key neu montiert).
 - Eingänge: Zeile „Rechnung R 2603 0001“ ist vorausgewählt und der Rechnung `R-26030001` zugeordnet (Leerzeichen-Variante). Zeile „Geschenk“ hat keine Zuordnung.
 - Ausgaben: beide Zeilen **nicht** angekreuzt. Swisscom ankreuzen, Kategorie wählen, „übernehmen“ → Zeile verschwindet, unter Buchhaltung → Ausgaben erscheint „Swisscom AG – Mobile Abo März“, CHF 89.90.
 - Datei erneut hochladen → „Keine neuen Bewegungen …“, Verlauf bleibt bei einem Eintrag.
@@ -2707,29 +2862,46 @@ In `tests/unit/external-payments-route.test.ts` im `describe` ergänzen (Stil de
   });
 ```
 
-In `tests/integration/payment-matching.test.ts` einen Test im Stil der vorhandenen ergänzen (vorhandenes Seed-Helper des Files verwenden):
+In `tests/integration/payment-matching.test.ts` (die Datei hat nur `seedCustomer()`, die Rechnung wird inline angelegt; vorher `sed -n 1,40p` ansehen und `db`, `seedCustomer` und den Import von `recordPayment` an den Bestand anpassen):
 
 ```ts
   it("stores the bank reference and does not book the same reference twice", async () => {
-    // seed an open invoice R-…, total 100, as the neighbouring tests do
-    // (use the file's own helper; invoice number below is the seeded one)
-    const first = await matchAndMarkPaid(
-      { description: `Zahlung ${invoice.documentNumber}`, amountRappen: 4000, bankReference: "REF-API" },
+    const customer = await seedCustomer();
+    const invoice = await db.prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-26030001",
+        date: new Date("2026-03-01"),
+        dueDate: new Date("2099-01-01"),
+        totalAmount: 100,
+        state: "Sent",
+      },
+    });
+    const actor = { user: { id: "1", name: "T", email: "t@test.ch", role: "Editor" } } as Session;
+    // A first partial payment already carries the reference.
+    await recordPayment(
+      { invoiceId: invoice.id, amount: 40, date: new Date("2026-03-02"), source: "manual", bankReference: "REF-API", actor },
       db.prisma
     );
-    expect(first.matched).toBe(false); // partial amounts still do not match automatically
 
-    const full = await matchAndMarkPaid(
-      { description: `Zahlung ${invoice.documentNumber}`, amountRappen: 10000, bankReference: "REF-API" },
+    // The remainder with the same reference is the same bank entry: not booked again.
+    const duplicate = await matchAndMarkPaid(
+      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API" },
       db.prisma
     );
-    expect(full.matched).toBe(true);
-    const payment = await db.prisma.payment.findFirstOrThrow({ where: { invoiceId: invoice.id } });
-    expect(payment.bankReference).toBe("REF-API");
+    expect(duplicate.matched).toBe(false);
+    expect(await db.prisma.payment.count({ where: { invoiceId: invoice.id } })).toBe(1);
+
+    // A different reference books the remainder and stores the reference.
+    const booked = await matchAndMarkPaid(
+      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API-2" },
+      db.prisma
+    );
+    expect(booked.matched).toBe(true);
+    const payments = await db.prisma.payment.findMany({ where: { invoiceId: invoice.id }, orderBy: { id: "asc" } });
+    expect(payments[1].bankReference).toBe("REF-API-2");
   });
 ```
-
-Vor dem Schreiben `sed -n 1,60p tests/integration/payment-matching.test.ts` ansehen und `invoice`/`db`-Namen an den Bestand anpassen, nicht raten.
 
 - [ ] **Step 2: Fehlschlag prüfen**
 
@@ -2779,7 +2951,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `FEATURE_ANALYSE.md`
 - Modify: `docs/superpowers/specs/2026-09-30-f7-bankabgleich-design.md` (eine Zeile)
 
-- [ ] **Step 1: Spec-Zeile angleichen** – in der Spec den Punkt „**Sammelaktion:** „Alle sichtbaren ignorieren“ …“ ersetzen durch: „**Sammelaktion:** „Nicht angekreuzte ignorieren“ für den privaten Rest (nur die sichtbaren, nicht die eingeklappten Zeilen).“
+- [ ] **Step 1: Spec-Zeilen angleichen** – in der Spec `userId String?` zu `userId Int?` ändern (wie `AuditLog.userId`), `BankStatementImport` um `balanceWarning String?` ergänzen und den Verlauf um die Saldoprüfung-Spalte. Außerdem den Punkt „**Sammelaktion:** „Alle sichtbaren ignorieren“ …“ ersetzen durch: „**Sammelaktion:** „Nicht angekreuzte ignorieren“ für den privaten Rest (nur die sichtbaren, nicht die eingeklappten Zeilen).“
 
 - [ ] **Step 2: CLAUDE.md** – im Abschnitt „Business document workflow“ nach dem Punkt „Payments“ einen Absatz einfügen:
 
