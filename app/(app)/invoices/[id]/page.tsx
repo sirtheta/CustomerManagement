@@ -68,6 +68,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         customer: true,
         items: true,
         sentLogs: { orderBy: { sentAt: "desc" } },
+        sentDocuments: { orderBy: { createdAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
         creditNoteFor: { select: { id: true, documentNumber: true } },
         creditNotes: {
@@ -260,6 +261,53 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                       </TableCell>
                       <TableCell>{log.sentTo}</TableCell>
                       <TableCell className="text-sm text-gray-600">{log.subject}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {canEdit && invoice.sentDocuments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Versendete Dokumente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Datum</TableHead>
+                    <TableHead>Art</TableHead>
+                    <TableHead>Empfänger</TableHead>
+                    <TableHead>Prüfsumme (SHA-256)</TableHead>
+                    <TableHead>PDF</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoice.sentDocuments.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="whitespace-nowrap">{formatDate(doc.createdAt)}</TableCell>
+                      <TableCell>
+                        {doc.kind === "Reminder" ? `Mahnung Stufe ${doc.reminderLevel ?? 1}` : "Rechnung"}
+                      </TableCell>
+                      <TableCell>{doc.sentTo}</TableCell>
+                      <TableCell className="font-mono text-xs" title={doc.sha256}>
+                        {doc.sha256.slice(0, 12)}…
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={`/api/invoices/${invoice.id}/archive/${doc.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary underline"
+                        >
+                          Öffnen
+                        </a>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
