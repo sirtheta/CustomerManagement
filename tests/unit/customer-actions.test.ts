@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    payment: { count: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -214,8 +215,23 @@ describe("customer actions", () => {
       expect(prisma.customer.delete).not.toHaveBeenCalled();
     });
 
+    it("refuses deletion when the customer's invoices have payments", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.payment.count).mockResolvedValue(3);
+
+      const res = await deleteCustomer(7);
+
+      expect(res).toEqual({
+        error: "Der Kunde hat Rechnungen mit erfassten Zahlungen. Bitte zuerst die Zahlungen löschen.",
+      });
+      expect(prisma.payment.count).toHaveBeenCalledWith({ where: { invoice: { customerId: 7 } } });
+      expect(prisma.customer.delete).not.toHaveBeenCalled();
+      expect(redirect).not.toHaveBeenCalled();
+    });
+
     it("deletes customer, writes audit log, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.payment.count).mockResolvedValue(0);
       vi.mocked(prisma.customer.delete).mockResolvedValue({} as never);
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT:/customers");

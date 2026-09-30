@@ -42,6 +42,11 @@ describe("matchAndMarkPaid against a real database", () => {
     expect(updated.state).toBe("Paid");
     expect(updated.paidDate).not.toBeNull();
 
+    const payments = await prisma.payment.findMany({ where: { invoiceId: invoice.id } });
+    expect(payments).toHaveLength(1);
+    expect(payments[0].amount.toNumber()).toBe(123.45);
+    expect(payments[0].source).toBe("budget-import");
+
     const reminders = await prisma.pendingReminder.findMany({ where: { invoiceId: invoice.id } });
     expect(reminders).toHaveLength(0);
 
@@ -49,6 +54,36 @@ describe("matchAndMarkPaid against a real database", () => {
     expect(auditLogs).toHaveLength(1);
     expect(auditLogs[0].action).toBe("STATUS");
     expect(JSON.parse(auditLogs[0].details!)).toMatchObject({ from: "Overdue", to: "Paid", source: "budget-import" });
+  });
+
+  it("marks a PartiallyPaid invoice Paid when the remainder is paid", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-26010004",
+        date: new Date(),
+        dueDate: new Date(),
+        totalAmount: 100,
+        state: "PartiallyPaid",
+      },
+    });
+    await prisma.payment.create({
+      data: { invoiceId: invoice.id, date: new Date("2026-01-05"), amount: 40, source: "manual" },
+    });
+
+    const result = await matchAndMarkPaid(
+      { description: "Restzahlung R-26010004", amountRappen: 6000, bookingDate: "2026-01-20" },
+      prisma
+    );
+
+    expect(result).toMatchObject({ matched: true, invoiceId: invoice.id });
+    const updated = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    expect(updated.state).toBe("Paid");
+    expect(updated.paidDate).toEqual(new Date("2026-01-20"));
+    expect(await prisma.payment.count({ where: { invoiceId: invoice.id } })).toBe(2);
   });
 
   it("does not match when the real Decimal totalAmount differs by a single Rappen", async () => {

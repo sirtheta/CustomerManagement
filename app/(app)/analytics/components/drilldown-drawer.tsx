@@ -18,6 +18,7 @@ const MONTH_NAMES = [
 
 const STATE_LABELS: Partial<Record<InvoiceState, string>> = {
   Sent: "Versendet",
+  PartiallyPaid: "Teilbezahlt",
   Paid: "Bezahlt",
   Overdue: "Überfällig",
   Canceled: "Storniert",
@@ -27,6 +28,7 @@ const STATE_LABELS: Partial<Record<InvoiceState, string>> = {
 const STATE_BADGE: Partial<Record<InvoiceState, string>> = {
   Paid: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   Sent: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  PartiallyPaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   Overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
   Canceled: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
   Draft: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",

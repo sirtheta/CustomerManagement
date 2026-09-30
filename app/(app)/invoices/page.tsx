@@ -27,6 +27,7 @@ const PAGE_SIZE = 25;
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
   Sent: "Versendet",
+  PartiallyPaid: "Teilbezahlt",
   Paid: "Bezahlt",
   Overdue: "Überfällig",
   Canceled: "Storniert",
@@ -35,6 +36,7 @@ const stateLabels: Record<InvoiceState, string> = {
 const stateVariants: Record<InvoiceState, "default" | "secondary" | "destructive" | "outline"> = {
   Draft: "secondary",
   Sent: "default",
+  PartiallyPaid: "secondary",
   Paid: "outline",
   Overdue: "destructive",
   Canceled: "outline",
@@ -44,6 +46,7 @@ const filterOptions: { value: string; label: string }[] = [
   { value: "all", label: "Alle" },
   { value: "Draft", label: "Entwurf" },
   { value: "Sent", label: "Versendet" },
+  { value: "PartiallyPaid", label: "Teilbezahlt" },
   { value: "Paid", label: "Bezahlt" },
   { value: "Overdue", label: "Überfällig" },
   { value: "Canceled", label: "Storniert" },

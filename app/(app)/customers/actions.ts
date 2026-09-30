@@ -158,8 +158,15 @@ export async function updateCustomer(
   redirect(`/customers/${id}`);
 }
 
-export async function deleteCustomer(id: number): Promise<void> {
+export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
+  // Payments cascade with the invoices; recorded payments must be removed on purpose.
+  const paymentCount = await prisma.payment.count({ where: { invoice: { customerId: id } } });
+  if (paymentCount > 0) {
+    return {
+      error: "Der Kunde hat Rechnungen mit erfassten Zahlungen. Bitte zuerst die Zahlungen löschen.",
+    };
+  }
   await prisma.customer.delete({ where: { customerId: id } });
   await logAudit(session, "DELETE", "Customer", id);
   // Cascade-deletes the customer's invoices, which feed the revenue figures.

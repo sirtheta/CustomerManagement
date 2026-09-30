@@ -9,6 +9,7 @@ import { documentLabel } from "@/lib/document-display";
 const stateLabels: Record<string, string> = {
   Draft: "Entwurf",
   Sent: "Versendet",
+  PartiallyPaid: "Teilbezahlt",
   Paid: "Bezahlt",
   Overdue: "Überfällig",
   Canceled: "Storniert",
