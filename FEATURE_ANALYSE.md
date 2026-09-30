@@ -215,12 +215,12 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
 
 - [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung (#114)
-- [ ] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
+- [x] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
 - [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
 - [ ] 4. F4 Belegarchiv und automatisches Backup (Teil C Backup erledigt; offen: kein PDF-Archiv mit Hash, keine Hash-Kette im Audit-Log)
   - [x] C Automatisches nächtliches Backup (`lib/backup.ts`)
-  - [ ] A PDF-Archiv mit SHA-256-Hash
-  - [ ] B Hash-Kette im Audit-Log
+  - [x] A PDF-Archiv mit SHA-256-Hash
+  - [x] B Hash-Kette im Audit-Log
 - [x] 5. Kleine Fixes (#113)
   - [x] Import prüft Währung und IBAN (Z3)
   - [x] Audit-Log für Pending-E-Mails (U6)
