@@ -147,6 +147,7 @@ describe("QRBill data preparation", () => {
         totalAmount: 1250.9 as unknown as import("@prisma/client").Prisma.Decimal,
         discountPercent: 0 as unknown as import("@prisma/client").Prisma.Decimal,
         customUserText: null,
+        creditNoteForId: null,
         customer: {
           customerId: 1,
           company: validCustomer.company,
@@ -162,6 +163,7 @@ describe("QRBill data preparation", () => {
           yearlyInvoice: false,
           contactInsteadOfCompany: false,
           nextInvoiceDate: null,
+          archivedAt: null,
         },
         items: [],
       },

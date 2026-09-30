@@ -1,5 +1,5 @@
 import defaultPrisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
@@ -111,12 +111,23 @@ export type UpdateDocumentInput = {
   items: ItemData[];
 };
 
+/** Thrown when someone tries to edit an invoice that already left Draft. */
+export class DocumentLockedError extends Error {}
+
 export async function updateDocumentWithItems(
   id: number,
-  input: UpdateDocumentInput
+  input: UpdateDocumentInput,
+  prisma: PrismaClient = defaultPrisma
 ): Promise<void> {
-  await defaultPrisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     if (input.kind === "invoice") {
+      const current = await tx.invoice.findUnique({ where: { id }, select: { state: true } });
+      if (!current) throw new Error("Rechnung nicht gefunden.");
+      if (current.state !== "Draft") {
+        throw new DocumentLockedError(
+          "Versendete Rechnungen können nicht mehr bearbeitet werden. Bitte eine Gutschrift erstellen."
+        );
+      }
       await tx.item.deleteMany({ where: { invoiceId: id } });
       await tx.invoice.update({
         where: { id },

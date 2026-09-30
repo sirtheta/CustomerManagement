@@ -35,6 +35,7 @@ vi.mock("@/lib/logger", () => ({
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
+  DocumentLockedError,
   sendDocument,
 } from "@/lib/document-actions";
 import prisma from "@/lib/prisma";
@@ -136,6 +137,35 @@ describe("updateDocumentWithItems", () => {
     expect(prisma.quote.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ discountPercent: 10 }) })
     );
+  });
+
+  const invoiceInput = {
+    kind: "invoice" as const,
+    customerId: 1,
+    customUserText: null,
+    date: new Date(),
+    dueDate: new Date(),
+    totalAmount: 100,
+    discountPercent: 0,
+    items: [],
+  };
+
+  it("refuses to update an invoice that has left Draft", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Sent" } as never);
+
+    await expect(updateDocumentWithItems(3, invoiceInput)).rejects.toBeInstanceOf(DocumentLockedError);
+    expect(prisma.item.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("updates a draft invoice", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Draft" } as never);
+    vi.mocked(prisma.item.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
+
+    await updateDocumentWithItems(3, invoiceInput);
+
+    expect(prisma.invoice.update).toHaveBeenCalledTimes(1);
   });
 });
 

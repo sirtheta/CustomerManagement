@@ -4,6 +4,7 @@ import {
   createValidTestCustomer,
   createValidItemList,
 } from "../test-utils";
+import { updateDocumentWithItems, DocumentLockedError } from "@/lib/document-actions";
 
 describe("InvoiceRepository", () => {
   const db = createTestDatabase();
@@ -146,5 +147,46 @@ describe("InvoiceRepository", () => {
     });
 
     expect(invoice.customUserText).toBe("Vielen Dank für Ihren Auftrag.");
+  });
+
+  it("refuses to edit a sent invoice and leaves items and total unchanged", async () => {
+    const { prisma } = db;
+    const customer = await prisma.customer.create({ data: createValidTestCustomer() });
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-LOCK-1",
+        date: new Date(),
+        dueDate: new Date(Date.now() + 30 * 86_400_000),
+        totalAmount: 200,
+        state: "Sent",
+        items: { create: createValidItemList() },
+      },
+      include: { items: true },
+    });
+
+    await expect(
+      updateDocumentWithItems(
+        invoice.id,
+        {
+          kind: "invoice",
+          customerId: customer.customerId,
+          customUserText: null,
+          date: new Date(),
+          dueDate: new Date(),
+          totalAmount: 1,
+          discountPercent: 0,
+          items: [],
+        },
+        prisma
+      )
+    ).rejects.toBeInstanceOf(DocumentLockedError);
+
+    const after = await prisma.invoice.findUniqueOrThrow({
+      where: { id: invoice.id },
+      include: { items: true },
+    });
+    expect(after.totalAmount.toNumber()).toBe(200);
+    expect(after.items).toHaveLength(invoice.items.length);
   });
 });

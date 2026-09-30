@@ -135,12 +135,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <Button variant="outline" size="sm" render={<Link href={backHref} />}>
             Zurück
           </Button>
-          <Button
-            size="sm"
-            render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
-          >
-            Bearbeiten
-          </Button>
+          {invoice.state === "Draft" && (
+            <Button
+              size="sm"
+              render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
+            >
+              Bearbeiten
+            </Button>
+          )}
         </div>
       </div>
 
@@ -276,7 +278,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       </Card>
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <DeleteInvoiceButton invoiceId={invoice.id} />
+        {invoice.state === "Draft" ? <DeleteInvoiceButton invoiceId={invoice.id} /> : <span />}
         <div className="flex items-center gap-2 flex-wrap">
           <SendInvoiceButton
             invoiceId={invoice.id}

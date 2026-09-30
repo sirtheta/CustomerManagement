@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import InvoiceForm from "../../InvoiceForm";
 
 type Props = {
@@ -26,6 +26,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   ]);
 
   if (!invoice) notFound();
+  if (invoice.state !== "Draft") redirect(`/invoices/${invoice.id}`);
 
   const serializedInvoice = {
     ...invoice,

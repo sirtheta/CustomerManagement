@@ -295,6 +295,7 @@ describe("generateQuotePdf", () => {
           yearlyInvoice: false,
           contactInsteadOfCompany: false,
           nextInvoiceDate: null,
+          archivedAt: null,
         },
         items: [
           {

@@ -17,6 +17,7 @@ import { canTransitionInvoice } from "@/lib/state-manager";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
+  DocumentLockedError,
   sendDocument,
 } from "@/lib/document-actions";
 
@@ -113,6 +114,7 @@ export async function updateInvoice(
       items,
     });
   } catch (err) {
+    if (err instanceof DocumentLockedError) return { error: err.message };
     log.error({ id, err }, "updateInvoice failed");
     return { error: "Rechnung konnte nicht gespeichert werden." };
   }
@@ -291,7 +293,16 @@ export async function markInvoicesPaidFromImport(
 
 export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
-  const inv = await prisma.invoice.findUnique({ where: { id }, select: { documentNumber: true } });
+  const inv = await prisma.invoice.findUnique({
+    where: { id },
+    select: { documentNumber: true, state: true },
+  });
+  if (!inv) return { error: "Rechnung nicht gefunden." };
+  if (inv.state !== "Draft") {
+    return {
+      error: "Versendete Rechnungen können nicht gelöscht werden. Stattdessen eine Gutschrift erstellen.",
+    };
+  }
   const paymentCount = await prisma.payment.count({ where: { invoiceId: id } });
   if (paymentCount > 0) {
     return { error: "Die Rechnung hat erfasste Zahlungen. Bitte zuerst die Zahlungen löschen." };
@@ -303,7 +314,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id, inv?.documentNumber ?? undefined);
+  await logAudit(session, "DELETE", "Invoice", id, inv.documentNumber ?? undefined);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");

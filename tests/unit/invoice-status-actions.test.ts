@@ -293,6 +293,7 @@ describe("deleteInvoice", () => {
   it("returns an error and does not delete when payments exist", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060007",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.payment.count).mockResolvedValue(2 as never);
 
@@ -306,6 +307,7 @@ describe("deleteInvoice", () => {
   it("deletes the invoice, writes an audit log, and redirects", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060005",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockResolvedValue({} as never);
     vi.mocked(redirect).mockImplementation(() => {
@@ -320,6 +322,7 @@ describe("deleteInvoice", () => {
   it("returns an error instead of throwing when the delete fails", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: "I-25060006",
+      state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockRejectedValue(new Error("FOREIGN KEY constraint failed"));
 
@@ -329,4 +332,22 @@ describe("deleteInvoice", () => {
     expect(redirect).not.toHaveBeenCalled();
     expect(logAudit).not.toHaveBeenCalled();
   });
+
+  it.each(["Sent", "Overdue", "PartiallyPaid", "Paid", "Canceled"])(
+    "refuses to delete a %s invoice",
+    async (state) => {
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        documentNumber: "I-25060008",
+        state,
+      } as never);
+
+      const result = await deleteInvoice(1);
+
+      expect(result.error).toBe(
+        "Versendete Rechnungen können nicht gelöscht werden. Stattdessen eine Gutschrift erstellen."
+      );
+      expect(prisma.invoice.delete).not.toHaveBeenCalled();
+      expect(redirect).not.toHaveBeenCalled();
+    }
+  );
 });
