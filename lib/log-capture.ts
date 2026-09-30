@@ -1,16 +1,16 @@
 import { createWriteStream, mkdirSync } from "fs";
 import { dirname, join } from "path";
+import { getDbPath } from "@/lib/db-path";
 
 /**
  * Log file directory, next to the SQLite database (inside the data volume in
- * Docker, so it survives restarts). Reads DATABASE_URL directly rather than
- * importing lib/prisma's getDbPath — that module instantiates the Prisma
- * client at import time, which this module (imported first thing in
- * instrumentation.ts, see startLogCapture) has no reason to force this early.
+ * Docker, so it survives restarts). Uses lib/db-path rather than lib/prisma's
+ * re-export — lib/prisma instantiates the Prisma client at import time, which
+ * this module (imported first thing in instrumentation.ts, see
+ * startLogCapture) has no reason to force this early.
  */
 function getLogDir(): string {
-  const dbPath = (process.env.DATABASE_URL ?? "file:./data/customermanagement.db").replace(/^file:/, "");
-  return join(dirname(dbPath), "logs");
+  return join(dirname(getDbPath()), "logs");
 }
 
 export const LOG_DIR = getLogDir();

@@ -29,4 +29,14 @@ export const config = {
       return Number.isFinite(parsed) ? parsed : 14;
     })(),
   },
+  backup: {
+    // Nightly SQLite snapshot (<data>/backups/db-<date>.db). Offset from the
+    // 02:35 log rotation so the two jobs never run at the same moment.
+    cronSchedule: process.env.BACKUP_CRON_SCHEDULE || "15 2 * * *",
+    // Days to keep backups; 0 keeps all (same reasoning as logs.maxKeepDays).
+    keepDays: (() => {
+      const parsed = parseInt(process.env.BACKUP_KEEP_DAYS ?? "", 10);
+      return Number.isFinite(parsed) ? parsed : 30;
+    })(),
+  },
 } as const;

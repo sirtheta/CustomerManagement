@@ -24,8 +24,8 @@ export default function DevToolsCard() {
         <p className="text-xs text-muted-foreground">
           Nur in Entwicklungsumgebungen sichtbar.
         </p>
-        <div className="flex items-center gap-3">
-          <form action={action}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <form action={action} className="shrink-0">
             <Button type="submit" variant="outline" size="sm" disabled={isPending}>
               {isPending ? "Wird ausgeführt…" : "Benachrichtigungscheck jetzt auslösen"}
             </Button>
