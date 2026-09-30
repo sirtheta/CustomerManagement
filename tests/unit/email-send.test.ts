@@ -72,6 +72,25 @@ describe("email.ts", () => {
   });
 
   describe("sendInvoiceEmail", () => {
+    it("uses credit note wording without a due date for credit notes", async () => {
+      const credit = {
+        ...makeInvoice(),
+        creditNoteForId: 5,
+        totalAmount: { toNumber: () => -40 },
+      } as unknown as Parameters<typeof sendInvoiceEmail>[0];
+      await sendInvoiceEmail(
+        credit,
+        makeSettings({ emailSubjectTemplate: "Rechnung {documentNumber}", emailBodyTemplate: "Zahlbar bis {dueDate}" }),
+        Buffer.from("pdf")
+      );
+      const mail = mockSendMail.mock.calls[0][0];
+      expect(mail.subject).toBe("Gutschrift Nr. R-2026-001 – Test AG");
+      expect(mail.text).toContain("die Gutschrift Nr. R-2026-001");
+      expect(mail.text).toContain("CHF 40.00");
+      expect(mail.text).not.toContain("Zahlbar bis");
+      expect(mail.attachments[0].filename).toBe("gutschrift-R-2026-001.pdf");
+    });
+
     it("skips sending when DISABLE_EMAIL=true", async () => {
       process.env.DISABLE_EMAIL = "true";
       await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"));

@@ -162,6 +162,9 @@ async function InvoicesTable({
                     <Link href={`/invoices/${inv.id}`} className="hover:underline">
                       {documentLabel(inv.documentNumber)}
                     </Link>
+                    {inv.creditNoteForId !== null && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Link href={`/customers/${inv.customer.customerId}`} className="hover:underline">

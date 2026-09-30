@@ -36,7 +36,7 @@ function resolvePlaceholders(
     .replace(/\{documentNumber\}/g, documentNumber)
     .replace(/\{contactPerson\}/g, c.contactPerson)
     .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
-    .replace(/\{totalAmount\}/g, formatCurrency(invoice.totalAmount.toNumber()))
+    .replace(/\{totalAmount\}/g, formatCurrency(Math.abs(invoice.totalAmount.toNumber())))
     .replace(/\{date\}/g, formatDate(invoice.date))
     .replace(/\{dueDate\}/g, formatDate(invoice.dueDate))
     .replace(/\{customUserText\}/g, invoice.customUserText || "")
@@ -46,6 +46,11 @@ function resolvePlaceholders(
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
   "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\n{customUserText}\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
+
+// Credit notes have no due date and are stored negative; they ignore the custom invoice templates.
+const CREDIT_NOTE_SUBJECT = "Gutschrift Nr. {documentNumber} – {companyName}";
+const CREDIT_NOTE_BODY =
+  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}";
 
 export async function sendInvoiceEmail(
   invoice: FullInvoice,
@@ -64,13 +69,14 @@ export async function sendInvoiceEmail(
 
   const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
   const fromAddress = settings.smtpFromAddress || settings.smtpUser;
-  const subjectTemplate = settings.emailSubjectTemplate || DEFAULT_SUBJECT;
-  const bodyTemplate = settings.emailBodyTemplate || DEFAULT_BODY;
+  const isCreditNote = invoice.creditNoteForId != null;
+  const subjectTemplate = isCreditNote ? CREDIT_NOTE_SUBJECT : settings.emailSubjectTemplate || DEFAULT_SUBJECT;
+  const bodyTemplate = isCreditNote ? CREDIT_NOTE_BODY : settings.emailBodyTemplate || DEFAULT_BODY;
 
   const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, documentNumber, settings);
   const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, documentNumber, settings);
   const to = overrides?.to ?? invoice.customer.email;
-  const filename = `rechnung-${invoice.documentNumber}.pdf`;
+  const filename = `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
 
   await transporter.sendMail({
     from: `"${fromName}" <${fromAddress}>`,

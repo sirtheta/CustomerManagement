@@ -185,6 +185,9 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                         <Link href={`/invoices/${inv.id}?from=customers/${customerId}`} className="hover:underline">
                           {documentLabel(inv.documentNumber)}
                         </Link>
+                        {inv.creditNoteForId !== null && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                        )}
                       </TableCell>
                       <TableCell>{formatDate(inv.date)}</TableCell>
                       <TableCell>{formatDate(inv.dueDate)}</TableCell>
