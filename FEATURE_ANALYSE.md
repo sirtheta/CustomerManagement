@@ -129,7 +129,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 ### F3 · Rechnungen festschreiben, Gutschrift und Storno — **Muss**
 - **Beschreibung:** Ab Status „Versendet“ ist eine Rechnung nicht mehr änderbar. Korrekturen laufen über eine **Gutschrift** (eigener Belegtyp mit Bezug zur Originalrechnung) oder einen Storno mit neuer Rechnung. Nicht-Entwürfe können nicht gelöscht werden. Kunden mit Rechnungen können nur archiviert, nicht gelöscht werden. Statuswechsel nur entlang erlaubter Übergänge.
-- **Nutzen:** Nachvollziehbarkeit gegenüber Kunden, Treuhänder und Behörden. Das ist die Voraussetzung für jeden Buchhaltungsexport.
+- **Nutzen:** Nachvollziehbarkeit gegenüber Kunden und Behörden (und einem späteren Treuhänder). Das ist die Voraussetzung für jeden Buchhaltungsexport.
 - **Aufwand:** mittel
 - **Code:** `lib/document-actions.ts`, `app/(app)/invoices/actions.ts`, `invoices/[id]/page.tsx`, `invoices/[id]/edit/page.tsx`, `InvoiceStatusSelect.tsx`, `customers/actions.ts`, `schema.prisma` (`onDelete: Restrict`, `Invoice.kind` bzw. `creditNoteForId`), `lib/state-manager.ts`
 - **Ansatz:** Eine Zustandsmaschine in `lib/state-manager.ts` mit einer Tabelle erlaubter Übergänge. Serverseitig prüfen in `updateDocumentWithItems`. Die Gutschrift als `Invoice` mit negativem Betrag oder als eigenes Modell: **bitte mit Treuhänder klären**, wie sie im Export erscheinen soll.
@@ -148,12 +148,12 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Code:** `schema.prisma`, `lib/payment-matching.ts`, `lib/import/matching.ts`, `app/(app)/invoices/actions.ts`, `accounting/lib/income-statement-queries.ts`, `analytics-queries.ts`, neue Seite `app/(app)/accounting/receivables/`
 - **Ansatz:** `markInvoicePaid` wird zu `recordPayment`. Der Status ergibt sich aus der Summe der Zahlungen. Bestehende `Paid`-Rechnungen per Migration in je eine Zahlung über den Gesamtbetrag umwandeln.
 
-### F6 · Buchhaltungsexport für den Treuhänder — **Muss**
-- **Beschreibung:** Kontierung einrichten: Ertragskonto pro Kategorie/Leistung, Aufwandkonto pro Ausgabenkategorie, Debitorenkonto, Bankkonto. Die Kontonummern **gibt der Treuhänder vor**, die App liefert keine. Export als Buchungsjournal (Datum, Beleg-Nr., Soll, Haben, Text, Betrag) als CSV. Dazu ein Jahrespaket als ZIP (Journal, OP-Liste, alle Rechnungs-PDFs, Belege).
-- **Nutzen:** Weniger Aufwand beim Treuhänder. Genau diese Übergabe fehlt heute, der CSV-Export `app/api/export/accounting/route.ts` enthält nur Einnahmen/Ausgaben ohne Konten.
-- **Aufwand:** mittel (generisches CSV), danach mittel pro Zielsoftware
-- **Code:** `schema.prisma` (`Account`, Kontierung an `Category`/`Service`), `app/api/export/accounting/route.ts`, `lib/csv-export.ts`, Einstellungen
-- **Ansatz:** Zuerst ein konfigurierbares, generisches Journal-CSV. Danach gezielt das Format der Software, die die Nutzer tatsächlich haben (siehe Abschnitt 7, Fragen). **Welche Importformate Banana, bexio oder Abacus genau erwarten, habe ich nicht geprüft.** Das ist vor der Umsetzung anhand der Hersteller-Dokumentation zu klären.
+### F6 · Jahresabschluss-Paket für die Selbstveranlagung — **Muss**
+- **Beschreibung:** Kein Treuhänder, keine Zielsoftware, kein Kontenplan. Die App liefert pro Jahr ein **ZIP**: Journal-CSV (Datum, Beleg-Nr., Typ Einnahme/Ausgabe, Kategorie, Text, Betrag), Einnahmen-/Ausgabenrechnung als PDF und CSV (Ausgaben nach Kategorie, damit man sie in die Steuererklärung übertragen kann), Debitorenliste per 31.12. (aus F5) sowie alle Rechnungs-PDFs und Belege.
+- **Nutzen:** Ein Ort für Steuererklärung und Aufbewahrung, und ein Nachweis bei einer Prüfung durch die Steuerbehörde. Grundlage ist das Belegarchiv aus F4. Ob und wie die Debitorenliste im Inventar zum Jahresende verlangt wird, **bitte bei der Steuerverwaltung des Kantons prüfen**.
+- **Aufwand:** klein bis mittel
+- **Code:** `app/api/export/accounting/route.ts` (heute nur Einnahmen/Ausgaben), `app/api/export/receivables/route.ts` (aus F5), `lib/csv-export.ts`, neuer ZIP-Export, `accounting/lib/income-statement-queries.ts`
+- **Ansatz:** Zuerst das ZIP mit dem bestehenden CSV, der GuV und der Debitorenliste. Danach Rechnungs-PDFs und Belege. Kontierung (`Account`) und Zielformate für Banana, bexio oder Abacus sind **bewusst nicht Teil davon**. Wenn später ein Treuhänder dazukommt, lassen sich Konten und ein Format nachrüsten.
 
 ### F7 · Besserer Bankabgleich — **Sollte**
 - **Beschreibung:** Treffersuche robuster machen (z. B. Rechnungsnummer auch mit Leerzeichen oder ohne Präfix erkennen, Kundenname als Zusatzsignal). Teilzahlungen (nach F5). Die importierten Bewegungen werden gespeichert (Duplikatschutz per Bankreferenz, Saldovergleich Anfangs-/Endsaldo). Warnung, wenn Währung oder IBAN nicht passen (Z3). Optional camt.054 als zweiter Parser. Die Ausgabenseite des Auszugs kann direkt als `Expense` übernommen werden.
@@ -213,15 +213,18 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 ## 4. Roadmap
 
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
-1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung
-2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen
-3. F1 IBAN-Prüfung
-4. F4 Belegarchiv und automatisches Backup
-5. Kleine Fixes: Import prüft Währung und IBAN (Z3), Audit-Log für Pending-E-Mails (U6)
+
+- [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung (#114)
+- [ ] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
+- [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
+- [ ] 4. F4 Belegarchiv und automatisches Backup (offen: kein PDF-Archiv mit Hash, keine Hash-Kette im Audit-Log, kein automatisches Backup)
+- [x] 5. Kleine Fixes (#113)
+  - [x] Import prüft Währung und IBAN (Z3)
+  - [x] Audit-Log für Pending-E-Mails (U6)
 
 **Phase 2: mittelfristig (3–9 Monate) – Buchhaltungsfähigkeit**
 6. F5 Zahlungen und offene Posten
-7. F6 Treuhänder-Export (generisch, danach 1 Zielsoftware)
+7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
 8. F7 Bankabgleich 2.0
 9. F11 flexible Abos
 
@@ -305,11 +308,11 @@ Begründung:
 3. Die Teile, die *nur* die App gut kann, bleiben in der App: Rechnungen, QR-Zahlteil, Zahlungsabgleich, offene Posten, Mahnwesen, Belegarchiv. Genau diese Daten braucht der Treuhänder sauber.
 4. Die Grenze liegt beim **Journal-Export**. Alles, was Konten, Abschluss und Bilanz betrifft, bleibt im Fachprogramm.
 
-Umsetzung in dieser Reihenfolge: F3 → F5 → F6, danach F7/F9. Kontonummern und Buchungslogik (z. B. ob pro Rechnung oder pro Zahlung gebucht wird) **legt der Treuhänder fest**. Die App bietet dafür eine Konfiguration an und enthält keine eingebauten Konten.
+Umsetzung in dieser Reihenfolge: F3 → F5 → F6, danach F7/F9. **Aktueller Stand:** Es gibt keinen Treuhänder und keinen vorgesehenen. F6 ist deshalb ein Jahresabschluss-Paket für die Selbstveranlagung (ZIP mit Journal-CSV, GuV, Debitorenliste, PDFs) ohne Kontenplan und ohne Zielsoftware. Kontierung und ein Importformat (Banana, bexio, Abacus) werden erst gebaut, wenn ein Treuhänder dazukommt. Dann **legt er Kontonummern und Buchungslogik fest** (z. B. ob pro Rechnung oder pro Zahlung gebucht wird), und die App bietet dafür eine Konfiguration an, ohne eingebaute Konten.
 
-**Offener Punkt:** Direkte API-Anbindungen (z. B. bexio) und genaue Importformate (Banana, Abacus) habe ich **nicht geprüft**. Vor F6 bitte die Hersteller-Dokumentation lesen und die Machbarkeit bestätigen.
+**Offener Punkt (nur relevant bei späterem Treuhänder):** Direkte API-Anbindungen (z. B. bexio) und genaue Importformate (Banana, Abacus) habe ich **nicht geprüft**. Vor einer solchen Erweiterung bitte die Hersteller-Dokumentation lesen und die Machbarkeit bestätigen.
 
-### 7.4 Fragen an einen Treuhänder
+### 7.4 Fragen an einen Treuhänder (nur falls einer dazukommt)
 
 1. Welche Software verwendest du, und welches Importformat (Datei oder API) akzeptierst du am liebsten?
 2. Wie willst du die Rechnungen verbucht haben: bei Rechnungsstellung (Debitoren) oder erst bei Zahlungseingang? Einzeln oder als Sammelbuchung?
