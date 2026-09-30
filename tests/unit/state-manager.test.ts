@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkAndUpdateDocumentStates } from "@/lib/state-manager";
+import { checkAndUpdateDocumentStates, canTransitionInvoice, allowedInvoiceTargets } from "@/lib/state-manager";
 
 const mockUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrisma = {
@@ -37,5 +37,43 @@ describe("checkAndUpdateDocumentStates", () => {
   it("skips invoice query when invoiceIds is empty", async () => {
     await checkAndUpdateDocumentStates(mockPrisma, [], []);
     expect(mockUpdateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("canTransitionInvoice", () => {
+  it.each([
+    ["Draft", "Sent"],
+    ["Draft", "Paid"],
+    ["Sent", "Overdue"],
+    ["Sent", "Paid"],
+    ["Overdue", "Sent"],
+    ["Overdue", "Paid"],
+    ["PartiallyPaid", "Paid"],
+  ] as const)("allows %s -> %s", (from, to) => {
+    expect(canTransitionInvoice(from, to)).toBe(true);
+  });
+
+  it.each([
+    ["Draft", "Overdue"],
+    ["Draft", "Canceled"],
+    ["Sent", "Draft"],
+    ["Sent", "Canceled"],
+    ["Overdue", "Canceled"],
+    ["Paid", "Sent"],
+    ["Paid", "Draft"],
+    ["PartiallyPaid", "Sent"],
+    ["Canceled", "Sent"],
+    ["Canceled", "Paid"],
+  ] as const)("refuses %s -> %s", (from, to) => {
+    expect(canTransitionInvoice(from, to)).toBe(false);
+  });
+
+  it("treats staying in the same state as allowed", () => {
+    expect(canTransitionInvoice("Canceled", "Canceled")).toBe(true);
+  });
+
+  it("lists the current state plus the allowed targets", () => {
+    expect(allowedInvoiceTargets("Sent")).toEqual(["Sent", "Overdue", "Paid"]);
+    expect(allowedInvoiceTargets("Canceled")).toEqual(["Canceled"]);
   });
 });

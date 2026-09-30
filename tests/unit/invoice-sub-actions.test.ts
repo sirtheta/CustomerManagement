@@ -17,6 +17,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn() }));
+vi.mock("@/lib/payments", () => ({ getPaymentSummary: vi.fn().mockResolvedValue({ remainingRappen: 50000 }) }));
 vi.mock("@/lib/document-number", () => ({ assignDocumentNumber: vi.fn() }));
 vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
@@ -38,6 +39,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
+import { getPaymentSummary } from "@/lib/payments";
 import { assignDocumentNumber } from "@/lib/document-number";
 
 const editorSession = {
@@ -118,6 +120,20 @@ describe("invoices/reminders actions", () => {
       expect(result.error).toBe("PDF error");
     });
 
+    it("requests only the remaining amount (after credit notes) on the QR slip", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1, invoiceId: 1, reminderLevel: 1, invoice: mockInvoice,
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 60000 } as never);
+      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+      vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+      vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+      await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
+      expect(generateInvoicePdf).toHaveBeenCalledWith(mockInvoice, mockSettings, { qrAmount: 600 });
+    });
+
     it("sends reminder, updates reminder level, logs audit, and returns success", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       const reminder = {
@@ -196,6 +212,17 @@ describe("invoices/templates actions", () => {
       vi.mocked(prisma.invoice.findUnique).mockResolvedValue(null);
       const result = await saveAsTemplate(1, "Vorlage 1");
       expect(result.error).toBe("Rechnung nicht gefunden.");
+    });
+
+    it("refuses credit notes", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        creditNoteForId: 3,
+        items: [{ name: "Item" }],
+      } as never);
+      const result = await saveAsTemplate(1, "Vorlage 1");
+      expect(result.error).toBe("Aus einer Gutschrift kann keine Vorlage erstellt werden.");
+      expect(prisma.invoiceTemplate.create).not.toHaveBeenCalled();
     });
 
     it("returns error when invoice has no items", async () => {

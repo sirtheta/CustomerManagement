@@ -512,6 +512,8 @@
         <li><strong>Dokumente</strong> – Dateien, die direkt am Kunden abgelegt werden (z.&nbsp;B. Verträge).</li>
         <li><strong>Rechnungen &amp; Offerten</strong> – alle mit diesem Kunden verknüpften Dokumente auf einen Blick.</li>
       </ol>
+      <h3 class="sub" id="kunden-archiv">Kunden archivieren</h3>
+      <p>Kundinnen und Kunden, die Rechnungen haben, lassen sich <strong>nicht löschen</strong>, weil die Rechnungen als Belege erhalten bleiben müssen. Stattdessen wählst du auf der Kundenseite <strong>«Archivieren»</strong>. Archivierte Kunden verschwinden aus der Kundenliste und aus den Auswahllisten für neue Rechnungen und Offerten; für sie werden auch keine Jahresrechnungen mehr erstellt. Über die Schaltfläche <strong>«Archiv»</strong> oben in der Kundenliste findest du sie wieder und kannst sie mit «Wiederherstellen» reaktivieren. Kunden ohne Rechnungen kann ein Admin weiterhin löschen.</p>
       <div class="callout warn">
         <div class="ic">⚠️</div>
         <div><strong>Betrachter</strong> sehen Kundendaten, Notizen und Dokumente vollständig, können aber nichts anlegen, ändern oder löschen.</div>
@@ -537,7 +539,7 @@
         <div class="legend-card"><div class="legend-code" style="background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd)">PartiallyPaid</div><div class="txt"><strong>Teilbezahlt</strong><span>Erst ein Teil des Betrags ist eingegangen</span></div></div>
         <div class="legend-card"><div class="legend-code" style="background:#15803d1a;color:var(--pos-fg);border:1px solid #15803d40">Paid</div><div class="txt"><strong>Bezahlt</strong><span>Zahlungen decken den Rechnungsbetrag; Zahlungsdatum = letzte Zahlung</span></div></div>
         <div class="legend-card"><div class="legend-code" style="background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-bd)">Overdue</div><div class="txt"><strong>Überfällig</strong><span>Fälligkeitsdatum verstrichen, nicht bezahlt</span></div></div>
-        <div class="legend-card"><div class="legend-code" style="background:var(--surface-3);color:var(--ink-faint);border:1px solid var(--border-strong)">Canceled</div><div class="txt"><strong>Storniert</strong><span>Ungültig gemacht</span></div></div>
+        <div class="legend-card"><div class="legend-code" style="background:var(--surface-3);color:var(--ink-faint);border:1px solid var(--border-strong)">Canceled</div><div class="txt"><strong>Storniert</strong><span>Vollständig gutgeschrieben</span></div></div>
       </div>
 
       <figure class="shot">
@@ -567,8 +569,23 @@
         <div class="ic">💡</div>
         <div><strong>Überzahlung</strong> Übersteigt eine Zahlung den Restbetrag, fragt das System nach einer Bestätigung. Der Überschuss wird als Überzahlung ausgewiesen, es entsteht kein Kundenguthaben.</div>
       </div>
-      <p>Der Status lässt sich nicht von Hand zurück auf «Versendet» oder «Überfällig» setzen, solange Zahlungen erfasst sind – zuerst die Zahlungen löschen. Rechnungen mit Zahlungen können nicht gelöscht werden, ebenso wenig Kunden, deren Rechnungen Zahlungen enthalten.</p>
+      <p>Der Status lässt sich nicht von Hand zurück auf «Versendet» oder «Überfällig» setzen, solange Zahlungen erfasst sind – zuerst die Zahlungen löschen. Versendete Rechnungen können generell nicht gelöscht werden, also auch nicht Rechnungen mit Zahlungen; Kunden mit Rechnungen lassen sich nur archivieren (siehe unten).</p>
       <p>Unter <strong>Buchhaltung → Offene Posten</strong> (Schaltfläche «Offene Posten») sind alle unbezahlten Forderungen per <strong>Stichtag</strong> aufgelistet: mit Restbetrag, Altersstruktur (nicht fällig, 1–30, 31–60, 61–90 und über 90 Tage überfällig), Summen pro Kunde und CSV-Export. Für den Stichtag zählen nur Rechnungen und Zahlungen bis zu diesem Datum.</p>
+
+      <h3 class="sub" id="festschreiben">Festschreiben, Gutschrift &amp; Storno</h3>
+      <p>Eine Rechnung lässt sich nur bearbeiten, solange sie ein <strong>Entwurf</strong> ist. Sobald sie versendet ist, ist sie festgeschrieben: Es gibt keinen Button «Bearbeiten» mehr, und die Rechnung lässt sich nicht löschen. So bleibt nachvollziehbar, was der Kundin oder dem Kunden tatsächlich zugestellt wurde. Nur Entwürfe (Rechnungen ohne Nummer) können gelöscht werden.</p>
+      <p>Der <strong>Status</strong> lässt sich nur noch entlang sinnvoller Übergänge ändern: Entwurf → Versendet oder Bezahlt, Versendet ↔ Überfällig, und «Bezahlt» über eine erfasste Zahlung. Zurück zum Entwurf oder von Hand auf «Storniert» geht nicht. «Storniert» ergibt sich nur aus einer Gutschrift.</p>
+      <p>Um eine versendete Rechnung zu korrigieren, erstellst du eine <strong>Gutschrift</strong>:</p>
+      <ol class="steps">
+        <li><strong>Gutschrift erstellen</strong> – auf der Rechnungsseite die Schaltfläche «Gutschrift erstellen» wählen. Es entsteht ein Entwurf mit allen Positionen der Rechnung.</li>
+        <li><strong>Anpassen</strong> – Positionen streichen oder Mengen und Beträge ändern, wenn nur ein Teil gutgeschrieben werden soll. Die Beträge erfasst du positiv; die Gutschrift wird automatisch als Minusbetrag geführt. Alle Gutschriften zusammen dürfen den Rechnungsbetrag nicht übersteigen.</li>
+        <li><strong>Versenden</strong> – wie eine Rechnung, per E-Mail mit PDF. Erst beim Versand erhält die Gutschrift ihre Nummer aus derselben Reihe wie die Rechnungen. Das PDF trägt den Titel «Gutschrift» und verweist auf die Rechnung; es hat keinen Zahlteil.</li>
+      </ol>
+      <p>Auf der Originalrechnung erscheint der Block «Gutschriften». Der <strong>offene Betrag</strong> ist Rechnungsbetrag minus Zahlungen minus versendete Gutschriften, und so erscheint er auch in der Offene-Posten-Liste. Wird die ganze Rechnung gutgeschrieben und war noch nichts bezahlt, wechselt sie auf «Storniert». Wurde schon bezahlt, weist die Offene-Posten-Liste den zu viel bezahlten Betrag als Guthaben aus.</p>
+      <div class="callout warn">
+        <div class="ic">⚠️</div>
+        <div><strong>Rückzahlungen</strong> Eine Gutschrift verändert die Einnahmen der Buchhaltung nicht. Ein Betrag, den du der Kundschaft zurückzahlst, wird derzeit nicht erfasst.</div>
+      </div>
 
       <h3 class="sub">Ausstehende E-Mails, Mahnungen &amp; Vorlagen</h3>
       <p>Drei weitere Unterseiten unter «Rechnungen» unterstützen den laufenden Betrieb:</p>

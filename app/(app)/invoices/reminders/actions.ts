@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
+import { getPaymentSummary } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
@@ -39,7 +40,8 @@ export async function sendReminder(
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
   try {
-    const pdf = await generateInvoicePdf(reminder.invoice, settings);
+    const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
+    const pdf = await generateInvoicePdf(reminder.invoice, settings, { qrAmount: remainingRappen / 100 });
     await sendInvoiceEmail(reminder.invoice, settings, pdf, { to, subject, body });
   } catch (err) {
     log.error({ reminderId, to, err }, "sendReminder failed");

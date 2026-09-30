@@ -24,6 +24,7 @@ type Props = {
   documentNumber: string | null;
   defaultSubject: string;
   defaultBody: string;
+  isCreditNote?: boolean;
 };
 
 export default function SendInvoiceButton({
@@ -32,7 +33,9 @@ export default function SendInvoiceButton({
   documentNumber,
   defaultSubject,
   defaultBody,
+  isCreditNote = false,
 }: Props) {
+  const noun = isCreditNote ? "Gutschrift" : "Rechnung";
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [to, setTo] = useState(customerEmail);
@@ -44,7 +47,7 @@ export default function SendInvoiceButton({
     {}
   );
 
-  useActionToast(state, `Rechnung ${documentLabel(documentNumber)} versendet`);
+  useActionToast(state, `${noun} ${documentLabel(documentNumber)} versendet`);
 
   // Close the dialog once a send succeeds, derived from the action result
   // timestamp during render rather than in an effect.
@@ -72,13 +75,13 @@ export default function SendInvoiceButton({
         render={
           <Button variant="default" size="sm">
             <SendIcon className="size-4 mr-1.5" />
-            Rechnung senden
+            {noun} senden
           </Button>
         }
       />
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Rechnung per E-Mail senden</DialogTitle>
+          <DialogTitle>{noun} per E-Mail senden</DialogTitle>
         </DialogHeader>
 
         {/* Tabs */}

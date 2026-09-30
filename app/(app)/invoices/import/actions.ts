@@ -46,12 +46,13 @@ export async function parseStatement(
 
   const [openInvoices, settings] = await Promise.all([
     prisma.invoice.findMany({
-      where: { state: { in: ["Sent", "Overdue", "PartiallyPaid"] } },
+      where: { state: { in: ["Sent", "Overdue", "PartiallyPaid"] }, creditNoteForId: null },
       select: {
         id: true,
         documentNumber: true,
         totalAmount: true,
         payments: { select: { amount: true } },
+        creditNotes: { where: { state: { not: "Draft" } }, select: { totalAmount: true } },
       },
     }),
     prisma.applicationSettings.findFirst({
@@ -65,10 +66,11 @@ export async function parseStatement(
       .filter((invoice): invoice is typeof invoice & { documentNumber: string } => invoice.documentNumber !== null)
       .map((invoice) => {
         const paidRappen = invoice.payments.reduce((s, p) => s + toRappen(p.amount), 0);
+        const creditedRappen = invoice.creditNotes.reduce((s, c) => s + Math.abs(toRappen(c.totalAmount)), 0);
         return {
           id: invoice.id,
           documentNumber: invoice.documentNumber,
-          openAmount: Math.max(toRappen(invoice.totalAmount) - paidRappen, 0) / 100,
+          openAmount: Math.max(toRappen(invoice.totalAmount) - creditedRappen - paidRappen, 0) / 100,
         };
       }),
     settings?.invoiceNumberPrefix ?? "R-"

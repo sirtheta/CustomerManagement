@@ -17,6 +17,11 @@ vi.mock("@/lib/document-number", async (importOriginal) => ({
   generateQuoteNumber: vi.fn(),
   assignDocumentNumber: vi.fn(),
 }));
+vi.mock("@/lib/credit-notes", async () => ({
+  CreditNoteError: class extends Error {},
+  assertCreditWithinOriginal: vi.fn(),
+}));
+vi.mock("@/lib/payments", () => ({ syncInvoiceState: vi.fn() }));
 vi.mock("@/lib/service-catalog", () => ({ saveItemsToCatalog: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({
   generateInvoicePdf: vi.fn(),
@@ -35,12 +40,16 @@ vi.mock("@/lib/logger", () => ({
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
+  DocumentLockedError,
   sendDocument,
 } from "@/lib/document-actions";
 import prisma from "@/lib/prisma";
 import { generateInvoiceNumber, generateQuoteNumber, assignDocumentNumber } from "@/lib/document-number";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
+import { assertCreditWithinOriginal, CreditNoteError } from "@/lib/credit-notes";
+import { syncInvoiceState } from "@/lib/payments";
+import { logAudit } from "@/lib/audit";
 
 const actor = { user: { id: "1", name: "Editor", email: "editor@test.ch", role: "Editor" } } as never;
 
@@ -137,6 +146,35 @@ describe("updateDocumentWithItems", () => {
       expect.objectContaining({ data: expect.objectContaining({ discountPercent: 10 }) })
     );
   });
+
+  const invoiceInput = {
+    kind: "invoice" as const,
+    customerId: 1,
+    customUserText: null,
+    date: new Date(),
+    dueDate: new Date(),
+    totalAmount: 100,
+    discountPercent: 0,
+    items: [],
+  };
+
+  it("refuses to update an invoice that has left Draft", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Sent" } as never);
+
+    await expect(updateDocumentWithItems(3, invoiceInput)).rejects.toBeInstanceOf(DocumentLockedError);
+    expect(prisma.item.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.update).not.toHaveBeenCalled();
+  });
+
+  it("updates a draft invoice", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ state: "Draft" } as never);
+    vi.mocked(prisma.item.deleteMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.invoice.update).mockResolvedValue({} as never);
+
+    await updateDocumentWithItems(3, invoiceInput);
+
+    expect(prisma.invoice.update).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("sendDocument", () => {
@@ -146,6 +184,49 @@ describe("sendDocument", () => {
       if (Array.isArray(arg)) return Promise.all(arg) as never;
       return (arg as (tx: typeof prisma) => Promise<unknown>)(prisma) as never;
     });
+  });
+
+  it("sends a credit note, then recalculates the original invoice", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 5,
+      documentNumber: null,
+      creditNoteForId: 1,
+      totalAmount: -50,
+      customer: {},
+      items: [],
+    } as never);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-002");
+    vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+    vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
+
+    const result = await sendDocument({ kind: "invoice", id: 5, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(result.success).toBe(true);
+    expect(assertCreditWithinOriginal).toHaveBeenCalled();
+    expect(syncInvoiceState).toHaveBeenCalledWith({ invoiceId: 1, actor, source: "credit-note" });
+    expect(logAudit).toHaveBeenCalledWith(actor, "SEND", "Invoice", 5, "I-2026-002", {
+      to: "a@b.ch",
+      creditNoteFor: 1,
+    });
+    // the send must not have assigned a number before the check passed
+    expect(vi.mocked(assertCreditWithinOriginal).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(assignDocumentNumber).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("does not send or number a credit note that exceeds the original", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      id: 5, documentNumber: null, creditNoteForId: 1, totalAmount: -500, customer: {}, items: [],
+    } as never);
+    vi.mocked(assertCreditWithinOriginal).mockRejectedValue(new CreditNoteError("Zu hoch."));
+
+    const result = await sendDocument({ kind: "invoice", id: 5, to: "a@b.ch", subject: "s", body: "b", actor });
+
+    expect(result).toEqual({ error: "Zu hoch." });
+    expect(assignDocumentNumber).not.toHaveBeenCalled();
+    expect(sendInvoiceEmail).not.toHaveBeenCalled();
   });
 
   it("returns an error when settings are missing", async () => {

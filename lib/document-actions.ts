@@ -1,5 +1,5 @@
 import defaultPrisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
@@ -10,6 +10,8 @@ import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail, sendQuoteEmail } from "@/lib/email";
+import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
+import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
 
@@ -111,12 +113,23 @@ export type UpdateDocumentInput = {
   items: ItemData[];
 };
 
+/** Thrown when someone tries to edit an invoice that already left Draft. */
+export class DocumentLockedError extends Error {}
+
 export async function updateDocumentWithItems(
   id: number,
-  input: UpdateDocumentInput
+  input: UpdateDocumentInput,
+  prisma: PrismaClient = defaultPrisma
 ): Promise<void> {
-  await defaultPrisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     if (input.kind === "invoice") {
+      const current = await tx.invoice.findUnique({ where: { id }, select: { state: true } });
+      if (!current) throw new Error("Rechnung nicht gefunden.");
+      if (current.state !== "Draft") {
+        throw new DocumentLockedError(
+          "Versendete Rechnungen können nicht mehr bearbeitet werden. Bitte eine Gutschrift erstellen."
+        );
+      }
       await tx.item.deleteMany({ where: { invoiceId: id } });
       await tx.invoice.update({
         where: { id },
@@ -171,9 +184,28 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
   if (input.kind === "invoice") {
     const invoice = await defaultPrisma.invoice.findUnique({
       where: { id: input.id },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
+      include: {
+        customer: true,
+        items: { orderBy: { id: "asc" } },
+        creditNoteFor: { select: { documentNumber: true } },
+      },
     });
     if (!invoice) return { error: "Rechnung nicht gefunden." };
+
+    // Drafts are not counted when a credit note is saved, so this is the real
+    // enforcement of the credit limit. It must run before a number is assigned.
+    if (invoice.creditNoteForId != null) {
+      try {
+        await assertCreditWithinOriginal(defaultPrisma, {
+          id: invoice.id,
+          creditNoteForId: invoice.creditNoteForId,
+          totalAmount: invoice.totalAmount,
+        });
+      } catch (err) {
+        if (err instanceof CreditNoteError) return { error: err.message };
+        throw err;
+      }
+    }
 
     let documentNumber: string;
     try {
@@ -210,7 +242,14 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     ]);
     await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
       to: input.to,
+      ...(invoice.creditNoteForId != null ? { creditNoteFor: invoice.creditNoteForId } : {}),
     });
+    if (invoice.creditNoteForId != null) {
+      await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });
+      revalidatePath(`/invoices/${invoice.creditNoteForId}`);
+      revalidatePath("/accounting/receivables");
+      revalidatePath("/dashboard");
+    }
     revalidatePath(`/invoices/${input.id}`);
     revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   } else {

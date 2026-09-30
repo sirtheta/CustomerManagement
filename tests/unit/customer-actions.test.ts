@@ -3,15 +3,21 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    payment: { count: vi.fn() },
+    invoice: { count: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
-import { createCustomer, updateCustomer, deleteCustomer } from "@/app/(app)/customers/actions";
+import {
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  archiveCustomer,
+  restoreCustomer,
+} from "@/app/(app)/customers/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -215,23 +221,23 @@ describe("customer actions", () => {
       expect(prisma.customer.delete).not.toHaveBeenCalled();
     });
 
-    it("refuses deletion when the customer's invoices have payments", async () => {
+    it("refuses deletion when the customer has invoices", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
-      vi.mocked(prisma.payment.count).mockResolvedValue(3);
+      vi.mocked(prisma.invoice.count).mockResolvedValue(3);
 
       const res = await deleteCustomer(7);
 
       expect(res).toEqual({
-        error: "Der Kunde hat Rechnungen mit erfassten Zahlungen. Bitte zuerst die Zahlungen löschen.",
+        error: "Der Kunde hat Rechnungen und kann nicht gelöscht werden. Bitte archivieren.",
       });
-      expect(prisma.payment.count).toHaveBeenCalledWith({ where: { invoice: { customerId: 7 } } });
+      expect(prisma.invoice.count).toHaveBeenCalledWith({ where: { customerId: 7 } });
       expect(prisma.customer.delete).not.toHaveBeenCalled();
       expect(redirect).not.toHaveBeenCalled();
     });
 
-    it("deletes customer, writes audit log, and redirects", async () => {
+    it("deletes a customer without invoices, writes audit log, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
-      vi.mocked(prisma.payment.count).mockResolvedValue(0);
+      vi.mocked(prisma.invoice.count).mockResolvedValue(0);
       vi.mocked(prisma.customer.delete).mockResolvedValue({} as never);
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT:/customers");
@@ -240,8 +246,48 @@ describe("customer actions", () => {
       await expect(deleteCustomer(7)).rejects.toThrow("REDIRECT:/customers");
       expect(prisma.customer.delete).toHaveBeenCalledWith({ where: { customerId: 7 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Customer", 7);
-      // Cascade-deletes the customer's invoices, which feed the revenue figures.
-      expect(revalidateTag).toHaveBeenCalledWith("analytics", { expire: 0 });
+    });
+  });
+
+  describe("archiveCustomer / restoreCustomer", () => {
+    it("rejects Viewer role", async () => {
+      vi.mocked(auth).mockResolvedValue(viewerSession);
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/dashboard");
+      });
+      await expect(archiveCustomer(1)).rejects.toThrow("REDIRECT:/dashboard");
+      expect(prisma.customer.update).not.toHaveBeenCalled();
+    });
+
+    it("archives, audits, and hides the customer", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.update).mockResolvedValue({} as never);
+
+      const res = await archiveCustomer(4);
+
+      expect(res).toEqual({});
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { customerId: 4 },
+        data: { archivedAt: expect.any(Date) },
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "Customer", 4, undefined, {
+        archived: true,
+      });
+    });
+
+    it("restores and audits", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.update).mockResolvedValue({} as never);
+
+      await restoreCustomer(4);
+
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { customerId: 4 },
+        data: { archivedAt: null },
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "Customer", 4, undefined, {
+        archived: false,
+      });
     });
   });
 });

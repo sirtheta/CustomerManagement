@@ -55,6 +55,8 @@ export function createTestDatabase() {
     await p.pendingReminder.deleteMany();
     await p.item.deleteMany();
     await p.pendingEmail.deleteMany();
+    // Credit notes reference their original (onDelete: Restrict, checked per row).
+    await p.invoice.deleteMany({ where: { creditNoteForId: { not: null } } });
     await p.invoice.deleteMany();
     await p.quote.deleteMany();
     await p.document.deleteMany();

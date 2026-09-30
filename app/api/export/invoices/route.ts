@@ -51,20 +51,21 @@ export async function GET(request: Request) {
           }
         : {}),
     },
-    include: { customer: true },
+    include: { customer: true, creditNoteFor: { select: { documentNumber: true } } },
     orderBy: { date: "desc" },
   });
 
-  const headers = ["Nummer", "Datum", "Fälligkeit", "Kunde", "Betrag (CHF)", "Status"];
+  const headers = ["Nummer", "Datum", "Fälligkeit", "Kunde", "Betrag (CHF)", "Status", "Gutschrift zu"];
   const rows = invoices.map((inv) => [
     documentLabel(inv.documentNumber),
     inv.date.toLocaleDateString("de-CH"),
-    inv.dueDate.toLocaleDateString("de-CH"),
+    inv.creditNoteForId != null ? "" : inv.dueDate.toLocaleDateString("de-CH"),
     inv.customer.contactInsteadOfCompany
       ? inv.customer.contactPerson
       : (inv.customer.company || inv.customer.contactPerson),
     inv.totalAmount.toNumber().toFixed(2),
     stateLabels[inv.state] ?? inv.state,
+    inv.creditNoteFor ? documentLabel(inv.creditNoteFor.documentNumber) : "",
   ]);
 
   const today = new Date().toISOString().slice(0, 10);

@@ -18,6 +18,7 @@ import InvoiceStatusSelect from "../InvoiceStatusSelect";
 import DeleteInvoiceButton from "../DeleteInvoiceButton";
 import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
+import CreateCreditNoteButton from "../CreateCreditNoteButton";
 import { UserRole, type InvoiceState } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
 import { toRappen } from "@/lib/payments";
@@ -68,6 +69,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         items: true,
         sentLogs: { orderBy: { sentAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
+        creditNoteFor: { select: { id: true, documentNumber: true } },
+        creditNotes: {
+          where: { state: { not: "Draft" } },
+          orderBy: { date: "asc" },
+          select: { id: true, documentNumber: true, date: true, totalAmount: true },
+        },
       },
     }),
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
@@ -77,11 +84,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   const totalRappen = toRappen(invoice.totalAmount);
   const paidRappen = invoice.payments.reduce((sum, p) => sum + toRappen(p.amount), 0);
+  const isCreditNote = invoice.creditNoteForId !== null;
+  const creditedRappen = invoice.creditNotes.reduce((sum, c) => sum + Math.abs(toRappen(c.totalAmount)), 0);
   const summary = {
     total: totalRappen / 100,
     paid: paidRappen / 100,
-    remaining: Math.max(totalRappen - paidRappen, 0) / 100,
-    overpaid: Math.max(paidRappen - totalRappen, 0) / 100,
+    remaining: Math.max(totalRappen - creditedRappen - paidRappen, 0) / 100,
+    overpaid: Math.max(paidRappen + creditedRappen - totalRappen, 0) / 100,
   };
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
@@ -96,11 +105,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const companyName = settings?.companyInfo.companyName ?? "";
   // Drafts have no number yet: keep the placeholder so it is filled in when sent.
   const numberOrPlaceholder = invoice.documentNumber ?? "{documentNumber}";
-  const defaultSubject =
+  const invoiceSubject =
     settings?.emailSubjectTemplate?.replace(/\{documentNumber\}/g, numberOrPlaceholder).replace(/\{companyName\}/g, companyName)
     ?? `Rechnung Nr. ${numberOrPlaceholder} – ${companyName}`;
+  const defaultSubject = isCreditNote
+    ? `Gutschrift Nr. ${numberOrPlaceholder} – ${companyName}`
+    : invoiceSubject;
   const DEFAULT_BODY = `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. ${numberOrPlaceholder} vom ${formatDate(invoice.date)} über ${formatCurrency(invoice.totalAmount.toNumber())}.\n${invoice.customUserText ? `\n${invoice.customUserText}\n` : ""}\nZahlbar bis: ${formatDate(invoice.dueDate)}\n\nMit freundlichen Grüssen\n${companyName}`;
-  const defaultBody = settings?.emailBodyTemplate
+  const invoiceBody = settings?.emailBodyTemplate
     ? settings.emailBodyTemplate
         .replace(/\{documentNumber\}/g, numberOrPlaceholder)
         .replace(/\{contactPerson\}/g, invoice.customer.contactPerson)
@@ -110,13 +122,26 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         .replace(/\{dueDate\}/g, formatDate(invoice.dueDate))
         .replace(/\{customUserText\}/g, invoice.customUserText ?? "")
     : DEFAULT_BODY;
+  const defaultBody = isCreditNote
+    ? `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Gutschrift Nr. ${numberOrPlaceholder} vom ${formatDate(invoice.date)} über ${formatCurrency(Math.abs(invoice.totalAmount.toNumber()))}.\n\nMit freundlichen Grüssen\n${companyName}`
+    : invoiceBody;
 
   return (
     <div className="space-y-4">
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">{documentLabel(invoice.documentNumber)}</h1>
+          <h1 className="text-2xl font-semibold">
+            {isCreditNote ? "Gutschrift " : ""}{documentLabel(invoice.documentNumber)}
+          </h1>
+          {invoice.creditNoteFor && (
+            <p className="text-sm text-gray-500">
+              Zu Rechnung{" "}
+              <Link href={`/invoices/${invoice.creditNoteFor.id}`} className="hover:underline">
+                {documentLabel(invoice.creditNoteFor.documentNumber)}
+              </Link>
+            </p>
+          )}
           <p className="text-sm text-gray-500 mt-0.5">
             <Link
               href={`/customers/${invoice.customer.customerId}`}
@@ -135,12 +160,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <Button variant="outline" size="sm" render={<Link href={backHref} />}>
             Zurück
           </Button>
-          <Button
-            size="sm"
-            render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
-          >
-            Bearbeiten
-          </Button>
+          {invoice.state === "Draft" && (
+            <Button
+              size="sm"
+              render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
+            >
+              Bearbeiten
+            </Button>
+          )}
         </div>
       </div>
 
@@ -154,10 +181,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               <span className="text-gray-500">Datum:</span>{" "}
               {formatDate(invoice.date)}
             </div>
-            <div>
-              <span className="text-gray-500">Fällig am:</span>{" "}
-              {formatDate(invoice.dueDate)}
-            </div>
+            {!isCreditNote && (
+              <div>
+                <span className="text-gray-500">Fällig am:</span>{" "}
+                {formatDate(invoice.dueDate)}
+              </div>
+            )}
             <div>
               <span className="text-gray-500">Betrag:</span>{" "}
               <span className="font-medium">
@@ -240,7 +269,44 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </Card>
       )}
 
-      {invoice.state !== "Draft" && invoice.state !== "Canceled" && (
+      {invoice.creditNotes.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Gutschriften</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nummer</TableHead>
+                    <TableHead>Datum</TableHead>
+                    <TableHead className="text-right">Betrag</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoice.creditNotes.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <Link href={`/invoices/${c.id}`} className="hover:underline">
+                          {documentLabel(c.documentNumber)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{formatDate(c.date)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(c.totalAmount.toNumber())}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="mt-3 text-right text-sm font-semibold">
+              Offener Betrag: {formatCurrency(summary.remaining)}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
         <Card>
           <CardHeader>
             <CardTitle>Zahlungen</CardTitle>
@@ -263,20 +329,22 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Status ändern</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-start gap-4 flex-wrap">
-          <InvoiceStatusSelect
-            invoiceId={invoice.id}
-            currentState={invoice.state}
-          />
-        </CardContent>
-      </Card>
+      {!isCreditNote && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Status ändern</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-start gap-4 flex-wrap">
+            <InvoiceStatusSelect
+              invoiceId={invoice.id}
+              currentState={invoice.state}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <DeleteInvoiceButton invoiceId={invoice.id} />
+        {invoice.state === "Draft" ? <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} /> : <span />}
         <div className="flex items-center gap-2 flex-wrap">
           <SendInvoiceButton
             invoiceId={invoice.id}
@@ -284,8 +352,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             documentNumber={invoice.documentNumber}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}
+            isCreditNote={isCreditNote}
           />
-          <SaveAsTemplateButton invoiceId={invoice.id} />
+          {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
+            <CreateCreditNoteButton invoiceId={invoice.id} />
+          )}
+          {!isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}
           <Button
             variant="outline"
             render={<Link href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer" />}

@@ -93,4 +93,33 @@ describe("buildReceivables", () => {
       [2, 10000],
     ]);
   });
+
+  it("subtracts credit notes dated up to the cut-off and keeps a credited invoice with a remainder", () => {
+    const report = buildReceivables(
+      [
+        inv({
+          id: 1,
+          creditNotes: [
+            { date: new Date("2026-03-01"), totalAmount: dec(-30) },
+            { date: new Date("2027-01-15"), totalAmount: dec(-20) },
+          ],
+        }),
+      ],
+      asOf
+    );
+    expect(report.rows).toHaveLength(1);
+    expect(report.rows[0].openRappen).toBe(7000);
+  });
+
+  it("drops an invoice that credit notes settled completely", () => {
+    const report = buildReceivables(
+      [inv({ id: 1, state: "Canceled", creditNotes: [{ date: new Date("2026-03-01"), totalAmount: dec(-100) }] })],
+      asOf
+    );
+    expect(report.rows).toHaveLength(0);
+  });
+
+  it("still skips a legacy Canceled invoice without credit notes", () => {
+    expect(buildReceivables([inv({ id: 1, state: "Canceled" })], asOf).rows).toHaveLength(0);
+  });
 });

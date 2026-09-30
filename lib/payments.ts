@@ -19,12 +19,17 @@ export function computeInvoiceState(input: {
   state: InvoiceState;
   totalRappen: number;
   paidRappen: number;
+  creditedRappen?: number;
   dueDate: Date;
   now?: Date;
 }): InvoiceState {
   const { state, totalRappen, paidRappen, dueDate } = input;
+  const creditedRappen = input.creditedRappen ?? 0;
   if (state === "Draft" || state === "Canceled") return state;
-  if (paidRappen > 0 && paidRappen >= totalRappen) return "Paid";
+  const settledRappen = paidRappen + creditedRappen;
+  // Fully credited without any payment: nothing was earned, nothing is open.
+  if (creditedRappen > 0 && paidRappen === 0 && settledRappen >= totalRappen) return "Canceled";
+  if (settledRappen > 0 && settledRappen >= totalRappen) return "Paid";
   if (paidRappen > 0) return "PartiallyPaid";
   if (state === "Paid" || state === "PartiallyPaid") {
     return dueDate.getTime() < (input.now ?? new Date()).getTime() ? "Overdue" : "Sent";
@@ -35,6 +40,15 @@ export function computeInvoiceState(input: {
 async function sumPaidRappen(db: Db, invoiceId: number): Promise<number> {
   const payments = await db.payment.findMany({ where: { invoiceId }, select: { amount: true } });
   return payments.reduce((sum, p) => sum + toRappen(p.amount), 0);
+}
+
+/** Sum of the amounts (as positive Rappen) of all sent credit notes of an invoice. */
+export async function sumCreditedRappen(db: Db, invoiceId: number): Promise<number> {
+  const credits = await db.invoice.findMany({
+    where: { creditNoteForId: invoiceId, state: { not: "Draft" } },
+    select: { totalAmount: true },
+  });
+  return credits.reduce((sum, c) => sum + Math.abs(toRappen(c.totalAmount)), 0);
 }
 
 /**
@@ -50,10 +64,12 @@ async function recalculateInvoiceState(
     select: { state: true, totalAmount: true, dueDate: true, documentNumber: true },
   });
   const paidRappen = await sumPaidRappen(db, invoiceId);
+  const creditedRappen = await sumCreditedRappen(db, invoiceId);
   const to = computeInvoiceState({
     state: invoice.state,
     totalRappen: toRappen(invoice.totalAmount),
     paidRappen,
+    creditedRappen,
     dueDate: invoice.dueDate,
   });
 
@@ -81,11 +97,13 @@ export async function getPaymentSummary(invoiceId: number, prisma: PrismaClient 
   });
   const totalRappen = toRappen(invoice.totalAmount);
   const paidRappen = await sumPaidRappen(prisma, invoiceId);
+  const creditedRappen = await sumCreditedRappen(prisma, invoiceId);
   return {
     totalRappen,
     paidRappen,
-    remainingRappen: Math.max(totalRappen - paidRappen, 0),
-    overpaidRappen: Math.max(paidRappen - totalRappen, 0),
+    creditedRappen,
+    remainingRappen: Math.max(totalRappen - creditedRappen - paidRappen, 0),
+    overpaidRappen: Math.max(paidRappen + creditedRappen - totalRappen, 0),
   };
 }
 
@@ -143,15 +161,20 @@ async function createPayment(
   const result = await prisma.$transaction(async (tx) => {
     const invoice = await tx.invoice.findUnique({
       where: { id: params.invoiceId },
-      select: { state: true, totalAmount: true },
+      select: { state: true, totalAmount: true, creditNoteForId: true },
     });
     if (!invoice) throw new PaymentError("Rechnung nicht gefunden.");
+    if (invoice.creditNoteForId != null) {
+      throw new PaymentError("Auf eine Gutschrift sind keine Zahlungen möglich.");
+    }
     if (invoice.state === "Draft" || invoice.state === "Canceled") {
       throw new PaymentError("Für Entwürfe und stornierte Rechnungen sind keine Zahlungen möglich.");
     }
     const amountRappen =
       params.amount === "remaining"
-        ? toRappen(invoice.totalAmount) - (await sumPaidRappen(tx, params.invoiceId))
+        ? toRappen(invoice.totalAmount) -
+          (await sumCreditedRappen(tx, params.invoiceId)) -
+          (await sumPaidRappen(tx, params.invoiceId))
         : toRappen(params.amount);
     if (amountRappen <= 0) return null;
 
@@ -247,13 +270,18 @@ export async function sumOpenAmount(
   prisma: PrismaClient = defaultPrisma
 ): Promise<{ amount: number; count: number }> {
   const invoices = await prisma.invoice.findMany({
-    where: { state: { in: ["Sent", "Overdue", "PartiallyPaid"] } },
-    select: { totalAmount: true, payments: { select: { amount: true } } },
+    where: { state: { in: ["Sent", "Overdue", "PartiallyPaid"] }, creditNoteForId: null },
+    select: {
+      totalAmount: true,
+      payments: { select: { amount: true } },
+      creditNotes: { where: { state: { not: "Draft" } }, select: { totalAmount: true } },
+    },
   });
   let rappen = 0;
   for (const inv of invoices) {
     const paid = inv.payments.reduce((s, p) => s + toRappen(p.amount), 0);
-    rappen += Math.max(toRappen(inv.totalAmount) - paid, 0);
+    const credited = inv.creditNotes.reduce((s, c) => s + Math.abs(toRappen(c.totalAmount)), 0);
+    rappen += Math.max(toRappen(inv.totalAmount) - credited - paid, 0);
   }
   return { amount: rappen / 100, count: invoices.length };
 }

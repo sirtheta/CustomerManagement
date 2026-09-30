@@ -56,6 +56,7 @@ type Props = {
   templates?: SerializedTemplate[];
   defaultCustomerId?: number;
   from?: string;
+  creditNoteFor?: { id: number; documentNumber: string | null };
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -81,6 +82,7 @@ export default function InvoiceForm({
   templates = [],
   defaultCustomerId,
   from,
+  creditNoteFor,
 }: Props) {
   const action = invoice
     ? updateInvoice.bind(null, invoice.id)
@@ -143,9 +145,16 @@ export default function InvoiceForm({
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          {invoice ? `Rechnung ${documentLabel(invoice.documentNumber)}` : "Neue Rechnung"}
-        </h1>
+        <div>
+          <h1 className="text-2xl font-semibold">
+            {invoice ? `${creditNoteFor ? "Gutschrift" : "Rechnung"} ${documentLabel(invoice.documentNumber)}` : "Neue Rechnung"}
+          </h1>
+          {creditNoteFor && (
+            <p className="text-sm text-muted-foreground">
+              Zu Rechnung {documentLabel(creditNoteFor.documentNumber)}. Erfasse die gutzuschreibenden Beträge positiv.
+            </p>
+          )}
+        </div>
         <Button variant="outline" render={<Link href={cancelHref} />}>
           Abbrechen
         </Button>
@@ -159,20 +168,27 @@ export default function InvoiceForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Rechnungsdaten</CardTitle>
+            <CardTitle>{creditNoteFor ? "Gutschriftsdaten" : "Rechnungsdaten"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="customerId">
                 Kunde <span className="text-destructive">*</span>
               </Label>
-              <CustomerCombobox
-                id="customerId"
-                name="customerId"
-                customers={customers}
-                defaultValue={defaultCustomer}
-                required
-              />
+              {creditNoteFor ? (
+                <>
+                  <input type="hidden" name="customerId" value={invoice!.customerId} />
+                  <p className="text-sm">{defaultCustomer?.company || defaultCustomer?.contactPerson}</p>
+                </>
+              ) : (
+                <CustomerCombobox
+                  id="customerId"
+                  name="customerId"
+                  customers={customers}
+                  defaultValue={defaultCustomer}
+                  required
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -188,17 +204,19 @@ export default function InvoiceForm({
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="dueDate">
-                  Fälligkeitsdatum <span className="text-destructive">*</span>
-                </Label>
-                <DatePickerInput
-                  id="dueDate"
-                  name="dueDate"
-                  value={dueDate}
-                  onChange={setDueDate}
-                />
-              </div>
+              {!creditNoteFor && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="dueDate">
+                    Fälligkeitsdatum <span className="text-destructive">*</span>
+                  </Label>
+                  <DatePickerInput
+                    id="dueDate"
+                    name="dueDate"
+                    value={dueDate}
+                    onChange={setDueDate}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -236,26 +254,31 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount />
+            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Rabatt auf Gesamtrechnung</CardTitle></CardHeader>
-          <CardContent className="space-y-1.5">
-            <Label htmlFor="discountPercent">Rabatt (%)</Label>
-            <input
-              id="discountPercent"
-              name="discountPercent"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              defaultValue={invoice?.discountPercent?.toString() ?? "0"}
-              className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            />
-          </CardContent>
-        </Card>
+        {creditNoteFor ? (
+          // A credit note keeps the original's discount so a full credit matches the original amount.
+          <input type="hidden" name="discountPercent" value={invoice?.discountPercent?.toString() ?? "0"} />
+        ) : (
+          <Card>
+            <CardHeader><CardTitle>Rabatt auf Gesamtrechnung</CardTitle></CardHeader>
+            <CardContent className="space-y-1.5">
+              <Label htmlFor="discountPercent">Rabatt (%)</Label>
+              <input
+                id="discountPercent"
+                name="discountPercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue={invoice?.discountPercent?.toString() ?? "0"}
+                className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              />
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" render={<Link href={cancelHref} />}>

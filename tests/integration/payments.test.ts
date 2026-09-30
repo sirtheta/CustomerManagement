@@ -60,6 +60,7 @@ describe("payments against a real database", () => {
     expect(await getPaymentSummary(inv.id, db.prisma)).toEqual({
       totalRappen: 10000,
       paidRappen: 10550,
+      creditedRappen: 0,
       remainingRappen: 0,
       overpaidRappen: 550,
     });
@@ -168,5 +169,76 @@ describe("payments against a real database", () => {
       db.prisma
     );
     expect(await sumOpenAmount(db.prisma)).toEqual({ amount: 110, count: 2 });
+  });
+
+  async function seedCreditNote(originalId: number, customerId: number, total: number, state: "Draft" | "Sent" = "Sent") {
+    return db.prisma.invoice.create({
+      data: {
+        customerId,
+        documentNumber: state === "Draft" ? null : `R-${Math.floor(Math.random() * 1e8)}`,
+        date: new Date("2026-02-01"),
+        dueDate: new Date("2026-02-01"),
+        totalAmount: -total,
+        state,
+        creditNoteForId: originalId,
+      },
+    });
+  }
+
+  it("summary subtracts sent credit notes and ignores draft ones", async () => {
+    const inv = await seedInvoice(100);
+    await seedCreditNote(inv.id, inv.customerId, 30);
+    await seedCreditNote(inv.id, inv.customerId, 50, "Draft");
+    expect(await getPaymentSummary(inv.id, db.prisma)).toEqual({
+      totalRappen: 10000,
+      paidRappen: 0,
+      creditedRappen: 3000,
+      remainingRappen: 7000,
+      overpaidRappen: 0,
+    });
+  });
+
+  it("syncInvoiceState turns a fully credited unpaid invoice into Canceled", async () => {
+    const inv = await seedInvoice(100);
+    await seedCreditNote(inv.id, inv.customerId, 100);
+    const res = await syncInvoiceState({ invoiceId: inv.id, actor, source: "credit-note" }, db.prisma);
+    expect(res.state).toBe("Canceled");
+  });
+
+  it("a partial credit then a payment of the rest marks the invoice Paid", async () => {
+    const inv = await seedInvoice(100);
+    await seedCreditNote(inv.id, inv.customerId, 30);
+    await syncInvoiceState({ invoiceId: inv.id, actor, source: "credit-note" }, db.prisma);
+    const paid = await recordRemainingPayment(
+      { invoiceId: inv.id, date: new Date("2026-03-01"), source: "manual", actor },
+      db.prisma
+    );
+    expect(paid?.state).toBe("Paid");
+    const row = await db.prisma.payment.findFirstOrThrow({ where: { invoiceId: inv.id } });
+    expect(row.amount.toNumber()).toBe(70);
+  });
+
+  it("reports the overpayment of a paid invoice that is credited afterwards", async () => {
+    const inv = await seedInvoice(100);
+    await recordPayment({ invoiceId: inv.id, amount: 100, date: new Date("2026-03-01"), source: "manual", actor }, db.prisma);
+    await seedCreditNote(inv.id, inv.customerId, 100);
+    await syncInvoiceState({ invoiceId: inv.id, actor, source: "credit-note" }, db.prisma);
+    const summary = await getPaymentSummary(inv.id, db.prisma);
+    expect(summary.overpaidRappen).toBe(10000);
+    expect((await db.prisma.invoice.findUniqueOrThrow({ where: { id: inv.id } })).state).toBe("Paid");
+  });
+
+  it("rejects payments on a credit note", async () => {
+    const inv = await seedInvoice(100);
+    const credit = await seedCreditNote(inv.id, inv.customerId, 20);
+    await expect(
+      recordPayment({ invoiceId: credit.id, amount: 5, date: new Date(), source: "manual", actor }, db.prisma)
+    ).rejects.toBeInstanceOf(PaymentError);
+  });
+
+  it("sumOpenAmount counts the remainder after credit notes and skips credit notes themselves", async () => {
+    const inv = await seedInvoice(100);
+    await seedCreditNote(inv.id, inv.customerId, 30);
+    expect(await sumOpenAmount(db.prisma)).toEqual({ amount: 70, count: 1 });
   });
 });
