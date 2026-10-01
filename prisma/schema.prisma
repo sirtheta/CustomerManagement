@@ -71,6 +71,7 @@ model Payment {
   bankReference String?
   createdAt     DateTime @default(now())
   invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bankTransaction BankTransaction?
 
   @@index([invoiceId])
   @@index([date])
@@ -244,6 +245,7 @@ model Expense {
   updatedAt   DateTime  @updatedAt
   category    Category? @relation(fields: [categoryId], references: [categoryId])
   receipts    ExpenseReceipt[]
+  bankTransaction BankTransaction?
 
   @@index([date])
   @@index([categoryId])
@@ -426,4 +428,52 @@ enum Unit {
   Day
   Piece
   Package
+}
+
+model BankStatementImport {
+  id                   Int       @id @default(autoincrement())
+  filename             String
+  iban                 String?
+  currency             String?
+  periodFrom           String?   // YYYY-MM-DD
+  periodTo             String?   // YYYY-MM-DD
+  openingBalanceRappen Int?
+  closingBalanceRappen Int?
+  /// Balance warnings shown at upload time, kept for the import history.
+  balanceWarning       String?
+  importedCount        Int
+  skippedCount         Int
+  userId               Int?
+  createdAt            DateTime  @default(now())
+  transactions         BankTransaction[]
+
+  @@index([createdAt])
+  @@index([iban, periodTo])
+}
+
+/// One booked entry of an imported CAMT.053 statement. Open = no payment,
+/// no expense and not ignored; there is deliberately no status column that
+/// could disagree with the payments (deleting a Payment/Expense sets the
+/// link to null and the row is open again).
+model BankTransaction {
+  id            Int      @id @default(autoincrement())
+  importId      Int
+  fingerprint   String   @unique
+  date          DateTime
+  /// Signed Rappen: negative = money out.
+  amountRappen  Int
+  description   String
+  counterparty  String?
+  bankReference String?
+  ignored       Boolean  @default(false)
+  paymentId     Int?     @unique
+  expenseId     Int?     @unique
+  createdAt     DateTime @default(now())
+
+  statementImport BankStatementImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+  payment         Payment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  expense         Expense?            @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  @@index([importId])
+  @@index([date])
 }

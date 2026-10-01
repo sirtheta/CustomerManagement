@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.04">
+  <BkToCstmrStmt>
+    <Stmt>
+      <Id>STMT-1</Id>
+      <FrToDt><FrDtTm>2026-03-01T00:00:00</FrDtTm><ToDtTm>2026-03-31T23:59:59</ToDtTm></FrToDt>
+      <Acct><Id><IBAN>CH9300762011623852957</IBAN></Id><Ccy>CHF</Ccy></Acct>
+      <Bal><Tp><CdOrPrtry><Cd>OPBD</Cd></CdOrPrtry></Tp><Amt Ccy="CHF">1000.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Dt><Dt>2026-03-01</Dt></Dt></Bal>
+      <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="CHF">1039.10</Amt><CdtDbtInd>CRDT</CdtDbtInd><Dt><Dt>2026-03-31</Dt></Dt></Bal>
+      <Ntry><Amt Ccy="CHF">100.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts><BookgDt><Dt>2026-03-05</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><AcctSvcrRef>SAMPLE-IN-1</AcctSvcrRef></Refs><RltdPties><Dbtr><Nm>Muster AG</Nm></Dbtr></RltdPties><RmtInf><Ustrd>Rechnung R 2603 0001</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+      <Ntry><Amt Ccy="CHF">50.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts><BookgDt><Dt>2026-03-08</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><AcctSvcrRef>SAMPLE-IN-2</AcctSvcrRef></Refs><RltdPties><Dbtr><Nm>Unbekannt</Nm></Dbtr></RltdPties><RmtInf><Ustrd>Geschenk</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+      <Ntry><Amt Ccy="CHF">89.90</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts>BOOK</Sts><BookgDt><Dt>2026-03-10</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><AcctSvcrRef>SAMPLE-OUT-1</AcctSvcrRef></Refs><RltdPties><Cdtr><Nm>Swisscom AG</Nm></Cdtr></RltdPties><RmtInf><Ustrd>Mobile Abo März</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+      <Ntry><Amt Ccy="CHF">21.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts>BOOK</Sts><BookgDt><Dt>2026-03-12</Dt></BookgDt>
+        <NtryDtls><TxDtls><Refs><AcctSvcrRef>SAMPLE-OUT-2</AcctSvcrRef></Refs><RltdPties><Cdtr><Nm>Migros</Nm></Cdtr></RltdPties><RmtInf><Ustrd>Einkauf</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

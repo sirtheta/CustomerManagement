@@ -29,3 +29,44 @@ export function checkStatementAccount(
 
   return warnings;
 }
+
+/** `2026-02-28` becomes `28.02.2026`; other shapes are returned unchanged. */
+const germanDate = (iso: string) => iso.replace(/^(\d{4})-(\d{2})-(\d{2}).*$/, "$3.$2.$1");
+
+const chf = (cents: number) => (Math.abs(cents) / 100).toFixed(2);
+
+/**
+ * Opening balance plus all movements must equal the closing balance,
+ * otherwise entries are missing from (or were skipped in) the file.
+ */
+export function checkBalanceCompleteness(statement: {
+  openingBalanceCents: number | null;
+  closingBalanceCents: number | null;
+  transactions: { amountCents: number }[];
+}): string[] {
+  if (statement.openingBalanceCents === null || statement.closingBalanceCents === null) return [];
+  const sum = statement.transactions.reduce((total, t) => total + t.amountCents, 0);
+  const difference = statement.closingBalanceCents - (statement.openingBalanceCents + sum);
+  if (difference === 0) return [];
+  return [
+    `Saldoprüfung: Anfangssaldo plus Bewegungen ergibt nicht den Endsaldo (Differenz CHF ${chf(difference)}). Der Kontoauszug ist vermutlich unvollständig.`,
+  ];
+}
+
+/**
+ * The opening balance should continue where the previous import for the same
+ * account ended; a gap usually means a month was never imported.
+ */
+export function checkBalanceContinuity(
+  openingBalanceCents: number | null,
+  previous: { closingBalanceRappen: number | null; periodTo: string | null } | null
+): string[] {
+  if (openingBalanceCents === null || !previous || previous.closingBalanceRappen === null) {
+    return [];
+  }
+  if (openingBalanceCents === previous.closingBalanceRappen) return [];
+  const difference = openingBalanceCents - previous.closingBalanceRappen;
+  return [
+    `Saldoprüfung: Der Anfangssaldo weicht vom Endsaldo des letzten Imports${previous.periodTo ? ` (bis ${germanDate(previous.periodTo)})` : ""} ab (Differenz CHF ${chf(difference)}). Möglicherweise fehlt ein Zeitraum.`,
+  ];
+}

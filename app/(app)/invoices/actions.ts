@@ -12,7 +12,7 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
-import { PaymentError, recordPayment, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
+import { PaymentError, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
 import { canTransitionInvoice } from "@/lib/state-manager";
 import {
   createDocumentWithItems,
@@ -240,87 +240,6 @@ export async function updateInvoiceStatus(
   revalidatePath("/dashboard");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   return {};
-}
-
-export type ImportMatch = {
-  invoiceId: number;
-  /** Booking date from the statement entry, YYYY-MM-DD. */
-  paidDate: string;
-  /** Credited amount of the statement entry, in Rappen. */
-  amountCents: number;
-  bankReference: string | null;
-};
-
-export type ImportMatchResult = {
-  error?: string;
-  paidCount?: number;
-};
-
-/**
- * Records the confirmed statement entries as payments (see
- * `app/(app)/invoices/import/`). Each invoice is re-checked against its
- * current state rather than trusting the preview: two people confirming the
- * same statement, or an invoice edited in between, must not clobber a state
- * the preview no longer reflects — such rows are silently skipped rather
- * than failing the whole batch.
- */
-export async function markInvoicesPaidFromImport(
-  matches: ImportMatch[]
-): Promise<ImportMatchResult> {
-  const session = await requireEditor();
-
-  if (matches.length === 0) return { error: "Keine Zuordnung ausgewählt." };
-
-  let paidCount = 0;
-
-  for (const match of matches) {
-    const paidDate = new Date(match.paidDate);
-    if (isNaN(paidDate.getTime())) continue;
-
-    if (!Number.isInteger(match.amountCents) || match.amountCents <= 0) continue;
-
-    const current = await prisma.invoice.findUnique({
-      where: { id: match.invoiceId },
-      select: { state: true },
-    });
-    if (
-      !current ||
-      (current.state !== "Sent" && current.state !== "Overdue" && current.state !== "PartiallyPaid")
-    ) {
-      continue;
-    }
-    if (
-      match.bankReference &&
-      (await prisma.payment.count({
-        where: { invoiceId: match.invoiceId, bankReference: match.bankReference },
-      })) > 0
-    ) {
-      continue;
-    }
-
-    try {
-      await recordPayment({
-        invoiceId: match.invoiceId,
-        amount: match.amountCents / 100,
-        date: paidDate,
-        source: "camt-import",
-        bankReference: match.bankReference,
-        actor: session,
-      });
-      paidCount++;
-    } catch (err) {
-      if (!(err instanceof PaymentError)) throw err;
-    }
-  }
-
-  revalidatePath("/invoices");
-  revalidatePath("/invoices/reminders");
-  revalidatePath("/accounting");
-  revalidatePath("/accounting/receivables");
-  revalidatePath("/dashboard");
-  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-
-  return { paidCount };
 }
 
 export async function deleteInvoice(id: number): Promise<{ error?: string }> {
