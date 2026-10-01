@@ -46,7 +46,7 @@ describe("subscription actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue(editorSession);
-    vi.mocked(prisma.invoiceTemplate.findUnique).mockResolvedValue({ id: 5 } as never);
+    vi.mocked(prisma.invoiceTemplate.findUnique).mockResolvedValue({ id: 5, _count: { items: 2 } } as never);
   });
 
   describe("createSubscription", () => {
@@ -101,6 +101,24 @@ describe("subscription actions", () => {
       expect(prisma.subscription.create).not.toHaveBeenCalled();
     });
 
+    it("rejects autoSend for a template without items", async () => {
+      vi.mocked(prisma.invoiceTemplate.findUnique).mockResolvedValue({ id: 5, _count: { items: 0 } } as never);
+      const res = await createSubscription(1, {}, form(VALID));
+      expect(res).toEqual({
+        error: "Die Vorlage hat keine Positionen. Automatischer Versand ist nur mit einer befüllten Vorlage möglich.",
+      });
+      expect(prisma.subscription.create).not.toHaveBeenCalled();
+    });
+
+    it("allows an empty template without autoSend", async () => {
+      vi.mocked(prisma.invoiceTemplate.findUnique).mockResolvedValue({ id: 5, _count: { items: 0 } } as never);
+      vi.mocked(prisma.subscription.create).mockResolvedValue({ id: 12 } as never);
+      const { autoSend: _a, ...noAuto } = VALID;
+      void _a;
+      const res = await createSubscription(1, {}, form(noAuto));
+      expect(res.success).toBe(true);
+    });
+
     it("rejects Viewer role", async () => {
       vi.mocked(auth).mockResolvedValue(viewerSession);
       vi.mocked(redirect).mockImplementation(() => {
@@ -133,6 +151,33 @@ describe("subscription actions", () => {
         expect.any(String),
         expect.objectContaining({ customerId: 1 })
       );
+    });
+
+    it("does not write nextInvoiceDate when it equals the loaded date", async () => {
+      vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
+      const res = await updateSubscription(1, 7, {}, form({ ...VALID, loadedNextInvoiceDate: "2027-01-01" }));
+      expect(res.success).toBe(true);
+      expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+        where: { id: 7, customerId: 1 },
+        data: { interval: "Quarterly", templateId: 5, autoSend: true },
+      });
+    });
+
+    it("writes nextInvoiceDate when it differs from the loaded date", async () => {
+      vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
+      await updateSubscription(1, 7, {}, form({ ...VALID, loadedNextInvoiceDate: "2026-10-01" }));
+      expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+        where: { id: 7, customerId: 1 },
+        data: expect.objectContaining({ nextInvoiceDate: new Date(2027, 0, 1) }),
+      });
+    });
+
+    it("still validates the date when it equals the loaded date", async () => {
+      const res = await updateSubscription(
+        1, 7, {}, form({ ...VALID, nextInvoiceDate: "2027-02-30", loadedNextInvoiceDate: "2027-02-30" })
+      );
+      expect(res).toEqual({ error: "Bitte ein gültiges Datum angeben." });
+      expect(prisma.subscription.updateMany).not.toHaveBeenCalled();
     });
 
     it("rejects invalid input", async () => {

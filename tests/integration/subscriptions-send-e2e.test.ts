@@ -28,6 +28,7 @@ import { checkSubscriptions } from "@/lib/subscriptions";
 import { verifyArchived, sha256Hex } from "@/lib/document-archive";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
+import { formatCurrency } from "@/lib/utils";
 
 describe("autoSend end to end", () => {
   const db = createTestDatabase();
@@ -78,5 +79,12 @@ describe("autoSend end to end", () => {
     expect(rows[0].sha256).toBe(sha256Hex(attached));
     expect(readFileSync(join(dir, rows[0].path))).toEqual(attached);
     expect((await verifyArchived(rows[0])).ok).toBe(true);
+
+    // {totalAmount} (and {documentNumber}) are resolved from the real invoice at send time.
+    const overrides = vi.mocked(sendInvoiceEmail).mock.calls[0][3];
+    expect(overrides?.body).toContain(formatCurrency(50));
+    expect(overrides?.body).not.toContain("{totalAmount}");
+    expect(overrides?.body).toContain(invoice.documentNumber!);
+    expect(overrides?.subject).not.toContain("{");
   });
 });

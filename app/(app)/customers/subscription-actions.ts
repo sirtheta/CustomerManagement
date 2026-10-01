@@ -35,8 +35,17 @@ async function parseSubscriptionForm(
   if (autoSend && templateId == null) return { error: "Automatischer Versand braucht eine Vorlage." };
 
   if (templateId != null) {
-    const template = await prisma.invoiceTemplate.findUnique({ where: { id: templateId }, select: { id: true } });
+    const template = await prisma.invoiceTemplate.findUnique({
+      where: { id: templateId },
+      select: { id: true, _count: { select: { items: true } } },
+    });
     if (!template) return { error: "Vorlage nicht gefunden." };
+    if (autoSend && template._count.items === 0) {
+      return {
+        error:
+          "Die Vorlage hat keine Positionen. Automatischer Versand ist nur mit einer befüllten Vorlage möglich.",
+      };
+    }
   }
 
   return { data: { interval: interval as SubscriptionIntervalName, nextInvoiceDate, templateId, autoSend } };
@@ -74,9 +83,17 @@ export async function updateSubscription(
   const parsed = await parseSubscriptionForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
+  // The form re-sends the date it was rendered with. If it is unchanged, leave the DB value
+  // alone: the job may have advanced it meanwhile and writing the stale date would bill twice.
+  const loaded = formData.get("loadedNextInvoiceDate");
+  const submitted = formData.get("nextInvoiceDate");
+  const { nextInvoiceDate: _unchanged, ...withoutDate } = parsed.data;
+  void _unchanged;
+  const data = typeof loaded === "string" && loaded !== "" && loaded === submitted ? withoutDate : parsed.data;
+
   const { count } = await prisma.subscription.updateMany({
     where: { id: subscriptionId, customerId },
-    data: parsed.data,
+    data,
   });
   if (count === 0) return { error: "Abo nicht gefunden." };
   await logAudit(session, "UPDATE", "Subscription", subscriptionId, INTERVAL_LABELS[parsed.data.interval], {

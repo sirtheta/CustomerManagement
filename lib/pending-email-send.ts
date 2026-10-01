@@ -3,7 +3,8 @@ import type { Session } from "next-auth";
 import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { assignDocumentNumber } from "@/lib/document-number";
-import { fillDocumentNumber } from "@/lib/document-display";
+import { fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
+import { formatCurrency } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
 
@@ -47,8 +48,9 @@ export async function sendPendingInvoice(input: {
     return { error: "Rechnungsnummer konnte nicht vergeben werden." };
   }
   const invoice = { ...pending.invoice, documentNumber };
-  const finalSubject = fillDocumentNumber(subject, documentNumber);
-  const finalBody = fillDocumentNumber(body, documentNumber);
+  const total = formatCurrency(Number(pending.invoice.totalAmount));
+  const finalSubject = fillTotalAmount(fillDocumentNumber(subject, documentNumber), total);
+  const finalBody = fillTotalAmount(fillDocumentNumber(body, documentNumber), total);
 
   let archive: ArchiveResult;
   try {

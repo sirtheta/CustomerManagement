@@ -23,7 +23,7 @@ const UNITS = Object.values(Unit);
 // Number of pending yearly-invoice mails to seed (see seedPendingYearlyInvoices)
 const PENDING_YEARLY_COUNT = 3;
 
-// Same defaults as lib/subscriptions.ts
+// Like the defaults in lib/subscriptions.ts, but without the {totalAmount} placeholder (seeded mails are not sent)
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
   "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";

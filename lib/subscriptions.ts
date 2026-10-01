@@ -3,7 +3,7 @@ import type { Session } from "next-auth";
 import { calculateInvoiceTotal, calculateItemTotal } from "@/lib/calculations";
 import { advancePast, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { logAuditEntry } from "@/lib/audit";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "subscriptions" });
@@ -116,7 +116,8 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
           documentNumber: "{documentNumber}",
           contactPerson: sub.customer.contactPerson,
           companyName,
-          totalAmount: formatCurrency(totalAmount),
+          // Placeholder too: positions can be edited on the pending page; resolved at send time.
+          totalAmount: "{totalAmount}",
           date: formatDate(today),
           dueDate: formatDate(dueDate),
           customUserText: "",

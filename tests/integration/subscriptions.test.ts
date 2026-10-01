@@ -60,8 +60,9 @@ describe("checkSubscriptions", () => {
     expect(pending[0].to).toBe("jane@clientag.ch");
     expect(pending[0].subject).toContain("{documentNumber}");
     expect(pending[0].body).toContain("{documentNumber}");
-    // Default body contains {totalAmount}; formatCurrency(246) renders "246.00" (check lib/utils.ts if the locale format differs).
-    expect(pending[0].body).toContain("246");
+    // Kept as placeholder: resolved at send time from the (possibly edited) invoice total.
+    expect(pending[0].body).toContain("{totalAmount}");
+    expect(pending[0].body).not.toContain("246");
   });
 
   it("creates an empty draft when the subscription has no template", async () => {

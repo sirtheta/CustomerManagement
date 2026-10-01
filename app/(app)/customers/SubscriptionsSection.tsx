@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -190,6 +191,7 @@ function SubscriptionItem({
     autoSend: sub.autoSend,
   });
   useActionToast(state, "Abo gespeichert");
+  const [isToggling, startToggle] = useTransition();
 
   return (
     <li className="py-3 space-y-2">
@@ -198,6 +200,7 @@ function SubscriptionItem({
         {sub.templateId == null && <Badge variant="destructive">Vorlage fehlt</Badge>}
       </div>
       <form action={formAction} className="space-y-2">
+        <input type="hidden" name="loadedNextInvoiceDate" value={sub.nextInvoiceDate} />
         <SubscriptionFields
           idPrefix={`sub-${sub.id}`}
           values={values}
@@ -213,7 +216,16 @@ function SubscriptionItem({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setSubscriptionActive(customerId, sub.id, !sub.active)}
+            disabled={isToggling}
+            onClick={() =>
+              startToggle(async () => {
+                try {
+                  await setSubscriptionActive(customerId, sub.id, !sub.active);
+                } catch {
+                  toast.error("Status konnte nicht geändert werden.");
+                }
+              })
+            }
           >
             {sub.active ? "Pausieren" : "Fortsetzen"}
           </Button>
@@ -265,7 +277,12 @@ export default function SubscriptionsSection({ customerId, subscriptions, templa
           <ul className="divide-y divide-border">
             {subscriptions.map((sub) =>
               canEdit ? (
-                <SubscriptionItem key={sub.id} customerId={customerId} sub={sub} templates={templates} />
+                <SubscriptionItem
+                  key={`${sub.id}-${sub.nextInvoiceDate}-${sub.templateId}-${sub.autoSend}-${sub.interval}`}
+                  customerId={customerId}
+                  sub={sub}
+                  templates={templates}
+                />
               ) : (
                 <ReadOnlyItem key={sub.id} sub={sub} />
               )
