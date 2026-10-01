@@ -373,7 +373,7 @@ export default function SettingsForm(props: Props) {
                 className="mt-0.5 h-4 w-4 accent-primary"
               />
               <Label htmlFor="notifyPendingEnabled" className="cursor-pointer font-normal">
-                Bei neuen Jahresrechnungen zur Überprüfung benachrichtigen
+                Bei neuen Abo-Rechnungen zur Überprüfung benachrichtigen
               </Label>
             </div>
           </div>

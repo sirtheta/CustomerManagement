@@ -106,8 +106,8 @@ export async function sendAdminNotifications(
     const n = unnotifiedPending.length;
     tasks.push(...buildChannelTasks(
       settings,
-      `Jahresrechnungen zur Überprüfung – ${n} neue Rechnung(en)`,
-      `${n} neue Jahresrechnung(en) warten auf Überprüfung.`,
+      `Abo-Rechnungen zur Überprüfung – ${n} neue Rechnung(en)`,
+      `${n} neue Abo-Rechnung(en) warten auf Überprüfung.`,
       "/invoices/pending"
     ));
   }

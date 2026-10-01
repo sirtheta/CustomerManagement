@@ -123,8 +123,8 @@ async function main() {
   // Customers (50 total)
   const customers = [];
   for (let i = 0; i < 50; i++) {
-    // The first few customers are guaranteed yearly-invoice customers so the
-    // pending yearly mails below always have someone to belong to
+    // The first few customers are guaranteed to get a yearly subscription so
+    // the pending subscription mails below always have someone to belong to
     const forcedYearly = i < PENDING_YEARLY_COUNT;
     const customer = await prisma.customer.create({
       data: {
@@ -136,11 +136,18 @@ async function main() {
         zipCode: swissZip(),
         email: faker.internet.email(),
         phone: faker.phone.number("+41 ## ### ## ##"),
-        yearlyInvoice: forcedYearly || faker.datatype.boolean(),
-        nextInvoiceDate: faker.date.future(),
       },
     });
     customers.push(customer);
+    if (forcedYearly || faker.datatype.boolean()) {
+      await prisma.subscription.create({
+        data: {
+          customerId: customer.customerId,
+          interval: forcedYearly ? "Yearly" : faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"] as const),
+          nextInvoiceDate: faker.date.future(),
+        },
+      });
+    }
   }
 
   // Invoices & Quotes per customer
@@ -294,14 +301,14 @@ async function main() {
   invoiceCounter = pendingYearly.invoiceCounter;
 
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending yearly invoice mails.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails.`,
   );
 }
 
-// Mirrors lib/yearly-invoices.ts: per due yearly customer a Draft invoice
-// (documentNumber null, totalAmount 0, no items) plus a PendingEmail whose
-// subject/body keep the raw {documentNumber} placeholder, and nextInvoiceDate
-// advanced by one year. Each customer also gets a prior numbered, Paid invoice
+// Mirrors lib/subscriptions.ts: per due subscription a Draft invoice
+// (documentNumber null, items and total) plus a PendingEmail whose
+// subject/body keep the raw {documentNumber} placeholder, and the
+// subscription's nextInvoiceDate advanced by one year (seeded as Yearly). Each customer also gets a prior numbered, Paid invoice
 // from a year ago so the history looks realistic.
 async function seedPendingYearlyInvoices(
   yearlyCustomers: { customerId: number; contactPerson: string; email: string }[],
@@ -341,20 +348,23 @@ async function seedPendingYearlyInvoices(
       },
     });
 
+    const draftItems = buildItems(categories);
+    const draftTotal = round2(draftItems.reduce((sum, item) => sum + item.totalAmount, 0));
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
         date: today,
         dueDate,
-        totalAmount: 0,
+        totalAmount: draftTotal,
         state: InvoiceState.Draft,
+        items: { create: draftItems },
       },
     });
     const vars = {
       documentNumber: "{documentNumber}",
       contactPerson: customer.contactPerson,
       companyName,
-      totalAmount: new Intl.NumberFormat("de-CH", { style: "currency", currency: "CHF" }).format(0),
+      totalAmount: new Intl.NumberFormat("de-CH", { style: "currency", currency: "CHF" }).format(draftTotal),
       date: formatChDate(today),
       dueDate: formatChDate(dueDate),
       customUserText: "",
@@ -371,7 +381,7 @@ async function seedPendingYearlyInvoices(
     // The job was due today and advanced the date by one year
     const next = new Date(today);
     next.setFullYear(next.getFullYear() + 1);
-    await prisma.customer.update({
+    await prisma.subscription.updateMany({
       where: { customerId: customer.customerId },
       data: { nextInvoiceDate: next },
     });
