@@ -23,7 +23,7 @@ const UNITS = Object.values(Unit);
 // Number of pending yearly-invoice mails to seed (see seedPendingYearlyInvoices)
 const PENDING_YEARLY_COUNT = 3;
 
-// Same defaults as lib/yearly-invoices.ts
+// Same defaults as lib/subscriptions.ts
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
   "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
@@ -290,7 +290,7 @@ async function main() {
     },
   });
 
-  // Pending yearly invoices, exactly as checkYearlyInvoices leaves them
+  // Pending yearly invoices, exactly as checkSubscriptions leaves them
   const pendingYearly = await seedPendingYearlyInvoices(
     customers.slice(0, PENDING_YEARLY_COUNT),
     company.companyName,
@@ -308,8 +308,9 @@ async function main() {
 // Mirrors lib/subscriptions.ts: per due subscription a Draft invoice
 // (documentNumber null, items and total) plus a PendingEmail whose
 // subject/body keep the raw {documentNumber} placeholder, and the
-// subscription's nextInvoiceDate advanced by one year (seeded as Yearly). Each customer also gets a prior numbered, Paid invoice
-// from a year ago so the history looks realistic.
+// subscription's nextInvoiceDate advanced by one year (seeded as Yearly).
+// Each customer also gets a prior numbered, Paid invoice from a year ago so
+// the history looks realistic.
 async function seedPendingYearlyInvoices(
   yearlyCustomers: { customerId: number; contactPerson: string; email: string }[],
   companyName: string,
