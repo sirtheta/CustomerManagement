@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Prisma } from "@prisma/client";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 
 const validCompany = {
@@ -183,6 +184,10 @@ describe("QRBill data preparation", () => {
         emailSubjectTemplate: null,
         emailBodyTemplate: null,
         reminderCooldownDays: 14,
+        reminderFeeLevel2Rappen: 0,
+        reminderFeeLevel3Rappen: 0,
+        reminderFeeLevel4Rappen: 0,
+        reminderInterestPercent: new Prisma.Decimal(0),
         notifyOverdueEnabled: false,
         notifyPendingEnabled: false,
         notifyEmailAddress: null,

@@ -7,8 +7,9 @@ import { extractDocumentNumberCandidates } from "@/lib/import/document-reference
  *
  * Signals, strongest first:
  *  - the invoice number in the text (`extractDocumentNumberCandidates`, tolerant
- *    of spaces and a missing prefix) together with the open amount → pre-selected;
- *  - the open amount alone, or the number with a different amount → manual pick;
+ *    of spaces and a missing prefix) together with the open amount, or the total
+ *    of the latest Mahnbeleg → pre-selected;
+ *  - the open amount (or Mahnbeleg total) alone, or the number with a different amount → manual pick;
  *  - the customer's name in the counterparty → suggestion only, never pre-selected.
  */
 
@@ -17,6 +18,8 @@ export interface OpenInvoice {
   documentNumber: string;
   /** Francs still open: total minus recorded payments. */
   openAmount: number;
+  /** Francs requested by the latest Mahnbeleg (open + fee + interest); only set when above `openAmount`. */
+  reminderTotal?: number;
   /** Names the customer may appear under on a statement (company, contact person). */
   customerNames?: string[];
 }
@@ -40,6 +43,14 @@ const MIN_NAME_LENGTH = 4;
 
 function centsOf(francs: number): number {
   return Math.round(francs * 100);
+}
+
+/** The open amount, or the total printed on the latest Mahnbeleg, is a payment of this invoice. */
+function acceptsAmount(invoice: OpenInvoice, cents: number): boolean {
+  return (
+    centsOf(invoice.openAmount) === cents ||
+    (invoice.reminderTotal != null && centsOf(invoice.reminderTotal) === cents)
+  );
 }
 
 function toCandidate(invoice: OpenInvoice): MatchCandidate {
@@ -96,7 +107,7 @@ export function matchStatementToInvoices<T extends ParsedTransaction>(
     .map((transaction): MatchedTransaction<T> => {
       const referenced = findReferencedInvoice(transaction, openInvoices, prefix);
       const amountMatches = openInvoices.filter(
-        (invoice) => centsOf(invoice.openAmount) === transaction.amountCents
+        (invoice) => acceptsAmount(invoice, transaction.amountCents)
       );
       const nameMatches = openInvoices.filter((invoice) =>
         mentionsCustomer(transaction.counterparty, invoice)
@@ -104,7 +115,7 @@ export function matchStatementToInvoices<T extends ParsedTransaction>(
 
       // Number and amount line up on the same invoice: safe to pre-select,
       // the user only has to confirm.
-      if (referenced && centsOf(referenced.openAmount) === transaction.amountCents) {
+      if (referenced && acceptsAmount(referenced, transaction.amountCents)) {
         return {
           transaction,
           candidates: [toCandidate(referenced)],

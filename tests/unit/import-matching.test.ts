@@ -58,6 +58,27 @@ describe("matchStatementToInvoices", () => {
     expect(result.candidates.map((c) => c.invoiceId).sort()).toEqual([1, 2]);
   });
 
+  it("treats the total of the latest Mahnbeleg as an amount match and pre-selects with the reference", () => {
+    const invoice: OpenInvoice = { id: 1, documentNumber: "I-26010042", openAmount: 123.45, reminderTotal: 133.45 };
+    const [withRef] = matchStatementToInvoices(
+      [tx({ amountCents: 13345, description: "Rechnung I-26010042" })],
+      [invoice],
+      PREFIX
+    );
+    expect(withRef.confidence).toBe("reference");
+    expect(withRef.preselectedInvoiceId).toBe(1);
+
+    const [amountOnly] = matchStatementToInvoices([tx({ amountCents: 13345 })], [invoice], PREFIX);
+    expect(amountOnly.confidence).toBe("amount");
+    expect(amountOnly.candidates).toEqual([{ invoiceId: 1, documentNumber: "I-26010042" }]);
+  });
+
+  it("still matches the plain open amount when a reminder total exists", () => {
+    const invoice: OpenInvoice = { id: 1, documentNumber: "I-26010042", openAmount: 123.45, reminderTotal: 133.45 };
+    const [result] = matchStatementToInvoices([tx({ amountCents: 12345 })], [invoice], PREFIX);
+    expect(result.confidence).toBe("amount");
+  });
+
   it("reports no candidates when nothing matches", () => {
     const [result] = matchStatementToInvoices(
       [tx({ description: "Miete Januar", amountCents: 250000 })],

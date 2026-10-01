@@ -26,6 +26,7 @@ import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
+import { reminderTitle } from "@/lib/reminder-charges";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -71,6 +72,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         sentDocuments: { orderBy: { createdAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
         creditNoteFor: { select: { id: true, documentNumber: true } },
+        pendingReminder: { select: { reminderLevel: true, snoozedUntil: true } },
         creditNotes: {
           where: { state: { not: "Draft" } },
           orderBy: { date: "asc" },
@@ -292,7 +294,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                     <TableRow key={doc.id}>
                       <TableCell className="whitespace-nowrap">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell>
-                        {doc.kind === "Reminder" ? `Mahnung Stufe ${doc.reminderLevel ?? 1}` : "Rechnung"}
+                        {doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : "Rechnung"}
                       </TableCell>
                       <TableCell>{doc.sentTo}</TableCell>
                       <TableCell className="font-mono text-xs" title={doc.sha256}>
@@ -402,6 +404,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             defaultBody={defaultBody}
             isCreditNote={isCreditNote}
           />
+          {canEdit && invoice.pendingReminder && (
+            <Button
+              variant="outline"
+              render={<Link href={`/invoices/reminders?search=${encodeURIComponent(invoice.documentNumber ?? "")}`} />}
+            >
+              {reminderTitle(invoice.pendingReminder.reminderLevel)} senden
+            </Button>
+          )}
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
             <CreateCreditNoteButton invoiceId={invoice.id} />
           )}

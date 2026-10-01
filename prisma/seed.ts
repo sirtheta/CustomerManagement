@@ -6,6 +6,10 @@ import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 
 import { fingerprint } from "../lib/import/dedupe";
+import { archivePdf } from "../lib/document-archive";
+import { generateReminderPdf } from "../lib/pdf/reminder-pdf";
+import { computeReminderCharges, reminderTitle } from "../lib/reminder-charges";
+import { checkOverdueInvoices } from "../lib/reminders";
 
 loadEnvConfig(process.cwd());
 
@@ -302,11 +306,125 @@ async function main() {
   );
   invoiceCounter = pendingYearly.invoiceCounter;
 
+  const reminderCount = await seedReminders(customers.slice(3, 3 + REMINDER_PLANS.length), categories, prefix, invoiceCounter);
+  invoiceCounter += REMINDER_PLANS.length;
+  // Remaining random Overdue invoices get a level-1 reminder, like the daily job
+  await checkOverdueInvoices(prisma);
+
   const bankCount = await seedBankStatement(company.companyIBAN);
 
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails, ${bankCount} open bank transactions.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails, ${reminderCount} dunning invoices, ${bankCount} open bank transactions.`,
   );
+}
+
+// Overdue invoices at every dunning stage. `pendingLevel` is the level of the
+// open PendingReminder (levels below it were already sent, each with a real
+// archived Mahnbeleg); `lastSent` additionally sent level 4 ("Letzte Stufe erreicht").
+const REMINDER_PLANS = [
+  { dueDaysAgo: 12, pendingLevel: 1, lastSent: false },
+  { dueDaysAgo: 40, pendingLevel: 2, lastSent: false },
+  { dueDaysAgo: 75, pendingLevel: 3, lastSent: false },
+  { dueDaysAgo: 110, pendingLevel: 4, lastSent: false },
+  { dueDaysAgo: 130, pendingLevel: 4, lastSent: true },
+];
+
+// Fees and interest so the Mahnbelege show amounts (defaults are 0 = off)
+async function seedReminders(
+  reminderCustomers: { customerId: number; email: string }[],
+  categories: { categoryId: number }[],
+  prefix: string,
+  startCounter: number,
+): Promise<number> {
+  const settings = await prisma.applicationSettings.update({
+    where: { applicationSettingsId: (await prisma.applicationSettings.findFirstOrThrow()).applicationSettingsId },
+    data: {
+      reminderFeeLevel2Rappen: 2000,
+      reminderFeeLevel3Rappen: 3000,
+      reminderFeeLevel4Rappen: 5000,
+      reminderInterestPercent: 5,
+    },
+    include: { companyInfo: true },
+  });
+  const admin = await prisma.user.findFirstOrThrow({ where: { role: UserRole.Admin } });
+  const DAY_MS = 86_400_000;
+  const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS);
+
+  for (const [i, plan] of REMINDER_PLANS.entries()) {
+    const customer = reminderCustomers[i];
+    const dueDate = daysAgo(plan.dueDaysAgo);
+    const date = new Date(dueDate.getTime() - 30 * DAY_MS);
+    const items = buildItems(categories);
+    const total = round2(items.reduce((sum, item) => sum + item.totalAmount, 0));
+    const number = `I-${prefix}${String(startCounter + i).padStart(4, "0")}`;
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: number,
+        date,
+        dueDate,
+        totalAmount: total,
+        state: InvoiceState.Overdue,
+        items: { create: items },
+        sentLogs: { create: buildSentLogs(number, "Rechnung", customer.email, date) },
+      },
+      include: { customer: true, items: { orderBy: { id: "asc" } } },
+    });
+
+    // Levels that were already sent, 10 days after the due date and then every 15 days
+    const lastSentLevel = plan.lastSent ? 4 : plan.pendingLevel - 1;
+    for (let level = 1; level <= lastSentLevel; level++) {
+      const dunningDate = daysAgo(plan.dueDaysAgo - 10 - 15 * (level - 1));
+      const charges = computeReminderCharges({
+        level,
+        openRappen: Math.round(total * 100),
+        dueDate,
+        dunningDate,
+        settings,
+      });
+      const subject = `${reminderTitle(level)}: Rechnung ${number} – ${settings.companyInfo.companyName}`;
+      const archive = await archivePdf({
+        documentNumber: number,
+        kind: "Reminder",
+        pdf: await generateReminderPdf(invoice, settings, charges),
+        now: dunningDate,
+      });
+      await prisma.sentDocument.create({
+        data: {
+          invoiceId: invoice.id,
+          kind: "Reminder",
+          reminderLevel: level,
+          documentNumber: number,
+          path: archive.path,
+          sha256: archive.sha256,
+          size: archive.size,
+          sentTo: customer.email,
+          subject,
+          createdAt: dunningDate,
+          createdById: admin.id,
+          openRappen: charges.openRappen,
+          feeRappen: charges.feeRappen,
+          interestRappen: charges.interestRappen,
+          interestPercent: charges.interestPercent,
+          dunningDate,
+        },
+      });
+      await prisma.invoiceSentLog.create({
+        data: { invoiceId: invoice.id, sentTo: customer.email, subject, sentAt: dunningDate },
+      });
+    }
+
+    // Pending entry as sendReminder leaves it: level advanced, cooldown already over
+    await prisma.pendingReminder.create({
+      data: {
+        invoiceId: invoice.id,
+        reminderLevel: plan.pendingLevel,
+        createdAt: daysAgo(plan.dueDaysAgo - 1),
+        snoozedUntil: lastSentLevel > 0 ? daysAgo(1) : null,
+      },
+    });
+  }
+  return REMINDER_PLANS.length;
 }
 
 // One imported statement (nothing booked) for the bank import page: payments

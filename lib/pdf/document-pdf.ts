@@ -28,7 +28,7 @@ const UNIT_LABELS: Record<Unit, string> = {
 // Document-type-agnostic shape consumed by the renderer. Invoice/quote wrappers
 // map their models onto this and supply the type-specific labels + optional QR.
 export type RenderDoc = {
-  kind: "invoice" | "quote";
+  kind: "invoice" | "quote" | "reminder";
   title: string; // "Rechnung" | "Offerte"
   documentNumber: string;
   numberLabel: string; // "Rechnungs-Nr.:" | "Offerten-Nr.:"
@@ -56,6 +56,10 @@ export type RenderDoc = {
   qr: QrBillData | null;
   /** True for an unnumbered draft: renders a diagonal "ENTWURF" watermark. */
   draft: boolean;
+  /** Reminder only: replaces the items table by label/amount rows (CHF). */
+  amountLines?: { label: string; amount: number }[];
+  /** Reminder only: one line printed under the document details, e.g. the days overdue. */
+  overdueNote?: string;
 };
 
 // Accepts both Prisma Decimal (real documents) and plain numbers (preview samples).
@@ -266,117 +270,142 @@ export async function generateDocumentPdf(
       y += textH + 16;
     }
 
-    // ── Items table header ───────────────────────────────────────────────
-    let headerTextColor = ACCENT;
-    if (theme.tableHeaderFill) {
-      pdf.rect(LINE_MARGIN, y, PAGE_W - 2 * LINE_MARGIN, TABLE_ROW_H + 6).fill(ACCENT);
-      headerTextColor = "#ffffff";
-      y += 6;
-    } else {
-      rule(y, 0.5);
-      y += 6;
-    }
-
-    pdf.font(BOLD).fontSize(SMALL).fillColor(headerTextColor);
-    let x = MARGIN;
-    pdf.text("Beschreibung", x, y, { width: COL_W.desc });
-    x += COL_W.desc;
-    pdf.text("Menge", x, y, { width: COL_W.qty, align: "right" });
-    x += COL_W.qty;
-    pdf.text("Einheit", x, y, { width: COL_W.unit, align: "right" });
-    x += COL_W.unit;
-    pdf.text("Preis/Einheit", x, y, { width: COL_W.price, align: "right" });
-    x += COL_W.price;
-    pdf.text("Total", x, y, { width: COL_W.total, align: "right" });
-    y += TABLE_ROW_H;
-    if (theme.tableHeaderFill) {
-      y += 8;
-    } else {
+    if (doc.kind === "reminder") {
+      if (doc.overdueNote) {
+        pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+        pdf.text(doc.overdueNote, MARGIN, y, { width: CONTENT_W });
+        y += pdf.heightOfString(doc.overdueNote, { width: CONTENT_W }) + 12;
+      }
       rule(y, 0.5);
       y += 8;
-    }
-
-    // ── Items rows ───────────────────────────────────────────────────────
-    pdf.fillColor(TEXT_COLOR);
-    for (const item of doc.items) {
-      // Reserve ~60pt for the totals block below the table
-      if (y > PAGE_H - MARGIN - 60) {
-        pdf.addPage();
-        y = MARGIN;
-      }
-
-      const nameH = pdf
-        .font(BOLD)
-        .fontSize(BASE)
-        .heightOfString(item.name, { width: COL_W.desc });
-      const descH = item.description
-        ? pdf.font(FONT).fontSize(SMALL).heightOfString(item.description, { width: COL_W.desc })
-        : 0;
-      const discountH = Number(item.discountPercent ?? 0) > 0 ? LINE_HEIGHT : 0;
-      const rowH = Math.max(TABLE_ROW_H, nameH + descH + discountH + 4);
-
-      x = MARGIN;
-      pdf.font(BOLD).fontSize(BASE).fillColor(TEXT_COLOR);
-      pdf.text(item.name, x, y, { width: COL_W.desc });
-      if (item.description) {
-        pdf.font(FONT).fontSize(SMALL);
-        pdf.text(item.description, x, y + nameH + 2, { width: COL_W.desc });
-      }
-      if (Number(item.discountPercent ?? 0) > 0) {
-        pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
-        pdf.text(`Rabatt: ${fmt(Number(item.discountPercent), locale)} %`, x, y + nameH + descH + 4, {
-          width: COL_W.desc,
-        });
-      }
-
-      x += COL_W.desc;
-      pdf.font(FONT).fontSize(BASE);
-      pdf.text(fmt(Number(item.quantity), locale), x, y, { width: COL_W.qty, align: "right" });
-      x += COL_W.qty;
-      pdf.text(UNIT_LABELS[item.unit], x, y, { width: COL_W.unit, align: "right" });
-      x += COL_W.unit;
-      pdf.text(`CHF ${fmt(Number(item.unitPrice), locale)}`, x, y, {
-        width: COL_W.price,
-        align: "right",
-      });
-      x += COL_W.price;
-      pdf.text(`CHF ${fmt(Number(item.totalAmount), locale)}`, x, y, {
-        width: COL_W.total,
-        align: "right",
-      });
-
-      y += rowH + 10;
-    }
-
-    // ── Totals ───────────────────────────────────────────────────────────
-    y += 5;
-    rule(y, 0.5);
-    y += 8;
-
-    const subtotal = doc.items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
-    const invoiceDiscount = Number(doc.discountPercent ?? 0);
-    if (invoiceDiscount > 0) {
       pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
-      pdf.text("Zwischensumme", MARGIN, y);
-      pdf.text(`CHF ${fmt(subtotal, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
-      y += LINE_HEIGHT + 4;
-      pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
-      pdf.text(`- CHF ${fmt(subtotal - doc.totalAmount, locale)}`, MARGIN, y, {
+      for (const line of doc.amountLines ?? []) {
+        pdf.text(line.label, MARGIN, y);
+        pdf.text(`CHF ${fmt(line.amount, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
+        y += LINE_HEIGHT + 4;
+      }
+      y += 2;
+      rule(y, 0.5);
+      y += 8;
+      pdf.font(BOLD).fontSize(TOTAL).fillColor(TEXT_COLOR);
+      pdf.text("Gesamtbetrag", MARGIN, y);
+      pdf.text(`CHF ${fmt(doc.totalAmount, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
+      y += TOTAL + 7;
+      rule(y, 1.5);
+      y += 16;
+    } else {
+      // ── Items table header ───────────────────────────────────────────────
+      let headerTextColor = ACCENT;
+      if (theme.tableHeaderFill) {
+        pdf.rect(LINE_MARGIN, y, PAGE_W - 2 * LINE_MARGIN, TABLE_ROW_H + 6).fill(ACCENT);
+        headerTextColor = "#ffffff";
+        y += 6;
+      } else {
+        rule(y, 0.5);
+        y += 6;
+      }
+
+      pdf.font(BOLD).fontSize(SMALL).fillColor(headerTextColor);
+      let x = MARGIN;
+      pdf.text("Beschreibung", x, y, { width: COL_W.desc });
+      x += COL_W.desc;
+      pdf.text("Menge", x, y, { width: COL_W.qty, align: "right" });
+      x += COL_W.qty;
+      pdf.text("Einheit", x, y, { width: COL_W.unit, align: "right" });
+      x += COL_W.unit;
+      pdf.text("Preis/Einheit", x, y, { width: COL_W.price, align: "right" });
+      x += COL_W.price;
+      pdf.text("Total", x, y, { width: COL_W.total, align: "right" });
+      y += TABLE_ROW_H;
+      if (theme.tableHeaderFill) {
+        y += 8;
+      } else {
+        rule(y, 0.5);
+        y += 8;
+      }
+
+      // ── Items rows ───────────────────────────────────────────────────────
+      pdf.fillColor(TEXT_COLOR);
+      for (const item of doc.items) {
+        // Reserve ~60pt for the totals block below the table
+        if (y > PAGE_H - MARGIN - 60) {
+          pdf.addPage();
+          y = MARGIN;
+        }
+
+        const nameH = pdf
+          .font(BOLD)
+          .fontSize(BASE)
+          .heightOfString(item.name, { width: COL_W.desc });
+        const descH = item.description
+          ? pdf.font(FONT).fontSize(SMALL).heightOfString(item.description, { width: COL_W.desc })
+          : 0;
+        const discountH = Number(item.discountPercent ?? 0) > 0 ? LINE_HEIGHT : 0;
+        const rowH = Math.max(TABLE_ROW_H, nameH + descH + discountH + 4);
+
+        x = MARGIN;
+        pdf.font(BOLD).fontSize(BASE).fillColor(TEXT_COLOR);
+        pdf.text(item.name, x, y, { width: COL_W.desc });
+        if (item.description) {
+          pdf.font(FONT).fontSize(SMALL);
+          pdf.text(item.description, x, y + nameH + 2, { width: COL_W.desc });
+        }
+        if (Number(item.discountPercent ?? 0) > 0) {
+          pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
+          pdf.text(`Rabatt: ${fmt(Number(item.discountPercent), locale)} %`, x, y + nameH + descH + 4, {
+            width: COL_W.desc,
+          });
+        }
+
+        x += COL_W.desc;
+        pdf.font(FONT).fontSize(BASE);
+        pdf.text(fmt(Number(item.quantity), locale), x, y, { width: COL_W.qty, align: "right" });
+        x += COL_W.qty;
+        pdf.text(UNIT_LABELS[item.unit], x, y, { width: COL_W.unit, align: "right" });
+        x += COL_W.unit;
+        pdf.text(`CHF ${fmt(Number(item.unitPrice), locale)}`, x, y, {
+          width: COL_W.price,
+          align: "right",
+        });
+        x += COL_W.price;
+        pdf.text(`CHF ${fmt(Number(item.totalAmount), locale)}`, x, y, {
+          width: COL_W.total,
+          align: "right",
+        });
+
+        y += rowH + 10;
+      }
+
+      // ── Totals ───────────────────────────────────────────────────────────
+      y += 5;
+      rule(y, 0.5);
+      y += 8;
+
+      const subtotal = doc.items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+      const invoiceDiscount = Number(doc.discountPercent ?? 0);
+      if (invoiceDiscount > 0) {
+        pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+        pdf.text("Zwischensumme", MARGIN, y);
+        pdf.text(`CHF ${fmt(subtotal, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
+        y += LINE_HEIGHT + 4;
+        pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
+        pdf.text(`- CHF ${fmt(subtotal - doc.totalAmount, locale)}`, MARGIN, y, {
+          width: CONTENT_W,
+          align: "right",
+        });
+        y += LINE_HEIGHT + 6;
+      }
+
+      pdf.font(BOLD).fontSize(TOTAL).fillColor(TEXT_COLOR);
+      pdf.text("Gesamtbetrag", MARGIN, y);
+      pdf.text(`CHF ${fmt(doc.totalAmount, locale)}`, MARGIN, y, {
         width: CONTENT_W,
         align: "right",
       });
-      y += LINE_HEIGHT + 6;
+      y += TOTAL + 7;
+      rule(y, 1.5);
+      y += 16;
     }
-
-    pdf.font(BOLD).fontSize(TOTAL).fillColor(TEXT_COLOR);
-    pdf.text("Gesamtbetrag", MARGIN, y);
-    pdf.text(`CHF ${fmt(doc.totalAmount, locale)}`, MARGIN, y, {
-      width: CONTENT_W,
-      align: "right",
-    });
-    y += TOTAL + 7;
-    rule(y, 1.5);
-    y += 16;
 
     // ── Payment note + optional closing block ────────────────────────────
     const footerLines = theme.showFooter

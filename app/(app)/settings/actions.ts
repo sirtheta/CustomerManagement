@@ -6,6 +6,7 @@ import sharp from "sharp";
 import nodemailer from "nodemailer";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { requireAdmin } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import logger from "@/lib/logger";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
@@ -18,11 +19,14 @@ import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
 const log = logger.child({ module: "settings" });
 
+const PLAIN_DECIMAL = /^-?\d+([.,]\d+)?$/;
+const MAX_REMINDER_FEE_RAPPEN = 10_000_000; // 100'000 CHF, keeps the value inside a 32-bit Int
+
 export async function saveSettings(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
   const settings = await prisma.applicationSettings.findFirst({
     include: { companyInfo: true },
   });
@@ -80,6 +84,21 @@ export async function saveSettings(
   const paymentTermDays = parseInt(formData.get("defaultPaymentTermDays") as string);
   const quoteValidityDays = parseInt(formData.get("defaultQuoteValidityDays") as string);
   const reminderCooldown = parseInt(formData.get("reminderCooldownDays") as string);
+  const feeToRappen = (name: string) => {
+    const raw = (formData.get(name) as string | null)?.trim();
+    if (!raw) return 0;
+    if (!PLAIN_DECIMAL.test(raw)) return NaN;
+    return Math.round(Number(raw.replace(",", ".")) * 100);
+  };
+  const feeLevel2 = feeToRappen("reminderFeeLevel2");
+  const feeLevel3 = feeToRappen("reminderFeeLevel3");
+  const feeLevel4 = feeToRappen("reminderFeeLevel4");
+  const interestRaw = (formData.get("reminderInterestPercent") as string | null)?.trim();
+  const interestPercent = !interestRaw
+    ? 0
+    : PLAIN_DECIMAL.test(interestRaw)
+      ? Number(interestRaw.replace(",", "."))
+      : NaN;
   const notifyRepeatRaw = (formData.get("notifyRepeatIntervalDays") as string)?.trim();
   const notifyRepeatInterval = notifyRepeatRaw ? parseInt(notifyRepeatRaw) : NaN;
   const smtpPort = smtpPortRaw ? parseInt(smtpPortRaw) : null;
@@ -88,6 +107,18 @@ export async function saveSettings(
       (!isNaN(quoteValidityDays) && quoteValidityDays < 1) ||
       (!isNaN(reminderCooldown) && reminderCooldown < 1)) {
     return { error: "Tage-Felder müssen mindestens 1 betragen." };
+  }
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => Number.isNaN(fee)) || Number.isNaN(interestPercent)) {
+    return { error: "Ungültiger Betrag." };
+  }
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => fee < 0)) {
+    return { error: "Mahngebühren dürfen nicht negativ sein." };
+  }
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => fee > MAX_REMINDER_FEE_RAPPEN)) {
+    return { error: "Ungültiger Betrag." };
+  }
+  if (interestPercent < 0 || interestPercent > 100) {
+    return { error: "Der Verzugszins muss zwischen 0 und 100 % liegen." };
   }
   if (smtpPort !== null && (!isNaN(smtpPort)) && (smtpPort < 1 || smtpPort > 65535)) {
     return { error: "SMTP-Port muss zwischen 1 und 65535 liegen." };
@@ -114,6 +145,10 @@ export async function saveSettings(
     emailSubjectTemplate: (formData.get("emailSubjectTemplate") as string) || null,
     emailBodyTemplate: (formData.get("emailBodyTemplate") as string) || null,
     reminderCooldownDays: isNaN(reminderCooldown) ? 14 : reminderCooldown,
+    reminderFeeLevel2Rappen: feeLevel2,
+    reminderFeeLevel3Rappen: feeLevel3,
+    reminderFeeLevel4Rappen: feeLevel4,
+    reminderInterestPercent: interestPercent,
     notifyOverdueEnabled: formData.get("notifyOverdueEnabled") === "on",
     notifyPendingEnabled: formData.get("notifyPendingEnabled") === "on",
     notifyEmailAddress: (formData.get("notifyEmailAddress") as string)?.trim() || null,
@@ -137,6 +172,20 @@ export async function saveSettings(
     const company = await prisma.companyInformation.create({ data: companyData });
     await prisma.applicationSettings.create({
       data: { ...appData, companyInformationId: company.companyInformationId },
+    });
+  }
+
+  const dunningChanged =
+    (settings?.reminderFeeLevel2Rappen ?? 0) !== feeLevel2 ||
+    (settings?.reminderFeeLevel3Rappen ?? 0) !== feeLevel3 ||
+    (settings?.reminderFeeLevel4Rappen ?? 0) !== feeLevel4 ||
+    Number(settings?.reminderInterestPercent ?? 0) !== interestPercent;
+  if (dunningChanged) {
+    await logAudit(session, "UPDATE", "Settings", settings?.applicationSettingsId, "Mahnwesen", {
+      reminderFeeLevel2Rappen: feeLevel2,
+      reminderFeeLevel3Rappen: feeLevel3,
+      reminderFeeLevel4Rappen: feeLevel4,
+      reminderInterestPercent: interestPercent,
     });
   }
 

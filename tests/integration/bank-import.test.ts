@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Session } from "next-auth";
-import { createTestDatabase } from "../test-utils";
+import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 
 vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
@@ -13,6 +13,7 @@ import {
   listOpenTransactions,
   undoImport,
 } from "@/lib/import/bank-import";
+import { loadOpenInvoices } from "@/lib/import/queries";
 import type { ParsedStatement, ParsedTransaction } from "@/lib/import/types";
 
 const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Editor" } } as Session;
@@ -291,6 +292,53 @@ describe("bank import service against a real database", () => {
       BankImportError
     );
     expect(await db.prisma.bankTransaction.count()).toBe(1);
+  });
+
+  describe("loadOpenInvoices and the dunning notice total", () => {
+    async function seedOverdue() {
+      const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+      return db.prisma.invoice.create({
+        data: {
+          customerId: customer.customerId, documentNumber: "I-26090001", date: new Date(),
+          dueDate: new Date(Date.now() - 5 * 86_400_000), totalAmount: 100, state: "Overdue",
+        },
+      });
+    }
+    function sentReminder(invoiceId: number) {
+      return db.prisma.sentDocument.create({
+        data: {
+          invoiceId, kind: "Reminder", reminderLevel: 2, documentNumber: "I-26090001",
+          path: "2026/mahnung.pdf", sha256: "a".repeat(64), size: 1,
+          sentTo: "a@b.ch", subject: "M", createdById: 1,
+          openRappen: 10000, feeRappen: 1000, interestRappen: 250,
+        },
+      });
+    }
+
+    it("exposes the total of the latest Mahnbeleg", async () => {
+      const inv = await seedOverdue();
+      await sentReminder(inv.id);
+      const [open] = await loadOpenInvoices(db.prisma);
+      expect(open.openAmount).toBe(100);
+      expect(open.reminderTotal).toBe(112.5);
+    });
+
+    it("has no reminder total without a Mahnbeleg", async () => {
+      await seedOverdue();
+      const [open] = await loadOpenInvoices(db.prisma);
+      expect(open.reminderTotal).toBeUndefined();
+    });
+
+    it("ignores a Mahnbeleg that is stale after a partial payment", async () => {
+      const inv = await seedOverdue();
+      await sentReminder(inv.id);
+      await db.prisma.payment.create({
+        data: { invoiceId: inv.id, amount: 40, date: new Date(), source: "manual" },
+      });
+      const [open] = await loadOpenInvoices(db.prisma);
+      expect(open.openAmount).toBe(60);
+      expect(open.reminderTotal).toBeUndefined();
+    });
   });
 
   it("makes a transaction open again when its expense is deleted", async () => {
