@@ -14,6 +14,7 @@ import { createContact, updateContact, deleteContact } from "@/app/(app)/custome
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 
 const editor = { user: { id: "1", name: "E", email: "e@test.ch", role: "Editor" } } as never;
@@ -76,5 +77,32 @@ describe("contact actions", () => {
     await deleteContact(1, 7);
     expect(prisma.customerContact.delete).toHaveBeenCalledWith({ where: { contactId: 7, customerId: 1 } });
     expect(logAudit).toHaveBeenCalledWith(editor, "DELETE", "CustomerContact", 7, "Buchhaltung");
+  });
+
+it("update returns an error and no audit when the contact is already gone (P2025)", async () => {
+    vi.mocked(prisma.customerContact.update).mockRejectedValue({ code: "P2025" });
+    const result = await updateContact(1, 7, {}, form({ name: "Einkauf" }));
+    expect(result.error).toBe("Kontakt nicht gefunden");
+    expect(result._ts).toEqual(expect.any(Number));
+    expect(logAudit).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/customers/1");
+  });
+
+  it("update rethrows errors other than P2025", async () => {
+    vi.mocked(prisma.customerContact.update).mockRejectedValue(new Error("boom"));
+    await expect(updateContact(1, 7, {}, form({ name: "Einkauf" }))).rejects.toThrow("boom");
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("delete resolves silently without audit when the contact is already gone (P2025)", async () => {
+    vi.mocked(prisma.customerContact.delete).mockRejectedValue({ code: "P2025" });
+    await expect(deleteContact(1, 7)).resolves.toBeUndefined();
+    expect(logAudit).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/customers/1");
+  });
+
+  it("delete rethrows errors other than P2025", async () => {
+    vi.mocked(prisma.customerContact.delete).mockRejectedValue(new Error("boom"));
+    await expect(deleteContact(1, 7)).rejects.toThrow("boom");
   });
 });

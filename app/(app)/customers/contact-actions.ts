@@ -11,6 +11,10 @@ function field(formData: FormData, key: string): string | null {
   return ((formData.get(key) as string) ?? "").trim() || null;
 }
 
+function isNotFound(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2025";
+}
+
 function readContact(formData: FormData):
   | { data: { name: string; role: string | null; email: string | null; phone: string | null } }
   | { error: string } {
@@ -48,7 +52,13 @@ export async function updateContact(
   if ("error" in parsed) return { error: parsed.error, _ts: Date.now() };
 
   // Scoped to the customer so a stale or forged id cannot touch another customer's contact.
-  await prisma.customerContact.update({ where: { contactId, customerId }, data: parsed.data });
+  try {
+    await prisma.customerContact.update({ where: { contactId, customerId }, data: parsed.data });
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+    revalidatePath(`/customers/${customerId}`);
+    return { error: "Kontakt nicht gefunden", _ts: Date.now() };
+  }
   await logAudit(session, "UPDATE", "CustomerContact", contactId, parsed.data.name);
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
@@ -56,7 +66,15 @@ export async function updateContact(
 
 export async function deleteContact(customerId: number, contactId: number): Promise<void> {
   const session = await requireEditor();
-  const contact = await prisma.customerContact.delete({ where: { contactId, customerId } });
+  let contact;
+  try {
+    contact = await prisma.customerContact.delete({ where: { contactId, customerId } });
+  } catch (err) {
+    if (!isNotFound(err)) throw err;
+    // Already deleted elsewhere: nothing left to do but refresh the stale row away.
+    revalidatePath(`/customers/${customerId}`);
+    return;
+  }
   await logAudit(session, "DELETE", "CustomerContact", contactId, contact.name);
   revalidatePath(`/customers/${customerId}`);
 }

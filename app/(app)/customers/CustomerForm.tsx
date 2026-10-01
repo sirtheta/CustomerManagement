@@ -266,7 +266,8 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
 
               <div className="space-y-1.5">
                 <Label htmlFor="country">Land</Label>
-                <Select name="country" defaultValue={submitted?.country ?? customer?.country ?? "CH"}>
+                {/* key re-mounts the uncontrolled Select with the submitted value after an error round trip */}
+                <Select key={submitted ? `country-${submitted.country ?? ""}` : "country-initial"} name="country" defaultValue={submitted?.country ?? customer?.country ?? "CH"}>
                   <SelectTrigger id="country" className="w-full">
                     <SelectValue>
                       {(value: string | null) =>
@@ -441,7 +442,8 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="billingCountry">Land</Label>
-                    <Select name="billingCountry" defaultValue={submitted?.billingCountry ?? customer?.billingCountry ?? "CH"}>
+                    {/* key re-mounts the uncontrolled Select with the submitted value after an error round trip */}
+                    <Select key={submitted ? `billingCountry-${submitted.billingCountry ?? ""}` : "billingCountry-initial"} name="billingCountry" defaultValue={submitted?.billingCountry ?? customer?.billingCountry ?? "CH"}>
                       <SelectTrigger id="billingCountry" className="w-full">
                         <SelectValue>
                           {(value: string | null) =>
