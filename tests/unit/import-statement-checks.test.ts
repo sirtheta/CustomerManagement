@@ -43,6 +43,14 @@ describe("checkBalanceContinuity", () => {
     });
     expect(warning).toContain("fehlt");
     expect(warning).toContain("10.00");
+    expect(warning).toContain("Saldoprüfung: ");
+    expect(warning).toContain("(bis 28.02.2026)");
+  });
+
+  it("omits the period when the previous import has none", () => {
+    const [warning] = checkBalanceContinuity(5000, { closingBalanceRappen: 4000, periodTo: null });
+    expect(warning).toContain("fehlt");
+    expect(warning).not.toContain("(bis");
   });
 
   it("does nothing without a previous import or opening balance", () => {

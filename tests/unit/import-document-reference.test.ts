@@ -27,8 +27,16 @@ describe("extractDocumentNumberCandidates", () => {
     expect(extractDocumentNumberCandidates("Ref 1260100421", P)).toEqual([]);
   });
 
-  it("does not match a prefix that is the tail of another word", () => {
-    expect(extractDocumentNumberCandidates("BILDI-26010042", P)).toEqual([]);
+  it("does not match a prefix that is the tail of another word, only the bare digits", () => {
+    // The prefix form is blocked behind a word character; the digits alone
+    // still count as an invoice number candidate.
+    expect(extractDocumentNumberCandidates("BILDI-26010042", P)).toEqual(["I-26010042"]);
+  });
+
+  it("accepts common payer spellings in front of the digits", () => {
+    for (const text of ["Rg.26010042", "Nr.26010042", "Rechnung-26010042"]) {
+      expect(extractDocumentNumberCandidates(text, P)).toEqual(["I-26010042"]);
+    }
   });
 
   it("does not take the digits of another document type such as a quote number", () => {

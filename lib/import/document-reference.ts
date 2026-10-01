@@ -37,9 +37,12 @@ export function extractDocumentNumberCandidates(description: string, prefix: str
     for (const match of description.matchAll(withPrefix)) add(match[1]);
   }
 
-  // Bare digits: delimited by non-digits and not directly behind a letter
-  // ("Q-26010003" is a quote number, not an invoice number).
-  for (const match of description.matchAll(/(?<![A-Za-z][.\-_]?)(?<!\d)\d{8}(?!\d)/g)) add(match[0]);
+  // Bare digits: delimited by non-digits and not behind a LONE letter
+  // ("Q-26010003" is a quote number, not an invoice number). A letter that
+  // ends a longer word ("Rg.", "Nr.", "Rechnung-") does not block the match.
+  for (const match of description.matchAll(/(?<!(?<![A-Za-z])[A-Za-z][.\-_]?)(?<!\d)\d{8}(?!\d)/g)) {
+    add(match[0]);
+  }
 
   return found;
 }

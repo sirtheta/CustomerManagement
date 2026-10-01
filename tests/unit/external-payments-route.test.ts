@@ -114,6 +114,7 @@ describe("POST /api/external/payments", () => {
       expect.objectContaining({ bankReference: "REF-1" })
     );
 
+    vi.mocked(matchAndMarkPaid).mockClear();
     const tooLong = await POST(
       req(
         { description: "R-2607", amountRappen: 100, bankReference: "x".repeat(101) },
@@ -121,6 +122,7 @@ describe("POST /api/external/payments", () => {
       )
     );
     expect(tooLong.status).toBe(400);
+    expect(matchAndMarkPaid).not.toHaveBeenCalled();
   });
 
   it("swallows a matchAndMarkPaid exception into a silent 200 matched:false", async () => {
