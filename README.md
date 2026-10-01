@@ -18,7 +18,7 @@ versende sie per E-Mail und behalte offene Zahlungen, Mahnungen und deinen Umsat
 - 👥 **Kundenverwaltung** mit Firmen-/Kontaktdaten und Datei-Uploads pro Kunde
 - 📄 **Offerten & Rechnungen** mit klarem Status-Workflow (Entwurf → Versendet → Bezahlt …)
 - 🇨🇭 **Schweizer QR-Rechnung** als fertiges PDF inkl. IBAN und Firmenlogo
-- 🔁 **Wiederkehrende Jahresrechnungen** werden automatisch erstellt
+- 🔁 **Abos (wiederkehrende Rechnungen, monatlich, quartalsweise, jährlich)** werden automatisch erstellt
 - ⏰ **Zahlungserinnerungen / Mahnwesen** mit mehreren Stufen
 - ✉️ **E-Mail-Versand** von Rechnungen direkt aus der App (eigener SMTP-Server)
 - 🔔 **Benachrichtigungen** über überfällige Posten per E-Mail oder Telegram

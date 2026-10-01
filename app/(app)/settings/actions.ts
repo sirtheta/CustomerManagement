@@ -10,7 +10,7 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import logger from "@/lib/logger";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
-import { checkYearlyInvoices } from "@/lib/yearly-invoices";
+import { checkSubscriptions } from "@/lib/subscriptions";
 import { sendAdminNotifications } from "@/lib/notifications";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
@@ -285,7 +285,7 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
   try {
     await checkAndUpdateAllDocumentStates(prisma);
     await checkOverdueInvoices(prisma);
-    await checkYearlyInvoices(prisma);
+    await checkSubscriptions(prisma);
     // Reset notification stamps so the check always sends in dev
     await Promise.all([
       prisma.pendingReminder.updateMany({ data: { adminNotifiedAt: null } }),

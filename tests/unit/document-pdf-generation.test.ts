@@ -326,9 +326,7 @@ describe("generateQuotePdf", () => {
           city: "Zürich",
           email: "anna@muster.ch",
           phone: null,
-          yearlyInvoice: false,
           contactInsteadOfCompany: false,
-          nextInvoiceDate: null,
           archivedAt: null,
         },
         items: [

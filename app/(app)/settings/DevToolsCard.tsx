@@ -38,7 +38,7 @@ export default function DevToolsCard() {
           )}
         </div>
         <p className="text-xs text-muted-foreground">
-          Führt checkAndUpdateAllDocumentStates, checkOverdueInvoices, checkYearlyInvoices und sendAdminNotifications aus — identisch zum Cron-Job.
+          Führt checkAndUpdateAllDocumentStates, checkOverdueInvoices, checkSubscriptions und sendAdminNotifications aus — identisch zum Cron-Job.
         </p>
       </CardContent>
     </Card>

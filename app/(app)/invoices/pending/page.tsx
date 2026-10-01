@@ -17,7 +17,7 @@ export default async function PendingEmailsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Ausstehende E-Mails</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Jahresrechnungen prüfen und versenden
+            Abo-Rechnungen prüfen und versenden
           </p>
         </div>
         <Button variant="outline" size="sm" render={<Link href="/invoices" />}>

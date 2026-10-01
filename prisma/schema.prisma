@@ -18,17 +18,15 @@ model Customer {
   addressNeedsReview      Boolean    @default(false)
   email                   String
   phone                   String?
-  yearlyInvoice           Boolean    @default(false)
   contactInsteadOfCompany Boolean    @default(false)
-  nextInvoiceDate         DateTime?
   archivedAt              DateTime?
   invoices                Invoice[]
   quotes                  Quote[]
   documents               Document[]
   notes                   CustomerNote[]
+  subscriptions           Subscription[]
 
   @@index([email])
-  @@index([nextInvoiceDate])
   @@index([archivedAt])
 }
 
@@ -173,6 +171,7 @@ model InvoiceTemplate {
   id    Int            @id @default(autoincrement())
   name  String
   items TemplateItem[]
+  subscriptions Subscription[]
 }
 
 model TemplateItem {
@@ -185,6 +184,28 @@ model TemplateItem {
   quantity    Decimal
   categoryId  Int?
   template    InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+enum SubscriptionInterval {
+  Monthly
+  Quarterly
+  Yearly
+}
+
+model Subscription {
+  id              Int                  @id @default(autoincrement())
+  customerId      Int
+  templateId      Int?
+  interval        SubscriptionInterval
+  nextInvoiceDate DateTime
+  autoSend        Boolean              @default(false)
+  active          Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  customer        Customer             @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  template        InvoiceTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([nextInvoiceDate])
+  @@index([customerId])
 }
 
 model Service {
