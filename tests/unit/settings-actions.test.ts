@@ -26,7 +26,7 @@ vi.mock("@/lib/state-manager", () => ({
   checkAndUpdateAllDocumentStates: vi.fn(),
 }));
 vi.mock("@/lib/reminders", () => ({ checkOverdueInvoices: vi.fn() }));
-vi.mock("@/lib/yearly-invoices", () => ({ checkYearlyInvoices: vi.fn() }));
+vi.mock("@/lib/subscriptions", () => ({ checkSubscriptions: vi.fn() }));
 vi.mock("@/lib/notifications", () => ({ sendAdminNotifications: vi.fn() }));
 vi.mock("@/lib/pdf/theme", () => ({
   resolveTheme: vi.fn((v: unknown) => v),

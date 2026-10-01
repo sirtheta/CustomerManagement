@@ -134,11 +134,19 @@ async function main() {
         zipCode:                 r.ZipCode,
         email:                   r.Email,
         phone:                   nullable(r.Phone),
-        yearlyInvoice:           toBool(r.YearlyInvoice),
         contactInsteadOfCompany: toBool(r.ContactInsteadOfCompany),
-        nextInvoiceDate:         toDate(r.NextInvoiceDate),
       },
     });
+    // Former yearly-invoice customers become a yearly subscription
+    if (toBool(r.YearlyInvoice) && toDate(r.NextInvoiceDate)) {
+      await prisma.subscription.create({
+        data: {
+          customerId:      r.CustomerId,
+          interval:        "Yearly",
+          nextInvoiceDate: toDate(r.NextInvoiceDate),
+        },
+      });
+    }
   }
   console.log(`Customers: ${customers.length} rows migrated`);
 

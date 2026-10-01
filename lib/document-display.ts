@@ -9,3 +9,8 @@ export function documentLabel(documentNumber: string | null | undefined): string
 export function fillDocumentNumber(text: string, documentNumber: string): string {
   return text.replace(/\{documentNumber\}/g, () => documentNumber);
 }
+
+/** Replaces the {totalAmount} placeholder with the formatted invoice total (at send time, after edits). */
+export function fillTotalAmount(text: string, formattedTotal: string): string {
+  return text.replace(/\{totalAmount\}/g, () => formattedTotal);
+}

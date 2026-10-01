@@ -318,8 +318,8 @@ export default async function InvoicesPage({ searchParams }: Props) {
         <div className="flex items-center justify-between gap-3 rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30 px-4 py-3">
           <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
             {pendingCount === 1
-              ? "1 Jahresrechnung wartet auf Prüfung und Versand."
-              : `${pendingCount} Jahresrechnungen warten auf Prüfung und Versand.`}
+              ? "1 Abo-Rechnung wartet auf Prüfung und Versand."
+              : `${pendingCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
           </p>
           <Button size="sm" render={<Link href="/invoices/pending" />}>Jetzt prüfen</Button>
         </div>

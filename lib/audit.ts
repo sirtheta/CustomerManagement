@@ -6,8 +6,8 @@ import { appendAuditEntry, type AuditEntryInput } from "@/lib/audit-chain";
 
 const log = logger.child({ module: "audit" });
 
-export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "SEND" | "STATUS";
-export type AuditEntity = "Customer" | "Invoice" | "Quote" | "Reminder" | "Service" | "User" | "Settings" | "CustomerNote" | "Expense" | "Payment" | "SentDocument" | "ExpenseReceipt";
+export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "SEND" | "STATUS" | "EXPORT";
+export type AuditEntity = "Customer" | "Invoice" | "Quote" | "Reminder" | "Service" | "User" | "Settings" | "CustomerNote" | "Expense" | "Payment" | "SentDocument" | "ExpenseReceipt" | "Subscription" | "YearPackage";
 
 /**
  * Writes one hash-chained audit row. Never throws: audit logging must not
