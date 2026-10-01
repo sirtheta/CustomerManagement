@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
-    customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn() },
     invoice: { count: vi.fn() },
   },
 }));
@@ -51,6 +51,10 @@ const VALID_FIELDS = {
 describe("customer actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.customer.aggregate).mockResolvedValue({ _max: { customerNumber: null } } as never);
+    vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
+    // vi.clearAllMocks() keeps implementations: an earlier test leaves redirect throwing.
+    vi.mocked(redirect).mockImplementation(() => undefined as never);
   });
 
   describe("createCustomer", () => {
@@ -253,6 +257,172 @@ describe("customer actions", () => {
       expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "Customer", 4, undefined, {
         archived: false,
       });
+    });
+  });
+
+  describe("extended customer fields", () => {
+    const BILLING = {
+      billingName: "Muster AG, Buchhaltung",
+      billingStreet: "Postfach",
+      billingZipCode: "3000",
+      billingCity: "Bern",
+    };
+
+    async function create(fields: Record<string, string>) {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      return createCustomer({}, form({ ...VALID_FIELDS, ...fields }));
+    }
+
+    it("assigns the next customer number automatically", async () => {
+      vi.mocked(prisma.customer.aggregate).mockResolvedValue({ _max: { customerNumber: 1041 } } as never);
+      await create({});
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ customerNumber: 1042 }) })
+      );
+    });
+
+    it("returns the submitted values with validation errors so the form can refill", async () => {
+      const result = await create({ company: "Muster AG", uid: "CHE-116.281.711", billingCity: "Bern" });
+      expect(result.fieldErrors?.uid).toBeDefined();
+      expect(result.values).toMatchObject({
+        company: "Muster AG",
+        contactPerson: "Max Muster",
+        email: "max@muster.ch",
+        uid: "CHE-116.281.711",
+        billingCity: "Bern",
+      });
+    });
+
+    it("returns the submitted values with a duplicate customer number", async () => {
+      vi.mocked(prisma.customer.create).mockRejectedValueOnce(
+        Object.assign(new Error("unique"), { code: "P2002" })
+      );
+      const result = await create({ customerNumber: "77", company: "Muster AG" });
+      expect(result.fieldErrors?.customerNumber).toBe("Kundennummer bereits vergeben.");
+      expect(result.values).toMatchObject({ customerNumber: "77", company: "Muster AG" });
+    });
+
+    it("does not return values on success", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      const result = await createCustomer({}, form(VALID_FIELDS));
+      expect(result?.values).toBeUndefined();
+    });
+
+    it("keeps an explicit customer number", async () => {
+      await create({ customerNumber: "77" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ customerNumber: 77 }) })
+      );
+    });
+
+    it("rejects a non-numeric customer number", async () => {
+      const result = await create({ customerNumber: "K-1" });
+      expect(result.fieldErrors?.customerNumber).toBeDefined();
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+    });
+
+    it("reports a duplicate customer number", async () => {
+      vi.mocked(prisma.customer.create).mockRejectedValueOnce(
+        Object.assign(new Error("unique"), { code: "P2002", name: "PrismaClientKnownRequestError" })
+      );
+      const result = await create({ customerNumber: "77" });
+      expect(result.fieldErrors?.customerNumber).toBe("Kundennummer bereits vergeben.");
+    });
+
+    it("retries an automatic number once after a collision", async () => {
+      vi.mocked(prisma.customer.aggregate)
+        .mockResolvedValueOnce({ _max: { customerNumber: 1001 } } as never)
+        .mockResolvedValueOnce({ _max: { customerNumber: 1002 } } as never);
+      vi.mocked(prisma.customer.create)
+        .mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }))
+        .mockResolvedValueOnce({ customerId: 5 } as never);
+      await create({});
+      expect(prisma.customer.create).toHaveBeenCalledTimes(2);
+      expect(prisma.customer.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ customerNumber: 1003 }) })
+      );
+    });
+
+    it("normalizes a valid UID and rejects an invalid one", async () => {
+      await create({ uid: "che116281710 mwst" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ uid: "CHE-116.281.710" }) })
+      );
+      vi.mocked(prisma.customer.create).mockClear();
+      const result = await create({ uid: "CHE-116.281.711" });
+      expect(result.fieldErrors?.uid).toBeDefined();
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+    });
+
+    it("saves a complete billing address with default country", async () => {
+      await create({ ...BILLING, billingEmail: "buchhaltung@muster.ch" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            billingName: "Muster AG, Buchhaltung",
+            billingStreet: "Postfach",
+            billingZipCode: "3000",
+            billingCity: "Bern",
+            billingCountry: "CH",
+            billingEmail: "buchhaltung@muster.ch",
+          }),
+        })
+      );
+    });
+
+    it("rejects a partial billing address", async () => {
+      const result = await create({ billingStreet: "Postfach", billingCity: "Bern" });
+      expect(result.fieldErrors?.billingStreet).toBeDefined();
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+    });
+
+    it("drops billing name and country when there is no billing address", async () => {
+      await create({ billingName: "Nur Name", billingCountry: "DE" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ billingName: null, billingCountry: null, billingStreet: null }),
+        })
+      );
+    });
+
+    it("rejects an invalid billing e-mail", async () => {
+      const result = await create({ billingEmail: "kaputt" });
+      expect(result.fieldErrors?.billingEmail).toBeDefined();
+    });
+
+    it("validates the payment term (1-365 days)", async () => {
+      for (const bad of ["0", "366", "abc", "-5"]) {
+        const result = await create({ paymentTermDays: bad });
+        expect(result.fieldErrors?.paymentTermDays).toBeDefined();
+      }
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+      await create({ paymentTermDays: "10" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ paymentTermDays: 10 }) })
+      );
+    });
+
+    it("stores no payment term when the field is empty", async () => {
+      await create({ paymentTermDays: "" });
+      expect(prisma.customer.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ paymentTermDays: null }) })
+      );
+    });
+
+    it("update keeps the customer number when the field is empty", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "" }));
+      const data = vi.mocked(prisma.customer.update).mock.calls[0][0].data as Record<string, unknown>;
+      expect("customerNumber" in data).toBe(false);
+    });
+
+    it("update reports a duplicate customer number", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.update).mockRejectedValueOnce(
+        Object.assign(new Error("unique"), { code: "P2002" })
+      );
+      const result = await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "9" }));
+      expect(result.fieldErrors?.customerNumber).toBe("Kundennummer bereits vergeben.");
     });
   });
 });
