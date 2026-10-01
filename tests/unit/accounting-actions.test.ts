@@ -9,8 +9,7 @@ vi.mock("@/lib/prisma", () => ({
       findUnique: vi.fn(),
     },
     expenseReceipt: {
-      findUnique: vi.fn(),
-      delete: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -36,7 +35,6 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
-  deleteExpenseReceipt,
 } from "@/app/(app)/accounting/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -231,29 +229,41 @@ describe("accounting actions", () => {
     });
   });
 
-  describe("deleteExpenseReceipt", () => {
-    it("rejects Editor role (Admin only)", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/dashboard");
-      });
+  describe("updateExpense receipt removal", () => {
+    const base = { date: "2026-01-15", description: "Miete", amount: "1200" };
 
-      await expect(deleteExpenseReceipt(1)).rejects.toThrow("REDIRECT:/dashboard");
-      expect(prisma.expenseReceipt.delete).not.toHaveBeenCalled();
+    it("deletes marked receipts on save and audits each one (Admin)", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.expenseReceipt.findMany).mockResolvedValue([{ id: 9, name: "beleg.pdf" }] as never);
+      vi.mocked(prisma.expense.update).mockResolvedValue({} as never);
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/accounting");
+      });
+      const fd = form(base);
+      fd.append("deleteReceiptIds", "9");
+
+      await expect(updateExpense(4, {}, fd)).rejects.toThrow("REDIRECT:/accounting");
+
+      expect(prisma.expenseReceipt.findMany).toHaveBeenCalledWith({
+        where: { id: { in: [9] }, expenseId: 4 },
+        select: { id: true, name: true },
+      });
+      expect(prisma.expense.update).toHaveBeenCalledWith({
+        where: { id: 4 },
+        data: expect.objectContaining({ receipts: { deleteMany: { id: { in: [9] } } } }),
+      });
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "ExpenseReceipt", 9, "beleg.pdf");
     });
 
-    it("deletes a receipt and writes an audit log for Admin", async () => {
-      vi.mocked(auth).mockResolvedValue(adminSession);
-      vi.mocked(prisma.expenseReceipt.findUnique).mockResolvedValue({
-        expenseId: 4,
-        name: "beleg.pdf",
-      } as never);
-      vi.mocked(prisma.expenseReceipt.delete).mockResolvedValue({} as never);
+    it("refuses receipt removal for Editor and saves nothing", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      const fd = form(base);
+      fd.append("deleteReceiptIds", "9");
 
-      await deleteExpenseReceipt(9);
+      const result = await updateExpense(4, {}, fd);
 
-      expect(prisma.expenseReceipt.delete).toHaveBeenCalledWith({ where: { id: 9 } });
-      expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "ExpenseReceipt", 9, "beleg.pdf");
+      expect(result.error).toContain("Admin");
+      expect(prisma.expense.update).not.toHaveBeenCalled();
     });
   });
 

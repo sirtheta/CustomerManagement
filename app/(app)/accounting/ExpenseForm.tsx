@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { createExpense, updateExpense, type ExpenseFormState } from "./actions";
 import type { Category, Expense } from "@prisma/client";
-import DeleteReceiptButton from "./DeleteReceiptButton";
 
 type SerializedExpense = Omit<Expense, "amount" | "date" | "dueDate" | "paidDate"> & {
   amount: number;
@@ -52,6 +51,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
 
   const fe = state.fieldErrors ?? {};
   const v = state.values;
+  const [removedReceipts, setRemovedReceipts] = useState<number[]>([]);
   const [paid, setPaid] = useState(expense ? expense.paidDate !== null : true);
 
   return (
@@ -218,24 +218,43 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               />
               {receipts.length > 0 && (
                 <ul className="mt-2 space-y-1 text-sm">
-                  {receipts.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-2">
-                      <a
-                        href={`/api/expenses/receipts/${r.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline truncate"
-                      >
-                        {r.name}
-                      </a>
-                      <span className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-muted-foreground">
-                          {Math.max(1, Math.round(r.size / 1024))} KB
+                  {receipts.map((r) => {
+                    const removed = removedReceipts.includes(r.id);
+                    return (
+                      <li key={r.id} className="flex items-center justify-between gap-2">
+                        {removed && <input type="hidden" name="deleteReceiptIds" value={r.id} />}
+                        <a
+                          href={`/api/expenses/receipts/${r.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`underline truncate ${removed ? "line-through text-muted-foreground" : ""}`}
+                        >
+                          {r.name}
+                        </a>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground">
+                            {removed
+                              ? "wird beim Speichern gelöscht"
+                              : `${Math.max(1, Math.round(r.size / 1024))} KB`}
+                          </span>
+                          {canDeleteReceipts && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setRemovedReceipts((prev) =>
+                                  removed ? prev.filter((id) => id !== r.id) : [...prev, r.id]
+                                )
+                              }
+                            >
+                              {removed ? "Rückgängig" : "Löschen"}
+                            </Button>
+                          )}
                         </span>
-                        {canDeleteReceipts && <DeleteReceiptButton receiptId={r.id} />}
-                      </span>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

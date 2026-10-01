@@ -3,7 +3,8 @@
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { requireAdmin, requireEditor } from "@/lib/permissions";
+import { hasRole, requireAdmin, requireEditor } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { readReceipts } from "@/lib/expense-receipts";
@@ -103,14 +104,33 @@ export async function updateExpense(
   const files = await readReceipts(formData.getAll("receipts"));
   if ("error" in files) return { error: files.error, values: echoValues(formData) };
 
+  // Receipts marked for removal in the form are only deleted on save.
+  const requestedDeletes = formData
+    .getAll("deleteReceiptIds")
+    .map((v) => parseInt(String(v), 10))
+    .filter((n) => !isNaN(n));
+  if (requestedDeletes.length > 0 && !hasRole(session, [UserRole.Admin]))
+    return { error: "Belege löschen darf nur ein Admin.", values: echoValues(formData) };
+  const toDelete =
+    requestedDeletes.length > 0
+      ? await prisma.expenseReceipt.findMany({
+          where: { id: { in: requestedDeletes }, expenseId: id },
+          select: { id: true, name: true },
+        })
+      : [];
+
   await prisma.expense.update({
     where: { id },
     data: {
       ...parsed.data,
-      ...(files.receipts.length > 0 && { receipts: { create: files.receipts } }),
+      receipts: {
+        ...(toDelete.length > 0 && { deleteMany: { id: { in: toDelete.map((r) => r.id) } } }),
+        ...(files.receipts.length > 0 && { create: files.receipts }),
+      },
     },
   });
   await logAudit(session, "UPDATE", "Expense", id, parsed.data.description);
+  for (const r of toDelete) await logAudit(session, "DELETE", "ExpenseReceipt", r.id, r.name);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/accounting");
@@ -123,17 +143,4 @@ export async function deleteExpense(id: number): Promise<void> {
   await logAudit(session, "DELETE", "Expense", id, expense?.description);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-}
-
-export async function deleteExpenseReceipt(receiptId: number): Promise<void> {
-  const session = await requireAdmin();
-  const receipt = await prisma.expenseReceipt.findUnique({
-    where: { id: receiptId },
-    select: { expenseId: true, name: true },
-  });
-  if (!receipt) return;
-  await prisma.expenseReceipt.delete({ where: { id: receiptId } });
-  await logAudit(session, "DELETE", "ExpenseReceipt", receiptId, receipt.name);
-  revalidatePath(`/accounting/${receipt.expenseId}`);
-  revalidatePath("/accounting");
 }
