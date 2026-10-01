@@ -19,27 +19,29 @@ Der Import eines CAMT.053-Kontoauszugs verbucht Zahlungseingänge zuverlässiger
 
 Die Migration ist reines SQL (Produktion wendet Migrationen über `scripts/startup.js` ohne Prisma CLI an).
 
-- `BankStatementImport`: `id`, `filename`, `iban String?`, `currency String?`, `periodFrom String?`, `periodTo String?` (YYYY-MM-DD), `openingBalanceRappen Int?`, `closingBalanceRappen Int?`, `importedCount Int`, `skippedCount Int`, `userId String?`, `createdAt`. Index auf `createdAt`.
+- `BankStatementImport`: `id`, `filename`, `iban String?`, `currency String?`, `periodFrom String?`, `periodTo String?` (YYYY-MM-DD), `openingBalanceRappen Int?`, `closingBalanceRappen Int?`, `balanceWarning String?` (Warnungen vom Upload für den Verlauf: Währung, IBAN, Saldo), `importedCount Int`, `skippedCount Int`, `userId Int?` (wie `AuditLog.userId`), `createdAt`. Indizes auf `createdAt` und `iban, periodTo`.
 - `BankTransaction`: `id`, `importId` (Relation auf `BankStatementImport`, `onDelete: Restrict`), `fingerprint String @unique`, `date DateTime`, `amountRappen Int` (mit Vorzeichen: negativ = Abbuchung), `description`, `counterparty String?`, `bankReference String?`, `ignored Boolean @default(false)`, `paymentId Int? @unique` (Relation auf `Payment`, `onDelete: SetNull`), `expenseId Int? @unique` (Relation auf `Expense`, `onDelete: SetNull`), `createdAt`. Indizes auf `importId` und `date`.
 - Offen = `paymentId`, `expenseId` und `ignored` sind leer. Wird eine `Payment` oder `Expense` gelöscht, wird die Bewegung dadurch automatisch wieder offen.
 - `Payment.bankReference` und `Payment.source = "camt-import"` bleiben wie in F5.
 
 ## Duplikatschutz (`lib/import/dedupe.ts`)
 
-- `fingerprint` = SHA-256 über IBAN und Bankreferenz, wenn die Bank eine Referenz liefert. Sonst über IBAN, Datum, Betrag, normalisierten Text (klein, Leerzeichen gekürzt), normalisierte Gegenpartei und einen Zähler.
-- Der Zähler nummeriert gleiche Bewegungen (gleiches Datum, Betrag, Text, Gegenpartei) in Dateireihenfolge. So werden zwei gleiche Abbuchungen am selben Tag beide importiert, ein erneuter Upload derselben Datei überspringt beide.
+- `fingerprint` = SHA-256 über IBAN, Bankreferenz, **Datum und Betrag**, wenn die Bank eine (nicht leere) Referenz liefert. Datum und Betrag gehören dazu, weil Zahler dieselbe EndToEndId jeden Monat wiederverwenden können; sonst würden alle späteren Monate still als „bekannt“ übersprungen. Ohne Referenz: IBAN, Datum, Betrag, normalisierter Text (klein, Leerzeichen gekürzt), normalisierte Gegenpartei und einen Zähler. Eine leere oder nur aus Leerzeichen bestehende Referenz gilt als fehlend.
+- Der Zähler nummeriert gleiche Bewegungen ohne Referenz (gleiches Datum, Betrag, Text, Gegenpartei) in Dateireihenfolge. Zeilen mit Referenz verschieben den Zähler nicht. So werden zwei gleiche Abbuchungen am selben Tag beide importiert, ein erneuter Upload derselben Datei überspringt beide.
 - Beim Upload werden bekannte Fingerprints übersprungen (`skippedCount`). Der eindeutige Index ist die letzte Absicherung bei parallelen Uploads: Ein Verstoss (P2002) zählt als übersprungen, nicht als Fehler.
-- Der bisherige Schutz über `Payment.bankReference` pro Rechnung bleibt als zweite Sicherung bestehen.
+- Zweite Sicherung beim Verbuchen: Existiert schon eine `Payment` mit derselben Bankreferenz, **demselben Datum und Betrag** (egal auf welcher Rechnung), wird der Eingang nicht noch einmal gebucht (eine Bankbewegung bezahlt eine Rechnung). Referenz allein genügt nicht, sonst liesse sich die Zahlung eines Zahlers mit wiederverwendeter Referenz ab dem zweiten Monat nie verbuchen.
+- Beim Verbuchen wird die Bewegung innerhalb der Zahlungstransaktion „beansprucht“ (`recordPayment` mit Rückruf `onCreated`). Eine zweite gleichzeitige Bestätigung findet sie nicht mehr offen und rollt ihre Zahlung zurück.
 
 ## Saldoprüfung (`lib/import/statement-checks.ts`)
 
 - **Vollständigkeit:** Anfangssaldo plus Summe aller Bewegungen der Datei (vor dem Überspringen von Duplikaten) muss den Endsaldo ergeben. Sonst Warnung. Fehlen Salden im Auszug, entfällt die Prüfung ohne Warnung.
 - **Kontinuität:** Der Anfangssaldo wird mit dem Endsaldo des letzten Imports derselben IBAN verglichen, dessen `periodTo` vor dem `periodFrom` der neuen Datei liegt. Weicht er ab, Warnung (vermutlich fehlt ein Zeitraum).
-- Beide Prüfungen sind Warnungen und blockieren den Import nicht. Die IBAN- und Währungswarnung (`checkStatementAccount`) bleibt unverändert.
+- Gibt es einen überlappenden Import derselben IBAN (`periodTo` nach dem `periodFrom` der neuen Datei), entfällt die Kontinuitätsprüfung, damit keine falsche Warnung entsteht.
+- Beide Prüfungen sind Warnungen und blockieren den Import nicht. Die IBAN- und Währungswarnung (`checkStatementAccount`) bleibt unverändert, wird aber zusammen mit den Saldowarnungen in `balanceWarning` gespeichert und im Verlauf angezeigt.
 
 ## Matching (`lib/import/matching.ts`)
 
-- **Nummer erkennen:** Statt der Regex `Präfix + 8 Ziffern` wird jede offene Rechnung gesucht. Text und Rechnungsnummer werden normalisiert (Gross-/Kleinschreibung egal, Leerzeichen, Bindestriche und Punkte entfernt), dann wird geprüft, ob die Nummer im Text steckt. Zusätzlich gilt ein Treffer auf den reinen Ziffernteil ohne Präfix, wenn er von Nichtziffern begrenzt ist (sonst träfe eine Ziffernfolge innerhalb einer IBAN).
+- **Nummer erkennen** (umgesetzt in `extractDocumentNumberCandidates`, liefert kanonische Nummern `Präfix + 8 Ziffern`, die dann gegen die offenen Rechnungen geprüft werden): Gross-/Kleinschreibung egal, Leerzeichen, Punkte, Bindestriche und Unterstriche zwischen Präfix und Ziffern und innerhalb der Ziffern sind erlaubt. Zusätzlich gilt ein Treffer auf die reinen acht Ziffern ohne Präfix, wenn sie von Nichtziffern begrenzt sind (sonst träfe eine Ziffernfolge innerhalb einer IBAN) und nicht direkt hinter einem einzelnen Buchstaben stehen (`Q-26010003` ist eine Offertennummer). Schreibweisen wie `Rg.26010042` oder `Nr.26010042` werden erkannt.
 - **Vorauswahl:** Nur wenn die Nummer erkannt wird und der Betrag dem Restbetrag entspricht. Das ist die heutige Regel.
 - **Kundenname:** Steckt der Kundenname (Firma oder Vor- und Nachname) in der Gegenpartei, werden die offenen Rechnungen dieses Kunden als Kandidaten vorgeschlagen, bevorzugt die mit passendem Betrag. Der Name führt nie zu einer Vorauswahl.
 - `lib/import/document-reference.ts` behält `extractDocumentNumberCandidates` für `lib/payment-matching.ts` (Budget-Schnittstelle). Diese nutzt für die Nummernerkennung dieselbe neue Normalisierung und bleibt sonst unverändert (bucht nur bei exakt passendem Restbetrag).
@@ -54,14 +56,15 @@ Die Migration ist reines SQL (Produktion wendet Migrationen über `scripts/start
 2. **Offene Bewegungen** (alle Importe, nicht nur der letzte, damit man später weitermachen kann):
    - **Eingänge:** wie heute mit Kandidaten und Vorauswahl. Zusätzlich „Ignorieren“. Ein Eingang ohne offene Rechnung kann nur ignoriert werden. Ein Hinweis erklärt, dass er schon über die Budget-App verbucht sein kann.
    - **Ausgaben:** je Zeile ein Kontrollkästchen, Datum, Betrag, Gegenpartei, Text und eine Kategorie-Auswahl (leer erlaubt). Geschäft und Privat laufen über ein Konto, daher ist **nichts vorausgewählt**: Nur angekreuzte Zeilen werden beim Bestätigen zu Ausgaben, der Rest bleibt offen und unverändert. Eine Ausgabe entsteht nie ohne diese ausdrückliche Wahl.
-     - **Bekannte Empfänger:** Hat eine normalisierte Gegenpartei schon eine übernommene Ausgabe (`BankTransaction.expenseId` gesetzt), ist die Zeile vorausgewählt und die Kategorie vorbelegt (zuletzt verwendete Kategorie). Hat sie nur ignorierte Bewegungen, steht die Zeile ausgegraut in einem eingeklappten Bereich „Bisher ignoriert“. So bleibt die Liste nach den ersten Monaten kurz, ohne eigene Regel-Tabelle.
-     - **Sammelaktion:** „Alle sichtbaren ignorieren“ für den Rest, der privat ist.
+     - **Bekannte Empfänger:** Es entscheidet die **neueste** frühere Bewegung derselben normalisierten Gegenpartei (nur Abbuchungen). Wurde sie als Ausgabe übernommen (`BankTransaction.expenseId` gesetzt), ist die Zeile vorausgewählt und die Kategorie vorbelegt (Kategorie jener Ausgabe). Wurde sie ignoriert, steht die Zeile ausgegraut in einem eingeklappten Bereich „Bisher ignoriert“ und ist nicht vorausgewählt. So bleibt die Liste nach den ersten Monaten kurz, ohne eigene Regel-Tabelle, und eine früher einmal übernommene Buchung (z. B. ein Einkauf bei Migros) wählt spätere private Einkäufe nicht für immer vor.
+     - **Sammelaktion:** „Nicht angekreuzte ignorieren“ für den Rest, der privat ist. Sie betrifft nur die sichtbaren, nicht angekreuzten Zeilen (nicht die eingeklappten) und fragt vorher nach, weil sich Ignorieren nur über „Rückgängig“ des ganzen Imports zurücknehmen lässt. Jede Zeile hat zusätzlich ein eigenes „Ignorieren“.
+     - Die Auswahl (Kreuze, Kategorien, gewählte Rechnung) bleibt erhalten, wenn sich die Liste durch Ignorieren oder Verbuchen einzelner Zeilen ändert. Bei Treffern nur über den Kundennamen ist keine Rechnung vorgewählt.
      - Ausgaben werden **nicht** automatisch vorausgewählt, wenn die Gegenpartei neu ist.
 3. **Bestätigen:**
    - Eingang → `recordPayment` (`source = "camt-import"`, `bankReference` der Bewegung), dann `BankTransaction.paymentId` setzen. Der Betrag ist der der Bewegung, nicht der Restbetrag (Vorschau bietet auch abweichende Beträge an, wie in F5).
    - Ausgabe → `Expense` mit Datum, Beschreibung (Gegenpartei und Text), Betrag als Absolutwert und Kategorie anlegen, dann `expenseId` setzen.
    - Jede Bewegung wird nur verbucht, wenn sie noch offen ist. Bereits verbuchte Zeilen (zweiter Tab, Doppelklick) werden übersprungen.
-4. **Importverlauf:** Liste der Importe mit Datum, Datei, Zeitraum, Anzahl und Saldowarnung. „Rückgängig“ löscht den Import samt seinen Bewegungen, aber nur wenn keine davon verbucht ist (`paymentId`/`expenseId` leer). Ignorierte Bewegungen dürfen gelöscht werden. Sonst Fehlermeldung mit Hinweis, erst die Zahlungen oder Ausgaben zu löschen.
+4. **Importverlauf:** Liste der Importe mit Datum, Datei, Zeitraum, Anzahl und den gespeicherten Warnungen (Saldo, Währung, IBAN). „Rückgängig“ löscht den Import samt seinen Bewegungen, aber nur wenn keine davon verbucht ist (`paymentId`/`expenseId` leer). Ignorierte Bewegungen dürfen gelöscht werden. Sonst Fehlermeldung mit Hinweis, erst die Zahlungen oder Ausgaben zu löschen.
 
 ## Audit und Berechtigungen
 

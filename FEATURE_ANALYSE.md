@@ -160,6 +160,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Nutzen:** Das Verbuchen der Zahlungseingänge geht fast automatisch. Die Ausgaben müssen nicht mehr doppelt erfasst werden.
 - **Aufwand:** mittel
 - **Code:** `lib/import/camt.ts`, `lib/import/matching.ts`, `app/(app)/invoices/import/*`, `schema.prisma` (`BankTransaction`)
+- **Umgesetzt (PR #123):** gespeicherte Bewegungen mit Duplikatschutz und Saldoprüfung, tolerantere Nummernerkennung, Kundenname als Vorschlag, Ausgaben nur nach ausdrücklichem Ankreuzen als `Expense`, Importverlauf mit „Rückgängig“. camt.054 ist bewusst nicht umgesetzt (camt.053 deckt es ab). Spec: `docs/superpowers/specs/2026-09-30-f7-bankabgleich-design.md`.
 
 ### F8 · Mahnwesen nach Schweizer Praxis — **Sollte**
 - **Beschreibung:** Eigener Mahnbeleg (PDF „1./2./3. Mahnung“ mit Bezug auf die Originalrechnung und aktualisiertem QR-Zahlteil über den offenen Betrag). Mahngebühr und Verzugszins sind konfigurierbar und standardmässig aus. Nach der letzten Stufe: Status „Betreibung/Inkasso“ und Export der Forderungsdaten für das Betreibungsbegehren.
@@ -229,7 +230,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 **Phase 2: mittelfristig (3–9 Monate) – Buchhaltungsfähigkeit**
 - [x] 6. F5 Zahlungen und offene Posten
 - [ ] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
-- [ ] 8. F7 Bankabgleich 2.0
+- [x] 8. F7 Bankabgleich 2.0 (PR #123)
 - [x] 9. F11 flexible Abos (#122)
 
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
@@ -257,7 +258,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 2. **Treuhänder:** Mit welcher Software arbeitet dein Treuhänder bzw. arbeiten die Treuhänder deiner Nutzer (Banana, bexio, Abacus, Run my Accounts, andere)?
 3. **Bank:** Welche Bank nutzt du? Gibt sie die Mitteilung aus dem QR-Code im CAMT.053 zuverlässig und unverändert zurück? (Bestimmt, wie der Abgleich in F7 gebaut wird.)
 4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)?
-5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F7 ersetzt werden?
+5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F7 ersetzt werden? *Beantwortet: Haushaltsbudget-App des Nutzers, die nach ihrem Import Zahlungseingänge an diese Schnittstelle schickt. Das CRM muss auch ohne sie funktionieren. Seit F7 hat es einen eigenen Bankimport, die Schnittstelle bleibt optional (neu: optionales `bankReference`).*
 6. **Volumen:** Wie viele Rechnungen, Ausgaben und Belege pro Jahr? (Relevant für BLOB-Speicherung in SQLite und Backups.)
 7. **Nummern:** Sollen bestehende, nie versendete Entwürfe bei F2 ihre Nummer verlieren oder behalten? Soll das Format (Präfix + JJMM + 4 Ziffern) konfigurierbar werden?
 8. **Betrieb:** Läuft die Instanz aus dem Internet erreichbar oder nur im LAN? (Relevant für Online-Zahlungs-Webhooks und die Backup-Strategie.) Welche Zeitzone hat der Container?
