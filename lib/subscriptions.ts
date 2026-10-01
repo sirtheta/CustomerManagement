@@ -24,6 +24,30 @@ class SubscriptionChangedError extends Error {
   }
 }
 
+type JobSettings = NonNullable<Awaited<ReturnType<PrismaClient["applicationSettings"]["findFirst"]>>>;
+
+/** Logs and tells the admins (notify e-mail / Telegram); draft and PendingEmail stay for manual approval. */
+async function reportAutoSendFailure(
+  settings: (JobSettings & { companyInfo: unknown }) | null,
+  subscriptionId: number,
+  invoiceId: number,
+  error: string
+): Promise<void> {
+  log.error({ subscriptionId, invoiceId, error }, "Auto-send failed, invoice waits for manual approval");
+  if (!settings) return;
+  try {
+    const { notifyAdmins } = await import("@/lib/notifications");
+    await notifyAdmins(
+      settings as Parameters<typeof notifyAdmins>[0],
+      "Abo-Rechnung konnte nicht versendet werden",
+      `Die Abo-Rechnung (Entwurf ${invoiceId}) konnte nicht automatisch versendet werden: ${error}. Sie wartet auf die manuelle Freigabe.`,
+      "/invoices/pending"
+    );
+  } catch (err) {
+    log.error({ err, subscriptionId }, "Notifying the admins about the failed auto-send failed");
+  }
+}
+
 function resolve(template: string, vars: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
 }
@@ -74,7 +98,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
     try {
       // Invoice, PendingEmail and the date advance succeed or fail together: a
       // crash between separate awaits would bill the same period twice.
-      const { invoiceId } = await prisma.$transaction(async (tx) => {
+      const { invoiceId, pending } = await prisma.$transaction(async (tx) => {
         const invoice = await tx.invoice.create({
           data: {
             customerId: sub.customerId,
@@ -98,7 +122,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
           customUserText: "",
         };
 
-        await tx.pendingEmail.create({
+        const pendingEmail = await tx.pendingEmail.create({
           data: {
             invoiceId: invoice.id,
             to: sub.customer.email,
@@ -117,7 +141,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         });
         if (advanced.count === 0) throw new SubscriptionChangedError();
 
-        return { invoiceId: invoice.id };
+        return { invoiceId: invoice.id, pending: pendingEmail };
       });
 
       await logAuditEntry(
@@ -132,6 +156,24 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         },
         prisma
       );
+
+      // Only a template with items is sent unattended, never a CHF 0 invoice.
+      if (sub.autoSend && items.length > 0) {
+        try {
+          // Loaded lazily: the PDF/mail stack is only needed when something is actually sent.
+          const { sendPendingInvoice } = await import("@/lib/pending-email-send");
+          const result = await sendPendingInvoice({
+            pendingId: pending.id,
+            to: pending.to,
+            subject: pending.subject,
+            body: pending.body,
+            actor: SYSTEM_ACTOR,
+          });
+          if ("error" in result) await reportAutoSendFailure(settings, sub.id, invoiceId, result.error);
+        } catch (err) {
+          await reportAutoSendFailure(settings, sub.id, invoiceId, err instanceof Error ? err.message : "Unbekannter Fehler");
+        }
+      }
     } catch (err) {
       // One broken subscription must not block the others; it is retried on the next run.
       if (err instanceof SubscriptionChangedError) {
