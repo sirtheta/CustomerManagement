@@ -18,7 +18,7 @@ Firmenkunden mit eigener Buchhaltung und individuellen Zahlungsfristen abbilden:
 
 `Customer`, alle neuen Felder optional ausser der Kundennummer:
 
-- `customerNumber Int @unique`: automatisch `max + 1`, mindestens 1001; im Formular überschreibbar. Die Migration nummeriert bestehende Kunden nach `customerId` ab 1001 durch, bevor die Eindeutigkeit gilt.
+- `customerNumber Int? @unique`: `createCustomer` vergibt automatisch `max + 1` (mindestens 1001), im Formular überschreibbar. Die Spalte ist in der DB nullable, damit Seed-Skripte und Tests, die `prisma.customer.create` direkt aufrufen, weiter funktionieren; ohne Nummer erscheint „Kunden-Nr.“ nirgends. Die Migration nummeriert bestehende Kunden nach `customerId` ab 1001 durch, bevor der eindeutige Index entsteht. Beim Bearbeiten bedeutet ein leeres Feld „Nummer unverändert lassen“.
 - `uid String?`: gespeichert normalisiert als `CHE-123.456.789` (ohne MWST/TVA/IVA-Suffix), validiert mit Prüfziffer (Modulo 11).
 - `billingName`, `billingStreet`, `billingHouseNumber`, `billingZipCode`, `billingCity`: `String?`; `billingCountry String?`; `billingEmail String?`.
 - `paymentTermDays Int?`: `null` = globale Frist (`ApplicationSettings.defaultPaymentTermDays`), sonst 1–365.
@@ -53,7 +53,7 @@ Anwendung:
 
 Bestehende Rechnungen behalten ihr `dueDate`. Archivierte PDFs werden nie neu gerendert, deshalb ändern spätere Adressänderungen sie nicht.
 
-Kundennummer, UID und Rechnungsadresse sind Pflege-Felder des Kunden: Änderungen laufen über `updateCustomer` und werden mit `logAudit` protokolliert (Details nennen die geänderten Feldnamen, keine Werte der Rechnungsadresse nötig).
+Kundennummer, UID und Rechnungsadresse sind Pflege-Felder des Kunden: Änderungen laufen über `updateCustomer` und werden wie bisher mit `logAudit(… "UPDATE", "Customer" …)` protokolliert (kein Feld-Diff). Neu ist nur der Audit-Entitätstyp `CustomerContact`.
 
 ## Validierung (`customers/actions.ts`, Zod)
 
