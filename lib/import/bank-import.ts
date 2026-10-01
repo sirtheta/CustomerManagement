@@ -14,7 +14,7 @@ export interface ImportResult {
   importId: number | null;
   importedCount: number;
   skippedCount: number;
-  /** Balance warnings; account/currency warnings are added by the caller. */
+  /** Account/currency warnings passed in plus the balance warnings found here. */
   warnings: string[];
 }
 
@@ -28,10 +28,16 @@ function isUniqueViolation(err: unknown): boolean {
  * uploads run at once.
  */
 export async function importStatement(
-  params: { statement: ParsedStatement; filename: string; actor: Session },
+  params: {
+    statement: ParsedStatement;
+    filename: string;
+    actor: Session;
+    /** Account/currency warnings computed by the caller; stored with the import. */
+    accountWarnings?: string[];
+  },
   prisma: PrismaClient = defaultPrisma
 ): Promise<ImportResult> {
-  const { statement, filename, actor } = params;
+  const { statement, filename, actor, accountWarnings = [] } = params;
   const hashed = withFingerprints(statement.iban, statement.transactions);
 
   const existing = await prisma.bankTransaction.findMany({
@@ -42,7 +48,7 @@ export async function importStatement(
   const fresh = hashed.filter((t) => !known.has(t.fingerprint));
 
   if (fresh.length === 0) {
-    return { importId: null, importedCount: 0, skippedCount: hashed.length, warnings: [] };
+    return { importId: null, importedCount: 0, skippedCount: hashed.length, warnings: accountWarnings };
   }
 
   // With an overlapping import for the same account the "previous" import is
@@ -66,6 +72,7 @@ export async function importStatement(
       })
     : null;
   const warnings = [
+    ...accountWarnings,
     ...checkBalanceCompleteness(statement),
     ...checkBalanceContinuity(statement.openingBalanceCents, previous),
   ];
@@ -235,27 +242,27 @@ export interface CounterpartyHistoryRow {
 
 /**
  * Household and business share one account, so nothing is pre-selected for a
- * counterparty that was never taken over as an expense before.
+ * counterparty without history. The newest decision wins: if the latest entry
+ * of a counterparty became an expense it is pre-selected with that category,
+ * if it was ignored it is marked as previously ignored.
  */
 export function buildExpenseHints(
   open: OpenTransaction[],
   history: CounterpartyHistoryRow[]
 ): Record<number, ExpenseHint> {
-  const byCounterparty = new Map<string, { expense: CounterpartyHistoryRow | null; ignored: boolean }>();
+  // History is newest first, so the first row per counterparty decides.
+  const newest = new Map<string, CounterpartyHistoryRow>();
   for (const row of history) {
     const key = normalize(row.counterparty);
-    const entry = byCounterparty.get(key) ?? { expense: null, ignored: false };
-    if (row.hasExpense && !entry.expense) entry.expense = row;
-    if (row.ignored) entry.ignored = true;
-    byCounterparty.set(key, entry);
+    if (!newest.has(key)) newest.set(key, row);
   }
 
   const hints: Record<number, ExpenseHint> = {};
   for (const transaction of open) {
-    const entry = byCounterparty.get(normalize(transaction.counterparty));
-    hints[transaction.id] = entry?.expense
-      ? { preselect: true, categoryId: entry.expense.expenseCategoryId, previouslyIgnored: false }
-      : { preselect: false, categoryId: null, previouslyIgnored: !!entry?.ignored };
+    const row = newest.get(normalize(transaction.counterparty));
+    hints[transaction.id] = row?.hasExpense
+      ? { preselect: true, categoryId: row.expenseCategoryId, previouslyIgnored: false }
+      : { preselect: false, categoryId: null, previouslyIgnored: !!row?.ignored };
   }
   return hints;
 }

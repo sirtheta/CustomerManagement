@@ -105,6 +105,23 @@ describe("bank import service against a real database", () => {
     expect(stored.balanceWarning).toContain("Saldo");
   });
 
+  it("stores account warnings together with the balance warnings", async () => {
+    const result = await importStatement(
+      {
+        statement: statement([tx()], { openingBalanceCents: 10000, closingBalanceCents: 9000 }),
+        filename: "w.xml",
+        actor,
+        accountWarnings: ["Das Konto stimmt nicht überein."],
+      },
+      db.prisma
+    );
+    expect(result.warnings[0]).toBe("Das Konto stimmt nicht überein.");
+    expect(result.warnings.length).toBeGreaterThan(1);
+    const stored = await db.prisma.bankStatementImport.findUniqueOrThrow({ where: { id: result.importId! } });
+    expect(stored.balanceWarning).toContain("Das Konto stimmt nicht überein.");
+    expect(stored.balanceWarning).toContain("Saldo");
+  });
+
   it("does not leave an empty import behind when two uploads of the same file run at once", async () => {
     const file = statement([tx({ bankReference: "P1" }), tx({ bankReference: "P2" })]);
     const [a, b] = await Promise.all([

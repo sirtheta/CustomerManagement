@@ -10,10 +10,19 @@ import { BankImportError, importStatement, undoImport } from "@/lib/import/bank-
 import { checkStatementAccount } from "@/lib/import/statement-checks";
 import { PaymentError, recordPayment } from "@/lib/payments";
 import logger from "@/lib/logger";
+import { z } from "zod";
 
 const log = logger.child({ module: "invoices.import" });
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+const INVALID_INPUT = "Ungültige Eingabe.";
+const id = z.number().int().positive();
+const idList = z.array(id).max(1000);
+const paymentItems = z.array(z.object({ transactionId: id, invoiceId: id })).max(1000);
+const expenseItems = z
+  .array(z.object({ transactionId: id, categoryId: id.nullable() }))
+  .max(1000);
 
 export type UploadStatementState = {
   error?: string;
@@ -62,17 +71,21 @@ export async function uploadStatement(
   const settings = await prisma.applicationSettings.findFirst({
     select: { companyInfo: { select: { companyIBAN: true } } },
   });
-  const result = await importStatement({ statement, filename: file.name, actor: session });
+  // Stored with the import so the history keeps showing them; result.warnings
+  // already contains them.
+  const accountWarnings = checkStatementAccount(statement, settings?.companyInfo?.companyIBAN ?? null);
+  const result = await importStatement({
+    statement,
+    filename: file.name,
+    actor: session,
+    accountWarnings,
+  });
 
   revalidateImport();
   return {
     importedCount: result.importedCount,
     skippedCount: result.skippedCount,
-    warnings: [
-      ...checkStatementAccount(statement, settings?.companyInfo?.companyIBAN ?? null),
-      ...result.warnings,
-      ...statement.warnings,
-    ],
+    warnings: [...result.warnings, ...statement.warnings],
   };
 }
 
@@ -90,6 +103,7 @@ export async function bookPayments(
   items: { transactionId: number; invoiceId: number }[]
 ): Promise<{ error?: string; paidCount?: number }> {
   const session = await requireEditor();
+  if (!paymentItems.safeParse(items).success) return { error: INVALID_INPUT };
   if (items.length === 0) return { error: "Keine Zuordnung ausgewählt." };
 
   let paidCount = 0;
@@ -105,9 +119,8 @@ export async function bookPayments(
     if (!invoice || !["Sent", "Overdue", "PartiallyPaid"].includes(invoice.state)) continue;
     if (
       entry.bankReference &&
-      (await prisma.payment.count({
-        where: { invoiceId: item.invoiceId, bankReference: entry.bankReference },
-      })) > 0
+      // One bank entry pays one invoice, so the check is global.
+      (await prisma.payment.count({ where: { bankReference: entry.bankReference } })) > 0
     ) {
       continue;
     }
@@ -146,6 +159,7 @@ export async function bookExpenses(
   items: { transactionId: number; categoryId: number | null }[]
 ): Promise<{ error?: string; expenseCount?: number }> {
   const session = await requireEditor();
+  if (!expenseItems.safeParse(items).success) return { error: INVALID_INPUT };
   if (items.length === 0) return { error: "Keine Ausgabe ausgewählt." };
 
   let expenseCount = 0;
@@ -202,13 +216,20 @@ export async function bookExpenses(
 export async function ignoreTransactions(
   ids: number[]
 ): Promise<{ error?: string; ignoredCount?: number }> {
-  await requireEditor();
+  const session = await requireEditor();
+  if (!idList.safeParse(ids).success) return { error: INVALID_INPUT };
   if (ids.length === 0) return { error: "Keine Bewegung ausgewählt." };
 
   const result = await prisma.bankTransaction.updateMany({
     where: { id: { in: ids }, ...isOpen },
     data: { ignored: true },
   });
+  if (result.count > 0) {
+    await logAudit(session, "UPDATE", "BankStatementImport", undefined, undefined, {
+      ignoredBankTransactionIds: ids.slice(0, 100),
+      count: result.count,
+    });
+  }
   revalidatePath("/invoices/import");
   return { ignoredCount: result.count };
 }

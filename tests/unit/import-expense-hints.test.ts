@@ -46,15 +46,23 @@ describe("buildExpenseHints", () => {
     });
   });
 
-  it("an earlier expense beats ignored bookings of the same counterparty", () => {
-    const history: CounterpartyHistoryRow[] = [
-      { counterparty: "Coop", ignored: true, hasExpense: false, expenseCategoryId: null },
-      { counterparty: "Coop", ignored: false, hasExpense: true, expenseCategoryId: null },
-    ];
-    expect(buildExpenseHints([open(1, "Coop")], history)[1]).toEqual({
+  it("the newest decision wins over older ones of the same counterparty", () => {
+    const ignored: CounterpartyHistoryRow = {
+      counterparty: "Coop", ignored: true, hasExpense: false, expenseCategoryId: null,
+    };
+    const expense: CounterpartyHistoryRow = {
+      counterparty: "Coop", ignored: false, hasExpense: true, expenseCategoryId: 4,
+    };
+    // History is passed newest first.
+    expect(buildExpenseHints([open(1, "Coop")], [expense, ignored])[1]).toEqual({
       preselect: true,
-      categoryId: null,
+      categoryId: 4,
       previouslyIgnored: false,
+    });
+    expect(buildExpenseHints([open(1, "Coop")], [ignored, expense])[1]).toEqual({
+      preselect: false,
+      categoryId: null,
+      previouslyIgnored: true,
     });
   });
 

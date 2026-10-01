@@ -116,6 +116,31 @@ describe("CAMT import actions against a real database", () => {
     expect(row.paidDate?.toISOString().slice(0, 10)).toBe("2026-03-15");
   });
 
+  it("does not book an entry whose bank reference already paid another invoice", async () => {
+    const first = await seedInvoice();
+    const second = await seedInvoice();
+    const a = await seedTransactions([{ bankReference: "REF-SHARED", date: "2026-03-01" }]);
+    expect(await bookPayments([{ transactionId: a.ids[0], invoiceId: first.id }])).toEqual({ paidCount: 1 });
+
+    const b = await seedTransactions([{ bankReference: "REF-SHARED", date: "2026-04-01" }]);
+    expect(await bookPayments([{ transactionId: b.ids[0], invoiceId: second.id }])).toEqual({ paidCount: 0 });
+    expect(await db.prisma.payment.count({ where: { invoiceId: second.id } })).toBe(0);
+  });
+
+  it("rejects an invalid payload", async () => {
+    expect(await bookPayments([{ transactionId: -1, invoiceId: 1 }])).toEqual({ error: "Ungültige Eingabe." });
+    expect(await bookExpenses([{ transactionId: 1.5, categoryId: null }])).toEqual({ error: "Ungültige Eingabe." });
+    expect(await ignoreTransactions(["x" as unknown as number])).toEqual({ error: "Ungültige Eingabe." });
+  });
+
+  it("audits ignored entries once", async () => {
+    const { ids } = await seedTransactions([{ amountCents: -100 }, { amountCents: -200 }]);
+    await ignoreTransactions(ids);
+    const entries = await db.prisma.auditLog.findMany({ where: { entityType: "BankStatementImport", action: "UPDATE" } });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].details).toContain("ignoredBankTransactionIds");
+  });
+
   it.each(["Paid", "Draft"] as const)("skips a %s invoice", async (state) => {
     const inv = await seedInvoice(state);
     const { ids } = await seedTransactions([{ amountCents: 10000, bankReference: "REF-X" }]);
