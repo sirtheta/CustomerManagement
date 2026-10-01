@@ -20,7 +20,7 @@ Firmenkunden mit eigener Buchhaltung und individuellen Zahlungsfristen abbilden:
 
 - `customerNumber Int? @unique`: `createCustomer` vergibt automatisch `max + 1` (mindestens 1001), im Formular überschreibbar. Die Spalte ist in der DB nullable, damit Seed-Skripte und Tests, die `prisma.customer.create` direkt aufrufen, weiter funktionieren; ohne Nummer erscheint „Kunden-Nr.“ nirgends. Die Migration nummeriert bestehende Kunden nach `customerId` ab 1001 durch, bevor der eindeutige Index entsteht. Beim Bearbeiten bedeutet ein leeres Feld „Nummer unverändert lassen“.
 - `uid String?`: gespeichert normalisiert als `CHE-123.456.789` (ohne MWST/TVA/IVA-Suffix), validiert mit Prüfziffer (Modulo 11).
-- `billingName`, `billingStreet`, `billingHouseNumber`, `billingZipCode`, `billingCity`: `String?`; `billingCountry String?`; `billingEmail String?`.
+- `billingName` (max. 70 Zeichen, Limit des QR-Zahlungspflichtigen), `billingStreet`, `billingHouseNumber`, `billingZipCode`, `billingCity`: `String?`; `billingCountry String?`; `billingEmail String?`.
 - `paymentTermDays Int?`: `null` = globale Frist (`ApplicationSettings.defaultPaymentTermDays`), sonst 1–365.
 - `contacts CustomerContact[]`.
 
@@ -36,7 +36,7 @@ Neuer Helfer `lib/customer-billing.ts` (rein, ohne Prisma):
 
 - `billingRecipient(customer)`: Rechnungsadresse (Name, Strasse, Hausnummer, PLZ, Ort, Land) wenn `billingStreet`, `billingZipCode` und `billingCity` gesetzt sind, sonst die Kundenadresse. Name: `billingName`, sonst der bisherige Empfängername. Liefert zusätzlich `uid`.
 - `billingEmail(customer)`: `billingEmail` wenn gesetzt, sonst `email`.
-- `effectivePaymentTermDays(customer, settings)`: `customer.paymentTermDays ?? settings.defaultPaymentTermDays`.
+- `effectivePaymentTermDays(customer, defaultDays)`: `customer?.paymentTermDays ?? defaultDays` (der Aufrufer übergibt `settings.defaultPaymentTermDays`).
 
 Anwendung:
 
@@ -75,7 +75,7 @@ Kundennummer, UID und Rechnungsadresse sind Pflege-Felder des Kunden: Änderunge
 
 - Kunde löschen: Kontakte werden per Cascade mitgelöscht; archivierte Kunden behalten alle Felder.
 - `billingEmail` gesetzt, aber ungültig gespeichert (Altdaten gibt es nicht): Versand schlägt wie bisher mit dem Mailfehler fehl.
-- Gleichzeitiges Anlegen: automatische Nummer wird bei `P2002` einmal neu berechnet und wiederholt.
+- Gleichzeitiges Anlegen: die automatische Nummer wird bei `P2002` neu berechnet und bis zu dreimal versucht.
 
 ## Tests
 

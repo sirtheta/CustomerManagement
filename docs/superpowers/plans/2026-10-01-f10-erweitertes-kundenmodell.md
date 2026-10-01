@@ -446,7 +446,7 @@ model CustomerContact {
 
 - [ ] **Step 2: SQL an die Migration anhängen**
 
-Ans Ende von `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` (nach der letzten `CREATE INDEX`-Zeile, mit Leerzeile davor):
+Ganz ans Dateiende von `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` (hinter den F8-Block, der mit `UPDATE "PendingReminder" SET "reminderLevel" = 4 …` endet; Leerzeile davor):
 
 ```sql
 
@@ -670,6 +670,8 @@ und im `beforeEach` nach `vi.clearAllMocks();` ergänzen:
 ```ts
     vi.mocked(prisma.customer.aggregate).mockResolvedValue({ _max: { customerNumber: null } } as never);
     vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
+    // vi.clearAllMocks() keeps implementations: an earlier test leaves redirect throwing.
+    vi.mocked(redirect).mockImplementation(() => undefined as never);
 ```
 
 (`prisma.customer.create` lieferte bisher `undefined`; `createCustomer` liest `customer.customerId`, bestehende Tests mocken das ggf. schon – dann bleibt deren Wert maßgeblich.)
@@ -877,7 +879,8 @@ const customerSchema = z
         (v) => v === null || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 365),
         "Zahlungsfrist muss zwischen 1 und 365 Tagen liegen."
       ),
-    billingName: optionalText(120, "Name"),
+    // The QR bill rejects debtor names longer than 70 characters (swissqrbill validator).
+    billingName: optionalText(70, "Name"),
     billingStreet: optionalText(ADDRESS_LIMITS.street, "Strasse"),
     billingHouseNumber: optionalText(ADDRESS_LIMITS.houseNumber, "Hausnummer"),
     billingZipCode: optionalText(ADDRESS_LIMITS.zip, "PLZ"),
@@ -1137,7 +1140,7 @@ describe("contact actions", () => {
     const result = await updateContact(1, 7, {}, form({ name: "Einkauf", role: "Einkauf" }));
     expect(result.success).toBe(true);
     expect(prisma.customerContact.update).toHaveBeenCalledWith({
-      where: { contactId: 7 },
+      where: { contactId: 7, customerId: 1 },
       data: { name: "Einkauf", role: "Einkauf", email: null, phone: null },
     });
     expect(logAudit).toHaveBeenCalledWith(editor, "UPDATE", "CustomerContact", 7, "Einkauf");
@@ -1145,7 +1148,7 @@ describe("contact actions", () => {
 
   it("deletes a contact as editor and audits", async () => {
     await deleteContact(1, 7);
-    expect(prisma.customerContact.delete).toHaveBeenCalledWith({ where: { contactId: 7 } });
+    expect(prisma.customerContact.delete).toHaveBeenCalledWith({ where: { contactId: 7, customerId: 1 } });
     expect(logAudit).toHaveBeenCalledWith(editor, "DELETE", "CustomerContact", 7, "Buchhaltung");
   });
 });
@@ -1190,7 +1193,7 @@ export async function createContact(
 ): Promise<ActionState> {
   const session = await requireEditor();
   const parsed = readContact(formData);
-  if ("error" in parsed) return { error: parsed.error };
+  if ("error" in parsed) return { error: parsed.error, _ts: Date.now() };
 
   const contact = await prisma.customerContact.create({ data: { customerId, ...parsed.data } });
   await logAudit(session, "CREATE", "CustomerContact", contact.contactId, parsed.data.name);
@@ -1206,9 +1209,10 @@ export async function updateContact(
 ): Promise<ActionState> {
   const session = await requireEditor();
   const parsed = readContact(formData);
-  if ("error" in parsed) return { error: parsed.error };
+  if ("error" in parsed) return { error: parsed.error, _ts: Date.now() };
 
-  await prisma.customerContact.update({ where: { contactId }, data: parsed.data });
+  // Scoped to the customer so a stale or forged id cannot touch another customer's contact.
+  await prisma.customerContact.update({ where: { contactId, customerId }, data: parsed.data });
   await logAudit(session, "UPDATE", "CustomerContact", contactId, parsed.data.name);
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
@@ -1216,7 +1220,7 @@ export async function updateContact(
 
 export async function deleteContact(customerId: number, contactId: number): Promise<void> {
   const session = await requireEditor();
-  const contact = await prisma.customerContact.delete({ where: { contactId } });
+  const contact = await prisma.customerContact.delete({ where: { contactId, customerId } });
   await logAudit(session, "DELETE", "CustomerContact", contactId, contact.name);
   revalidatePath(`/customers/${customerId}`);
 }
@@ -1257,7 +1261,7 @@ type Props = {
 function ContactFields({ contact, disabled }: { contact?: ContactRecord; disabled: boolean }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      <Input name="name" placeholder="Name" defaultValue={contact?.name ?? ""} disabled={disabled} />
+      <Input name="name" placeholder="Name" required defaultValue={contact?.name ?? ""} disabled={disabled} />
       <Input name="role" placeholder="Rolle (z.B. Buchhaltung)" defaultValue={contact?.role ?? ""} disabled={disabled} />
       <Input name="email" type="email" placeholder="E-Mail" defaultValue={contact?.email ?? ""} disabled={disabled} />
       <Input name="phone" type="tel" placeholder="Telefon" defaultValue={contact?.phone ?? ""} disabled={disabled} />
@@ -1376,7 +1380,7 @@ export default function ContactsSection({ customerId, canEdit, contacts }: Props
 In `app/(app)/customers/[id]/page.tsx`:
 
 1. Import ergänzen: `import ContactsSection from "../ContactsSection";`
-2. In `Promise.all` am Ende (nach `prisma.invoiceTemplate.findMany(…)`) ergänzen: `prisma.customerContact.findMany({ where: { customerId }, orderBy: { createdAt: "asc" } }),` und die Destrukturierung um `contacts` erweitern: `…, subscriptions, templates, contacts] =await Promise.all([`.
+2. In `Promise.all` am Ende (nach `prisma.invoiceTemplate.findMany(…)`) ergänzen: `prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),` und die Destrukturierung um `contacts` erweitern: `…, subscriptions, templates, contacts] =await Promise.all([`.
 3. Im rechten `<div className="space-y-6">` vor `<SubscriptionsSection …>` einfügen:
 
 ```tsx
@@ -1414,7 +1418,8 @@ git commit -m "feat(customers): add additional contacts card"
 - Modify: `lib/pdf/qrbill-helpers.ts` (Typ `QrBillInput.customer`, Debtor)
 - Modify: `lib/receivables.ts` (`ReceivableInput.customer`, `customerAddress`)
 - Modify: `lib/email.ts` (Empfänger in `sendInvoiceEmail`), `lib/subscriptions.ts` (`to` des `PendingEmail`), `app/(app)/invoices/[id]/page.tsx` und `app/(app)/invoices/reminders/page.tsx` (vorbelegte Empfängeradresse im Versanddialog)
-- Test: `tests/unit/qrbill-data.test.ts`, `tests/unit/document-pdf-generation.test.ts`, `tests/unit/reminder-pdf.test.ts`, `tests/unit/receivables.test.ts`, `tests/unit/email-send.test.ts`
+- Modify: `app/api/settings/pdf-preview/route.ts` (`SAMPLE_CUSTOMER` bekommt `customerNumber: 1001`, damit „Kunden-Nr.“ in der Layout-Vorschau erscheint)
+- Test: `tests/unit/qrbill-data.test.ts`, `tests/unit/document-pdf-generation.test.ts`, `tests/unit/reminder-pdf.test.ts`, `tests/unit/receivables.test.ts`, `tests/integration/receivables.test.ts`, `tests/unit/email-send.test.ts`
 
 **Interfaces:**
 - Consumes: `billingRecipient`, `customerRecipient`, `hasBillingAddress`, `billingEmail`, `AddressCustomer`, `BillingFields` (Task 1).
@@ -1540,7 +1545,7 @@ und im `describe("sendQuoteEmail", …)`:
 
 (Falls es in der Datei kein `describe("sendQuoteEmail", …)` gibt, den Test in ein neues `describe` am Ende des äusseren `describe("email.ts", …)` setzen.)
 
-**d) `tests/unit/document-pdf-generation.test.ts`:** am Ende des ersten `describe` (nach dem Test „adds no QR page for a quote“) anfügen; `baseDoc` und `extractText` existieren bereits in der Datei:
+**d) `tests/unit/document-pdf-generation.test.ts`:** direkt nach dem Test „adds no QR page for a quote“ (innerhalb des ersten `describe`, die Datei hat dahinter noch weitere Tests) anfügen; `baseDoc` und `extractText` existieren bereits in der Datei:
 
 ```ts
   const extended = {
@@ -1618,7 +1623,8 @@ und im `describe("sendQuoteEmail", …)`:
     expect(pageText[0]).toContain("3000 Bern");
     expect(pageText[0]).toContain("UID: CHE-116.281.710");
     expect(pageText[0]).toContain("Kunden-Nr.:");
-    expect(pageText[0]).not.toContain("8000 Zürich");
+    // Company header also says "8000 Zürich"; the customer's own street must be gone.
+    expect(pageText[0]).not.toContain("Weg 1");
     // The QR slip (page 2) names the same debtor.
     expect(pageText[1]).toContain("Muster AG, Buchhaltung");
     expect(pageText[1]).toContain("Postfach");
@@ -1636,7 +1642,7 @@ Import oben ergänzen: `import { billingRecipient, type AddressCustomer } from "
 
 Im Typ `QrBillInput` den Block `customer: { … };` ersetzen durch `customer: AddressCustomer;`.
 
-In `buildQrBillData` die Zeilen `const debtorName = …;` (3 Zeilen) ersetzen durch `const debtor = billingRecipient(customer);` und den `debtor`-Block im Rückgabeobjekt ersetzen durch:
+In `buildQrBillData` die Zeilen `const debtorName = …;` (4 Zeilen, ab `const debtorName =` bis zum Semikolon) ersetzen durch `const debtor = billingRecipient(customer);` und den `debtor`-Block im Rückgabeobjekt ersetzen durch:
 
 ```ts
     debtor: {
@@ -1693,8 +1699,10 @@ Direkt nach `const detailRows: string[][] = [ … ];` (nach dem `["Datum:", …]
 
 - [ ] **Step 5: PDF manuell prüfen**
 
+Vorher in `app/api/settings/pdf-preview/route.ts` im `SAMPLE_CUSTOMER` die Zeile `customerNumber: 1001,` ergänzen.
+
 Run: `npx vitest run tests/unit/document-pdf-generation.test.ts`
-Expected: PASS. Danach in der laufenden App (`npm run dev`) einen Kunden mit Rechnungsadresse, UID und Kundennummer anlegen, eine Entwurfsrechnung öffnen (`/api/invoices/<id>/pdf`) und prüfen: Empfängerblock zeigt Rechnungsadresse und „UID: …“, „Kunden-Nr.:“ steht im Kopf, die QR-Seite nennt dieselbe Adresse als Zahlungspflichtigen; eine Offerte desselben Kunden zeigt die Kundenadresse ohne UID; die Mahnbeleg-Vorschau (`/api/reminders/<id>/pdf` einer überfälligen Rechnung) zeigt wie die Rechnung die Rechnungsadresse.
+Expected: PASS. Achtung: Die PDF-Route cached gerenderte Dokumente bis zu 10 Minuten, und der Cache-Key (`inv-<id>-v<version>-n<nummer>-t<theme>`) enthält keine Kundendaten. Nach dem Ändern des Kunden deshalb eine **neue** Entwurfsrechnung verwenden oder das Cache-Verzeichnis leeren (bestehendes Verhalten, kein Teil von F10; versendete PDFs werden immer frisch gerendert und archiviert). Danach in der laufenden App (`npm run dev`) einen Kunden mit Rechnungsadresse, UID und Kundennummer anlegen, eine Entwurfsrechnung öffnen (`/api/invoices/<id>/pdf`) und prüfen: Empfängerblock zeigt Rechnungsadresse und „UID: …“, „Kunden-Nr.:“ steht im Kopf, die QR-Seite nennt dieselbe Adresse als Zahlungspflichtigen; eine Offerte desselben Kunden zeigt die Kundenadresse ohne UID; die Mahnbeleg-Vorschau (`/api/reminders/<id>/pdf` einer überfälligen Rechnung) zeigt wie die Rechnung die Rechnungsadresse.
 
 - [ ] **Step 6: `receivables.ts` anpassen**
 
@@ -1720,7 +1728,55 @@ Den `customerAddress`-Block ersetzen durch:
           },
 ```
 
+Zusätzlich lädt `fetchReceivables` (`lib/receivables.ts`) die Kundenfelder per expliziten `select`; ohne die Billing-Felder greift in der OP-Liste, im CSV und im Jahrespaket (nutzt `fetchReceivables`) immer die Kundenadresse. Im `customer: { select: { … } }` nach `country: true,` einfügen:
+
+```ts
+          billingStreet: true,
+          billingHouseNumber: true,
+          billingZipCode: true,
+          billingCity: true,
+          billingCountry: true,
+```
+
+Und in `tests/integration/receivables.test.ts` (Import und `createTestDatabase` sind vorhanden) im `describe` anfügen:
+
+```ts
+  it("carries the billing address of the customer into the report", async () => {
+    const { prisma } = db;
+    const customer = await prisma.customer.create({
+      data: {
+        ...createValidTestCustomer(),
+        billingStreet: "Postfach",
+        billingHouseNumber: "7",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+      },
+    });
+    await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-9",
+        date: new Date("2026-01-10"),
+        dueDate: new Date("2026-02-10"),
+        totalAmount: 100,
+        state: "Sent",
+      },
+    });
+
+    const report = await fetchReceivables(prisma, new Date("2026-12-31"));
+    expect(report.rows[0].customerAddress).toEqual({
+      street: "Postfach 7",
+      zip: "3000",
+      city: "Bern",
+      country: "CH",
+    });
+  });
+```
+
 - [ ] **Step 7: Mailempfänger anpassen**
+
+**Wirksame Stellen:** Alle echten Versandpfade (`lib/document-actions.ts`, `lib/pending-email-send.ts`, `reminders/actions.ts` über `renderArchiveAndSend`) übergeben `to` explizit; die Rückfallebene in `sendInvoiceEmail` ist nur Absicherung. Praktisch wirken die Vorbelegungen in den Seiten und die Abo-Mail. Die Seiten-Vorbelegungen sind nicht automatisiert getestet und werden deshalb in Step 8b manuell geprüft.
 
 - `lib/email.ts`: Import `import { billingEmail } from "@/lib/customer-billing";` und in `sendInvoiceEmail` die Zeile `const to = overrides?.to ?? invoice.customer.email;` → `const to = overrides?.to ?? billingEmail(invoice.customer);`. Die Zeile für Offerten (`quote.customer.email`) bleibt unverändert.
 - `lib/subscriptions.ts`: Import ergänzen und `to: sub.customer.email,` → `to: billingEmail(sub.customer),`.
@@ -1732,9 +1788,13 @@ Den `customerAddress`-Block ersetzen durch:
 Run: `npx tsc --noEmit; npx vitest run tests/unit tests/integration/subscriptions.test.ts tests/integration/subscriptions-send-e2e.test.ts tests/integration/receivables.test.ts`
 Expected: PASS. Schlägt ein Subscription-Test fehl, weil er `to` des `PendingEmail` prüft, ist das erwartete Verhalten nur dann falsch, wenn der Test Billing-Daten setzt; sonst Implementierung prüfen.
 
+- [ ] **Step 8b: Versanddialoge manuell prüfen**
+
+Kunden mit Rechnungs-E-Mail anlegen, eine Rechnung versenden-Dialog öffnen (`/invoices/<id>`) und die Mahnliste (`/invoices/reminders`) mit einer überfälligen Rechnung dieses Kunden öffnen: das Empfängerfeld ist mit der Rechnungs-E-Mail vorbelegt; beim Offerten-Versanddialog (`/quotes/<id>`) mit der normalen Kunden-E-Mail.
+
 - [ ] **Step 9: Integrationstest für Abo mit Rechnungs-E-Mail**
 
-In `tests/integration/subscriptions.test.ts` den Helfer `seedSubscription` um eine Kunden-Überschreibung erweitern: den Typ von `overrides` um `customer: Record<string, unknown>` ergänzen und im `customer.create`-Aufruf nach `archivedAt: …` die Zeile `...overrides.customer,` einfügen. Dann nach dem Test „creates an empty draft when the subscription has no template“ anfügen:
+In `tests/integration/subscriptions.test.ts` den Helfer `seedSubscription` um eine Kunden-Überschreibung erweitern: den Typ von `overrides` um `customer: Partial<Prisma.CustomerUncheckedCreateInput>` ergänzen (`import type { Prisma } from "@prisma/client";` oben ergänzen) und im `customer.create`-Aufruf nach `archivedAt: …` die Zeile `...overrides.customer,` einfügen. Dann nach dem Test „creates an empty draft when the subscription has no template“ anfügen:
 
 ```ts
   it("sends to the billing e-mail when the customer has one", async () => {
@@ -1810,7 +1870,9 @@ git commit -m "feat(invoices): send invoices to the billing address and e-mail"
 
 ```ts
   it("uses the customer's payment term for the invoice due date", async () => {
-    await db.prisma.applicationSettings.create({ data: { defaultPaymentTermDays: 30 } });
+    await db.prisma.applicationSettings.create({
+      data: { defaultPaymentTermDays: 30, companyInfo: { create: {} } },
+    });
     await seedSubscription({ customer: { paymentTermDays: 14 } });
     await checkSubscriptions(db.prisma);
     const [invoice] = await db.prisma.invoice.findMany();
@@ -1819,7 +1881,7 @@ git commit -m "feat(invoices): send invoices to the billing address and e-mail"
   });
 ```
 
-Falls `applicationSettings.create` weitere Pflichtfelder verlangt, die Einstellungen so anlegen, wie es andere Tests in `tests/integration/` tun (`grep -rn "applicationSettings.create" tests/integration`); `checkSubscriptions` liest die Einstellungen mit `findFirst` samt `companyInfo` (siehe `lib/subscriptions.ts`), ohne Einstellungen gilt die Frist 30.
+`ApplicationSettings` braucht eine `companyInfo`-Relation (Muster: `tests/integration/pending-email-send.test.ts`); `checkSubscriptions` liest die Einstellungen mit `findFirst` samt `companyInfo`. Ohne Einstellungen gilt als Frist 30, deshalb prüft der Test mit `defaultPaymentTermDays: 30` und Kundenfrist 14 wirklich den Vorrang der Kundenfrist.
 
 - [ ] **Step 2: Tests laufen lassen, Fehlschlag prüfen**
 
@@ -2007,7 +2069,7 @@ Expected: FAIL (neue/angepasste Tests).
 
 und im Kunden-`where.OR` (neben `{ city: { contains: q } }`) `...numberMatch,` ergänzen.
 
-`app/(app)/customers/page.tsx`: Im `where`-Objekt nach `{ city: { contains: term } },` ergänzen: `...(/^\d{1,9}$/.test(term) ? [{ customerNumber: Number(term) }] : []),`. In der Tabelle: vor `<TableHead>` für „Firma / Kontakt“ eine `<TableHead>Kunden-Nr.</TableHead>` einfügen (ohne Sortierung) und in der Zeile vor der ersten `<TableCell>` `<TableCell>{c.customerNumber ?? "—"}</TableCell>`; `colSpan` der Leer-Zeile um 1 erhöhen.
+`app/(app)/customers/page.tsx`: Im `where`-Objekt nach `{ city: { contains: term } },` ergänzen: `...(/^\d{1,9}$/.test(term) ? [{ customerNumber: Number(term) }] : []),`. In der Tabelle: vor `<TableHead>` für „Firma / Kontakt“ eine `<TableHead>Kunden-Nr.</TableHead>` einfügen (ohne Sortierung) und in der Zeile vor der ersten `<TableCell>` `<TableCell>{c.customerNumber ?? "—"}</TableCell>`; `colSpan` der Leer-Zeile um 1 erhöhen. Auch `CustomersTableSkeleton` (weiter unten in derselben Datei) bekommt `<TableHead>Kunden-Nr.</TableHead>` vor „Firma / Kontakt“ und `<TableSkeleton columns={6} />`; der Platzhalter der `SearchInput` wird zu `"Firma, Kontakt, Ort oder Kunden-Nr. suchen…"`.
 
 - [ ] **Step 4: Export erweitern**
 
@@ -2018,7 +2080,7 @@ und im Kunden-`where.OR` (neben `{ city: { contains: q } }`) `...numberMatch,` e
     orderBy: { contactPerson: "asc" },
     include: {
       subscriptions: { where: { active: true }, select: { interval: true } },
-      contacts: { orderBy: { createdAt: "asc" } },
+      contacts: { orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] },
     },
   });
 
@@ -2170,6 +2232,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                   <Input
                     id="billingName"
                     name="billingName"
+                    maxLength={70}
                     defaultValue={customer?.billingName ?? ""}
                     placeholder="Firma AG, Kreditorenbuchhaltung"
                   />
@@ -2256,6 +2319,8 @@ In `app/(app)/customers/CustomerForm.tsx`:
             </details>
 ```
 
+Bekannte Einschränkung (bestehendes Verhalten, nicht Teil von F10): React 19 setzt ein `<form action>` nach jedem aufgelösten Action-Lauf zurück, auch wenn dieser `fieldErrors` liefert. Nach einem Validierungsfehler im Formular sind die eingegebenen Werte deshalb weg, der Abschnitt „Weitere Angaben“ bleibt aber offen und zeigt die Fehlermeldung. Wer das beheben will, gibt die Eingaben im `CustomerFormState` zurück und nutzt sie als `defaultValue` (eigener Schritt).
+
 Hinweis: Das Land-Select sendet immer einen Wert („CH“); ohne Strasse/PLZ/Ort verwirft `customerData` (Task 3) Land und Name, ein leerer Abschnitt bleibt also folgenlos.
 
 - [ ] **Step 7: Typen, Lint, Tests**
@@ -2290,7 +2355,7 @@ git commit -m "feat(customers): extended customer form, list search and export"
 
 In `prisma/seed.ts` bei `prisma.customer.create` (Zeile ~131) das `data`-Objekt um `customerNumber: 1001 + index` erweitern (die Schleifenvariable der Kunden verwenden; gibt es keinen Index, einen Zähler vor der Schleife anlegen). Für die ersten zwei Kunden zusätzlich Beispielwerte: `uid: "CHE-116.281.710"`, `paymentTermDays: 10`, Rechnungsadresse und `billingEmail`, sowie einen Kontakt via `contacts: { create: [{ name: "Buchhaltung", role: "Buchhaltung", email: "buchhaltung@example.ch" }] }`.
 
-Run: `npm run db:seed` gegen eine frische lokale DB (`npx prisma migrate reset --force` setzt sie zurück; nur lokal).
+Run: `npm run db:seed` gegen eine frische lokale DB (`npx prisma migrate reset --force` setzt sie zurück, nur lokal; als Agent zusätzlich `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=yes` setzen, siehe `tests/test-utils.ts`).
 Expected: läuft ohne Fehler durch.
 
 - [ ] **Step 2: `CLAUDE.md` ergänzen**
