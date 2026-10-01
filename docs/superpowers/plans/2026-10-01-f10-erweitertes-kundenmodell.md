@@ -14,8 +14,8 @@
 
 - UI-Texte, Fehlermeldungen und Doku sind **auf Deutsch**; Commit-Messages **auf Englisch** (Conventional Commits, z. B. `feat(customers): …`), mit der Zeile `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` am Ende.
 - Alle neuen `Customer`-Spalten sind optional; ohne Eingabe bleibt das Verhalten unverändert (Rechnung an Kundenadresse und `customer.email`, globale Zahlungsfrist).
-- Angebote gehen immer an die Kundenadresse und `customer.email` (nie an die Rechnungsadresse/-E-Mail), zeigen keine UID, aber „Kunden-Nr.“.
-- Keine neue Migration: SQL wird ans **Ende** von `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` angehängt (die Migration steckt in keinem Release-Tag). Lokale Dev-DBs müssen danach zurückgesetzt werden.
+- Angebote gehen immer an die Kundenadresse und `customer.email` (nie an die Rechnungsadresse/-E-Mail), zeigen keine UID, aber „Kunden-Nr.“. Rechnungen, Gutschriften und Mahnbelege (`RenderDoc.kind` `"invoice"` und `"reminder"`, seit F8 in `lib/pdf/reminder-pdf.ts`) verwenden `billingRecipient`; nur `kind === "quote"` verwendet `customerRecipient`.
+- Keine neue Migration: SQL wird ans **Ende** von `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` angehängt (die Migration steckt in keinem Release-Tag; F8 hat dort bereits den Block „F8: dunning fees, interest …“ angehängt, der F10-Block kommt dahinter). Lokale Dev-DBs müssen danach zurückgesetzt werden.
 - Nie `logAudit`/`logAuditEntry` innerhalb eines `$transaction`-Callbacks aufrufen; nie direkt `prisma.auditLog.create`.
 - Prisma-Schema ist die einzige Quelle für das Datenmodell; Tests bauen die DB per `prisma db push` aus dem Schema (`tests/test-utils.ts`).
 - Next.js 16: vor Änderungen an Routing/Data-Fetching `node_modules/next/dist/docs/` prüfen (hier nur Server Actions und Server-Komponenten nach bestehendem Muster).
@@ -33,7 +33,7 @@
 | `app/(app)/customers/contact-actions.ts` (neu) | CRUD für `CustomerContact` |
 | `app/(app)/customers/ContactsSection.tsx` (neu) | UI-Karte „Kontakte“ |
 | `app/(app)/customers/CustomerForm.tsx`, `customers/[id]/page.tsx`, `customers/page.tsx` | Formular, Detailseite, Liste |
-| `lib/pdf/document-pdf.ts`, `lib/pdf/qrbill-helpers.ts`, `lib/receivables.ts` | Empfänger/Zahlungspflichtiger aus `billingRecipient` |
+| `lib/pdf/document-pdf.ts`, `lib/pdf/qrbill-helpers.ts`, `lib/receivables.ts` | Empfänger/Zahlungspflichtiger aus `billingRecipient` (Rechnung, Gutschrift und Mahnbeleg; `lib/pdf/reminder-pdf.ts` braucht keine Änderung, es reicht `invoice.customer` an `RenderDoc` und `buildQrBillData` durch) |
 | `lib/email.ts`, `lib/subscriptions.ts`, `invoices/[id]/page.tsx`, `invoices/reminders/page.tsx` | Rechnungs-E-Mail |
 | `app/(app)/quotes/actions.ts`, `invoices/InvoiceForm.tsx`, `components/customer-combobox.tsx` | kundenspezifische Zahlungsfrist |
 | `lib/search.ts`, `app/api/export/customers/route.ts` | Suche nach Kundennummer, Export-Spalten |
@@ -1413,8 +1413,8 @@ git commit -m "feat(customers): add additional contacts card"
 - Modify: `lib/pdf/document-pdf.ts` (Typ `RenderDoc.customer`, Empfängerblock, Kopfzeilen)
 - Modify: `lib/pdf/qrbill-helpers.ts` (Typ `QrBillInput.customer`, Debtor)
 - Modify: `lib/receivables.ts` (`ReceivableInput.customer`, `customerAddress`)
-- Modify: `lib/email.ts:78`, `lib/subscriptions.ts:145`, `app/(app)/invoices/[id]/page.tsx:399`, `app/(app)/invoices/reminders/page.tsx:108`
-- Test: `tests/unit/qrbill-data.test.ts`, `tests/unit/document-pdf-generation.test.ts`, `tests/unit/receivables.test.ts`, `tests/unit/email-send.test.ts`
+- Modify: `lib/email.ts` (Empfänger in `sendInvoiceEmail`), `lib/subscriptions.ts` (`to` des `PendingEmail`), `app/(app)/invoices/[id]/page.tsx` und `app/(app)/invoices/reminders/page.tsx` (vorbelegte Empfängeradresse im Versanddialog)
+- Test: `tests/unit/qrbill-data.test.ts`, `tests/unit/document-pdf-generation.test.ts`, `tests/unit/reminder-pdf.test.ts`, `tests/unit/receivables.test.ts`, `tests/unit/email-send.test.ts`
 
 **Interfaces:**
 - Consumes: `billingRecipient`, `customerRecipient`, `hasBillingAddress`, `billingEmail`, `AddressCustomer`, `BillingFields` (Task 1).
@@ -1596,6 +1596,35 @@ und im `describe("sendQuoteEmail", …)`:
   });
 ```
 
+**e) `tests/unit/reminder-pdf.test.ts`:** im `describe("generateReminderPdf", …)` anfügen (`invoice`, `settings`, `charges` und `extractText` existieren in der Datei):
+
+```ts
+  it("addresses the notice to the billing address with UID and shows the QR debtor", async () => {
+    const withBilling = {
+      ...(invoice as object),
+      customer: {
+        ...customer,
+        customerNumber: 1042,
+        uid: "CHE-116.281.710",
+        billingName: "Muster AG, Buchhaltung",
+        billingStreet: "Postfach",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+      },
+    } as never;
+    const { pageText } = await extractText(await generateReminderPdf(withBilling, settings, charges(2)));
+    expect(pageText[0]).toContain("Muster AG, Buchhaltung");
+    expect(pageText[0]).toContain("3000 Bern");
+    expect(pageText[0]).toContain("UID: CHE-116.281.710");
+    expect(pageText[0]).toContain("Kunden-Nr.:");
+    expect(pageText[0]).not.toContain("8000 Zürich");
+    // The QR slip (page 2) names the same debtor.
+    expect(pageText[1]).toContain("Muster AG, Buchhaltung");
+    expect(pageText[1]).toContain("Postfach");
+  });
+```
+
 - [ ] **Step 2: Tests laufen lassen, Fehlschlag prüfen**
 
 Run: `npx vitest run tests/unit/qrbill-data.test.ts tests/unit/receivables.test.ts tests/unit/email-send.test.ts`
@@ -1644,8 +1673,8 @@ Im Typ `RenderDoc` den `customer: Pick<Customer, …>` erweitern zu:
 Den Abschnitt „Customer address“ (ab `const displayName = …` bis zum `addrLines`-Array) ersetzen durch:
 
 ```ts
-    // Invoices and reminders go to the billing address; quotes always to the customer.
-    const recipient = doc.kind === "invoice" ? billingRecipient(customer) : customerRecipient(customer);
+    // Invoices, credit notes and reminders go to the billing address; quotes always to the customer.
+    const recipient = doc.kind === "quote" ? customerRecipient(customer) : billingRecipient(customer);
     const addrLines = [
       recipient.name,
       recipient.contactLine,
@@ -1665,7 +1694,7 @@ Direkt nach `const detailRows: string[][] = [ … ];` (nach dem `["Datum:", …]
 - [ ] **Step 5: PDF manuell prüfen**
 
 Run: `npx vitest run tests/unit/document-pdf-generation.test.ts`
-Expected: PASS. Danach in der laufenden App (`npm run dev`) einen Kunden mit Rechnungsadresse, UID und Kundennummer anlegen, eine Entwurfsrechnung öffnen (`/api/invoices/<id>/pdf`) und prüfen: Empfängerblock zeigt Rechnungsadresse und „UID: …“, „Kunden-Nr.:“ steht im Kopf, die QR-Seite nennt dieselbe Adresse als Zahlungspflichtigen; eine Offerte desselben Kunden zeigt die Kundenadresse ohne UID.
+Expected: PASS. Danach in der laufenden App (`npm run dev`) einen Kunden mit Rechnungsadresse, UID und Kundennummer anlegen, eine Entwurfsrechnung öffnen (`/api/invoices/<id>/pdf`) und prüfen: Empfängerblock zeigt Rechnungsadresse und „UID: …“, „Kunden-Nr.:“ steht im Kopf, die QR-Seite nennt dieselbe Adresse als Zahlungspflichtigen; eine Offerte desselben Kunden zeigt die Kundenadresse ohne UID; die Mahnbeleg-Vorschau (`/api/reminders/<id>/pdf` einer überfälligen Rechnung) zeigt wie die Rechnung die Rechnungsadresse.
 
 - [ ] **Step 6: `receivables.ts` anpassen**
 
@@ -1693,10 +1722,10 @@ Den `customerAddress`-Block ersetzen durch:
 
 - [ ] **Step 7: Mailempfänger anpassen**
 
-- `lib/email.ts`: Import `import { billingEmail } from "@/lib/customer-billing";` und Zeile 78 `const to = overrides?.to ?? invoice.customer.email;` → `const to = overrides?.to ?? billingEmail(invoice.customer);`. Die Zeile für Offerten (`quote.customer.email`) bleibt unverändert.
+- `lib/email.ts`: Import `import { billingEmail } from "@/lib/customer-billing";` und in `sendInvoiceEmail` die Zeile `const to = overrides?.to ?? invoice.customer.email;` → `const to = overrides?.to ?? billingEmail(invoice.customer);`. Die Zeile für Offerten (`quote.customer.email`) bleibt unverändert.
 - `lib/subscriptions.ts`: Import ergänzen und `to: sub.customer.email,` → `to: billingEmail(sub.customer),`.
-- `app/(app)/invoices/[id]/page.tsx:399`: `customerEmail={invoice.customer.email}` → `customerEmail={billingEmail(invoice.customer)}` plus Import.
-- `app/(app)/invoices/reminders/page.tsx:108`: `customerEmail={c.email}` → `customerEmail={billingEmail(c)}` plus Import (`c` ist dort der Kunde der Rechnung, bei Typfehlern `inv.customer` verwenden).
+- `app/(app)/invoices/[id]/page.tsx`: `customerEmail={invoice.customer.email}` → `customerEmail={billingEmail(invoice.customer)}` plus Import.
+- `app/(app)/invoices/reminders/page.tsx`: `customerEmail={c.email}` → `customerEmail={billingEmail(c)}` plus Import (`c` ist dort `inv.customer`). Der Versand selbst (`sendReminder` in `app/(app)/invoices/reminders/actions.ts`) nimmt die Adresse aus dem Formularfeld `to` und braucht keine Änderung.
 
 - [ ] **Step 8: Tests und Typen prüfen**
 
