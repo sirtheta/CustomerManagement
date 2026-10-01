@@ -62,13 +62,22 @@ export default function ReminderRow(props: Props) {
               </p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link href={`/invoices/${props.invoiceId}`} />}
-          >
-            Rechnung anzeigen
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={`/api/reminders/${props.reminderId}/pdf`} target="_blank" rel="noopener noreferrer" />}
+            >
+              Mahnbeleg-Vorschau
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/invoices/${props.invoiceId}`} />}
+            >
+              Rechnung anzeigen
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

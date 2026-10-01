@@ -72,6 +72,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         sentDocuments: { orderBy: { createdAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
         creditNoteFor: { select: { id: true, documentNumber: true } },
+        pendingReminder: { select: { reminderLevel: true, snoozedUntil: true } },
         creditNotes: {
           where: { state: { not: "Draft" } },
           orderBy: { date: "asc" },
@@ -403,6 +404,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             defaultBody={defaultBody}
             isCreditNote={isCreditNote}
           />
+          {canEdit && invoice.pendingReminder && (
+            <Button
+              variant="outline"
+              render={<Link href={`/invoices/reminders?search=${encodeURIComponent(invoice.documentNumber ?? "")}`} />}
+            >
+              {reminderTitle(invoice.pendingReminder.reminderLevel)} senden
+            </Button>
+          )}
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
             <CreateCreditNoteButton invoiceId={invoice.id} />
           )}
