@@ -30,6 +30,7 @@ vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
 }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn(), generateQuotePdf: vi.fn() }));
+vi.mock("@/lib/pdf/reminder-pdf", () => ({ generateReminderPdf: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn(), sendQuoteEmail: vi.fn() }));
 
 import { sendDocument } from "@/lib/document-actions";
@@ -37,6 +38,7 @@ import { approvePendingEmail } from "@/app/(app)/invoices/pending/actions";
 import { sendReminder } from "@/app/(app)/invoices/reminders/actions";
 import { verifyArchived, sha256Hex } from "@/lib/document-archive";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
+import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 
 const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Editor" } } as never;
@@ -57,6 +59,7 @@ describe("invoice send paths with real archive and database", () => {
     holder.prisma = db.prisma;
     vi.clearAllMocks();
     vi.mocked(generateInvoicePdf).mockResolvedValue(pdf);
+    vi.mocked(generateReminderPdf).mockResolvedValue(pdf);
     vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
     dir = mkdtempSync(join(tmpdir(), "dispatch-test-"));
     process.env.ARCHIVE_DIR = dir;
@@ -134,6 +137,53 @@ describe("invoice send paths with real archive and database", () => {
     const row = await expectArchivedAndAttached("Reminder");
     expect(row.reminderLevel).toBe(2);
     expect((await db.prisma.pendingReminder.findUniqueOrThrow({ where: { id: reminder.id } })).reminderLevel).toBe(3);
+    expect(row.openRappen).toBe(10000);
+    expect(row.feeRappen).toBe(0);
+    expect(row.interestRappen).toBe(0);
+    expect(row.dunningDate).not.toBeNull();
+    expect(generateInvoicePdf).not.toHaveBeenCalled();
+  });
+
+  it("sendReminder stores fee and interest on the SentDocument", async () => {
+    await db.prisma.applicationSettings.updateMany({
+      data: { reminderFeeLevel2Rappen: 1000, reminderInterestPercent: 5 },
+    });
+    const invoice = await seedInvoice();
+    await db.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { dueDate: new Date(Date.now() - 73 * 86_400_000), totalAmount: 1000 },
+    });
+    const reminder = await db.prisma.pendingReminder.create({ data: { invoiceId: invoice.id, reminderLevel: 2 } });
+
+    const result = await sendReminder({}, form({ reminderId: String(reminder.id), to: "a@b.ch", subject: "M", body: "T" }));
+
+    expect(result.success).toBe(true);
+    const row = await db.prisma.sentDocument.findFirstOrThrow();
+    expect(row.openRappen).toBe(100000);
+    expect(row.feeRappen).toBe(1000);
+    expect(row.interestRappen).toBeGreaterThan(900); // 5 % x 73 Tage, +-1 Tag je nach Uhrzeit
+    expect(row.interestRappen).toBeLessThan(1100);
+    expect(Number(row.interestPercent)).toBe(5);
+  });
+
+  it("sendReminder stops after the last level and keeps level 4", async () => {
+    const invoice = await seedInvoice();
+    const reminder = await db.prisma.pendingReminder.create({ data: { invoiceId: invoice.id, reminderLevel: 4 } });
+
+    const first = await sendReminder({}, form({ reminderId: String(reminder.id), to: "a@b.ch", subject: "M", body: "T" }));
+    expect(first.success).toBe(true);
+    expect((await db.prisma.pendingReminder.findUniqueOrThrow({ where: { id: reminder.id } })).reminderLevel).toBe(4);
+
+    const second = await sendReminder({}, form({ reminderId: String(reminder.id), to: "a@b.ch", subject: "M", body: "T" }));
+    expect(second.error).toBe("Die letzte Mahnstufe wurde bereits versendet.");
+    expect(await db.prisma.sentDocument.count()).toBe(1);
+  });
+
+  it("sendReminder names the attachment after the level", async () => {
+    const invoice = await seedInvoice();
+    const reminder = await db.prisma.pendingReminder.create({ data: { invoiceId: invoice.id, reminderLevel: 2 } });
+    await sendReminder({}, form({ reminderId: String(reminder.id), to: "a@b.ch", subject: "M", body: "T" }));
+    expect(vi.mocked(sendInvoiceEmail).mock.calls[0][3]).toMatchObject({ attachmentName: "mahnung-I-26090001-stufe2.pdf" });
   });
 
   it("sendDocument sends nothing and changes nothing when the archive is not writable", async () => {

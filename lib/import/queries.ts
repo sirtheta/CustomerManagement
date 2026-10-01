@@ -27,6 +27,12 @@ export async function loadOpenInvoices(
       customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
       payments: { select: { amount: true } },
       creditNotes: { where: { state: { not: "Draft" } }, select: { totalAmount: true } },
+      sentDocuments: {
+        where: { kind: "Reminder" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { openRappen: true, feeRappen: true, interestRappen: true },
+      },
     },
   });
 
@@ -40,10 +46,19 @@ export async function loadOpenInvoices(
         invoice.customer.company ?? "",
         invoice.customer.contactPerson ?? "",
       ].filter((name, index, all) => name && all.indexOf(name) === index);
+      const openRappen = Math.max(toRappen(invoice.totalAmount) - creditedRappen - paidRappen, 0);
+      const lastReminder = invoice.sentDocuments[0];
+      // Only a notice written for the current remainder counts; after a partial payment
+      // or a credit note the old total would no longer be what the customer owes.
+      const reminderRappen =
+        lastReminder && lastReminder.openRappen === openRappen
+          ? openRappen + (lastReminder.feeRappen ?? 0) + (lastReminder.interestRappen ?? 0)
+          : 0;
       return {
         id: invoice.id,
         documentNumber: invoice.documentNumber,
-        openAmount: Math.max(toRappen(invoice.totalAmount) - creditedRappen - paidRappen, 0) / 100,
+        openAmount: openRappen / 100,
+        ...(reminderRappen > openRappen ? { reminderTotal: reminderRappen / 100 } : {}),
         customerNames: names,
       };
     });

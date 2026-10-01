@@ -99,6 +99,12 @@ model SentDocument {
   subject        String
   createdAt      DateTime @default(now())
   createdById    Int
+  // Reminder only (kind = "Reminder"): the amounts printed on the Mahnbeleg.
+  openRappen     Int?
+  feeRappen      Int?
+  interestRappen Int?
+  interestPercent Decimal?
+  dunningDate    DateTime?
   invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
 
   @@index([invoiceId])
@@ -325,6 +331,10 @@ model ApplicationSettings {
   emailSubjectTemplate     String?
   emailBodyTemplate        String?
   reminderCooldownDays     Int                @default(14)
+  reminderFeeLevel2Rappen  Int                @default(0)
+  reminderFeeLevel3Rappen  Int                @default(0)
+  reminderFeeLevel4Rappen  Int                @default(0)
+  reminderInterestPercent  Decimal            @default(0)
   notifyOverdueEnabled     Boolean            @default(false)
   notifyPendingEnabled     Boolean            @default(false)
   notifyEmailAddress       String?

@@ -56,7 +56,7 @@ export async function sendInvoiceEmail(
   invoice: FullInvoice,
   settings: FullSettings,
   pdf: Buffer,
-  overrides?: { to?: string; subject?: string; body?: string }
+  overrides?: { to?: string; subject?: string; body?: string; attachmentName?: string }
 ): Promise<void> {
   const documentNumber = invoice.documentNumber;
   if (!documentNumber) throw new Error("Rechnung hat noch keine Nummer.");
@@ -76,7 +76,8 @@ export async function sendInvoiceEmail(
   const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, documentNumber, settings);
   const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, documentNumber, settings);
   const to = overrides?.to ?? invoice.customer.email;
-  const filename = `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
+  const filename =
+    overrides?.attachmentName ?? `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
 
   await transporter.sendMail({
     from: `"${fromName}" <${fromAddress}>`,

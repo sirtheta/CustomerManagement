@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { checkOverdueInvoices } from "@/lib/reminders";
+import { checkOverdueInvoices, isLastReminderLevelSent } from "@/lib/reminders";
 
 describe("checkOverdueInvoices", () => {
   const db = createTestDatabase();
@@ -222,5 +222,50 @@ describe("snoozedUntil filter logic", () => {
     expect(results.map((r) => r.invoiceId)).toEqual(
       expect.arrayContaining([active.id, expired.id])
     );
+  });
+});
+
+describe("isLastReminderLevelSent", () => {
+  const db = createTestDatabase();
+
+  async function seed() {
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+    return db.prisma.invoice.create({
+      data: {
+        customerId: customer.customerId, documentNumber: "I-26090001", date: new Date(),
+        dueDate: new Date(Date.now() - 5 * 86_400_000), totalAmount: 500, state: "Overdue",
+      },
+    });
+  }
+  function sentLevel4(invoiceId: number, createdAt: Date) {
+    return db.prisma.sentDocument.create({
+      data: {
+        invoiceId, kind: "Reminder", reminderLevel: 4, documentNumber: "I-26090001",
+        path: `2026/x-${createdAt.getTime()}.pdf`, sha256: "a".repeat(64), size: 1,
+        sentTo: "a@b.ch", subject: "M", createdById: 1, createdAt,
+      },
+    });
+  }
+
+  it("is false below level 4 and true above it", async () => {
+    const inv = await seed();
+    const r = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 3 } });
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(false);
+    expect(await isLastReminderLevelSent(db.prisma, { ...r, reminderLevel: 5 })).toBe(true);
+  });
+
+  it("is true once a level-4 notice was sent for this reminder", async () => {
+    const inv = await seed();
+    const r = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(false);
+    await sentLevel4(inv.id, new Date(r.createdAt.getTime() + 1000));
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(true);
+  });
+
+  it("ignores a level-4 notice from before the reminder was recreated", async () => {
+    const inv = await seed();
+    await sentLevel4(inv.id, new Date(Date.now() - 60_000));
+    const fresh = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
+    expect(await isLastReminderLevelSent(db.prisma, fresh)).toBe(false);
   });
 });
