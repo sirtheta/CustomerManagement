@@ -183,7 +183,7 @@ export default function QuoteForm({
               type="number"
               min="0"
               max="100"
-              step="0.01"
+              step="any"
               defaultValue={quote?.discountPercent?.toString() ?? "0"}
               className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             />
