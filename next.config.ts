@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
   // Allow LAN devices (e.g. phone testing over WiFi) to load dev resources.
   // Dev-only setting — has no effect on production builds.
   allowedDevOrigins: ["192.168.1.*"],
+  // Server actions are capped at 1 MB by default; the bank statement upload
+  // allows 10 MB files (MAX_FILE_BYTES), plus multipart overhead.
+  experimental: {
+    serverActions: { bodySizeLimit: "11mb" },
+  },
   // These packages use native bindings or complex require() chains —
   // keep them out of the webpack bundle so Node.js resolves them at runtime.
   serverExternalPackages: [
