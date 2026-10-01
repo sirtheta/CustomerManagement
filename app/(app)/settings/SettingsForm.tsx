@@ -4,6 +4,7 @@ import { useActionState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { saveSettings, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
@@ -119,18 +120,20 @@ export default function SettingsForm(props: Props) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="companyCountry">Land</Label>
-              <select
-                id="companyCountry"
-                name="companyCountry"
-                defaultValue={props.companyCountry}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-              >
-                {CREDITOR_COUNTRIES.map((code) => (
-                  <option key={code} value={code}>
-                    {countryName(code)}
-                  </option>
-                ))}
-              </select>
+              <Select name="companyCountry" defaultValue={props.companyCountry}>
+                <SelectTrigger id="companyCountry" className="w-full">
+                  <SelectValue>
+                    {(value: string | null) => (value ? countryName(value) : "")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {CREDITOR_COUNTRIES.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {countryName(code)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

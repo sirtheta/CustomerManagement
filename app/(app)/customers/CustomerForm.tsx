@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createCustomer, updateCustomer, type CustomerFormState } from "./actions";
 import type { Customer } from "@prisma/client";
@@ -225,21 +226,25 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
 
               <div className="space-y-1.5">
                 <Label htmlFor="country">Land</Label>
-                <select
-                  id="country"
-                  name="country"
-                  defaultValue={customer?.country ?? "CH"}
-                  className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-                >
-                  {Object.entries(COUNTRIES).map(([code, name]) => (
-                    <option key={code} value={code}>
-                      {name}
-                    </option>
-                  ))}
-                  {customer?.country && !(customer.country in COUNTRIES) && (
-                    <option value={customer.country}>{customer.country}</option>
-                  )}
-                </select>
+                <Select name="country" defaultValue={customer?.country ?? "CH"}>
+                  <SelectTrigger id="country" className="w-full">
+                    <SelectValue>
+                      {(value: string | null) =>
+                        value ? ((COUNTRIES as Record<string, string>)[value] ?? value) : ""
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COUNTRIES).map(([code, name]) => (
+                      <SelectItem key={code} value={code}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                    {customer?.country && !(customer.country in COUNTRIES) && (
+                      <SelectItem value={customer.country}>{customer.country}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

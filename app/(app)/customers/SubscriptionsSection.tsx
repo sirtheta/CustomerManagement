@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActionToast } from "@/hooks/use-action-toast";
@@ -34,9 +35,6 @@ type Props = {
   canEdit: boolean;
 };
 
-const selectClass =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm dark:bg-input/30";
-
 type FieldValues = {
   interval: SubscriptionIntervalName;
   nextInvoiceDate: string;
@@ -63,20 +61,27 @@ function SubscriptionFields({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label htmlFor={`${idPrefix}-interval`}>Intervall</Label>
-          <select
-            id={`${idPrefix}-interval`}
+          <Select
             name="interval"
             value={values.interval}
-            onChange={(e) => onChange({ ...values, interval: e.target.value as SubscriptionIntervalName })}
-            className={selectClass}
+            onValueChange={(v) => onChange({ ...values, interval: v as SubscriptionIntervalName })}
             disabled={disabled}
           >
-            {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id={`${idPrefix}-interval`} className="w-full">
+              <SelectValue>
+                {(value: string | null) =>
+                  value ? (INTERVAL_LABELS[value as SubscriptionIntervalName] ?? value) : ""
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <Label htmlFor={`${idPrefix}-date`}>Nächstes Rechnungsdatum</Label>
@@ -91,27 +96,35 @@ function SubscriptionFields({
       </div>
       <div className="space-y-1">
         <Label htmlFor={`${idPrefix}-template`}>Vorlage</Label>
-        <select
-          id={`${idPrefix}-template`}
+        <Select
           name="templateId"
           value={values.templateId}
-          onChange={(e) =>
+          onValueChange={(v) => {
+            const templateId = v ?? "";
             onChange({
               ...values,
-              templateId: e.target.value,
-              autoSend: e.target.value === "" ? false : values.autoSend,
-            })
-          }
-          className={selectClass}
+              templateId,
+              autoSend: templateId === "" ? false : values.autoSend,
+            });
+          }}
           disabled={disabled}
         >
-          <option value="">Keine Vorlage</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id={`${idPrefix}-template`} className="w-full">
+            <SelectValue>
+              {(value: string | null) =>
+                value ? (templates.find((t) => String(t.id) === value)?.name ?? value) : "Keine Vorlage"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Keine Vorlage</SelectItem>
+            {templates.map((t) => (
+              <SelectItem key={t.id} value={String(t.id)}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input
