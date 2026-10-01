@@ -1,4 +1,4 @@
--- Squashed migration for everything added after release 1.5.0:
+-- Schema changes since release 1.5.0, combined into one migration:
 --   structured addresses, nullable document numbers, payments, invoice locking
 --   and credit notes, audit hash chain, sent documents, subscriptions, bank
 --   transactions and expense receipts.
