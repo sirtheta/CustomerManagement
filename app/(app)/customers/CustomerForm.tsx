@@ -1,12 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DatePickerInput } from "@/components/ui/date-picker";
 import { createCustomer, updateCustomer, type CustomerFormState } from "./actions";
 import type { Customer } from "@prisma/client";
 import { ADDRESS_LIMITS, COUNTRIES, countryName, formatCityLine, formatStreetLine } from "@/lib/address";
@@ -51,12 +50,6 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
 
   const fe = state.fieldErrors ?? {};
 
-  const nextInvoiceDateDefault = customer?.nextInvoiceDate
-    ? new Date(customer.nextInvoiceDate).toISOString().split("T")[0]
-    : "";
-  const [yearlyInvoice, setYearlyInvoice] = useState(customer?.yearlyInvoice ?? false);
-  const [nextInvoiceDate, setNextInvoiceDate] = useState(nextInvoiceDateDefault);
-
   if (customer && readOnly) {
     return (
       <Card>
@@ -92,20 +85,6 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               <div>
                 <dt className="text-muted-foreground">Telefon</dt>
                 <dd className="font-medium">{customer.phone}</dd>
-              </div>
-            )}
-            {customer.nextInvoiceDate && (
-              <div>
-                <dt className="text-muted-foreground">Nächstes Rechnungsdatum</dt>
-                <dd className="font-medium">
-                  {new Date(customer.nextInvoiceDate).toLocaleDateString("de-CH")}
-                </dd>
-              </div>
-            )}
-            {customer.yearlyInvoice && (
-              <div>
-                <dt className="text-muted-foreground">Jährliche Rechnung</dt>
-                <dd className="font-medium">Ja</dd>
               </div>
             )}
             {customer.contactInsteadOfCompany && (
@@ -294,33 +273,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="nextInvoiceDate">Nächstes Rechnungsdatum</Label>
-              <DatePickerInput
-                id="nextInvoiceDate"
-                name="nextInvoiceDate"
-                value={nextInvoiceDate}
-                onChange={setNextInvoiceDate}
-                disabled={!yearlyInvoice}
-              />
-            </div>
-
             <div className="flex flex-col gap-3 pt-1">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="yearlyInvoice"
-                  checked={yearlyInvoice}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
-                    setYearlyInvoice(checked);
-                    if (!checked) setNextInvoiceDate("");
-                  }}
-                  className="h-4 w-4 rounded border-input accent-primary"
-                />
-                Jährliche Rechnung
-              </label>
-
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
