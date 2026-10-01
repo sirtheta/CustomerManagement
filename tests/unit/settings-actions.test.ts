@@ -243,6 +243,42 @@ describe("settings actions", () => {
       expect(badRate.error).toBe("Der Verzugszins muss zwischen 0 und 100 % liegen.");
     });
 
+    it("rejects reminder fees above 100000 CHF and non-plain-decimal input", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);
+
+      const tooHigh = await saveSettings({}, form({ reminderFeeLevel2: "100001" }));
+      expect(tooHigh.error).toBe("Ungültiger Betrag.");
+
+      const exponent = await saveSettings({}, form({ reminderFeeLevel2: "1e2" }));
+      expect(exponent.error).toBe("Ungültiger Betrag.");
+
+      const hex = await saveSettings({}, form({ reminderInterestPercent: "0x10" }));
+      expect(hex.error).toBe("Ungültiger Betrag.");
+
+      expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+    });
+
+    it("accepts a reminder fee of exactly 100000 CHF", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      const result = await saveSettings({}, form({ reminderFeeLevel2: "100000" }));
+
+      expect(result.success).toBe(true);
+      expect(prisma.applicationSettings.update).toHaveBeenCalledWith({
+        where: { applicationSettingsId: 1 },
+        data: expect.objectContaining({ reminderFeeLevel2Rappen: 10000000 }),
+      });
+    });
+
     it("creates new settings when none exist", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);

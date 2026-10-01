@@ -18,6 +18,9 @@ import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
 const log = logger.child({ module: "settings" });
 
+const PLAIN_DECIMAL = /^-?\d+([.,]\d+)?$/;
+const MAX_REMINDER_FEE_RAPPEN = 10_000_000; // 100'000 CHF, keeps the value inside a 32-bit Int
+
 export async function saveSettings(
   _prev: ActionState,
   formData: FormData
@@ -81,15 +84,20 @@ export async function saveSettings(
   const quoteValidityDays = parseInt(formData.get("defaultQuoteValidityDays") as string);
   const reminderCooldown = parseInt(formData.get("reminderCooldownDays") as string);
   const feeToRappen = (name: string) => {
-    const raw = (formData.get(name) as string | null)?.trim().replace(",", ".");
-    const value = raw ? Number(raw) : 0;
-    return Number.isFinite(value) ? Math.round(value * 100) : NaN;
+    const raw = (formData.get(name) as string | null)?.trim();
+    if (!raw) return 0;
+    if (!PLAIN_DECIMAL.test(raw)) return NaN;
+    return Math.round(Number(raw.replace(",", ".")) * 100);
   };
   const feeLevel2 = feeToRappen("reminderFeeLevel2");
   const feeLevel3 = feeToRappen("reminderFeeLevel3");
   const feeLevel4 = feeToRappen("reminderFeeLevel4");
-  const interestRaw = (formData.get("reminderInterestPercent") as string | null)?.trim().replace(",", ".");
-  const interestPercent = interestRaw ? Number(interestRaw) : 0;
+  const interestRaw = (formData.get("reminderInterestPercent") as string | null)?.trim();
+  const interestPercent = !interestRaw
+    ? 0
+    : PLAIN_DECIMAL.test(interestRaw)
+      ? Number(interestRaw.replace(",", "."))
+      : NaN;
   const notifyRepeatRaw = (formData.get("notifyRepeatIntervalDays") as string)?.trim();
   const notifyRepeatInterval = notifyRepeatRaw ? parseInt(notifyRepeatRaw) : NaN;
   const smtpPort = smtpPortRaw ? parseInt(smtpPortRaw) : null;
@@ -104,6 +112,9 @@ export async function saveSettings(
   }
   if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => fee < 0)) {
     return { error: "Mahngebühren dürfen nicht negativ sein." };
+  }
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => fee > MAX_REMINDER_FEE_RAPPEN)) {
+    return { error: "Ungültiger Betrag." };
   }
   if (interestPercent < 0 || interestPercent > 100) {
     return { error: "Der Verzugszins muss zwischen 0 und 100 % liegen." };

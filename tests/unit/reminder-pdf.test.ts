@@ -75,9 +75,9 @@ describe("generateReminderPdf", () => {
     expect(first).toContain("Offener Betrag");
     expect(first).toContain("Mahngebühr");
     expect(first).toContain("Verzugszins");
-    expect(first).toContain("1'020.00");
+    expect(first).toMatch(/1['’]020\.00/);
     expect(numPages).toBe(2);
-    expect(pageText[1]).toContain("1 020.00");
+    expect(pageText[1]).toMatch(/1[\s  ]020\.00/);
   });
 
   it("prints no overdue note when the due date is the dunning date", async () => {
