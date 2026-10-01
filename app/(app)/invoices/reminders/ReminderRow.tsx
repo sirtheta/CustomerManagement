@@ -12,11 +12,7 @@ import { SendIcon, Trash2Icon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
 
-const levelLabels: Record<number, string> = {
-  1: "Zahlungserinnerung",
-  2: "1. Mahnung",
-  3: "2. Mahnung",
-};
+import { reminderTitle } from "@/lib/reminder-charges";
 
 type Props = {
   reminderId: number;
@@ -29,6 +25,9 @@ type Props = {
   reminderLevel: number;
   defaultSubject: string;
   defaultBody: string;
+  feeRappen: number;
+  interestRappen: number;
+  lastLevelSent: boolean;
 };
 
 export default function ReminderRow(props: Props) {
@@ -40,7 +39,7 @@ export default function ReminderRow(props: Props) {
 
   useActionToast(state, `Mahnung für ${documentLabel(props.documentNumber)} versendet`);
 
-  const levelLabel = levelLabels[props.reminderLevel] ?? `Mahnung ${props.reminderLevel}`;
+  const levelLabel = reminderTitle(props.reminderLevel);
 
   return (
     <Card>
@@ -56,17 +55,50 @@ export default function ReminderRow(props: Props) {
               <span className="text-destructive font-medium">{props.dueDate}</span> ·{" "}
               {formatCurrency(props.totalAmount)}
             </p>
+            {(props.feeRappen > 0 || props.interestRappen > 0) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                + Mahngebühr {formatCurrency(props.feeRappen / 100)} · Verzugszins{" "}
+                {formatCurrency(props.interestRappen / 100)} (auf dem Beleg)
+              </p>
+            )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            render={<Link href={`/invoices/${props.invoiceId}`} />}
-          >
-            Rechnung anzeigen
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={`/api/reminders/${props.reminderId}/pdf`} target="_blank" rel="noopener noreferrer" />}
+            >
+              Mahnbeleg-Vorschau
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/invoices/${props.invoiceId}`} />}
+            >
+              Rechnung anzeigen
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
+        {props.lastLevelSent ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              Letzte Stufe erreicht. Weitere Schritte (z. B. Betreibung) erfolgen ausserhalb der App.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={dismissing}
+              onClick={() => startDismiss(() => dismissReminder(props.reminderId))}
+            >
+              <Trash2Icon className="size-4 mr-1.5" />
+              {dismissing ? "Wird verworfen…" : "Ignorieren"}
+            </Button>
+          </div>
+        ) : (
         <form action={formAction} className="space-y-3">
           <input type="hidden" name="reminderId" value={props.reminderId} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -122,6 +154,7 @@ export default function ReminderRow(props: Props) {
             </Button>
           </div>
         </form>
+        )}
       </CardContent>
     </Card>
   );

@@ -249,7 +249,7 @@ function SortableItemRow({
               type="number"
               min="0"
               max="100"
-              step="0.01"
+              step="any"
               value={item.discountPercent}
               onChange={(e) => onUpdate({ discountPercent: Number(e.target.value) || 0 })}
               className="h-8 text-sm text-right"

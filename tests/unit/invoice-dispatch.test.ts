@@ -66,9 +66,23 @@ describe("renderArchiveAndSend", () => {
     await expect(renderArchiveAndSend({ invoice, settings, kind: "Reminder", mail })).rejects.toThrow("SMTP down");
   });
 
-  it("forwards PDF options such as the QR amount", async () => {
-    await renderArchiveAndSend({ invoice, settings, kind: "Reminder", mail, pdfOptions: { qrAmount: 12.5 } });
-    expect(generateInvoicePdf).toHaveBeenCalledWith(invoice, settings, { qrAmount: 12.5 });
+  it("uses renderPdf instead of generateInvoicePdf when provided", async () => {
+    const custom = Buffer.from("%PDF-reminder");
+    const renderPdf = vi.fn().mockResolvedValue(custom);
+    await renderArchiveAndSend({ invoice, settings, kind: "Reminder", mail, renderPdf });
+    expect(renderPdf).toHaveBeenCalledTimes(1);
+    expect(generateInvoicePdf).not.toHaveBeenCalled();
+    expect(sendInvoiceEmail).toHaveBeenCalledWith(invoice, settings, custom, mail);
+    expect(archivePdf).toHaveBeenCalledWith(expect.objectContaining({ kind: "Reminder", pdf: custom }));
+  });
+
+  it("passes the attachment name to the mail", async () => {
+    const renderPdf = vi.fn().mockResolvedValue(Buffer.from("%PDF"));
+    await renderArchiveAndSend({ invoice, settings, kind: "Reminder", mail, renderPdf, attachmentName: "mahnung-X-stufe2.pdf" });
+    expect(sendInvoiceEmail).toHaveBeenCalledWith(invoice, settings, expect.any(Buffer), {
+      ...mail,
+      attachmentName: "mahnung-X-stufe2.pdf",
+    });
   });
 
   it("refuses an invoice without a number", async () => {
@@ -117,6 +131,16 @@ describe("sentDocumentData", () => {
       actor,
     });
     expect(data.reminderLevel).toBeNull();
+  });
+
+  it("stores the reminder amounts when charges are given", () => {
+    const dunningDate = new Date("2026-03-01");
+    const data = sentDocumentData({
+      invoiceId: 1, documentNumber: "I-26090001", kind: "Reminder", reminderLevel: 2, archive,
+      sentTo: "a@b.ch", subject: "Mahnung", actor,
+      charges: { level: 2, openRappen: 100000, feeRappen: 1000, interestRappen: 250, totalRappen: 101250, interestPercent: 5, overdueDays: 20, dunningDate },
+    });
+    expect(data).toMatchObject({ openRappen: 100000, feeRappen: 1000, interestRappen: 250, interestPercent: 5, dunningDate });
   });
 });
 

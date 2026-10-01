@@ -27,6 +27,10 @@ type Props = {
   defaultPaymentTermDays: number;
   defaultQuoteValidityDays: number;
   reminderCooldownDays: number;
+  reminderFeeLevel2: number;
+  reminderFeeLevel3: number;
+  reminderFeeLevel4: number;
+  reminderInterestPercent: number;
   invoiceNumberPrefix: string;
   quoteNumberPrefix: string;
   useHolderNameOnQR: boolean;
@@ -210,6 +214,39 @@ export default function SettingsForm(props: Props) {
               <p className="text-xs text-muted-foreground">
                 Wartezeit nach einer Mahnung, bevor dieselbe Rechnung wieder erscheint
               </p>
+            </div>
+          </div>
+          <div className="space-y-3 pt-2 border-t">
+            <div>
+              <p className="text-sm font-medium">Mahngebühren und Verzugszins</p>
+              <p className="text-xs text-muted-foreground">
+                Standardmässig aus (0). Gebühren und Zins dürfen nur berechnet werden, wenn sie
+                vereinbart sind (z. B. in den AGB). Bitte rechtlich klären.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {([
+                ["reminderFeeLevel2", "Gebühr 1. Mahnung (CHF)", props.reminderFeeLevel2],
+                ["reminderFeeLevel3", "Gebühr 2. Mahnung (CHF)", props.reminderFeeLevel3],
+                ["reminderFeeLevel4", "Gebühr 3. Mahnung (CHF)", props.reminderFeeLevel4],
+              ] as const).map(([name, label, value]) => (
+                <div key={name} className="space-y-1">
+                  <Label htmlFor={name}>{label}</Label>
+                  <Input id={name} name={name} type="number" min="0" step="0.05" defaultValue={value} />
+                </div>
+              ))}
+              <div className="space-y-1">
+                <Label htmlFor="reminderInterestPercent">Verzugszins (% p. a.)</Label>
+                <Input
+                  id="reminderInterestPercent"
+                  name="reminderInterestPercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  defaultValue={props.reminderInterestPercent}
+                />
+              </div>
             </div>
           </div>
 

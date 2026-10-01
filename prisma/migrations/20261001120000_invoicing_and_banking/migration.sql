@@ -1,7 +1,7 @@
 -- Schema changes since release 1.5.0, combined into one migration:
 --   structured addresses, nullable document numbers, payments, invoice locking
 --   and credit notes, audit hash chain, sent documents, subscriptions, bank
---   transactions and expense receipts.
+--   transactions and expense receipts, dunning fees and interest.
 -- None of the replaced migrations was ever released, so databases that ran
 -- them during development have to be recreated (or reset to 1.5.0).
 
@@ -282,3 +282,18 @@ CREATE UNIQUE INDEX "BankTransaction_paymentId_key" ON "BankTransaction"("paymen
 CREATE UNIQUE INDEX "BankTransaction_expenseId_key" ON "BankTransaction"("expenseId");
 CREATE INDEX "BankTransaction_importId_idx" ON "BankTransaction"("importId");
 CREATE INDEX "BankTransaction_date_idx" ON "BankTransaction"("date");
+
+-- F8: dunning fees, interest and the amounts printed on a Mahnbeleg
+ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel2Rappen" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel3Rappen" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel4Rappen" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderInterestPercent" DECIMAL NOT NULL DEFAULT 0;
+
+ALTER TABLE "SentDocument" ADD COLUMN "dunningDate" DATETIME;
+ALTER TABLE "SentDocument" ADD COLUMN "feeRappen" INTEGER;
+ALTER TABLE "SentDocument" ADD COLUMN "interestPercent" DECIMAL;
+ALTER TABLE "SentDocument" ADD COLUMN "interestRappen" INTEGER;
+ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
+
+-- The old code raised the level without a cap; level 4 is now the last one.
+UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;

@@ -6,6 +6,9 @@ import { requireEditor } from "@/lib/permissions";
 import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { getPaymentSummary } from "@/lib/payments";
+import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
+import { computeReminderCharges, MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
+import { isLastReminderLevelSent } from "@/lib/reminders";
 import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
@@ -39,15 +42,29 @@ export async function sendReminder(
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
+  if (await isLastReminderLevelSent(prisma, reminder)) {
+    return { error: "Die letzte Mahnstufe wurde bereits versendet." };
+  }
+
   let archive: ArchiveResult;
+  let charges: ReturnType<typeof computeReminderCharges>;
   try {
     const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
+    if (remainingRappen <= 0) return { error: "Die Rechnung ist bereits beglichen." };
+    charges = computeReminderCharges({
+      level: reminder.reminderLevel,
+      openRappen: remainingRappen,
+      dueDate: reminder.invoice.dueDate,
+      dunningDate: new Date(),
+      settings,
+    });
     archive = await renderArchiveAndSend({
       invoice: reminder.invoice,
       settings,
       kind: "Reminder",
       mail: { to, subject, body },
-      pdfOptions: { qrAmount: remainingRappen / 100 },
+      renderPdf: () => generateReminderPdf(reminder.invoice, settings, charges),
+      attachmentName: `mahnung-${reminder.invoice.documentNumber}-stufe${reminder.reminderLevel}.pdf`,
     });
   } catch (err) {
     log.error({ reminderId, to, err }, "sendReminder failed");
@@ -64,7 +81,7 @@ export async function sendReminder(
     prisma.pendingReminder.update({
       where: { id: reminderId },
       data: {
-        reminderLevel: reminder.reminderLevel + 1,
+        reminderLevel: Math.min(reminder.reminderLevel + 1, MAX_REMINDER_LEVEL),
         snoozedUntil,
       },
     }),
@@ -78,6 +95,7 @@ export async function sendReminder(
         sentTo: to,
         subject,
         actor: session,
+        charges,
       }),
     }),
   ]);
@@ -85,6 +103,8 @@ export async function sendReminder(
   await logAudit(session, "SEND", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
     to,
     level: reminder.reminderLevel,
+    feeRappen: charges.feeRappen,
+    interestRappen: charges.interestRappen,
   });
   await auditArchived(session, sentDocument, reminder.invoice.documentNumber!, archive);
   revalidatePath("/invoices/reminders");
