@@ -11,7 +11,20 @@ import { readReceipts } from "@/lib/expense-receipts";
 export type ExpenseFormState = {
   error?: string;
   fieldErrors?: Record<string, string>;
+  /** Submitted text values, echoed back because React resets the form after an action. */
+  values?: Record<string, string>;
 };
+
+const ECHO_FIELDS = ["description", "date", "amount", "supplier", "dueDate", "paidDate", "notes"];
+
+function echoValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const key of ECHO_FIELDS) {
+    const v = formData.get(key);
+    if (typeof v === "string") values[key] = v;
+  }
+  return values;
+}
 
 function parseExpenseForm(formData: FormData) {
   const date = formData.get("date") as string;
@@ -61,10 +74,10 @@ export async function createExpense(
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
   const parsed = parseExpenseForm(formData);
-  if ("error" in parsed) return parsed;
+  if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
   const files = await readReceipts(formData.getAll("receipts"));
-  if ("error" in files) return { error: files.error };
+  if ("error" in files) return { error: files.error, values: echoValues(formData) };
 
   const expense = await prisma.expense.create({
     data: {
@@ -85,10 +98,10 @@ export async function updateExpense(
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
   const parsed = parseExpenseForm(formData);
-  if ("error" in parsed) return parsed;
+  if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
   const files = await readReceipts(formData.getAll("receipts"));
-  if ("error" in files) return { error: files.error };
+  if ("error" in files) return { error: files.error, values: echoValues(formData) };
 
   await prisma.expense.update({
     where: { id },

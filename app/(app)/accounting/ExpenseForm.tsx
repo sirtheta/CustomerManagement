@@ -51,6 +51,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
   );
 
   const fe = state.fieldErrors ?? {};
+  const v = state.values;
   const [paid, setPaid] = useState(expense ? expense.paidDate !== null : true);
 
   return (
@@ -82,7 +83,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                 id="description"
                 name="description"
                 required
-                defaultValue={expense?.description ?? ""}
+                defaultValue={v?.description ?? expense?.description ?? ""}
                 placeholder="z.B. Bürozubehör"
                 aria-invalid={!!fe.description}
                 aria-describedby={fe.description ? "description-error" : undefined}
@@ -100,7 +101,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                   name="date"
                   type="date"
                   required
-                  defaultValue={expense?.date?.slice(0, 10) ?? ""}
+                  defaultValue={v?.date ?? expense?.date?.slice(0, 10) ?? ""}
                   aria-invalid={!!fe.date}
                   aria-describedby={fe.date ? "date-error" : undefined}
                 />
@@ -118,7 +119,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                   step="0.01"
                   min="0"
                   required
-                  defaultValue={expense?.amount ?? ""}
+                  defaultValue={v?.amount ?? expense?.amount ?? ""}
                   placeholder="0.00"
                   aria-invalid={!!fe.amount}
                   aria-describedby={fe.amount ? "amount-error" : undefined}
@@ -168,7 +169,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               <Input
                 id="supplier"
                 name="supplier"
-                defaultValue={expense?.supplier ?? ""}
+                defaultValue={v?.supplier ?? expense?.supplier ?? ""}
                 placeholder="z.B. Muster AG"
               />
             </div>
@@ -180,7 +181,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                   id="dueDate"
                   name="dueDate"
                   type="date"
-                  defaultValue={expense?.dueDate?.slice(0, 10) ?? ""}
+                  defaultValue={v?.dueDate ?? expense?.dueDate?.slice(0, 10) ?? ""}
                 />
               </div>
               <div className="space-y-1.5">
@@ -190,7 +191,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                   name="paidDate"
                   type="date"
                   disabled={!paid}
-                  defaultValue={expense?.paidDate?.slice(0, 10) ?? ""}
+                  defaultValue={v?.paidDate ?? expense?.paidDate?.slice(0, 10) ?? ""}
                 />
                 <p className="text-xs text-muted-foreground">Leer = Datum der Ausgabe.</p>
               </div>
@@ -244,7 +245,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               <textarea
                 id="notes"
                 name="notes"
-                defaultValue={expense?.notes ?? ""}
+                defaultValue={v?.notes ?? expense?.notes ?? ""}
                 rows={3}
                 placeholder="Optionale Notiz"
                 className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
