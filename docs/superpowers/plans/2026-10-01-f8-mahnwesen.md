@@ -20,6 +20,7 @@
 - Beträge werden **immer serverseitig** neu berechnet, nie aus Formulardaten übernommen.
 - Nie `logAudit` innerhalb einer `$transaction` aufrufen; nie direkt in `AuditLog` schreiben.
 - Betreibung/Inkasso und Forderungsexport sind **nicht** im Umfang.
+- **Keine neue Migration anlegen.** Schemaänderungen werden als SQL an die letzte (unveröffentlichte) Migration `20261001081107_expense_receipts` angehängt.
 - Der Versand wird verweigert, wenn der Restbetrag 0 ist („Die Rechnung ist bereits beglichen.“).
 - Änderungen an Gebühren/Zinssatz werden auditiert (`UPDATE Settings`, ausserhalb jeder Transaktion).
 - Bekannt und bewusst nicht behoben: gleichzeitiger Doppelversand derselben Mahnung (zwei Tabs) ist wie schon heute durch kein Claim geschützt.
@@ -31,7 +32,7 @@
 
 | Datei | Verantwortung |
 |---|---|
-| `prisma/schema.prisma`, neue Migration | Einstellungsfelder (Gebühren, Zinssatz) und Betragsspalten an `SentDocument` |
+| `prisma/schema.prisma`, letzte Migration (SQL angehängt) | Einstellungsfelder (Gebühren, Zinssatz) und Betragsspalten an `SentDocument` |
 | `lib/reminder-charges.ts` (neu) | `reminderTitle`, `MAX_REMINDER_LEVEL`, `computeReminderCharges` (rein, ohne Prisma) |
 | `lib/reminders.ts` | zusätzlich `isLastReminderLevelSent` (gemeinsamer Helper für Action und Liste) |
 | `lib/email.ts` | `sendInvoiceEmail` mit optionalem `attachmentName` |
@@ -51,7 +52,7 @@
 
 **Files:**
 - Modify: `prisma/schema.prisma` (`ApplicationSettings` nach `reminderCooldownDays`, `SentDocument`)
-- Create: `prisma/migrations/20261001100000_reminder_charges/migration.sql`
+- Modify: `prisma/migrations/20261001081107_expense_receipts/migration.sql` (SQL anhängen, **keine neue Migration**)
 - Modify: `app/(app)/settings/actions.ts`, `app/(app)/settings/page.tsx`, `app/(app)/settings/SettingsForm.tsx`
 - Test: `tests/unit/settings-actions.test.ts`
 
@@ -209,16 +210,16 @@ In `model SentDocument`, direkt nach `createdById    Int`:
   dunningDate    DateTime?
 ```
 
-Dann `npx prisma migrate dev --name reminder_charges --create-only` ausführen und den erzeugten Ordnernamen beibehalten (er ist neuer als `20261001081107_expense_receipts`). Inhaltlich prüfen: Die Datei enthält die folgenden `ALTER TABLE ... ADD COLUMN`-Befehle (die Reihenfolge darf abweichen); die Level-Kappung am Ende erzeugt Prisma nicht, sie wird von Hand angehängt. Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Deshalb nach dem Anlegen einmal `npx prisma migrate dev` ausführen:
+Keine neue Migration: Vor dem Anhängen prüfen, dass `20261001081107_expense_receipts` in keinem Release-Tag steckt (`git tag --contains $(git log -1 --format=%h -- prisma/migrations/20261001081107_expense_receipts)` liefert nichts); sonst abbrechen und nachfragen. Dann die SQL an `prisma/migrations/20261001081107_expense_receipts/migration.sql` anhängen (am Dateiende, mit Leerzeile davor). Sie muss genau dem Schema entsprechen; zur Kontrolle einmal `npx prisma migrate dev --name tmp_check --create-only` ausführen, die erzeugten `ALTER TABLE`-Befehle mit den folgenden vergleichen (die Reihenfolge darf abweichen), danach den erzeugten Ordner `…_tmp_check` **löschen**. Angehängt wird:
 
 ```sql
--- AlterTable
+
+-- F8: dunning fees, interest and the amounts printed on a Mahnbeleg
 ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel2Rappen" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel3Rappen" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderFeeLevel4Rappen" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "ApplicationSettings" ADD COLUMN "reminderInterestPercent" DECIMAL NOT NULL DEFAULT 0;
 
--- AlterTable
 ALTER TABLE "SentDocument" ADD COLUMN "dunningDate" DATETIME;
 ALTER TABLE "SentDocument" ADD COLUMN "feeRappen" INTEGER;
 ALTER TABLE "SentDocument" ADD COLUMN "interestPercent" DECIMAL;
@@ -229,7 +230,7 @@ ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
 UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;
 ```
 
-Dann `npx prisma migrate dev` und `npx prisma generate`.
+Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Eine lokale Entwicklungs-DB, die `20261001081107_expense_receipts` schon angewendet hat, meldet danach eine geänderte Prüfsumme. Das Zurücksetzen (`npx prisma migrate reset`) löscht die lokalen Daten, deshalb **vorher beim Nutzer nachfragen**; danach `npx prisma generate`. Ohne Reset läuft `scripts/startup.js` auf einer frischen DB (z. B. `DATABASE_URL=file:./data/tmp-check.db`) zur Kontrolle, dass die ganze Migrationskette durchläuft.
 
 - [ ] **Step 4: `saveSettings` erweitern**
 
@@ -355,7 +356,7 @@ Run: `npx tsc --noEmit` → keine Fehler (Prüfen, dass alle Stellen, die `Setti
 - [ ] **Step 7: Commit**
 
 ```bash
-git add prisma/schema.prisma prisma/migrations app/\(app\)/settings tests/unit/settings-actions.test.ts
+git add prisma/schema.prisma prisma/migrations/20261001081107_expense_receipts/migration.sql app/\(app\)/settings tests/unit/settings-actions.test.ts
 git commit -m "feat(reminders): add dunning fee and interest settings
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"

@@ -23,7 +23,7 @@ Eine Mahnung ist heute das normale Rechnungs-PDF mit Titel „Rechnung“ (QR-Be
 
 Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminder.reminderLevel` nicht über 4 und die Mahnliste zeigt „Letzte Stufe erreicht“ ohne Versandbutton (Ignorieren bleibt möglich). „Letzte Stufe versendet“ gilt, wenn `reminderLevel >= 4` und seit `PendingReminder.createdAt` ein `SentDocument` mit `kind = "Reminder"` und `reminderLevel = 4` existiert (Helper `isLastReminderLevelSent` in `lib/reminders.ts`, von Action und Liste gemeinsam genutzt). Wird die Mahnung zurückgesetzt (Zahlung gelöscht, Status zurück), beginnt sie mit einer neuen `PendingReminder`-Zeile wieder bei Level 1. Die Migration setzt bestehende `reminderLevel > 4` auf 4.
 
-## Datenmodell (eine Migration)
+## Datenmodell (keine neue Migration)
 
 `ApplicationSettings`:
 - `reminderFeeLevel2Rappen`, `reminderFeeLevel3Rappen`, `reminderFeeLevel4Rappen`: `Int @default(0)`.
@@ -36,7 +36,9 @@ Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminde
 
 Keine neue Tabelle: Level, Empfänger, Betreff und Archivpfad liegen bereits in `SentDocument`.
 
-Die Migration setzt ausserdem `PendingReminder.reminderLevel` auf höchstens 4 (`UPDATE … SET reminderLevel = 4 WHERE reminderLevel > 4`).
+Es wird **keine neue Migration angelegt**. Die nötigen SQL-Befehle werden an die letzte, noch unveröffentlichte Migration `20261001081107_expense_receipts` angehängt (Projektpraxis, siehe Squash #125). Falls diese Migration bereits in einem Release steckt, ist das nicht zulässig und es muss neu entschieden werden. Eine lokale DB, die die Migration schon angewendet hat, muss danach zurückgesetzt werden (geänderte Prüfsumme).
+
+Die angehängte SQL setzt ausserdem `PendingReminder.reminderLevel` auf höchstens 4 (`UPDATE … SET reminderLevel = 4 WHERE reminderLevel > 4`).
 
 ## Berechnung (`lib/reminder-charges.ts`)
 
