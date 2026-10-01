@@ -119,12 +119,29 @@ describe("CAMT import actions against a real database", () => {
   it("does not book an entry whose bank reference already paid another invoice", async () => {
     const first = await seedInvoice();
     const second = await seedInvoice();
-    const a = await seedTransactions([{ bankReference: "REF-SHARED", date: "2026-03-01" }]);
-    expect(await bookPayments([{ transactionId: a.ids[0], invoiceId: first.id }])).toEqual({ paidCount: 1 });
-
-    const b = await seedTransactions([{ bankReference: "REF-SHARED", date: "2026-04-01" }]);
+    // Same reference, date and amount as an existing payment of another invoice.
+    await db.prisma.payment.create({
+      data: {
+        invoiceId: first.id,
+        date: new Date("2026-03-01"),
+        amount: 40,
+        source: "camt-import",
+        bankReference: "REF-SHARED",
+      },
+    });
+    const b = await seedTransactions([{ bankReference: "REF-SHARED", date: "2026-03-01", amountCents: 4000 }]);
     expect(await bookPayments([{ transactionId: b.ids[0], invoiceId: second.id }])).toEqual({ paidCount: 0 });
     expect(await db.prisma.payment.count({ where: { invoiceId: second.id } })).toBe(0);
+  });
+
+  it("books an entry that reuses a bank reference on another date and amount", async () => {
+    const first = await seedInvoice();
+    const second = await seedInvoice();
+    const a = await seedTransactions([{ bankReference: "REF-MONTHLY", date: "2026-03-01", amountCents: 4000 }]);
+    expect(await bookPayments([{ transactionId: a.ids[0], invoiceId: first.id }])).toEqual({ paidCount: 1 });
+
+    const b = await seedTransactions([{ bankReference: "REF-MONTHLY", date: "2026-04-01", amountCents: 5000 }]);
+    expect(await bookPayments([{ transactionId: b.ids[0], invoiceId: second.id }])).toEqual({ paidCount: 1 });
   });
 
   it("rejects an invalid payload", async () => {

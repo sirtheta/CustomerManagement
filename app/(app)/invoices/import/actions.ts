@@ -119,8 +119,15 @@ export async function bookPayments(
     if (!invoice || !["Sent", "Overdue", "PartiallyPaid"].includes(invoice.state)) continue;
     if (
       entry.bankReference &&
-      // One bank entry pays one invoice, so the check is global.
-      (await prisma.payment.count({ where: { bankReference: entry.bankReference } })) > 0
+      // One bank entry pays one invoice, so the check is global. The same entry means the
+      // same reference, date and amount: payers reuse references month after month.
+      (await prisma.payment.count({
+        where: {
+          bankReference: entry.bankReference,
+          date: entry.date,
+          amount: entry.amountRappen / 100,
+        },
+      })) > 0
     ) {
       continue;
     }
