@@ -142,6 +142,21 @@ async function main() {
         zipCode: swissZip(),
         email: faker.internet.email(),
         phone: faker.phone.number("+41 ## ### ## ##"),
+        customerNumber: 1001 + i,
+        // The first two customers show the extended model
+        ...(i < 2
+          ? {
+              uid: "CHE-116.281.710",
+              paymentTermDays: 10,
+              billingName: "Buchhaltung " + faker.company.name(),
+              billingStreet: faker.location.street(),
+              billingHouseNumber: faker.location.buildingNumber(),
+              billingZipCode: swissZip(),
+              billingCity: faker.location.city(),
+              billingEmail: "rechnungen@example.ch",
+              contacts: { create: [{ name: "Buchhaltung", role: "Buchhaltung", email: "buchhaltung@example.ch" }] },
+            }
+          : {}),
       },
     });
     customers.push(customer);
