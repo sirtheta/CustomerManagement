@@ -56,6 +56,12 @@ export default async function AccountingPage({ searchParams }: Props) {
           >
             CSV-Export
           </Button>
+          <Button
+            variant="outline"
+            render={<a href={`/api/export/year-package?year=${selectedYear}`} download />}
+          >
+            Jahrespaket (ZIP)
+          </Button>
         </div>
       </div>
 
