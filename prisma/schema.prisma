@@ -25,6 +25,7 @@ model Customer {
   documents               Document[]
   notes                   CustomerNote[]
   subscriptions           Subscription[]
+  tasks                   Task[]
 
   @@index([email])
   @@index([archivedAt])
@@ -138,6 +139,7 @@ model Quote {
   customer       Customer   @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
   items          Item[]
   sentLogs       QuoteSentLog[]
+  tasks          Task[]
 
   @@unique([documentNumber])
   @@index([customerId])
@@ -290,6 +292,28 @@ model CustomerNote {
   @@index([customerId])
 }
 
+// Follow-up task for a customer. Created by hand or automatically seven days
+// after a quote was sent (quoteId set). doneAt marks it completed; notifiedAt
+// is stamped once the admin channels were told it is due.
+model Task {
+  id         Int       @id @default(autoincrement())
+  customerId Int
+  title      String
+  dueDate    DateTime
+  assigneeId Int?
+  quoteId    Int?
+  doneAt     DateTime?
+  notifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  assignee   User?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  quote      Quote?    @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([doneAt, dueDate])
+  @@index([quoteId])
+}
+
 model CompanyInformation {
   companyInformationId Int                  @id @default(autoincrement())
   companyName          String?
@@ -386,6 +410,7 @@ model User {
   sessionEpoch Int @default(0)
 
   passwordResetTokens PasswordResetToken[]
+  tasks               Task[]
 }
 
 model PasswordResetToken {

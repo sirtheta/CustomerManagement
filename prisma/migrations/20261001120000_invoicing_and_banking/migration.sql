@@ -1,7 +1,7 @@
 -- Schema changes since release 1.5.0, combined into one migration:
 --   structured addresses, nullable document numbers, payments, invoice locking
 --   and credit notes, audit hash chain, sent documents, subscriptions, bank
---   transactions and expense receipts.
+--   transactions, expense receipts and customer follow-up tasks.
 -- None of the replaced migrations was ever released, so databases that ran
 -- them during development have to be recreated (or reset to 1.5.0).
 
@@ -282,3 +282,24 @@ CREATE UNIQUE INDEX "BankTransaction_paymentId_key" ON "BankTransaction"("paymen
 CREATE UNIQUE INDEX "BankTransaction_expenseId_key" ON "BankTransaction"("expenseId");
 CREATE INDEX "BankTransaction_importId_idx" ON "BankTransaction"("importId");
 CREATE INDEX "BankTransaction_date_idx" ON "BankTransaction"("date");
+
+
+-- ── Customer follow-up tasks (F12) ──────────────────────────────────────
+CREATE TABLE "Task" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "customerId" INTEGER NOT NULL,
+    "title" TEXT NOT NULL,
+    "dueDate" DATETIME NOT NULL,
+    "assigneeId" INTEGER,
+    "quoteId" INTEGER,
+    "doneAt" DATETIME,
+    "notifiedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Task_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("customerId") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Task_assigneeId_fkey" FOREIGN KEY ("assigneeId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Task_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quote" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE INDEX "Task_customerId_idx" ON "Task"("customerId");
+CREATE INDEX "Task_doneAt_dueDate_idx" ON "Task"("doneAt", "dueDate");
+CREATE INDEX "Task_quoteId_idx" ON "Task"("quoteId");

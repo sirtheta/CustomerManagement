@@ -11,6 +11,7 @@ import logger from "@/lib/logger";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
+import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
@@ -286,15 +287,18 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
     await checkAndUpdateAllDocumentStates(prisma);
     await checkOverdueInvoices(prisma);
     await checkSubscriptions(prisma);
+    await closeAnsweredFollowUps(prisma);
     // Reset notification stamps so the check always sends in dev
     await Promise.all([
       prisma.pendingReminder.updateMany({ data: { adminNotifiedAt: null } }),
       prisma.pendingEmail.updateMany({ data: { adminNotifiedAt: null } }),
+      prisma.task.updateMany({ data: { notifiedAt: null } }),
     ]);
     const settings = await prisma.applicationSettings.findFirst({
       include: { companyInfo: true },
     });
     await sendAdminNotifications(prisma, settings);
+    await notifyDueTasks(prisma, settings);
     revalidatePath("/");
     return { success: true, _ts: Date.now() };
   } catch (err) {
