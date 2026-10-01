@@ -96,9 +96,7 @@ describe("customer actions", () => {
           contactPerson: "Max Muster",
           email: "max@muster.ch",
           zipCode: "8001",
-          yearlyInvoice: false,
           contactInsteadOfCompany: false,
-          nextInvoiceDate: null,
         }),
       });
       expect(logAudit).toHaveBeenCalledWith(
@@ -110,7 +108,7 @@ describe("customer actions", () => {
       );
     });
 
-    it("sets yearlyInvoice and contactInsteadOfCompany to true when 'on'", async () => {
+    it("sets contactInsteadOfCompany to true when 'on'", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
       vi.mocked(redirect).mockImplementation(() => {
@@ -118,43 +116,10 @@ describe("customer actions", () => {
       });
 
       await expect(
-        createCustomer(
-          {},
-          form({ ...VALID_FIELDS, yearlyInvoice: "on", contactInsteadOfCompany: "on" })
-        )
+        createCustomer({}, form({ ...VALID_FIELDS, contactInsteadOfCompany: "on" }))
       ).rejects.toThrow("REDIRECT");
       expect(prisma.customer.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ yearlyInvoice: true, contactInsteadOfCompany: true }),
-      });
-    });
-
-    it("parses nextInvoiceDate when provided", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT");
-      });
-
-      await expect(
-        createCustomer({}, form({ ...VALID_FIELDS, yearlyInvoice: "on", nextInvoiceDate: "2027-01-01" }))
-      ).rejects.toThrow("REDIRECT");
-      expect(prisma.customer.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ nextInvoiceDate: new Date("2027-01-01") }),
-      });
-    });
-
-    it("ignores nextInvoiceDate when yearlyInvoice is not enabled", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT");
-      });
-
-      await expect(
-        createCustomer({}, form({ ...VALID_FIELDS, nextInvoiceDate: "2027-01-01" }))
-      ).rejects.toThrow("REDIRECT");
-      expect(prisma.customer.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ yearlyInvoice: false, nextInvoiceDate: null }),
+        data: expect.objectContaining({ contactInsteadOfCompany: true }),
       });
     });
 

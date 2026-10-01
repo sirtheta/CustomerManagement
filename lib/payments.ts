@@ -140,6 +140,8 @@ type RecordParams = {
   source: PaymentSource;
   bankReference?: string | null;
   actor: Session;
+  /** Runs inside the payment transaction right after the payment row exists; throw to roll back. */
+  onCreated?: (tx: Parameters<typeof recalculateInvoiceState>[0], paymentId: number) => Promise<void>;
 };
 
 /**
@@ -187,6 +189,7 @@ async function createPayment(
         bankReference: params.bankReference ?? null,
       },
     });
+    await params.onCreated?.(tx, payment.id);
     const change = await recalculateInvoiceState(tx, params.invoiceId);
     return { payment, change, amountRappen };
   });

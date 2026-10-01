@@ -3,14 +3,29 @@
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { requireAdmin, requireEditor } from "@/lib/permissions";
+import { hasRole, requireAdmin, requireEditor } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
+import { readReceipts } from "@/lib/expense-receipts";
 
 export type ExpenseFormState = {
   error?: string;
   fieldErrors?: Record<string, string>;
+  /** Submitted text values, echoed back because React resets the form after an action. */
+  values?: Record<string, string>;
 };
+
+const ECHO_FIELDS = ["description", "date", "amount", "supplier", "dueDate", "paidDate", "notes"];
+
+function echoValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const key of ECHO_FIELDS) {
+    const v = formData.get(key);
+    if (typeof v === "string") values[key] = v;
+  }
+  return values;
+}
 
 function parseExpenseForm(formData: FormData) {
   const date = formData.get("date") as string;
@@ -18,6 +33,10 @@ function parseExpenseForm(formData: FormData) {
   const amountRaw = formData.get("amount") as string;
   const categoryIdRaw = formData.get("categoryId") as string | null;
   const notes = (formData.get("notes") as string | null)?.trim();
+  const supplier = (formData.get("supplier") as string | null)?.trim();
+  const dueDateRaw = formData.get("dueDate") as string | null;
+  const paid = formData.get("paid") === "on";
+  const paidDateRaw = formData.get("paidDate") as string | null;
 
   const fieldErrors: Record<string, string> = {};
   if (!date) fieldErrors.date = "Datum ist erforderlich.";
@@ -33,6 +52,9 @@ function parseExpenseForm(formData: FormData) {
     return { error: "Bitte alle Pflichtfelder ausfüllen." as const, fieldErrors };
   }
 
+  // Paid without an explicit payment date counts as paid on the expense date.
+  const paidDate = paid ? new Date(paidDateRaw || date) : null;
+
   return {
     data: {
       date: new Date(date),
@@ -40,6 +62,9 @@ function parseExpenseForm(formData: FormData) {
       amount,
       categoryId: categoryIdRaw && categoryIdRaw !== "" ? parseInt(categoryIdRaw, 10) : null,
       notes: notes || null,
+      supplier: supplier || null,
+      dueDate: dueDateRaw ? new Date(dueDateRaw) : null,
+      paidDate,
     },
   };
 }
@@ -50,9 +75,17 @@ export async function createExpense(
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
   const parsed = parseExpenseForm(formData);
-  if ("error" in parsed) return parsed;
+  if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
-  const expense = await prisma.expense.create({ data: parsed.data });
+  const files = await readReceipts(formData.getAll("receipts"));
+  if ("error" in files) return { error: files.error, values: echoValues(formData) };
+
+  const expense = await prisma.expense.create({
+    data: {
+      ...parsed.data,
+      ...(files.receipts.length > 0 && { receipts: { create: files.receipts } }),
+    },
+  });
   await logAudit(session, "CREATE", "Expense", expense.id, expense.description);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
@@ -66,10 +99,38 @@ export async function updateExpense(
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
   const parsed = parseExpenseForm(formData);
-  if ("error" in parsed) return parsed;
+  if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
-  await prisma.expense.update({ where: { id }, data: parsed.data });
+  const files = await readReceipts(formData.getAll("receipts"));
+  if ("error" in files) return { error: files.error, values: echoValues(formData) };
+
+  // Receipts marked for removal in the form are only deleted on save.
+  const requestedDeletes = formData
+    .getAll("deleteReceiptIds")
+    .map((v) => parseInt(String(v), 10))
+    .filter((n) => !isNaN(n));
+  if (requestedDeletes.length > 0 && !hasRole(session, [UserRole.Admin]))
+    return { error: "Belege löschen darf nur ein Admin.", values: echoValues(formData) };
+  const toDelete =
+    requestedDeletes.length > 0
+      ? await prisma.expenseReceipt.findMany({
+          where: { id: { in: requestedDeletes }, expenseId: id },
+          select: { id: true, name: true },
+        })
+      : [];
+
+  await prisma.expense.update({
+    where: { id },
+    data: {
+      ...parsed.data,
+      receipts: {
+        ...(toDelete.length > 0 && { deleteMany: { id: { in: toDelete.map((r) => r.id) } } }),
+        ...(files.receipts.length > 0 && { create: files.receipts }),
+      },
+    },
+  });
   await logAudit(session, "UPDATE", "Expense", id, parsed.data.description);
+  for (const r of toDelete) await logAudit(session, "DELETE", "ExpenseReceipt", r.id, r.name);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/accounting");

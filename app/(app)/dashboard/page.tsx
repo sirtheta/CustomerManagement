@@ -8,6 +8,7 @@ import { InvoiceState, QuoteState } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
 import { sumOpenAmount } from "@/lib/payments";
+import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 
 export default async function DashboardPage() {
   await auth();
@@ -22,8 +23,8 @@ export default async function DashboardPage() {
     currentYearRevenue,
     pendingEmailCount,
     overdueCount,
-    scheduledCustomerCount,
-    scheduledCustomers,
+    scheduledSubscriptionCount,
+    scheduledSubscriptions,
   ] = await Promise.all([
     prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
@@ -46,17 +47,18 @@ export default async function DashboardPage() {
     }),
     prisma.pendingEmail.count(),
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
-    prisma.customer.count({
-      where: { yearlyInvoice: true, archivedAt: null, nextInvoiceDate: { not: null } },
+    prisma.subscription.count({
+      where: { active: true, customer: { archivedAt: null } },
     }),
-    prisma.customer.findMany({
-      where: { yearlyInvoice: true, archivedAt: null, nextInvoiceDate: { not: null } },
+    prisma.subscription.findMany({
+      where: { active: true, customer: { archivedAt: null } },
       select: {
-        customerId: true,
-        company: true,
-        contactPerson: true,
-        contactInsteadOfCompany: true,
+        id: true,
+        interval: true,
         nextInvoiceDate: true,
+        customer: {
+          select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true },
+        },
       },
       orderBy: { nextInvoiceDate: "asc" },
       take: 5,
@@ -76,8 +78,8 @@ export default async function DashboardPage() {
                 <AlertTriangle className="size-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
                 <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
                   {pendingEmailCount === 1
-                    ? "1 Jahresrechnung wartet auf Prüfung und Versand."
-                    : `${pendingEmailCount} Jahresrechnungen warten auf Prüfung und Versand.`}
+                    ? "1 Abo-Rechnung wartet auf Prüfung und Versand."
+                    : `${pendingEmailCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
                 </p>
               </div>
               <Button size="sm" render={<Link href="/invoices/pending" />}>
@@ -162,16 +164,16 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/customers?yearlyInvoice=true" className="h-full">
+        <Link href="/customers?subscription=true" className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
-                Geplante Jahresrechnungen
+                Geplante Abos
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{scheduledCustomerCount}</p>
-              <p className="text-sm text-gray-500 mt-1">Aktive Planungen</p>
+              <p className="text-3xl font-bold">{scheduledSubscriptionCount}</p>
+              <p className="text-sm text-gray-500 mt-1">Aktive Abos</p>
             </CardContent>
           </Card>
         </Link>
@@ -179,25 +181,25 @@ export default async function DashboardPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Kommende Jahresrechnungen</CardTitle>
-          <Button variant="outline" size="sm" render={<Link href="/customers?yearlyInvoice=true" />}>
+          <CardTitle className="text-base">Kommende Abo-Rechnungen</CardTitle>
+          <Button variant="outline" size="sm" render={<Link href="/customers?subscription=true" />}>
             Alle anzeigen
           </Button>
         </CardHeader>
         <CardContent>
-          {scheduledCustomers.length === 0 ? (
-            <p className="text-sm text-gray-500">Keine Jahresrechnungen geplant.</p>
+          {scheduledSubscriptions.length === 0 ? (
+            <p className="text-sm text-gray-500">Keine Abos geplant.</p>
           ) : (
             <ul className="divide-y">
-              {scheduledCustomers.map((customer) => (
-                <li key={customer.customerId} className="py-2 flex justify-between items-center gap-3">
-                  <Link href={`/customers/${customer.customerId}`} className="font-medium text-sm hover:underline">
-                    {customer.contactInsteadOfCompany
-                      ? customer.contactPerson
-                      : (customer.company || customer.contactPerson)}
+              {scheduledSubscriptions.map((sub) => (
+                <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
+                  <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
+                    {sub.customer.contactInsteadOfCompany
+                      ? sub.customer.contactPerson
+                      : (sub.customer.company || sub.customer.contactPerson)}
                   </Link>
                   <span className="text-sm text-gray-500 whitespace-nowrap">
-                    {customer.nextInvoiceDate?.toLocaleDateString("de-CH")}
+                    {INTERVAL_LABELS[sub.interval]} · {sub.nextInvoiceDate.toLocaleDateString("de-CH")}
                   </span>
                 </li>
               ))}

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -176,17 +177,20 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
             </Field>
 
             <Field label="Schriftart">
-              <select
-                value={theme.fontFamily}
-                onChange={(e) => set("fontFamily", e.target.value as PdfFont)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              >
-                {PDF_FONTS.map((f) => (
-                  <option key={f} value={f}>
-                    {FONT_LABELS[f]}
-                  </option>
-                ))}
-              </select>
+              <Select value={theme.fontFamily} onValueChange={(v) => set("fontFamily", v as PdfFont)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string | null) => (value ? (FONT_LABELS[value as PdfFont] ?? value) : "")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {PDF_FONTS.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {FONT_LABELS[f]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
 
             <NumberField
@@ -227,14 +231,20 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
               />
             </div>
             <Field label="Logo-Position">
-              <select
+              <Select
                 value={theme.logoPosition}
-                onChange={(e) => set("logoPosition", e.target.value as "left" | "right")}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                onValueChange={(v) => set("logoPosition", v as "left" | "right")}
               >
-                <option value="left">Links</option>
-                <option value="right">Rechts</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string | null) => (value === "right" ? "Rechts" : "Links")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Links</SelectItem>
+                  <SelectItem value="right">Rechts</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </CardContent>
         </Card>

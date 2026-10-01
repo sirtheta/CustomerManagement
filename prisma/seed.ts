@@ -5,6 +5,8 @@ import { faker } from "@faker-js/faker";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 
+import { fingerprint } from "../lib/import/dedupe";
+
 loadEnvConfig(process.cwd());
 
 function createClient() {
@@ -23,7 +25,7 @@ const UNITS = Object.values(Unit);
 // Number of pending yearly-invoice mails to seed (see seedPendingYearlyInvoices)
 const PENDING_YEARLY_COUNT = 3;
 
-// Same defaults as lib/yearly-invoices.ts
+// Like the defaults in lib/subscriptions.ts, but without the {totalAmount} placeholder (seeded mails are not sent)
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
 const DEFAULT_BODY =
   "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
@@ -123,8 +125,8 @@ async function main() {
   // Customers (50 total)
   const customers = [];
   for (let i = 0; i < 50; i++) {
-    // The first few customers are guaranteed yearly-invoice customers so the
-    // pending yearly mails below always have someone to belong to
+    // The first few customers are guaranteed to get a yearly subscription so
+    // the pending subscription mails below always have someone to belong to
     const forcedYearly = i < PENDING_YEARLY_COUNT;
     const customer = await prisma.customer.create({
       data: {
@@ -136,11 +138,18 @@ async function main() {
         zipCode: swissZip(),
         email: faker.internet.email(),
         phone: faker.phone.number("+41 ## ### ## ##"),
-        yearlyInvoice: forcedYearly || faker.datatype.boolean(),
-        nextInvoiceDate: faker.date.future(),
       },
     });
     customers.push(customer);
+    if (forcedYearly || faker.datatype.boolean()) {
+      await prisma.subscription.create({
+        data: {
+          customerId: customer.customerId,
+          interval: forcedYearly ? "Yearly" : faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"] as const),
+          nextInvoiceDate: faker.date.future(),
+        },
+      });
+    }
   }
 
   // Invoices & Quotes per customer
@@ -283,7 +292,7 @@ async function main() {
     },
   });
 
-  // Pending yearly invoices, exactly as checkYearlyInvoices leaves them
+  // Pending yearly invoices, exactly as checkSubscriptions leaves them
   const pendingYearly = await seedPendingYearlyInvoices(
     customers.slice(0, PENDING_YEARLY_COUNT),
     company.companyName,
@@ -293,16 +302,86 @@ async function main() {
   );
   invoiceCounter = pendingYearly.invoiceCounter;
 
+  const bankCount = await seedBankStatement(company.companyIBAN);
+
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending yearly invoice mails.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails, ${bankCount} open bank transactions.`,
   );
 }
 
-// Mirrors lib/yearly-invoices.ts: per due yearly customer a Draft invoice
-// (documentNumber null, totalAmount 0, no items) plus a PendingEmail whose
-// subject/body keep the raw {documentNumber} placeholder, and nextInvoiceDate
-// advanced by one year. Each customer also gets a prior numbered, Paid invoice
-// from a year ago so the history looks realistic.
+// One imported statement (nothing booked) for the bank import page: payments
+// that match open numbered invoices (one by reference, one partial, one with
+// the number written differently), plus an expense-like debit and a stray credit.
+async function seedBankStatement(iban: string | null): Promise<number> {
+  const open = await prisma.invoice.findMany({
+    where: {
+      documentNumber: { not: null },
+      creditNoteForId: null,
+      state: { in: [InvoiceState.Sent, InvoiceState.Overdue] },
+    },
+    include: { customer: true },
+    orderBy: { date: "desc" },
+    take: 3,
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const day = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return d.toISOString().slice(0, 10);
+  };
+  const rows: Array<{
+    date: string;
+    amountCents: number;
+    description: string;
+    counterparty: string | null;
+    bankReference: string | null;
+  }> = [];
+  open.forEach((invoice, i) => {
+    const cents = Math.round(invoice.totalAmount * 100);
+    const number = invoice.documentNumber as string;
+    rows.push({
+      date: day(i + 1),
+      amountCents: i === 1 ? Math.round(cents / 2) : cents,
+      description: i === 2 ? `Rechnung ${number.replace("-", " ")}` : `Zahlung ${number}`,
+      counterparty: invoice.customer.company,
+      bankReference: `SEED-REF-${invoice.id}`,
+    });
+  });
+  rows.push(
+    { date: day(4), amountCents: -184050, description: "Büromiete", counterparty: "Immobilien AG", bankReference: "SEED-REF-RENT" },
+    { date: day(5), amountCents: 25000, description: "Überweisung ohne Zuordnung", counterparty: "Hans Muster", bankReference: null },
+  );
+  const rowDates = rows.map((r) => r.date).sort();
+  const statement = await prisma.bankStatementImport.create({
+    data: {
+      filename: "camt053-demo.xml",
+      iban,
+      currency: "CHF",
+      periodFrom: rowDates[0],
+      periodTo: rowDates[rowDates.length - 1] ?? today,
+      importedCount: rows.length,
+      skippedCount: 0,
+      transactions: {
+        create: rows.map((r) => ({
+          date: new Date(`${r.date}T00:00:00.000Z`),
+          amountRappen: r.amountCents,
+          description: r.description,
+          counterparty: r.counterparty,
+          bankReference: r.bankReference,
+          fingerprint: fingerprint(iban, r, 0),
+        })),
+      },
+    },
+  });
+  return statement.importedCount;
+}
+
+// Mirrors lib/subscriptions.ts: per due subscription a Draft invoice
+// (documentNumber null, items and total) plus a PendingEmail whose
+// subject/body keep the raw {documentNumber} placeholder, and the
+// subscription's nextInvoiceDate advanced by one year (seeded as Yearly).
+// Each customer also gets a prior numbered, Paid invoice from a year ago so
+// the history looks realistic.
 async function seedPendingYearlyInvoices(
   yearlyCustomers: { customerId: number; contactPerson: string; email: string }[],
   companyName: string,
@@ -341,20 +420,23 @@ async function seedPendingYearlyInvoices(
       },
     });
 
+    const draftItems = buildItems(categories);
+    const draftTotal = round2(draftItems.reduce((sum, item) => sum + item.totalAmount, 0));
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
         date: today,
         dueDate,
-        totalAmount: 0,
+        totalAmount: draftTotal,
         state: InvoiceState.Draft,
+        items: { create: draftItems },
       },
     });
     const vars = {
       documentNumber: "{documentNumber}",
       contactPerson: customer.contactPerson,
       companyName,
-      totalAmount: new Intl.NumberFormat("de-CH", { style: "currency", currency: "CHF" }).format(0),
+      totalAmount: new Intl.NumberFormat("de-CH", { style: "currency", currency: "CHF" }).format(draftTotal),
       date: formatChDate(today),
       dueDate: formatChDate(dueDate),
       customUserText: "",
@@ -371,7 +453,7 @@ async function seedPendingYearlyInvoices(
     // The job was due today and advanced the date by one year
     const next = new Date(today);
     next.setFullYear(next.getFullYear() + 1);
-    await prisma.customer.update({
+    await prisma.subscription.updateMany({
       where: { customerId: customer.customerId },
       data: { nextInvoiceDate: next },
     });

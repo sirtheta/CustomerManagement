@@ -85,4 +85,71 @@ describe("matchStatementToInvoices", () => {
     const results = matchStatementToInvoices([tx({ amountCents: -12345 })], [INVOICE_A], PREFIX);
     expect(results).toHaveLength(0);
   });
+
+  it("recognises the number with spaces and without the prefix", () => {
+    const [spaced] = matchStatementToInvoices(
+      [tx({ description: "Rg I 2601 0042" })],
+      [INVOICE_A],
+      PREFIX
+    );
+    expect(spaced.confidence).toBe("reference");
+    expect(spaced.preselectedInvoiceId).toBe(1);
+
+    const [bare] = matchStatementToInvoices(
+      [tx({ description: "Rechnung 26010042" })],
+      [INVOICE_A],
+      PREFIX
+    );
+    expect(bare.preselectedInvoiceId).toBe(1);
+  });
+
+  it("suggests the invoices of a customer named in the counterparty, but never pre-selects", () => {
+    const invoice: OpenInvoice = {
+      id: 7,
+      documentNumber: "I-26010077",
+      openAmount: 500,
+      customerNames: ["Müller Bau AG", "Hans Müller"],
+    };
+    const [result] = matchStatementToInvoices(
+      [tx({ amountCents: 40000, description: "Überweisung", counterparty: "MUELLER BAU AG" })],
+      [invoice],
+      PREFIX
+    );
+    // "MUELLER" vs "Müller" differ after normalisation; use the exact spelling below.
+    expect(result.confidence).toBe("none");
+
+    const [hit] = matchStatementToInvoices(
+      [tx({ amountCents: 40000, description: "Überweisung", counterparty: "Müller Bau AG" })],
+      [invoice],
+      PREFIX
+    );
+    expect(hit.confidence).toBe("name");
+    expect(hit.preselectedInvoiceId).toBeNull();
+    expect(hit.candidates).toEqual([{ invoiceId: 7, documentNumber: "I-26010077" }]);
+  });
+
+  it("puts amount matches of the named customer first", () => {
+    const named = (id: number, number: string, open: number): OpenInvoice => ({
+      id,
+      documentNumber: number,
+      openAmount: open,
+      customerNames: ["Acme GmbH"],
+    });
+    const [result] = matchStatementToInvoices(
+      [tx({ amountCents: 20000, description: "Zahlung", counterparty: "Acme GmbH" })],
+      [named(1, "I-26010001", 300), named(2, "I-26010002", 200)],
+      PREFIX
+    );
+    expect(result.confidence).toBe("amount");
+    expect(result.candidates.map((c) => c.invoiceId)).toEqual([2, 1]);
+  });
+
+  it("ignores very short customer names", () => {
+    const [result] = matchStatementToInvoices(
+      [tx({ amountCents: 1, description: "x", counterparty: "AG Bank" })],
+      [{ id: 3, documentNumber: "I-26010003", openAmount: 9, customerNames: ["AG"] }],
+      PREFIX
+    );
+    expect(result.confidence).toBe("none");
+  });
 });

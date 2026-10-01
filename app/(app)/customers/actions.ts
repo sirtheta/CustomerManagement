@@ -68,10 +68,7 @@ export async function createCustomer(
 
   const { company, contactPerson, street, houseNumber, city, zipCode, country, email, phone } =
     parsed.data;
-  const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
-  const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
-  const nextInvoiceDate = yearlyInvoice && nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
 
   const customer = await prisma.customer.create({
     data: {
@@ -86,9 +83,7 @@ export async function createCustomer(
       addressNeedsReview: false,
       email,
       phone: phone || null,
-      yearlyInvoice,
       contactInsteadOfCompany,
-      nextInvoiceDate,
     },
   });
   await logAudit(session, "CREATE", "Customer", customer.customerId, contactPerson);
@@ -127,10 +122,7 @@ export async function updateCustomer(
 
   const { company, contactPerson, street, houseNumber, city, zipCode, country, email, phone } =
     parsed.data;
-  const yearlyInvoice = formData.get("yearlyInvoice") === "on";
   const contactInsteadOfCompany = formData.get("contactInsteadOfCompany") === "on";
-  const nextInvoiceDateRaw = formData.get("nextInvoiceDate") as string | null;
-  const nextInvoiceDate = yearlyInvoice && nextInvoiceDateRaw ? new Date(nextInvoiceDateRaw) : null;
 
   await prisma.customer.update({
     where: { customerId: id },
@@ -146,9 +138,7 @@ export async function updateCustomer(
       addressNeedsReview: false,
       email,
       phone: phone || null,
-      yearlyInvoice,
       contactInsteadOfCompany,
-      nextInvoiceDate,
     },
   });
   await logAudit(session, "UPDATE", "Customer", id, contactPerson);

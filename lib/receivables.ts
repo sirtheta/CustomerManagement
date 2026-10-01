@@ -40,6 +40,11 @@ export type ReceivableInput = {
     company: string | null;
     contactPerson: string | null;
     contactInsteadOfCompany: boolean;
+    street?: string;
+    houseNumber?: string | null;
+    zipCode?: string;
+    city?: string;
+    country?: string;
   };
   payments: { date: Date; amount: { toNumber(): number } }[];
   creditNotes?: { date: Date; totalAmount: { toNumber(): number } }[];
@@ -50,6 +55,7 @@ export type ReceivableRow = {
   documentNumber: string | null;
   customerId: number;
   customerName: string;
+  customerAddress: { street: string; zip: string; city: string; country: string };
   date: Date;
   dueDate: Date;
   totalRappen: number;
@@ -108,6 +114,12 @@ export function buildReceivables(invoices: ReceivableInput[], asOf: Date): Recei
       documentNumber: inv.documentNumber,
       customerId: inv.customer.customerId,
       customerName,
+      customerAddress: {
+        street: [inv.customer.street, inv.customer.houseNumber].filter(Boolean).join(" "),
+        zip: inv.customer.zipCode ?? "",
+        city: inv.customer.city ?? "",
+        country: inv.customer.country ?? "",
+      },
       date: inv.date,
       dueDate: inv.dueDate,
       totalRappen,
@@ -146,7 +158,17 @@ export async function fetchReceivables(prisma: PrismaClient, asOf: Date): Promis
       dueDate: true,
       totalAmount: true,
       customer: {
-        select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true },
+        select: {
+          customerId: true,
+          company: true,
+          contactPerson: true,
+          contactInsteadOfCompany: true,
+          street: true,
+          houseNumber: true,
+          zipCode: true,
+          city: true,
+          country: true,
+        },
       },
       payments: { select: { date: true, amount: true } },
       creditNotes: { where: { state: { not: "Draft" } }, select: { date: true, totalAmount: true } },

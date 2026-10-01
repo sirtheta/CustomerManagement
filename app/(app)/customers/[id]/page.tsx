@@ -6,6 +6,8 @@ import DeleteCustomerButton from "../DeleteCustomerButton";
 import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
+import SubscriptionsSection from "../SubscriptionsSection";
+import { toDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,7 +83,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
   const DETAIL_LIST_LIMIT = 25;
 
-  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount] = await Promise.all([
+  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates] =await Promise.all([
     prisma.customer.findUnique({ where: { customerId } }),
     prisma.document.findMany({
       where: { customerId },
@@ -110,6 +112,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
     }),
     prisma.invoice.count({ where: { customerId } }),
     prisma.quote.count({ where: { customerId } }),
+    prisma.subscription.findMany({
+      where: { customerId },
+      include: { template: { select: { name: true } } },
+      orderBy: { nextInvoiceDate: "asc" },
+    }),
+    prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   if (!customer) notFound();
@@ -141,6 +149,20 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
         />
         <div className="space-y-6">
+          <SubscriptionsSection
+            customerId={customerId}
+            canEdit={canEdit}
+            templates={templates}
+            subscriptions={subscriptions.map((s) => ({
+              id: s.id,
+              interval: s.interval,
+              nextInvoiceDate: toDateString(s.nextInvoiceDate),
+              autoSend: s.autoSend,
+              active: s.active,
+              templateId: s.templateId,
+              templateName: s.template?.name ?? null,
+            }))}
+          />
           <DocumentsSection customerId={customerId} documents={documents} />
           <NotesSection customerId={customerId} notes={decryptedNotes} />
         </div>

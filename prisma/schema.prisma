@@ -18,17 +18,15 @@ model Customer {
   addressNeedsReview      Boolean    @default(false)
   email                   String
   phone                   String?
-  yearlyInvoice           Boolean    @default(false)
   contactInsteadOfCompany Boolean    @default(false)
-  nextInvoiceDate         DateTime?
   archivedAt              DateTime?
   invoices                Invoice[]
   quotes                  Quote[]
   documents               Document[]
   notes                   CustomerNote[]
+  subscriptions           Subscription[]
 
   @@index([email])
-  @@index([nextInvoiceDate])
   @@index([archivedAt])
 }
 
@@ -73,6 +71,7 @@ model Payment {
   bankReference String?
   createdAt     DateTime @default(now())
   invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bankTransaction BankTransaction?
 
   @@index([invoiceId])
   @@index([date])
@@ -173,6 +172,7 @@ model InvoiceTemplate {
   id    Int            @id @default(autoincrement())
   name  String
   items TemplateItem[]
+  subscriptions Subscription[]
 }
 
 model TemplateItem {
@@ -185,6 +185,28 @@ model TemplateItem {
   quantity    Decimal
   categoryId  Int?
   template    InvoiceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+enum SubscriptionInterval {
+  Monthly
+  Quarterly
+  Yearly
+}
+
+model Subscription {
+  id              Int                  @id @default(autoincrement())
+  customerId      Int
+  templateId      Int?
+  interval        SubscriptionInterval
+  nextInvoiceDate DateTime
+  autoSend        Boolean              @default(false)
+  active          Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  customer        Customer             @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
+  template        InvoiceTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([nextInvoiceDate])
+  @@index([customerId])
 }
 
 model Service {
@@ -215,12 +237,32 @@ model Expense {
   amount      Decimal
   categoryId  Int?
   notes       String?
+  supplier    String?
+  dueDate     DateTime?
+  // null = open supplier invoice, otherwise the day it was paid
+  paidDate    DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   category    Category? @relation(fields: [categoryId], references: [categoryId])
+  receipts    ExpenseReceipt[]
+  bankTransaction BankTransaction?
 
   @@index([date])
   @@index([categoryId])
+  @@index([paidDate])
+}
+
+model ExpenseReceipt {
+  id         Int      @id @default(autoincrement())
+  expenseId  Int
+  name       String
+  fileType   String
+  size       Int
+  uploadDate DateTime @default(now())
+  content    Bytes
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
 }
 
 model Document {
@@ -386,4 +428,52 @@ enum Unit {
   Day
   Piece
   Package
+}
+
+model BankStatementImport {
+  id                   Int       @id @default(autoincrement())
+  filename             String
+  iban                 String?
+  currency             String?
+  periodFrom           String?   // YYYY-MM-DD
+  periodTo             String?   // YYYY-MM-DD
+  openingBalanceRappen Int?
+  closingBalanceRappen Int?
+  /// Balance warnings shown at upload time, kept for the import history.
+  balanceWarning       String?
+  importedCount        Int
+  skippedCount         Int
+  userId               Int?
+  createdAt            DateTime  @default(now())
+  transactions         BankTransaction[]
+
+  @@index([createdAt])
+  @@index([iban, periodTo])
+}
+
+/// One booked entry of an imported CAMT.053 statement. Open = no payment,
+/// no expense and not ignored; there is deliberately no status column that
+/// could disagree with the payments (deleting a Payment/Expense sets the
+/// link to null and the row is open again).
+model BankTransaction {
+  id            Int      @id @default(autoincrement())
+  importId      Int
+  fingerprint   String   @unique
+  date          DateTime
+  /// Signed Rappen: negative = money out.
+  amountRappen  Int
+  description   String
+  counterparty  String?
+  bankReference String?
+  ignored       Boolean  @default(false)
+  paymentId     Int?     @unique
+  expenseId     Int?     @unique
+  createdAt     DateTime @default(now())
+
+  statementImport BankStatementImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+  payment         Payment?            @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  expense         Expense?            @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  @@index([importId])
+  @@index([date])
 }
