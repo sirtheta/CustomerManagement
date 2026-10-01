@@ -123,3 +123,35 @@ describe("buildReceivables", () => {
     expect(buildReceivables([inv({ id: 1, state: "Canceled" })], asOf).rows).toHaveLength(0);
   });
 });
+
+describe("buildReceivables customer address", () => {
+  it("carries the customer address on each row", () => {
+    const report = buildReceivables(
+      [
+        inv({
+          id: 1,
+          customer: {
+            ...customer,
+            street: "Seestrasse",
+            houseNumber: "100",
+            zipCode: "3011",
+            city: "Bern",
+            country: "CH",
+          },
+        }),
+      ],
+      new Date("2026-12-31")
+    );
+    expect(report.rows[0].customerAddress).toEqual({
+      street: "Seestrasse 100",
+      zip: "3011",
+      city: "Bern",
+      country: "CH",
+    });
+  });
+
+  it("falls back to empty strings when the input has no address", () => {
+    const report = buildReceivables([inv({ id: 1 })], new Date("2026-12-31"));
+    expect(report.rows[0].customerAddress).toEqual({ street: "", zip: "", city: "", country: "" });
+  });
+});

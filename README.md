@@ -28,7 +28,7 @@ versende sie per E-Mail und behalte offene Zahlungen, Mahnungen und deinen Umsat
 - 🔍 **Volltextsuche** über Kunden, Rechnungen und Offerten
 - 👤 **Benutzer & Rollen** (Admin, Editor, Viewer) mit optionaler **2-Faktor-Authentifizierung**
 - 📝 **Audit-Log** protokolliert alle wichtigen Änderungen
-- 📤 **CSV-Export** von Kunden, Rechnungen und Offerten
+- 📤 **CSV-Export** von Kunden, Rechnungen und Offerten sowie ein **Jahrespaket (ZIP)** für die Steuererklärung (Journal, Jahresübersicht, offene Posten, archivierte Rechnungs-PDFs)
 
 ---
 
