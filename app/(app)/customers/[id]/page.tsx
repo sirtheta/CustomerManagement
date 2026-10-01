@@ -7,6 +7,7 @@ import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import SubscriptionsSection from "../SubscriptionsSection";
+import ContactsSection from "../ContactsSection";
 import { toDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +84,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
   const DETAIL_LIST_LIMIT = 25;
 
-  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates] =await Promise.all([
+  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates, contacts] = await Promise.all([
     prisma.customer.findUnique({ where: { customerId } }),
     prisma.document.findMany({
       where: { customerId },
@@ -118,6 +119,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       orderBy: { nextInvoiceDate: "asc" },
     }),
     prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),
   ]);
 
   if (!customer) notFound();
@@ -149,6 +151,17 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
         />
         <div className="space-y-6">
+          <ContactsSection
+            customerId={customerId}
+            canEdit={canEdit}
+            contacts={contacts.map((c) => ({
+              contactId: c.contactId,
+              name: c.name,
+              role: c.role,
+              email: c.email,
+              phone: c.phone,
+            }))}
+          />
           <SubscriptionsSection
             customerId={customerId}
             canEdit={canEdit}
