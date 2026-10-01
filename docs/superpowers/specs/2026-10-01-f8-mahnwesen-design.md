@@ -36,7 +36,7 @@ Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminde
 
 Keine neue Tabelle: Level, Empfänger, Betreff und Archivpfad liegen bereits in `SentDocument`.
 
-Es wird **keine neue Migration angelegt**. Die nötigen SQL-Befehle werden an die letzte, noch unveröffentlichte Migration `20261001081107_expense_receipts` angehängt (Projektpraxis, siehe Squash #125). Falls diese Migration bereits in einem Release steckt, ist das nicht zulässig und es muss neu entschieden werden. Eine lokale DB, die die Migration schon angewendet hat, muss danach zurückgesetzt werden (geänderte Prüfsumme).
+Es wird **keine neue Migration angelegt**. Die nötigen SQL-Befehle werden an die letzte, noch unveröffentlichte Migration `20261001120000_invoicing_and_banking` angehängt (Projektpraxis, siehe Squash #125). Falls diese Migration bereits in einem Release steckt, ist das nicht zulässig und es muss neu entschieden werden. Eine lokale DB, die die Migration schon angewendet hat, muss danach zurückgesetzt werden (geänderte Prüfsumme).
 
 Die angehängte SQL setzt ausserdem `PendingReminder.reminderLevel` auf höchstens 4 (`UPDATE … SET reminderLevel = 4 WHERE reminderLevel > 4`).
 

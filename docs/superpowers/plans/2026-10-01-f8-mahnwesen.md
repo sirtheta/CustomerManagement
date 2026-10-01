@@ -20,7 +20,7 @@
 - Beträge werden **immer serverseitig** neu berechnet, nie aus Formulardaten übernommen.
 - Nie `logAudit` innerhalb einer `$transaction` aufrufen; nie direkt in `AuditLog` schreiben.
 - Betreibung/Inkasso und Forderungsexport sind **nicht** im Umfang.
-- **Keine neue Migration anlegen.** Schemaänderungen werden als SQL an die letzte (unveröffentlichte) Migration `20261001081107_expense_receipts` angehängt.
+- **Keine neue Migration anlegen.** Schemaänderungen werden als SQL an die letzte (unveröffentlichte) Migration `20261001120000_invoicing_and_banking` angehängt.
 - Der Versand wird verweigert, wenn der Restbetrag 0 ist („Die Rechnung ist bereits beglichen.“).
 - Änderungen an Gebühren/Zinssatz werden auditiert (`UPDATE Settings`, ausserhalb jeder Transaktion).
 - Bekannt und bewusst nicht behoben: gleichzeitiger Doppelversand derselben Mahnung (zwei Tabs) ist wie schon heute durch kein Claim geschützt.
@@ -52,7 +52,7 @@
 
 **Files:**
 - Modify: `prisma/schema.prisma` (`ApplicationSettings` nach `reminderCooldownDays`, `SentDocument`)
-- Modify: `prisma/migrations/20261001081107_expense_receipts/migration.sql` (SQL anhängen, **keine neue Migration**)
+- Modify: `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` (SQL anhängen, **keine neue Migration**)
 - Modify: `app/(app)/settings/actions.ts`, `app/(app)/settings/page.tsx`, `app/(app)/settings/SettingsForm.tsx`
 - Test: `tests/unit/settings-actions.test.ts`
 
@@ -210,7 +210,7 @@ In `model SentDocument`, direkt nach `createdById    Int`:
   dunningDate    DateTime?
 ```
 
-Keine neue Migration: Vor dem Anhängen prüfen, dass `20261001081107_expense_receipts` in keinem Release-Tag steckt (`git tag --contains $(git log -1 --format=%h -- prisma/migrations/20261001081107_expense_receipts)` liefert nichts); sonst abbrechen und nachfragen. Dann die SQL an `prisma/migrations/20261001081107_expense_receipts/migration.sql` anhängen (am Dateiende, mit Leerzeile davor). Sie muss genau dem Schema entsprechen; zur Kontrolle einmal `npx prisma migrate dev --name tmp_check --create-only` ausführen, die erzeugten `ALTER TABLE`-Befehle mit den folgenden vergleichen (die Reihenfolge darf abweichen), danach den erzeugten Ordner `…_tmp_check` **löschen**. Angehängt wird:
+Keine neue Migration: Vor dem Anhängen prüfen, dass `20261001120000_invoicing_and_banking` in keinem Release-Tag steckt (`git tag --contains $(git log -1 --format=%h -- prisma/migrations/20261001120000_invoicing_and_banking)` liefert nichts); sonst abbrechen und nachfragen. Dann die SQL an `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` anhängen (am Dateiende, mit Leerzeile davor). Sie muss genau dem Schema entsprechen; zur Kontrolle einmal `npx prisma migrate dev --name tmp_check --create-only` ausführen, die erzeugten `ALTER TABLE`-Befehle mit den folgenden vergleichen (die Reihenfolge darf abweichen), danach den erzeugten Ordner `…_tmp_check` **löschen**. Angehängt wird:
 
 ```sql
 
@@ -230,7 +230,7 @@ ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
 UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;
 ```
 
-Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Eine lokale Entwicklungs-DB, die `20261001081107_expense_receipts` schon angewendet hat, meldet danach eine geänderte Prüfsumme. Das Zurücksetzen (`npx prisma migrate reset`) löscht die lokalen Daten, deshalb **vorher beim Nutzer nachfragen**; danach `npx prisma generate`. Ohne Reset läuft `scripts/startup.js` auf einer frischen DB (z. B. `DATABASE_URL=file:./data/tmp-check.db`) zur Kontrolle, dass die ganze Migrationskette durchläuft.
+Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Eine lokale Entwicklungs-DB, die `20261001120000_invoicing_and_banking` schon angewendet hat, meldet danach eine geänderte Prüfsumme. Das Zurücksetzen (`npx prisma migrate reset`) löscht die lokalen Daten, deshalb **vorher beim Nutzer nachfragen**; danach `npx prisma generate`. Ohne Reset läuft `scripts/startup.js` auf einer frischen DB (z. B. `DATABASE_URL=file:./data/tmp-check.db`) zur Kontrolle, dass die ganze Migrationskette durchläuft.
 
 - [ ] **Step 4: `saveSettings` erweitern**
 
@@ -356,7 +356,7 @@ Run: `npx tsc --noEmit` → keine Fehler (Prüfen, dass alle Stellen, die `Setti
 - [ ] **Step 7: Commit**
 
 ```bash
-git add prisma/schema.prisma prisma/migrations/20261001081107_expense_receipts/migration.sql app/\(app\)/settings tests/unit/settings-actions.test.ts
+git add prisma/schema.prisma prisma/migrations/20261001120000_invoicing_and_banking/migration.sql app/\(app\)/settings tests/unit/settings-actions.test.ts
 git commit -m "feat(reminders): add dunning fee and interest settings
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
