@@ -69,9 +69,16 @@ Der Restbetrag stammt aus `getPaymentSummary(...).remainingRappen` (berücksicht
 
 Neuer Abschnitt „Mahnwesen“ neben `reminderCooldownDays` in Einstellungen: drei Gebührenfelder (CHF, intern Rappen), Zinssatz (%), Hinweis zur rechtlichen Klärung. Validierung: Beträge ≥ 0 (ungültige Eingabe: „Ungültiger Betrag.“), Zinssatz 0–100. `saveSettings` schreibt einen Audit-Eintrag `UPDATE Settings` (`entityRef` „Mahnwesen“, Details mit den neuen Werten), wenn sich Gebühren oder Zinssatz ändern.
 
+## Bekannte Grenzen
+
+- Das Mahndatum ist die Serverzeit (Container in UTC); kurz nach Mitternacht Schweizer Zeit liegt es auf dem Vortag, Zinstage und gedrucktes Datum sind dann um einen Tag niedriger.
+- Eine Mahnung mit „Letzte Stufe erreicht“ bleibt in der Liste (Ignorieren setzt nur den Cooldown) und kann über `notifyRepeatIntervalDays` weiter gemeldet werden, bis die Rechnung bezahlt oder die Mahnung zurückgesetzt ist.
+- Gleichzeitiger Doppelversand derselben Mahnung (zwei Tabs) ist nicht gesperrt, wie schon heute.
+- Bestehende Nicht-Release-Datenbanken, die `20261001120000_invoicing_and_banking` schon angewendet haben, bekommen die neuen Spalten nicht und müssen neu aufgebaut werden (`scripts/startup.js` und `migrate deploy` vergleichen nur den Migrationsnamen).
+
 ## Bankabgleich
 
-`OpenInvoice` (`lib/import/matching.ts`) erhält optional `reminderTotal` (CHF: Offen + Gebühr + Zins der zuletzt versendeten Mahnung, nur wenn grösser als der offene Betrag). `matchStatementToInvoices` akzeptiert einen Betrag, der dem offenen Betrag oder dem `reminderTotal` entspricht, als Betragstreffer. `loadOpenInvoices` füllt das Feld aus der neuesten `SentDocument`-Zeile mit `kind = "Reminder"`. Die Zahlung wird über `recordPayment` gebucht; der Überschuss gegenüber dem Rest erscheint als Überzahlung.
+`OpenInvoice` (`lib/import/matching.ts`) erhält optional `reminderTotal` (CHF: Offen + Gebühr + Zins der zuletzt versendeten Mahnung; nur gesetzt, wenn deren `openRappen` dem aktuellen Rest entspricht und der Total über dem Rest liegt, damit eine nach Teilzahlung oder Gutschrift veraltete Mahnung nicht mehr zählt). `matchStatementToInvoices` akzeptiert einen Betrag, der dem offenen Betrag oder dem `reminderTotal` entspricht, als Betragstreffer. `loadOpenInvoices` füllt das Feld aus der neuesten `SentDocument`-Zeile mit `kind = "Reminder"`. Die Zahlung wird über `recordPayment` gebucht; der Überschuss gegenüber dem Rest erscheint als Überzahlung.
 
 ## Tests
 

@@ -23,6 +23,8 @@
 - **Keine neue Migration anlegen.** Schemaänderungen werden als SQL an die letzte (unveröffentlichte) Migration `20261001120000_invoicing_and_banking` angehängt.
 - Der Versand wird verweigert, wenn der Restbetrag 0 ist („Die Rechnung ist bereits beglichen.“).
 - Änderungen an Gebühren/Zinssatz werden auditiert (`UPDATE Settings`, ausserhalb jeder Transaktion).
+- Bewusstes Verhalten: Eine Mahnung mit „Letzte Stufe erreicht“ bleibt in der Liste (Ignorieren setzt nur den Cooldown) und kann über `notifyRepeatIntervalDays` weiter an die Admins gemeldet werden, bis die Rechnung bezahlt oder die Mahnung zurückgesetzt ist. Betreibung ist ein manueller Schritt ausserhalb der App.
+- Bekannte Grenze: Das Mahndatum ist `new Date()` auf dem Server (Container in UTC). Zwischen 00:00 und 01:00/02:00 Schweizer Zeit liegt es auf dem Vortag, Zinstage und gedrucktes Datum sind dann um einen Tag niedriger.
 - Bekannt und bewusst nicht behoben: gleichzeitiger Doppelversand derselben Mahnung (zwei Tabs) ist wie schon heute durch kein Claim geschützt.
 - Tests: `npx vitest run <datei>`; Integrationstests nutzen `createTestDatabase()` aus `tests/test-utils.ts`.
 
@@ -54,7 +56,7 @@
 - Modify: `prisma/schema.prisma` (`ApplicationSettings` nach `reminderCooldownDays`, `SentDocument`)
 - Modify: `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` (SQL anhängen, **keine neue Migration**)
 - Modify: `app/(app)/settings/actions.ts`, `app/(app)/settings/page.tsx`, `app/(app)/settings/SettingsForm.tsx`
-- Test: `tests/unit/settings-actions.test.ts`
+- Test: `tests/unit/settings-actions.test.ts`, `tests/integration/invoicing-and-banking-migration.test.ts`
 
 **Interfaces:**
 - Produces: `ApplicationSettings.reminderFeeLevel2Rappen | reminderFeeLevel3Rappen | reminderFeeLevel4Rappen: number` (Rappen, Default 0), `ApplicationSettings.reminderInterestPercent: Prisma.Decimal` (Default 0); `SentDocument.openRappen | feeRappen | interestRappen: number | null`, `SentDocument.interestPercent: Prisma.Decimal | null`, `SentDocument.dunningDate: Date | null`.
@@ -186,7 +188,7 @@ In `tests/unit/settings-actions.test.ts` im Block `describe("saveSettings", …)
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/unit/settings-actions.test.ts`
-Expected: FAIL (Felder fehlen in `data`, Fehlermeldungen unbekannt).
+Expected: FAIL (Felder fehlen in `data`, Fehlermeldungen unbekannt). Der Migrationstest wird in Step 3 (Punkt 5) geschrieben und dort vor dem Anhängen der SQL rot, danach grün geprüft.
 
 - [ ] **Step 3: Schema und Migration**
 
@@ -210,7 +212,11 @@ In `model SentDocument`, direkt nach `createdById    Int`:
   dunningDate    DateTime?
 ```
 
-Keine neue Migration: Vor dem Anhängen prüfen, dass `20261001120000_invoicing_and_banking` in keinem Release-Tag steckt (`git tag --contains $(git log -1 --format=%h -- prisma/migrations/20261001120000_invoicing_and_banking)` liefert nichts); sonst abbrechen und nachfragen. Dann die SQL an `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` anhängen (am Dateiende, mit Leerzeile davor). Sie muss genau dem Schema entsprechen; zur Kontrolle einmal `npx prisma migrate dev --name tmp_check --create-only` ausführen, die erzeugten `ALTER TABLE`-Befehle mit den folgenden vergleichen (die Reihenfolge darf abweichen), danach den erzeugten Ordner `…_tmp_check` **löschen**. Angehängt wird:
+Keine neue Migration. Reihenfolge:
+
+1. Direkt nach der Schemaänderung `npx prisma generate` ausführen (Prisma 7 erzeugt den Client nicht automatisch; ohne Generate scheitert `npx tsc --noEmit` an den neuen Feldern).
+2. Prüfen, dass `20261001120000_invoicing_and_banking` in keinem Release-Tag steckt: `git tag --contains $(git log -1 --format=%h -- prisma/migrations/20261001120000_invoicing_and_banking)` muss leer sein; sonst abbrechen und nachfragen.
+3. Die SQL an `prisma/migrations/20261001120000_invoicing_and_banking/migration.sql` anhängen (am Dateiende, mit Leerzeile davor):
 
 ```sql
 
@@ -230,7 +236,55 @@ ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
 UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;
 ```
 
-Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Eine lokale Entwicklungs-DB, die `20261001120000_invoicing_and_banking` schon angewendet hat, meldet danach eine geänderte Prüfsumme. Das Zurücksetzen (`npx prisma migrate reset`) löscht die lokalen Daten, deshalb **vorher beim Nutzer nachfragen**; danach `npx prisma generate`. Ohne Reset läuft `scripts/startup.js` auf einer frischen DB (z. B. `DATABASE_URL=file:./data/tmp-check.db`) zur Kontrolle, dass die ganze Migrationskette durchläuft.
+Im Kopfkommentar derselben Datei die Aufzählung (`… bank transactions and expense receipts.`) um `, dunning fees and interest` ergänzen.
+
+4. Die Migration kontrollieren, ohne die lokale Entwicklungs-DB anzufassen (`npx prisma migrate dev` ist hier ungeeignet: die lokale DB hat die Migration schon angewendet, `migrate dev` meldet „modified after applied“ und verlangt einen Reset, in der nicht-interaktiven Shell bricht es ab):
+
+```bash
+DATABASE_URL=file:./data/tmp-check.db node scripts/startup.js
+DATABASE_URL=file:./data/tmp-check.db npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+```
+
+Erwartet: `startup.js` wendet die ganze Kette an, und `migrate diff` gibt keine Änderungen aus (leere Ausgabe bzw. „No difference“). Danach `data/tmp-check.db` löschen (`rm -f data/tmp-check.db*`). Weicht die Ausgabe ab, die SQL oben an das Schema angleichen, nicht umgekehrt. Falls `scripts/startup.js` ohne `ADMIN_EMAIL`/`ADMIN_PASSWORD` das Seeding verweigert, nur die Migrationsschleife ausführen oder die Variablen für den Lauf setzen.
+
+5. Migrationstest ergänzen: in `tests/integration/invoicing-and-banking-migration.test.ts` im `describe` einen Fall anfügen (die Hilfen `legacyDb` und `applyMigration` stehen in der Datei):
+
+```ts
+  it("adds the dunning columns and caps legacy reminder levels at 4", () => {
+    const db = legacyDb();
+    db.pragma("foreign_keys = OFF");
+    db.prepare(
+      `INSERT INTO "Invoice" ("customerId", "documentNumber", "date", "totalAmount", "dueDate", "state")
+       VALUES (1, 'R-1', 1700000000000, 100, 1702592000000, 'Overdue')`
+    ).run();
+    db.prepare(`INSERT INTO "PendingReminder" ("invoiceId", "reminderLevel") VALUES (1, 6)`).run();
+
+    applyMigration(db, MIGRATION);
+
+    expect(db.prepare(`SELECT "reminderLevel" FROM "PendingReminder"`).get()).toEqual({ reminderLevel: 4 });
+
+    const settings = db.prepare(`PRAGMA table_info("ApplicationSettings")`).all() as {
+      name: string; notnull: number; dflt_value: string | null;
+    }[];
+    for (const name of ["reminderFeeLevel2Rappen", "reminderFeeLevel3Rappen", "reminderFeeLevel4Rappen", "reminderInterestPercent"]) {
+      const col = settings.find((c) => c.name === name);
+      expect(col, name).toBeDefined();
+      expect(col!.notnull).toBe(1);
+      expect(col!.dflt_value).toBe("0");
+    }
+
+    const sent = db.prepare(`PRAGMA table_info("SentDocument")`).all() as { name: string; notnull: number }[];
+    for (const name of ["openRappen", "feeRappen", "interestRappen", "interestPercent", "dunningDate"]) {
+      const col = sent.find((c) => c.name === name);
+      expect(col, name).toBeDefined();
+      expect(col!.notnull).toBe(0);
+    }
+  });
+```
+
+Dieser Test gehört in Step 1 (zu den fehlschlagenden Tests) und läuft in Step 6 mit.
+
+6. Hinweis zu bestehenden Datenbanken: `scripts/startup.js` (`WHERE finished_at IS NOT NULL`, Vergleich nur über den Namen) und `prisma migrate deploy` (`test:e2e:server`) überspringen eine schon angewendete Migration, ohne die Prüfsumme zu vergleichen. Jede Nicht-Release-DB, die `20261001120000_invoicing_and_banking` schon hat (lokale `data/customermanagement.db`, Docker-Testinstanzen mit einem Image von `main`, `data-e2e`, `data-manual`, `data-marketing`), bekommt die neuen Spalten daher **nicht** und scheitert zur Laufzeit mit „no such column“; sie muss neu aufgebaut werden. Für die lokale Entwicklungs-DB gibt es zwei Wege, beide löschen oder verändern Daten und brauchen **vorher die Zustimmung des Nutzers**: (a) `npx prisma migrate reset` (löscht alle lokalen Daten), oder (b) datenerhaltend: die angehängten Befehle per `npx prisma db execute --file <sql-datei>` ausführen und in `_prisma_migrations` die `checksum` der Migration auf den neuen SHA-256 des `migration.sql` setzen. Release-DBs (Stand 1.5.0) sind nicht betroffen.
 
 - [ ] **Step 4: `saveSettings` erweitern**
 
@@ -350,13 +404,13 @@ Im JSX direkt nach dem `<div className="grid grid-cols-2 gap-4">…</div>`-Block
 
 - [ ] **Step 6: Run tests and typecheck**
 
-Run: `npx vitest run tests/unit/settings-actions.test.ts` → PASS
+Run: `npx vitest run tests/unit/settings-actions.test.ts tests/integration/invoicing-and-banking-migration.test.ts` → PASS
 Run: `npx tsc --noEmit` → keine Fehler (Prüfen, dass alle Stellen, die `SettingsForm` rendern, die neuen Props bekommen).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add prisma/schema.prisma prisma/migrations/20261001120000_invoicing_and_banking/migration.sql app/\(app\)/settings tests/unit/settings-actions.test.ts
+git add prisma/schema.prisma prisma/migrations/20261001120000_invoicing_and_banking/migration.sql app/\(app\)/settings tests/unit/settings-actions.test.ts tests/integration/invoicing-and-banking-migration.test.ts
 git commit -m "feat(reminders): add dunning fee and interest settings
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
@@ -1051,7 +1105,7 @@ export async function isLastReminderLevelSent(
 }
 ```
 
-Test dazu in `tests/integration/reminders.test.ts` (neuer eigener `describe`, der Import der Datei wird zu `import { checkOverdueInvoices, isLastReminderLevelSent } from "@/lib/reminders";`):
+Test dazu in `tests/integration/reminders.test.ts` (**Reihenfolge:** diesen Block schon in Step 1 schreiben und in Step 2 rot laufen lassen, bevor der Helper implementiert wird; neuer eigener `describe`, der Import der Datei wird zu `import { checkOverdueInvoices, isLastReminderLevelSent } from "@/lib/reminders";`):
 
 ```ts
 describe("isLastReminderLevelSent", () => {
@@ -1130,14 +1184,18 @@ und den Versand `await sendInvoiceEmail(invoice, settings, pdf, mail);` ersetzen
   await sendInvoiceEmail(invoice, settings, pdf, attachmentName ? { ...mail, attachmentName } : mail);
 ```
 
-`sentDocumentData`: Parameter `charges?: ReminderCharges;` und im zurückgegebenen Objekt ergänzen:
+`sentDocumentData`: Parameter `charges?: ReminderCharges;` und am Ende des zurückgegebenen Objekts (nach `createdById: …`) ergänzen. Ohne `charges` dürfen die Schlüssel **nicht** im Objekt stehen (auch nicht als `null`), sonst bricht das bestehende `toEqual` in `tests/unit/invoice-dispatch.test.ts`:
 
 ```ts
-    openRappen: params.charges?.openRappen ?? null,
-    feeRappen: params.charges?.feeRappen ?? null,
-    interestRappen: params.charges?.interestRappen ?? null,
-    interestPercent: params.charges ? params.charges.interestPercent : null,
-    dunningDate: params.charges?.dunningDate ?? null,
+    ...(params.charges
+      ? {
+          openRappen: params.charges.openRappen,
+          feeRappen: params.charges.feeRappen,
+          interestRappen: params.charges.interestRappen,
+          interestPercent: params.charges.interestPercent,
+          dunningDate: params.charges.dunningDate,
+        }
+      : {}),
 ```
 
 - [ ] **Step 4: `sendReminder`**
@@ -1193,13 +1251,13 @@ Hinweis: Level 4 bleibt nach dem Versand auf 4 stehen und `snoozedUntil` wird ge
 
 - [ ] **Step 5: Run to verify tests pass**
 
-Run: `npx vitest run tests/unit/invoice-dispatch.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts`
+Run: `npx vitest run tests/unit/invoice-dispatch.test.ts tests/unit/invoice-sub-actions.test.ts tests/unit/email-send.test.ts tests/unit/document-pdf-generation.test.ts tests/integration/invoice-dispatch.test.ts tests/integration/reminders.test.ts`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/invoice-dispatch.ts app/\(app\)/invoices/reminders/actions.ts tests/unit/invoice-dispatch.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts
+git add lib/invoice-dispatch.ts lib/email.ts lib/reminders.ts lib/pdf/invoice-pdf.ts app/\(app\)/invoices/reminders/actions.ts tests/unit/invoice-dispatch.test.ts tests/unit/invoice-sub-actions.test.ts tests/unit/email-send.test.ts tests/unit/document-pdf-generation.test.ts tests/integration/invoice-dispatch.test.ts tests/integration/reminders.test.ts
 git commit -m "feat(reminders): send the dunning notice and store its amounts
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
@@ -1210,7 +1268,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ### Task 5: Mahnliste (Stufen, Vorschau, letzte Stufe)
 
 **Files:**
-- Modify: `app/(app)/invoices/reminders/page.tsx`, `app/(app)/invoices/reminders/ReminderRow.tsx`
+- Modify: `app/(app)/invoices/reminders/page.tsx`, `app/(app)/invoices/reminders/ReminderRow.tsx`, `app/(app)/invoices/[id]/page.tsx`
 
 **Interfaces:**
 - Consumes: `reminderTitle`, `computeReminderCharges` (Task 2); `isLastReminderLevelSent` (Task 4).
@@ -1266,7 +1324,7 @@ Der bestehende `defaultBody` bleibt unverändert (`Betrag:` zeigt weiterhin den 
               : "";
 ```
 
-und in `defaultBody` direkt nach `Betrag: ${formatCurrency(remaining)}` den Platzhalter `${extra}` einfügen.
+Die Konstante `extra` **vor** `const defaultBody` deklarieren und in `defaultBody` direkt nach `Betrag: ${formatCurrency(remaining)}` den Platzhalter `${extra}` einfügen.
 
 - [ ] **Step 2: `ReminderRow.tsx`**
 
@@ -1306,6 +1364,20 @@ Wenn `props.lastLevelSent` gilt, statt `<form …>…</form>` im `CardContent` n
         )}
 ```
 
+- [ ] **Step 2b: Archivliste der Rechnungsseite**
+
+In `app/(app)/invoices/[id]/page.tsx` (Archivtabelle, Zelle mit `Mahnung Stufe …`) die Beschriftung durch den Belegtitel ersetzen, damit Stufe 1 „Zahlungserinnerung“ heisst statt „Mahnung Stufe 1“. `import { reminderTitle } from "@/lib/reminder-charges";` ergänzen und
+
+```tsx
+{doc.kind === "Reminder" ? `Mahnung Stufe ${doc.reminderLevel ?? 1}` : "Rechnung"}
+```
+
+ersetzen durch
+
+```tsx
+{doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : "Rechnung"}
+```
+
 - [ ] **Step 3: Typecheck und Lint**
 
 Run: `npx tsc --noEmit` → keine Fehler
@@ -1318,7 +1390,7 @@ Run: `npm run lint` → keine neuen Fehler
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/\(app\)/invoices/reminders
+git add app/\(app\)/invoices/reminders app/\(app\)/invoices/\[id\]/page.tsx
 git commit -m "feat(reminders): show dunning levels, charges preview and last level
 
 Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
@@ -1333,7 +1405,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Test: `tests/unit/import-matching.test.ts`, `tests/integration/bank-import.test.ts`
 
 **Interfaces:**
-- Produces: `OpenInvoice.reminderTotal?: number` (CHF), gesetzt von `loadOpenInvoices`, wenn die zuletzt versendete Mahnung einen Total über dem offenen Betrag hat.
+- Produces: `OpenInvoice.reminderTotal?: number` (CHF), gesetzt von `loadOpenInvoices` nur, wenn der `openRappen` der zuletzt versendeten Mahnung dem aktuellen Rest entspricht (sonst ist sie nach einer Teilzahlung oder Gutschrift veraltet) und ihr Total über dem Rest liegt.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1370,7 +1442,9 @@ In `tests/integration/bank-import.test.ts` einen Test ergänzen, der `loadOpenIn
     expect(open.reminderTotal).toBe(112.5);
 ```
 
-und einen zweiten Fall ohne Mahnung: `reminderTotal` ist `undefined`.
+einen zweiten Fall ohne Mahnung (`reminderTotal` ist `undefined`) und einen dritten Fall „veraltete Mahnung“: eine Zahlung über CHF 40 auf die Rechnung (`db.prisma.payment.create` mit `invoiceId`, `amount: 40`, `date`, `source: "manual"`), dann ist `openAmount` 60 und `reminderTotal` `undefined`, weil `openRappen` der Mahnung (10000) nicht mehr dem Rest (6000) entspricht.
+
+Den Seed (Kunde und Rechnung) in `tests/integration/bank-import.test.ts` ausschreiben, die Datei legt bisher keine Kunden oder Rechnungen an: `import { createTestDatabase, createValidTestCustomer } from "../test-utils";` (bzw. den bestehenden Import erweitern), Kunde mit `db.prisma.customer.create({ data: createValidTestCustomer() })`, Rechnung wie in `tests/integration/reminders.test.ts` (`state: "Overdue"`, `documentNumber: "I-26090001"`, `totalAmount: 100`, `dueDate` in der Vergangenheit).
 
 - [ ] **Step 2: Run to verify they fail**
 
@@ -1422,9 +1496,12 @@ und im `.map` nach `const names = …`:
 ```ts
       const openRappen = Math.max(toRappen(invoice.totalAmount) - creditedRappen - paidRappen, 0);
       const lastReminder = invoice.sentDocuments[0];
-      const reminderRappen = lastReminder
-        ? (lastReminder.openRappen ?? 0) + (lastReminder.feeRappen ?? 0) + (lastReminder.interestRappen ?? 0)
-        : 0;
+      // Only a notice written for the current remainder counts; after a partial payment
+      // or a credit note the old total would no longer be what the customer owes.
+      const reminderRappen =
+        lastReminder && lastReminder.openRappen === openRappen
+          ? openRappen + (lastReminder.feeRappen ?? 0) + (lastReminder.interestRappen ?? 0)
+          : 0;
 ```
 
 Das zurückgegebene Objekt: `openAmount: openRappen / 100,` und
@@ -1491,7 +1568,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ## Self-Review
 
-- **Spec-Abdeckung:** Stufen und Level-Deckel (Task 2, 4, 5), Datenmodell (Task 1), Berechnung (Task 2), Mahnbeleg-PDF (Task 3), Versand und Speicherung (Task 4), Mahnliste (Task 5), Einstellungen inkl. Rechtshinweis und Validierung (Task 1), Tests (je Task), Doku (Task 6). Nicht im Umfang bleiben Betreibung/Export und Verrechnung als Forderung.
-- **Typkonsistenz:** `ReminderCharges`, `computeReminderCharges`, `reminderTitle`, `MAX_REMINDER_LEVEL` (Task 2) werden in Task 3–5 mit denselben Namen verwendet; die Feldnamen `reminderFeeLevel{2,3,4}Rappen` und `reminderInterestPercent` stimmen zwischen Schema, Formular (`reminderFeeLevel2/3/4`, `reminderInterestPercent`), `saveSettings` und `computeReminderCharges` überein.
+- **Spec-Abdeckung:** Stufen und Level-Deckel (Task 2, 4, 5), Datenmodell (Task 1), Berechnung (Task 2), Mahnbeleg-PDF (Task 3), Versand und Speicherung (Task 4), Mahnliste (Task 5), Einstellungen inkl. Rechtshinweis und Validierung (Task 1), Tests (je Task), Bankabgleich mit Mahn-Total (Task 6), Doku (Task 7). Nicht im Umfang bleiben Betreibung/Export und Verrechnung als Forderung.
+- **Typkonsistenz:** `ReminderCharges`, `computeReminderCharges`, `reminderTitle`, `MAX_REMINDER_LEVEL` (Task 2) werden in Task 3–6 mit denselben Namen verwendet; die Feldnamen `reminderFeeLevel{2,3,4}Rappen` und `reminderInterestPercent` stimmen zwischen Schema, Formular (`reminderFeeLevel2/3/4`, `reminderInterestPercent`), `saveSettings` und `computeReminderCharges` überein.
 - **Designhinweis:** Der „letzte Stufe“-Zustand wird über eine `SentDocument`-Zeile mit `reminderLevel = 4` seit `PendingReminder.createdAt` erkannt (kein Schema-Feld auf `PendingReminder`); die Spec beschreibt dasselbe.
 - **Review-Befunde eingearbeitet** (Opus-Review vom 2026-10-01): Tests mit `toEqual`/Mock-Zustand, Reset-sichere Stufensperre, Rest-0-Schutz, Settings-Audit, Anhangname, Bankabgleich-Total, Level 1 ohne Zins, kalendertagbasierte Zinstage, `pdfOptions`/`qrAmount` entfernt.
