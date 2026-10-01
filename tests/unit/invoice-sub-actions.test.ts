@@ -6,7 +6,7 @@ vi.mock("@/lib/prisma", () => ({
     pendingReminder: { findUnique: vi.fn(), update: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
-    sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }) },
+    sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }), count: vi.fn().mockResolvedValue(0) },
     invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     pendingEmail: { findUnique: vi.fn(), delete: vi.fn() },
     invoiceTemplate: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -20,6 +20,7 @@ vi.mock("@/lib/document-archive", () => ({
 }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("@/lib/pdf/invoice-pdf", () => ({ generateInvoicePdf: vi.fn() }));
+vi.mock("@/lib/pdf/reminder-pdf", () => ({ generateReminderPdf: vi.fn() }));
 vi.mock("@/lib/email", () => ({ sendInvoiceEmail: vi.fn() }));
 vi.mock("@/lib/payments", () => ({ getPaymentSummary: vi.fn().mockResolvedValue({ remainingRappen: 50000 }) }));
 vi.mock("@/lib/document-number", () => ({ assignDocumentNumber: vi.fn() }));
@@ -43,6 +44,7 @@ import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { archivePdf } from "@/lib/document-archive";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
+import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 import { getPaymentSummary } from "@/lib/payments";
 import { assignDocumentNumber } from "@/lib/document-number";
@@ -66,18 +68,25 @@ function form(fields: Record<string, string>): FormData {
 const mockInvoice = {
   id: 10,
   documentNumber: "R-2026-010",
+  dueDate: new Date("2026-01-01"),
+  date: new Date("2025-12-01"),
   customer: { email: "kunde@test.ch" },
   items: [{ id: 1 }],
 };
 
 const mockSettings = {
   reminderCooldownDays: 14,
+  reminderFeeLevel2Rappen: 0,
+  reminderFeeLevel3Rappen: 0,
+  reminderFeeLevel4Rappen: 0,
+  reminderInterestPercent: 0,
   companyInfo: {},
 };
 
 describe("invoices/reminders actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 50000 } as never);
   });
 
   describe("sendReminder", () => {
@@ -114,10 +123,10 @@ describe("invoices/reminders actions", () => {
     it("returns error when PDF generation fails", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
-        invoice: mockInvoice,
+        id: 1, invoiceId: 10, reminderLevel: 1, invoice: mockInvoice,
       } as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
-      vi.mocked(generateInvoicePdf).mockRejectedValue(new Error("PDF error"));
+      vi.mocked(generateReminderPdf).mockRejectedValue(new Error("PDF error"));
       const result = await sendReminder(
         {},
         form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" })
@@ -125,18 +134,47 @@ describe("invoices/reminders actions", () => {
       expect(result.error).toBe("PDF error");
     });
 
-    it("requests only the remaining amount (after credit notes) on the QR slip", async () => {
+    it("renders the Mahnbeleg for the open remainder plus the level's fee", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
-        id: 1, invoiceId: 1, reminderLevel: 1, invoice: mockInvoice,
+        id: 1, invoiceId: 1, reminderLevel: 2, invoice: mockInvoice,
       } as never);
-      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
-      vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 60000 } as never);
-      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(
+        { ...mockSettings, reminderFeeLevel2Rappen: 1000 } as never
+      );
+      vi.mocked(getPaymentSummary).mockResolvedValueOnce({ remainingRappen: 60000 } as never);
+      vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf"));
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}, { id: 1 }] as never);
       await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
-      expect(generateInvoicePdf).toHaveBeenCalledWith(mockInvoice, mockSettings, { qrAmount: 600 });
+      expect(generateReminderPdf).toHaveBeenCalledWith(
+        mockInvoice,
+        expect.objectContaining({ reminderFeeLevel2Rappen: 1000 }),
+        expect.objectContaining({ level: 2, openRappen: 60000, feeRappen: 1000, totalRappen: 61000 })
+      );
+    });
+
+    it("refuses to send when nothing is open any more", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1, invoiceId: 1, reminderLevel: 2, invoice: mockInvoice,
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(getPaymentSummary).mockResolvedValueOnce({ remainingRappen: 0 } as never);
+      const result = await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
+      expect(result.error).toBe("Die Rechnung ist bereits beglichen.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it("refuses another reminder after the last level", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1, invoiceId: 1, reminderLevel: 5, invoice: mockInvoice,
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      const result = await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
+      expect(result.error).toBe("Die letzte Mahnstufe wurde bereits versendet.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
     });
 
     it("sends reminder, updates reminder level, logs audit, and returns success", async () => {
@@ -149,7 +187,7 @@ describe("invoices/reminders actions", () => {
       };
       vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue(reminder as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
-      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.invoiceSentLog.create).mockResolvedValue({} as never);
       vi.mocked(prisma.pendingReminder.update).mockResolvedValue({} as never);
@@ -162,7 +200,7 @@ describe("invoices/reminders actions", () => {
         form({ reminderId: "1", to: "kunde@test.ch", subject: "Mahnung", body: "Text" })
       );
       expect(result.success).toBe(true);
-      expect(generateInvoicePdf).toHaveBeenCalled();
+      expect(generateReminderPdf).toHaveBeenCalled();
       expect(sendInvoiceEmail).toHaveBeenCalled();
       expect(logAudit).toHaveBeenCalledWith(
         editorSession,
@@ -184,7 +222,7 @@ describe("invoices/reminders actions", () => {
         invoice: { ...mockInvoice, documentNumber: "R-2026-010" },
       } as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
-      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.$transaction).mockImplementation((arg: unknown) => Promise.all(arg as Promise<unknown>[]) as never);
 
@@ -193,7 +231,7 @@ describe("invoices/reminders actions", () => {
       expect(result.success).toBe(true);
       expect(archivePdf).toHaveBeenCalledWith(expect.objectContaining({ documentNumber: "R-2026-010", kind: "Reminder" }));
       expect(prisma.sentDocument.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ invoiceId: 10, kind: "Reminder", reminderLevel: 2 }),
+        data: expect.objectContaining({ invoiceId: 10, kind: "Reminder", reminderLevel: 2, openRappen: 50000, feeRappen: 0, interestRappen: 0 }),
       });
     });
 
@@ -204,7 +242,7 @@ describe("invoices/reminders actions", () => {
         invoice: { ...mockInvoice, documentNumber: "R-2026-010" },
       } as never);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
-      vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf") as never);
+      vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(archivePdf).mockRejectedValueOnce(new Error("EACCES"));
 
       const result = await sendReminder({}, form({ reminderId: "1", to: "k@test.ch", subject: "M", body: "T" }));

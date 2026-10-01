@@ -3,6 +3,7 @@ import type { Session } from "next-auth";
 import { generateInvoicePdf, type InvoiceWithDetails } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 import { archivePdf, type ArchiveKind, type ArchiveResult } from "@/lib/document-archive";
+import type { ReminderCharges } from "@/lib/reminder-charges";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
 
@@ -21,15 +22,15 @@ export async function renderArchiveAndSend(params: {
   settings: DispatchSettings;
   kind: ArchiveKind;
   mail: { to: string; subject: string; body: string };
-  /** Passed to `generateInvoicePdf` (reminders request the open remainder on the QR slip). */
-  pdfOptions?: { qrAmount?: number };
+  /** Replaces the default invoice rendering (reminders pass the Mahnbeleg renderer). */
+  renderPdf?: () => Promise<Buffer>;
+  /** Attachment file name; defaults to the invoice naming in `sendInvoiceEmail`. */
+  attachmentName?: string;
 }): Promise<ArchiveResult> {
-  const { invoice, settings, kind, mail, pdfOptions } = params;
+  const { invoice, settings, kind, mail, renderPdf, attachmentName } = params;
   if (!invoice.documentNumber) throw new Error("Rechnung hat noch keine Nummer.");
 
-  const pdf = pdfOptions
-    ? await generateInvoicePdf(invoice, settings, pdfOptions)
-    : await generateInvoicePdf(invoice, settings);
+  const pdf = renderPdf ? await renderPdf() : await generateInvoicePdf(invoice, settings);
 
   let archive: ArchiveResult;
   try {
@@ -39,7 +40,7 @@ export async function renderArchiveAndSend(params: {
     throw new Error("PDF konnte nicht archiviert werden. Die E-Mail wurde nicht versendet.");
   }
 
-  await sendInvoiceEmail(invoice, settings, pdf, mail);
+  await sendInvoiceEmail(invoice, settings, pdf, attachmentName ? { ...mail, attachmentName } : mail);
   return archive;
 }
 
@@ -53,6 +54,7 @@ export function sentDocumentData(params: {
   sentTo: string;
   subject: string;
   actor: Session;
+  charges?: ReminderCharges;
 }): Prisma.SentDocumentUncheckedCreateInput {
   return {
     invoiceId: params.invoiceId,
@@ -65,6 +67,15 @@ export function sentDocumentData(params: {
     sentTo: params.sentTo,
     subject: params.subject,
     createdById: parseInt(params.actor.user.id, 10),
+    ...(params.charges
+      ? {
+          openRappen: params.charges.openRappen,
+          feeRappen: params.charges.feeRappen,
+          interestRappen: params.charges.interestRappen,
+          interestPercent: params.charges.interestPercent,
+          dunningDate: params.charges.dunningDate,
+        }
+      : {}),
   };
 }
 

@@ -72,6 +72,11 @@ describe("email.ts", () => {
   });
 
   describe("sendInvoiceEmail", () => {
+    it("uses the attachment name override (reminders)", async () => {
+      await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"), { attachmentName: "mahnung-R-2026-001-stufe2.pdf" });
+      expect(mockSendMail.mock.calls[0][0].attachments[0].filename).toBe("mahnung-R-2026-001-stufe2.pdf");
+    });
+
     it("uses credit note wording without a due date for credit notes", async () => {
       const credit = {
         ...makeInvoice(),
