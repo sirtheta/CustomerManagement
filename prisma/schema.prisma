@@ -215,12 +215,31 @@ model Expense {
   amount      Decimal
   categoryId  Int?
   notes       String?
+  supplier    String?
+  dueDate     DateTime?
+  // null = open supplier invoice, otherwise the day it was paid
+  paidDate    DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   category    Category? @relation(fields: [categoryId], references: [categoryId])
+  receipts    ExpenseReceipt[]
 
   @@index([date])
   @@index([categoryId])
+  @@index([paidDate])
+}
+
+model ExpenseReceipt {
+  id         Int      @id @default(autoincrement())
+  expenseId  Int
+  name       String
+  fileType   String
+  size       Int
+  uploadDate DateTime @default(now())
+  content    Bytes
+  expense    Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
 }
 
 model Document {

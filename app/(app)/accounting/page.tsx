@@ -22,6 +22,7 @@ import { YearSelector } from "./components/year-selector";
 import { ProfitLossChart } from "./components/profit-loss-chart";
 import DeleteExpenseButton from "./DeleteExpenseButton";
 import { documentLabel } from "@/lib/document-display";
+import { Badge } from "@/components/ui/badge";
 
 type Props = {
   searchParams: Promise<{ year?: string }>;
@@ -39,6 +40,10 @@ export default async function AccountingPage({ searchParams }: Props) {
     fetchPaymentsForYear(prisma, selectedYear),
     fetchExpensesForYear(prisma, selectedYear),
   ]);
+
+  const openExpenses = expenses.filter((e) => e.paidDate === null);
+  const openTotal = openExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -150,9 +155,15 @@ export default async function AccountingPage({ searchParams }: Props) {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Ausgaben {statement.selectedYear}</CardTitle>
+            {openExpenses.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {openExpenses.length} offene Lieferantenrechnung{openExpenses.length === 1 ? "" : "en"}:{" "}
+                {formatCurrency(openTotal)}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -161,15 +172,18 @@ export default async function AccountingPage({ searchParams }: Props) {
                   <TableRow>
                     <TableHead>Datum</TableHead>
                     <TableHead>Bezeichnung</TableHead>
+                    <TableHead>Lieferant</TableHead>
                     <TableHead>Kategorie</TableHead>
                     <TableHead>Betrag</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Belege</TableHead>
                     <TableHead className="w-32" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {expenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-gray-500 py-8">
+                      <TableCell colSpan={8} className="text-center text-gray-500 py-8">
                         Keine Ausgaben vorhanden.
                       </TableCell>
                     </TableRow>
@@ -178,8 +192,32 @@ export default async function AccountingPage({ searchParams }: Props) {
                       <TableRow key={exp.id}>
                         <TableCell>{formatDate(exp.date)}</TableCell>
                         <TableCell>{exp.description}</TableCell>
+                        <TableCell>{exp.supplier ?? "—"}</TableCell>
                         <TableCell>{exp.categoryName ?? "—"}</TableCell>
                         <TableCell>{formatCurrency(exp.amount)}</TableCell>
+                        <TableCell>
+                          {exp.paidDate ? (
+                            <Badge variant="secondary">Bezahlt</Badge>
+                          ) : (
+                            <div className="flex flex-col items-start gap-0.5">
+                              <Badge
+                                variant={
+                                  exp.dueDate && exp.dueDate.slice(0, 10) < today
+                                    ? "destructive"
+                                    : "outline"
+                                }
+                              >
+                                Offen
+                              </Badge>
+                              {exp.dueDate && (
+                                <span className="text-xs text-muted-foreground">
+                                  fällig {formatDate(exp.dueDate)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{exp.receiptCount > 0 ? exp.receiptCount : "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 justify-end">
                             <Button
