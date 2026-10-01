@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Prisma } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { notifyAdmins, sendAdminNotifications } from "@/lib/notifications";
 
@@ -32,6 +33,10 @@ function baseSettings() {
     emailSubjectTemplate: null,
     emailBodyTemplate: null,
     reminderCooldownDays: 14,
+    reminderFeeLevel2Rappen: 0,
+    reminderFeeLevel3Rappen: 0,
+    reminderFeeLevel4Rappen: 0,
+    reminderInterestPercent: new Prisma.Decimal(0),
     notifyOverdueEnabled: true,
     notifyPendingEnabled: true,
     notifyEmailAddress: "admin@example.com",

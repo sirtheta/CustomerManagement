@@ -79,6 +79,10 @@ export default async function SettingsPage() {
           emailSubjectTemplate={s?.emailSubjectTemplate ?? ""}
           emailBodyTemplate={s?.emailBodyTemplate ?? ""}
           reminderCooldownDays={s?.reminderCooldownDays ?? 14}
+          reminderFeeLevel2={(s?.reminderFeeLevel2Rappen ?? 0) / 100}
+          reminderFeeLevel3={(s?.reminderFeeLevel3Rappen ?? 0) / 100}
+          reminderFeeLevel4={(s?.reminderFeeLevel4Rappen ?? 0) / 100}
+          reminderInterestPercent={Number(s?.reminderInterestPercent ?? 0)}
           notifyOverdueEnabled={s?.notifyOverdueEnabled ?? false}
           notifyPendingEnabled={s?.notifyPendingEnabled ?? false}
           notifyEmailAddress={s?.notifyEmailAddress ?? ""}

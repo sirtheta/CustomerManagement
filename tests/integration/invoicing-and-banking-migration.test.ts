@@ -223,4 +223,35 @@ describe(`migration ${MIGRATION}`, () => {
       date: 1700000000000,
     });
   });
+
+  it("adds the dunning columns and caps legacy reminder levels at 4", () => {
+    const db = legacyDb();
+    db.pragma("foreign_keys = OFF");
+    db.prepare(
+      `INSERT INTO "Invoice" ("customerId", "documentNumber", "date", "totalAmount", "dueDate", "state")
+       VALUES (1, 'R-1', 1700000000000, 100, 1702592000000, 'Overdue')`
+    ).run();
+    db.prepare(`INSERT INTO "PendingReminder" ("invoiceId", "reminderLevel") VALUES (1, 6)`).run();
+
+    applyMigration(db, MIGRATION);
+
+    expect(db.prepare(`SELECT "reminderLevel" FROM "PendingReminder"`).get()).toEqual({ reminderLevel: 4 });
+
+    const settings = db.prepare(`PRAGMA table_info("ApplicationSettings")`).all() as {
+      name: string; notnull: number; dflt_value: string | null;
+    }[];
+    for (const name of ["reminderFeeLevel2Rappen", "reminderFeeLevel3Rappen", "reminderFeeLevel4Rappen", "reminderInterestPercent"]) {
+      const col = settings.find((c) => c.name === name);
+      expect(col, name).toBeDefined();
+      expect(col!.notnull).toBe(1);
+      expect(col!.dflt_value).toBe("0");
+    }
+
+    const sent = db.prepare(`PRAGMA table_info("SentDocument")`).all() as { name: string; notnull: number }[];
+    for (const name of ["openRappen", "feeRappen", "interestRappen", "interestPercent", "dunningDate"]) {
+      const col = sent.find((c) => c.name === name);
+      expect(col, name).toBeDefined();
+      expect(col!.notnull).toBe(0);
+    }
+  });
 });
