@@ -50,6 +50,11 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
   );
 
   const fe = state.fieldErrors ?? {};
+  // After a failed submit the action returns what was typed; React resets the form
+  // to its defaultValues, so those must come from the submitted values.
+  const submitted = state.values;
+  const val = (name: string, fallback: string | number | null | undefined) =>
+    submitted ? (submitted[name] ?? "") : (fallback ?? "");
 
   if (customer && readOnly) {
     return (
@@ -86,6 +91,41 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               <div>
                 <dt className="text-muted-foreground">Telefon</dt>
                 <dd className="font-medium">{customer.phone}</dd>
+              </div>
+            )}
+            {customer.customerNumber != null && (
+              <div>
+                <dt className="text-muted-foreground">Kunden-Nr.</dt>
+                <dd className="font-medium">{customer.customerNumber}</dd>
+              </div>
+            )}
+            {customer.uid && (
+              <div>
+                <dt className="text-muted-foreground">UID</dt>
+                <dd className="font-medium">{customer.uid}</dd>
+              </div>
+            )}
+            {customer.paymentTermDays != null && (
+              <div>
+                <dt className="text-muted-foreground">Zahlungsfrist</dt>
+                <dd className="font-medium">{customer.paymentTermDays} Tage</dd>
+              </div>
+            )}
+            {customer.billingStreet && (
+              <div className="sm:col-span-2">
+                <dt className="text-muted-foreground">Rechnungsadresse</dt>
+                <dd className="font-medium">
+                  {[customer.billingName, formatStreetLine(customer.billingStreet, customer.billingHouseNumber), formatCityLine(customer.billingZipCode, customer.billingCity)]
+                    .filter(Boolean)
+                    .join(", ")}
+                  {customer.billingCountry && customer.billingCountry !== "CH" && `, ${countryName(customer.billingCountry)}`}
+                </dd>
+              </div>
+            )}
+            {customer.billingEmail && (
+              <div>
+                <dt className="text-muted-foreground">Rechnungs-E-Mail</dt>
+                <dd className="font-medium">{customer.billingEmail}</dd>
               </div>
             )}
             {customer.contactInsteadOfCompany && (
@@ -134,7 +174,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <Input
                   id="company"
                   name="company"
-                  defaultValue={customer?.company ?? ""}
+                  defaultValue={val("company", customer?.company)}
                   placeholder="Firma AG"
                 />
               </div>
@@ -147,7 +187,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   id="contactPerson"
                   name="contactPerson"
                   required
-                  defaultValue={customer?.contactPerson ?? ""}
+                  defaultValue={val("contactPerson", customer?.contactPerson)}
                   placeholder="Max Muster"
                   aria-invalid={!!fe.contactPerson}
                   aria-describedby={fe.contactPerson ? "contactPerson-error" : undefined}
@@ -168,7 +208,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   name="street"
                   required
                   maxLength={ADDRESS_LIMITS.street}
-                  defaultValue={customer?.street ?? ""}
+                  defaultValue={val("street", customer?.street)}
                   placeholder="Musterstrasse"
                   aria-invalid={!!fe.street}
                   aria-describedby={fe.street ? "street-error" : undefined}
@@ -182,7 +222,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   id="houseNumber"
                   name="houseNumber"
                   maxLength={ADDRESS_LIMITS.houseNumber}
-                  defaultValue={customer?.houseNumber ?? ""}
+                  defaultValue={val("houseNumber", customer?.houseNumber)}
                   placeholder="1"
                   aria-invalid={!!fe.houseNumber}
                   aria-describedby={fe.houseNumber ? "houseNumber-error" : undefined}
@@ -200,7 +240,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   id="zipCode"
                   name="zipCode"
                   required
-                  defaultValue={customer?.zipCode ?? ""}
+                  defaultValue={val("zipCode", customer?.zipCode)}
                   placeholder="8000"
                   aria-invalid={!!fe.zipCode}
                   aria-describedby={fe.zipCode ? "zipCode-error" : undefined}
@@ -216,7 +256,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   id="city"
                   name="city"
                   required
-                  defaultValue={customer?.city ?? ""}
+                  defaultValue={val("city", customer?.city)}
                   placeholder="Zürich"
                   aria-invalid={!!fe.city}
                   aria-describedby={fe.city ? "city-error" : undefined}
@@ -226,7 +266,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
 
               <div className="space-y-1.5">
                 <Label htmlFor="country">Land</Label>
-                <Select name="country" defaultValue={customer?.country ?? "CH"}>
+                <Select name="country" defaultValue={submitted?.country ?? customer?.country ?? "CH"}>
                   <SelectTrigger id="country" className="w-full">
                     <SelectValue>
                       {(value: string | null) =>
@@ -258,7 +298,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   name="email"
                   type="email"
                   required
-                  defaultValue={customer?.email ?? ""}
+                  defaultValue={val("email", customer?.email)}
                   placeholder="info@beispiel.ch"
                   aria-invalid={!!fe.email}
                   aria-describedby={fe.email ? "email-error" : undefined}
@@ -272,7 +312,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   id="phone"
                   name="phone"
                   type="tel"
-                  defaultValue={customer?.phone ?? ""}
+                  defaultValue={val("phone", customer?.phone)}
                   placeholder="+41 44 000 00 00"
                 />
               </div>
@@ -283,12 +323,160 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <input
                   type="checkbox"
                   name="contactInsteadOfCompany"
-                  defaultChecked={customer?.contactInsteadOfCompany ?? false}
+                  defaultChecked={submitted ? submitted.contactInsteadOfCompany === "on" : (customer?.contactInsteadOfCompany ?? false)}
                   className="h-4 w-4 rounded border-input accent-primary"
                 />
                 Kontaktperson statt Firma anzeigen
               </label>
             </div>
+
+            <details
+              className="rounded-lg border border-input px-3 py-2"
+              open={Boolean(
+                customer &&
+                  (customer.uid ||
+                    customer.paymentTermDays != null ||
+                    customer.billingStreet ||
+                    customer.billingEmail)
+              ) || Object.keys(fe).some((k) => k === "customerNumber" || k === "uid" || k === "paymentTermDays" || k.startsWith("billing"))}
+            >
+              <summary className="cursor-pointer text-sm font-medium">Weitere Angaben</summary>
+              <div className="space-y-4 pt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customerNumber">Kundennummer</Label>
+                    <Input
+                      id="customerNumber"
+                      name="customerNumber"
+                      inputMode="numeric"
+                      defaultValue={val("customerNumber", customer?.customerNumber)}
+                      placeholder={customer ? "" : "automatisch"}
+                      aria-invalid={!!fe.customerNumber}
+                      aria-describedby={fe.customerNumber ? "customerNumber-error" : undefined}
+                    />
+                    <FieldError id="customerNumber-error" message={fe.customerNumber} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="uid">UID</Label>
+                    <Input
+                      id="uid"
+                      name="uid"
+                      defaultValue={val("uid", customer?.uid)}
+                      placeholder="CHE-123.456.789"
+                      aria-invalid={!!fe.uid}
+                      aria-describedby={fe.uid ? "uid-error" : undefined}
+                    />
+                    <FieldError id="uid-error" message={fe.uid} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="paymentTermDays">Zahlungsfrist (Tage)</Label>
+                    <Input
+                      id="paymentTermDays"
+                      name="paymentTermDays"
+                      inputMode="numeric"
+                      defaultValue={val("paymentTermDays", customer?.paymentTermDays)}
+                      placeholder="Standard"
+                      aria-invalid={!!fe.paymentTermDays}
+                      aria-describedby={fe.paymentTermDays ? "paymentTermDays-error" : undefined}
+                    />
+                    <FieldError id="paymentTermDays-error" message={fe.paymentTermDays} />
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Abweichende Rechnungsadresse: Rechnungen, Mahnungen und die QR-Rechnung gehen an diese Adresse
+                  (Strasse, PLZ und Ort zusammen ausfüllen). Offerten verwenden immer die Kundenadresse.
+                </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="billingName">Name auf der Rechnung</Label>
+                  <Input
+                    id="billingName"
+                    name="billingName"
+                    maxLength={70}
+                    defaultValue={val("billingName", customer?.billingName)}
+                    placeholder="Firma AG, Kreditorenbuchhaltung"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="billingStreet">Strasse</Label>
+                    <Input
+                      id="billingStreet"
+                      name="billingStreet"
+                      maxLength={ADDRESS_LIMITS.street}
+                      defaultValue={val("billingStreet", customer?.billingStreet)}
+                      aria-invalid={!!fe.billingStreet}
+                      aria-describedby={fe.billingStreet ? "billingStreet-error" : undefined}
+                    />
+                    <FieldError id="billingStreet-error" message={fe.billingStreet} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billingHouseNumber">Hausnummer</Label>
+                    <Input
+                      id="billingHouseNumber"
+                      name="billingHouseNumber"
+                      maxLength={ADDRESS_LIMITS.houseNumber}
+                      defaultValue={val("billingHouseNumber", customer?.billingHouseNumber)}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billingZipCode">PLZ</Label>
+                    <Input
+                      id="billingZipCode"
+                      name="billingZipCode"
+                      maxLength={ADDRESS_LIMITS.zip}
+                      defaultValue={val("billingZipCode", customer?.billingZipCode)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billingCity">Ort</Label>
+                    <Input
+                      id="billingCity"
+                      name="billingCity"
+                      maxLength={ADDRESS_LIMITS.city}
+                      defaultValue={val("billingCity", customer?.billingCity)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billingCountry">Land</Label>
+                    <Select name="billingCountry" defaultValue={submitted?.billingCountry ?? customer?.billingCountry ?? "CH"}>
+                      <SelectTrigger id="billingCountry" className="w-full">
+                        <SelectValue>
+                          {(value: string | null) =>
+                            value ? ((COUNTRIES as Record<string, string>)[value] ?? value) : ""
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(COUNTRIES).map(([code, name]) => (
+                          <SelectItem key={code} value={code}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                        {customer?.billingCountry && !(customer.billingCountry in COUNTRIES) && (
+                          <SelectItem value={customer.billingCountry}>{customer.billingCountry}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5 sm:max-w-sm">
+                  <Label htmlFor="billingEmail">Rechnungs-E-Mail</Label>
+                  <Input
+                    id="billingEmail"
+                    name="billingEmail"
+                    type="email"
+                    defaultValue={val("billingEmail", customer?.billingEmail)}
+                    placeholder="buchhaltung@beispiel.ch"
+                    aria-invalid={!!fe.billingEmail}
+                    aria-describedby={fe.billingEmail ? "billingEmail-error" : undefined}
+                  />
+                  <FieldError id="billingEmail-error" message={fe.billingEmail} />
+                </div>
+              </div>
+            </details>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" render={<Link href={cancelHref} />}>

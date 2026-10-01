@@ -65,6 +65,9 @@ export async function searchGlobal(
     ],
   };
 
+  // Customer numbers are integers: match them exactly, only for purely numeric terms.
+  const numberMatch = /^\d{1,9}$/.test(q) ? [{ customerNumber: Number(q) }] : [];
+
   const [customers, invoices, quotes] = await Promise.all([
     db.customer.findMany({
       where: {
@@ -73,6 +76,7 @@ export async function searchGlobal(
           { contactPerson: { contains: q } },
           { email: { contains: q } },
           { city: { contains: q } },
+          ...numberMatch,
         ],
       },
       select: {
