@@ -282,7 +282,7 @@ Erwartet: `startup.js` wendet die ganze Kette an, und `migrate diff` gibt keine 
   });
 ```
 
-Dieser Test gehört in Step 1 (zu den fehlschlagenden Tests) und läuft in Step 6 mit.
+Reihenfolge: diesen Test zuerst schreiben und mit `npx vitest run tests/integration/invoicing-and-banking-migration.test.ts` rot laufen lassen, dann die SQL aus Punkt 3 anhängen und grün prüfen; in Step 6 läuft er mit.
 
 6. Hinweis zu bestehenden Datenbanken: `scripts/startup.js` (`WHERE finished_at IS NOT NULL`, Vergleich nur über den Namen) und `prisma migrate deploy` (`test:e2e:server`) überspringen eine schon angewendete Migration, ohne die Prüfsumme zu vergleichen. Jede Nicht-Release-DB, die `20261001120000_invoicing_and_banking` schon hat (lokale `data/customermanagement.db`, Docker-Testinstanzen mit einem Image von `main`, `data-e2e`, `data-manual`, `data-marketing`), bekommt die neuen Spalten daher **nicht** und scheitert zur Laufzeit mit „no such column“; sie muss neu aufgebaut werden. Für die lokale Entwicklungs-DB gibt es zwei Wege, beide löschen oder verändern Daten und brauchen **vorher die Zustimmung des Nutzers**: (a) `npx prisma migrate reset` (löscht alle lokalen Daten), oder (b) datenerhaltend: die angehängten Befehle per `npx prisma db execute --file <sql-datei>` ausführen und in `_prisma_migrations` die `checksum` der Migration auf den neuen SHA-256 des `migration.sql` setzen. Release-DBs (Stand 1.5.0) sind nicht betroffen.
 
