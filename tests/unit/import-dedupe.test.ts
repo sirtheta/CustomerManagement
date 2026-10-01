@@ -23,10 +23,16 @@ describe("normalize", () => {
 });
 
 describe("fingerprint", () => {
-  it("lets the bank reference dominate the hash", () => {
-    const a = fingerprint(IBAN, tx({ bankReference: "REF-1", description: "A" }), 0);
-    const b = fingerprint(IBAN, tx({ bankReference: "REF-1", description: "B", amountCents: -1 }), 5);
+  it("lets the bank reference dominate text and counterparty", () => {
+    const a = fingerprint(IBAN, tx({ bankReference: "REF-1", description: "A", counterparty: "X" }), 0);
+    const b = fingerprint(IBAN, tx({ bankReference: "REF-1", description: "B", counterparty: "Y" }), 5);
     expect(a).toBe(b);
+  });
+
+  it("separates a reused reference by date or amount", () => {
+    const a = fingerprint(IBAN, tx({ bankReference: "REF-1" }), 0);
+    expect(a).not.toBe(fingerprint(IBAN, tx({ bankReference: "REF-1", date: "2026-04-01" }), 0));
+    expect(a).not.toBe(fingerprint(IBAN, tx({ bankReference: "REF-1", amountCents: -1 }), 0));
   });
 
   it("differs per IBAN and ignores IBAN spacing and case", () => {

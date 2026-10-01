@@ -28,7 +28,8 @@ export function fingerprint(
 ): string {
   const reference = transaction.bankReference?.trim();
   const parts = reference
-    ? [normalizeIban(iban), reference]
+    ? // Date and amount too: payers reuse EndToEndIds month after month.
+      [normalizeIban(iban), reference, transaction.date, transaction.amountCents]
     : [
         normalizeIban(iban),
         transaction.date,
