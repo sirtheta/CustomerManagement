@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Eigener Mahnbeleg-PDF je Stufe (Zahlungserinnerung, 1.–3. Mahnung) mit optionaler Mahngebühr und optionalem Verzugszins; Beträge werden pro Versand in `SentDocument` festgehalten.
+**Goal:** Eigener Mahnbeleg-PDF je Stufe (Zahlungserinnerung, 1.–3. Mahnung) mit optionaler Mahngebühr und optionalem Verzugszins; Beträge werden pro Versand in `SentDocument` festgehalten, der Bankabgleich erkennt den Mahn-Total.
 
 **Architecture:** Eine reine Berechnungsfunktion (`lib/reminder-charges.ts`) liefert Restbetrag, Gebühr, Zins und Total in Rappen. `generateDocumentPdf` bekommt eine dritte Dokumentart `"reminder"` mit einer Betragstabelle statt der Positionstabelle, und `lib/pdf/reminder-pdf.ts` mappt Rechnung und Beträge darauf. `sendReminder` berechnet serverseitig, rendert über den bestehenden Weg `renderArchiveAndSend` (einmal rendern, Bytes archivieren, dieselben Bytes mailen) und speichert die Beträge an `SentDocument`. Rechnung, `Payment` und OP-Liste bleiben unverändert.
 
@@ -15,11 +15,14 @@
 - UI, Belegtexte und Doku sind **auf Deutsch**; Commit-Messages **auf Englisch** im Conventional-Commits-Format, mit der Zeile `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` am Ende.
 - Beträge intern in **Rappen (`Int`)**, CHF nur an der Darstellungsgrenze; Rundung mit `Math.round`.
 - Stufen: 1 Zahlungserinnerung (keine Gebühr), 2 = 1. Mahnung, 3 = 2. Mahnung, 4 = 3. Mahnung. Nach Level 4 keine weitere Stufe.
-- Gebühr und Zins sind standardmässig **aus** (Gebühren 0, Zinssatz 0). Zins `= Rest × Satz/100 × Tage / 365`, Tage = `max(0, Tage von Fälligkeit bis Mahndatum)`.
-- Rechnung, `Payment`, OP-Liste und GuV werden nicht verändert; Gebühr und Zins stehen nur auf dem Beleg, im QR-Betrag und in `SentDocument`.
+- Gebühr und Zins sind standardmässig **aus** (Gebühren 0, Zinssatz 0). Zins `= Rest × Satz/100 × Tage / 365`, Tage = Kalendertage (UTC-Datumsteile) von Fälligkeit bis Mahndatum, mindestens 0. **Level 1 (Zahlungserinnerung) hat weder Gebühr noch Zins.**
+- Rechnung, `Payment` und OP-Liste werden nicht verändert; Gebühr und Zins stehen nur auf dem Beleg, im QR-Betrag und in `SentDocument`. Eine gezahlte Gebühr wird zur Überzahlung (`Payment.amount`) und erscheint so im Journal.
 - Beträge werden **immer serverseitig** neu berechnet, nie aus Formulardaten übernommen.
 - Nie `logAudit` innerhalb einer `$transaction` aufrufen; nie direkt in `AuditLog` schreiben.
 - Betreibung/Inkasso und Forderungsexport sind **nicht** im Umfang.
+- Der Versand wird verweigert, wenn der Restbetrag 0 ist („Die Rechnung ist bereits beglichen.“).
+- Änderungen an Gebühren/Zinssatz werden auditiert (`UPDATE Settings`, ausserhalb jeder Transaktion).
+- Bekannt und bewusst nicht behoben: gleichzeitiger Doppelversand derselben Mahnung (zwei Tabs) ist wie schon heute durch kein Claim geschützt.
 - Tests: `npx vitest run <datei>`; Integrationstests nutzen `createTestDatabase()` aus `tests/test-utils.ts`.
 
 ---
@@ -30,9 +33,13 @@
 |---|---|
 | `prisma/schema.prisma`, neue Migration | Einstellungsfelder (Gebühren, Zinssatz) und Betragsspalten an `SentDocument` |
 | `lib/reminder-charges.ts` (neu) | `reminderTitle`, `MAX_REMINDER_LEVEL`, `computeReminderCharges` (rein, ohne Prisma) |
+| `lib/reminders.ts` | zusätzlich `isLastReminderLevelSent` (gemeinsamer Helper für Action und Liste) |
+| `lib/email.ts` | `sendInvoiceEmail` mit optionalem `attachmentName` |
+| `lib/import/matching.ts`, `lib/import/queries.ts` | Mahn-Total als Betragstreffer im Bankabgleich |
 | `lib/pdf/document-pdf.ts` | `RenderDoc` um `kind: "reminder"` und `amountLines` erweitern, Betragstabelle rendern |
 | `lib/pdf/reminder-pdf.ts` (neu) | `generateReminderPdf(invoice, settings, input)` |
-| `lib/invoice-dispatch.ts` | `renderArchiveAndSend` mit optionalem `renderPdf`; `sentDocumentData` mit Beträgen |
+| `lib/invoice-dispatch.ts` | `renderArchiveAndSend` mit `renderPdf` und `attachmentName` (ersetzt `pdfOptions`); `sentDocumentData` mit Beträgen |
+| `lib/pdf/invoice-pdf.ts` | Option `qrAmount` entfällt (nur Mahnungen nutzten sie) |
 | `app/(app)/invoices/reminders/actions.ts` | `sendReminder` berechnet, rendert Mahnbeleg, speichert Beträge, Level-Deckel |
 | `app/(app)/invoices/reminders/page.tsx`, `ReminderRow.tsx` | Stufenlabel 1–4, Vorschau Gebühr/Zins/Total, „Letzte Stufe erreicht“ |
 | `app/(app)/settings/actions.ts`, `page.tsx`, `SettingsForm.tsx` | Felder „Mahnwesen“ speichern, validieren, anzeigen |
@@ -113,12 +120,62 @@ In `tests/unit/settings-actions.test.ts` im Block `describe("saveSettings", …)
       });
     });
 
+    it("writes an audit entry when the dunning values change", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+        reminderFeeLevel2Rappen: 0,
+        reminderFeeLevel3Rappen: 0,
+        reminderFeeLevel4Rappen: 0,
+        reminderInterestPercent: 0,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({ reminderFeeLevel2: "10", reminderInterestPercent: "5" }));
+
+      expect(logAudit).toHaveBeenCalledWith(
+        adminSession,
+        "UPDATE",
+        "Settings",
+        1,
+        "Mahnwesen",
+        expect.objectContaining({ reminderFeeLevel2Rappen: 1000, reminderInterestPercent: 5 })
+      );
+    });
+
+    it("does not audit when the dunning values stay the same", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+        reminderFeeLevel2Rappen: 1000,
+        reminderFeeLevel3Rappen: 0,
+        reminderFeeLevel4Rappen: 0,
+        reminderInterestPercent: 5,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({ reminderFeeLevel2: "10", reminderInterestPercent: "5" }));
+
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
     it("rejects negative reminder fees and an interest rate outside 0-100", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);
 
       const negativeFee = await saveSettings({}, form({ reminderFeeLevel2: "-1" }));
       expect(negativeFee.error).toBe("Mahngebühren dürfen nicht negativ sein.");
+
+      const garbage = await saveSettings({}, form({ reminderFeeLevel3: "abc" }));
+      expect(garbage.error).toBe("Ungültiger Betrag.");
 
       const badRate = await saveSettings({}, form({ reminderInterestPercent: "101" }));
       expect(badRate.error).toBe("Der Verzugszins muss zwischen 0 und 100 % liegen.");
@@ -152,7 +209,7 @@ In `model SentDocument`, direkt nach `createdById    Int`:
   dunningDate    DateTime?
 ```
 
-Dann `npx prisma migrate dev --name reminder_charges --create-only` ausführen, den erzeugten Ordner auf `20261001100000_reminder_charges` umbenennen (falls der Zeitstempel kleiner ist als der der letzten Migration `20261001081107_expense_receipts`, so lassen, sonst umbenennen) und den Inhalt prüfen: er muss genau diese Befehle enthalten (SQLite erzeugt die Tabellen für `ALTER TABLE ... ADD COLUMN` ohne Neuaufbau):
+Dann `npx prisma migrate dev --name reminder_charges --create-only` ausführen und den erzeugten Ordnernamen beibehalten (er ist neuer als `20261001081107_expense_receipts`). Inhaltlich prüfen: Die Datei enthält die folgenden `ALTER TABLE ... ADD COLUMN`-Befehle (die Reihenfolge darf abweichen); die Level-Kappung am Ende erzeugt Prisma nicht, sie wird von Hand angehängt. Hinweis: Die Integrationstests bauen die DB mit `prisma db push` (`tests/test-utils.ts`), die Migration selbst läuft nur über `migrate dev` und `scripts/startup.js`. Deshalb nach dem Anlegen einmal `npx prisma migrate dev` ausführen:
 
 ```sql
 -- AlterTable
@@ -167,13 +224,16 @@ ALTER TABLE "SentDocument" ADD COLUMN "feeRappen" INTEGER;
 ALTER TABLE "SentDocument" ADD COLUMN "interestPercent" DECIMAL;
 ALTER TABLE "SentDocument" ADD COLUMN "interestRappen" INTEGER;
 ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
+
+-- The old code raised the level without a cap; level 4 is now the last one.
+UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;
 ```
 
 Dann `npx prisma migrate dev` und `npx prisma generate`.
 
 - [ ] **Step 4: `saveSettings` erweitern**
 
-In `app/(app)/settings/actions.ts` nach der Zeile `const reminderCooldown = parseInt(…);`:
+In `app/(app)/settings/actions.ts` die erste Zeile `await requireAdmin();` zu `const session = await requireAdmin();` ändern, `import { logAudit } from "@/lib/audit";` ergänzen (falls noch nicht importiert) und nach der Zeile `const reminderCooldown = parseInt(…);` einfügen:
 
 ```ts
   const feeToRappen = (name: string) => {
@@ -191,10 +251,13 @@ In `app/(app)/settings/actions.ts` nach der Zeile `const reminderCooldown = pars
 Nach dem Block mit `"Tage-Felder müssen mindestens 1 betragen."` einfügen:
 
 ```ts
-  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => Number.isNaN(fee) || fee < 0)) {
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => Number.isNaN(fee)) || Number.isNaN(interestPercent)) {
+    return { error: "Ungültiger Betrag." };
+  }
+  if ([feeLevel2, feeLevel3, feeLevel4].some((fee) => fee < 0)) {
     return { error: "Mahngebühren dürfen nicht negativ sein." };
   }
-  if (!Number.isFinite(interestPercent) || interestPercent < 0 || interestPercent > 100) {
+  if (interestPercent < 0 || interestPercent > 100) {
     return { error: "Der Verzugszins muss zwischen 0 und 100 % liegen." };
   }
 ```
@@ -206,6 +269,24 @@ In `appData` nach `reminderCooldownDays: …,`:
     reminderFeeLevel3Rappen: feeLevel3,
     reminderFeeLevel4Rappen: feeLevel4,
     reminderInterestPercent: interestPercent,
+```
+
+Direkt vor `revalidatePath("/settings");` in `saveSettings` (nach dem if/else mit `update`/`create`, also ausserhalb jeder Transaktion) einfügen:
+
+```ts
+  const dunningChanged =
+    (settings?.reminderFeeLevel2Rappen ?? 0) !== feeLevel2 ||
+    (settings?.reminderFeeLevel3Rappen ?? 0) !== feeLevel3 ||
+    (settings?.reminderFeeLevel4Rappen ?? 0) !== feeLevel4 ||
+    Number(settings?.reminderInterestPercent ?? 0) !== interestPercent;
+  if (dunningChanged) {
+    await logAudit(session, "UPDATE", "Settings", settings?.applicationSettingsId, "Mahnwesen", {
+      reminderFeeLevel2Rappen: feeLevel2,
+      reminderFeeLevel3Rappen: feeLevel3,
+      reminderFeeLevel4Rappen: feeLevel4,
+      reminderInterestPercent: interestPercent,
+    });
+  }
 ```
 
 - [ ] **Step 5: Formular und Seite**
@@ -330,10 +411,28 @@ describe("computeReminderCharges", () => {
     expect(c).toMatchObject({ feeRappen: 0, interestRappen: 0, totalRappen: 100000, interestPercent: 0, overdueDays: 40 });
   });
 
-  it("charges no fee on the Zahlungserinnerung even if fees are set", () => {
-    const c = computeReminderCharges({ level: 1, openRappen: 50000, dueDate: due, dunningDate: dunning(10), settings: { ...settings, reminderInterestPercent: 0 } });
+  it("charges neither fee nor interest on the Zahlungserinnerung even if both are set", () => {
+    const c = computeReminderCharges({ level: 1, openRappen: 50000, dueDate: due, dunningDate: dunning(10), settings });
     expect(c.feeRappen).toBe(0);
+    expect(c.interestRappen).toBe(0);
     expect(c.totalRappen).toBe(50000);
+  });
+
+  it("works on a reduced remainder (e.g. after a credit note)", () => {
+    // 250.00 CHF x 5 % x 73 / 365 = 2.50 CHF
+    const c = computeReminderCharges({ level: 2, openRappen: 25000, dueDate: due, dunningDate: dunning(73), settings });
+    expect(c.interestRappen).toBe(250);
+    expect(c.totalRappen).toBe(25000 + 1000 + 250);
+  });
+
+  it("counts calendar days independent of the time of day and the DST change", () => {
+    const c = computeReminderCharges({
+      level: 2, openRappen: 100000,
+      dueDate: new Date("2026-03-20T00:00:00Z"),
+      dunningDate: new Date("2026-04-05T23:30:00Z"),
+      settings,
+    });
+    expect(c.overdueDays).toBe(16);
   });
 
   it("picks the fee of the level", () => {
@@ -433,9 +532,10 @@ export function computeReminderCharges(input: {
   const { level, openRappen, dueDate, dunningDate, settings } = input;
   const rate = settings.reminderInterestPercent;
   const interestPercent = typeof rate === "number" ? rate : rate.toNumber();
-  const overdueDays = Math.max(0, Math.floor((dunningDate.getTime() - dueDate.getTime()) / DAY_MS));
+  const utcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const overdueDays = Math.max(0, Math.round((utcDay(dunningDate) - utcDay(dueDate)) / DAY_MS));
   const interestRappen =
-    interestPercent > 0 && overdueDays > 0
+    level > 1 && interestPercent > 0 && overdueDays > 0
       ? Math.round((openRappen * (interestPercent / 100) * overdueDays) / 365)
       : 0;
   const feeRappen = feeForLevel(level, settings);
@@ -550,7 +650,8 @@ describe("generateReminderPdf", () => {
       const buf = await generateReminderPdf(invoice, settings, charges(level));
       const { pageText } = await extractText(buf);
       expect(pageText[0]).toContain(title);
-      expect(pageText[0]).not.toContain("Rechnung Gesamtbetrag");
+      expect(pageText[0]).not.toContain("Beschreibung"); // no items table
+      expect(pageText[0]).not.toContain("Menge");
       expect(pageText[0]).toContain("I-26010001");
     }
   );
@@ -565,6 +666,13 @@ describe("generateReminderPdf", () => {
     expect(first).toContain("1’020.00");
     expect(numPages).toBe(2);
     expect(pageText[1]).toContain("1 020.00");
+  });
+
+  it("prints no overdue note when the due date is the dunning date", async () => {
+    const due = new Date("2026-01-31T00:00:00Z");
+    const c = computeReminderCharges({ level: 2, openRappen: 100000, dueDate: due, dunningDate: due, settings: settings as never });
+    const { pageText } = await extractText(await generateReminderPdf(invoice, settings, c));
+    expect(pageText[0]).not.toContain("überfällig");
   });
 
   it("omits fee and interest lines when they are zero", async () => {
@@ -689,7 +797,10 @@ export async function generateReminderPdf(
     dueLabel: "Zahlbar bis:",
     closingNoteLabel: "Zahlbar bis:",
     referenceLine: `Rechnung ${invoice.documentNumber} vom ${formatDate(invoice.date, locale)}, fällig am ${formatDate(invoice.dueDate, locale)}`,
-    overdueNote: `Die Rechnung ist seit ${charges.overdueDays} Tagen überfällig. Bitte überweisen Sie den offenen Betrag bis zum angegebenen Datum.`,
+    overdueNote:
+      charges.overdueDays > 0
+        ? `Die Rechnung ist seit ${charges.overdueDays} Tagen überfällig. Bitte überweisen Sie den offenen Betrag bis zum angegebenen Datum.`
+        : undefined,
     customUserText: null,
     totalAmount: total,
     customer: invoice.customer,
@@ -729,18 +840,23 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `lib/invoice-dispatch.ts` (`renderArchiveAndSend`, `sentDocumentData`)
+- Modify: `lib/email.ts` (Anhangname in `sendInvoiceEmail`)
+- Modify: `lib/reminders.ts` (`isLastReminderLevelSent`)
+- Modify: `lib/pdf/invoice-pdf.ts` (Option `qrAmount` entfernen)
 - Modify: `app/(app)/invoices/reminders/actions.ts` (`sendReminder`)
-- Test: `tests/unit/invoice-dispatch.test.ts`, `tests/unit/invoice-sub-actions.test.ts`, `tests/integration/invoice-dispatch.test.ts`
+- Test: `tests/unit/invoice-dispatch.test.ts`, `tests/unit/invoice-sub-actions.test.ts`, `tests/unit/email-send.test.ts`, `tests/unit/document-pdf-generation.test.ts`, `tests/integration/invoice-dispatch.test.ts`, `tests/integration/reminders.test.ts`
 
 **Interfaces:**
 - Consumes: `computeReminderCharges`, `MAX_REMINDER_LEVEL`, `ReminderCharges` (Task 2); `generateReminderPdf` (Task 3); `getPaymentSummary(invoiceId).remainingRappen`; die neuen Spalten aus Task 1.
 - Produces:
-  - `renderArchiveAndSend` akzeptiert zusätzlich `renderPdf?: () => Promise<Buffer>`; wenn gesetzt, ersetzt es das Rendern von `generateInvoicePdf` (`pdfOptions` bleibt für Rechnungs-PDFs bestehen).
-  - `sentDocumentData` akzeptiert zusätzlich `charges?: ReminderCharges` und schreibt `openRappen`, `feeRappen`, `interestRappen`, `interestPercent`, `dunningDate`.
+  - `renderArchiveAndSend` akzeptiert `renderPdf?: () => Promise<Buffer>` und `attachmentName?: string`; `renderPdf` ersetzt das Rendern von `generateInvoicePdf`. Der bisherige Parameter `pdfOptions` (und `qrAmount` in `generateInvoicePdf`) entfällt, weil nur Mahnungen ihn nutzten.
+  - `sendInvoiceEmail(invoice, settings, pdf, overrides?: { to?; subject?; body?; attachmentName? })`.
+  - `sentDocumentData` akzeptiert zusätzlich `charges?: ReminderCharges` und schreibt `openRappen`, `feeRappen`, `interestRappen`, `interestPercent`, `dunningDate` **nur**, wenn `charges` gesetzt ist (sonst fehlen die Schlüssel, damit das bestehende `toEqual` für Rechnungen gültig bleibt).
+  - `isLastReminderLevelSent(prisma: PrismaClient, reminder: { invoiceId: number; reminderLevel: number; createdAt: Date }): Promise<boolean>` in `lib/reminders.ts`.
 
 - [ ] **Step 1: Write the failing tests**
 
-`tests/unit/invoice-dispatch.test.ts`: Der bestehende Test mit `pdfOptions` bleibt. Daneben ergänzen (die Datei mockt `generateInvoicePdf` bereits; den Aufbau von `invoice`, `settings`, `mail` dort übernehmen):
+`tests/unit/invoice-dispatch.test.ts`: den Test „forwards PDF options such as the QR amount“ **löschen**. Daneben ergänzen (die Datei mockt `generateInvoicePdf`, `archivePdf` und `sendInvoiceEmail` bereits; `invoice`, `settings`, `mail` und `archive`/`actor` stammen aus dem bestehenden Aufbau der Datei):
 
 ```ts
   it("uses renderPdf instead of generateInvoicePdf when provided", async () => {
@@ -752,9 +868,41 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
     expect(sendInvoiceEmail).toHaveBeenCalledWith(invoice, settings, custom, mail);
     expect(archivePdf).toHaveBeenCalledWith(expect.objectContaining({ kind: "Reminder", pdf: custom }));
   });
+
+  it("passes the attachment name to the mail", async () => {
+    const renderPdf = vi.fn().mockResolvedValue(Buffer.from("%PDF"));
+    await renderArchiveAndSend({ invoice, settings, kind: "Reminder", mail, renderPdf, attachmentName: "mahnung-X-stufe2.pdf" });
+    expect(sendInvoiceEmail).toHaveBeenCalledWith(invoice, settings, expect.any(Buffer), {
+      ...mail,
+      attachmentName: "mahnung-X-stufe2.pdf",
+    });
+  });
 ```
 
-Vor dem Schreiben die Datei lesen (`tests/unit/invoice-dispatch.test.ts`), um die tatsächlichen Namen der Mocks (`archivePdf`, `sendInvoiceEmail`) und die Fixtures zu verwenden.
+Im `describe("sentDocumentData", …)` derselben Datei bleibt der Test „builds the create input including the acting user“ unverändert (ohne `charges` fehlen die neuen Schlüssel). Ergänzen:
+
+```ts
+  it("stores the reminder amounts when charges are given", () => {
+    const dunningDate = new Date("2026-03-01");
+    const data = sentDocumentData({
+      invoiceId: 1, documentNumber: "I-26090001", kind: "Reminder", reminderLevel: 2, archive,
+      sentTo: "a@b.ch", subject: "Mahnung", actor,
+      charges: { level: 2, openRappen: 100000, feeRappen: 1000, interestRappen: 250, totalRappen: 101250, interestPercent: 5, overdueDays: 20, dunningDate },
+    });
+    expect(data).toMatchObject({ openRappen: 100000, feeRappen: 1000, interestRappen: 250, interestPercent: 5, dunningDate });
+  });
+```
+
+`tests/unit/email-send.test.ts` im Block `describe("sendInvoiceEmail", …)` ergänzen:
+
+```ts
+    it("uses the attachment name override (reminders)", async () => {
+      await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"), { attachmentName: "mahnung-R-2026-001-stufe2.pdf" });
+      expect(mockSendMail.mock.calls[0][0].attachments[0].filename).toBe("mahnung-R-2026-001-stufe2.pdf");
+    });
+```
+
+`tests/unit/document-pdf-generation.test.ts`: den Test „uses qrAmount instead of the invoice total on the QR slip“ löschen.
 
 `tests/unit/invoice-sub-actions.test.ts`:
 1. Mocks ergänzen: `vi.mock("@/lib/pdf/reminder-pdf", () => ({ generateReminderPdf: vi.fn() }));` und `import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";`. `getPaymentSummary`-Mock bleibt.
@@ -771,7 +919,7 @@ Vor dem Schreiben die Datei lesen (`tests/unit/invoice-dispatch.test.ts`), um di
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(
         { ...mockSettings, reminderFeeLevel2Rappen: 1000 } as never
       );
-      vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 60000 } as never);
+      vi.mocked(getPaymentSummary).mockResolvedValueOnce({ remainingRappen: 60000 } as never);
       vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf"));
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.$transaction).mockResolvedValue([{}, {}, { id: 1 }] as never);
@@ -781,6 +929,18 @@ Vor dem Schreiben die Datei lesen (`tests/unit/invoice-dispatch.test.ts`), um di
         expect.objectContaining({ reminderFeeLevel2Rappen: 1000 }),
         expect.objectContaining({ level: 2, openRappen: 60000, feeRappen: 1000, totalRappen: 61000 })
       );
+    });
+
+    it("refuses to send when nothing is open any more", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 1, invoiceId: 1, reminderLevel: 2, invoice: mockInvoice,
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(mockSettings as never);
+      vi.mocked(getPaymentSummary).mockResolvedValueOnce({ remainingRappen: 0 } as never);
+      const result = await sendReminder({}, form({ reminderId: "1", to: "x@x.ch", subject: "s", body: "b" }));
+      expect(result.error).toBe("Die Rechnung ist bereits beglichen.");
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
     });
 
     it("refuses another reminder after the last level", async () => {
@@ -795,7 +955,7 @@ Vor dem Schreiben die Datei lesen (`tests/unit/invoice-dispatch.test.ts`), um di
     });
 ```
 
-5. In „archives the reminder PDF and records a SentDocument …“ die Erwartung erweitern: `data: expect.objectContaining({ invoiceId: 10, kind: "Reminder", reminderLevel: 2, openRappen: 50000, feeRappen: 0, interestRappen: 0 })` (der Default-Mock von `getPaymentSummary` liefert `remainingRappen: 50000`).
+5. In „archives the reminder PDF and records a SentDocument …“ die Erwartung erweitern: `data: expect.objectContaining({ invoiceId: 10, kind: "Reminder", reminderLevel: 2, openRappen: 50000, feeRappen: 0, interestRappen: 0 })`. Weil `vi.clearAllMocks()` Implementierungen nicht zurücksetzt, im `beforeEach` des Blocks `describe("invoices/reminders actions", …)` zusätzlich `vi.mocked(getPaymentSummary).mockResolvedValue({ remainingRappen: 50000 } as never);` setzen; alle neuen Tests nutzen `mockResolvedValueOnce`.
 
 `tests/integration/invoice-dispatch.test.ts`:
 1. Mock `vi.mock("@/lib/pdf/reminder-pdf", () => ({ generateReminderPdf: vi.fn() }));`, Import ergänzen, in `beforeEach` `vi.mocked(generateReminderPdf).mockResolvedValue(pdf);` setzen.
@@ -846,34 +1006,127 @@ Vor dem Schreiben die Datei lesen (`tests/unit/invoice-dispatch.test.ts`), um di
     expect(second.error).toBe("Die letzte Mahnstufe wurde bereits versendet.");
     expect(await db.prisma.sentDocument.count()).toBe(1);
   });
+
+  it("sendReminder names the attachment after the level", async () => {
+    const invoice = await seedInvoice();
+    const reminder = await db.prisma.pendingReminder.create({ data: { invoiceId: invoice.id, reminderLevel: 2 } });
+    await sendReminder({}, form({ reminderId: String(reminder.id), to: "a@b.ch", subject: "M", body: "T" }));
+    expect(vi.mocked(sendInvoiceEmail).mock.calls[0][3]).toMatchObject({ attachmentName: "mahnung-I-26090001-stufe2.pdf" });
+  });
 ```
 
-Damit der zweite Aufruf „letzte Stufe bereits versendet“ erkennt, muss der Zustand nach dem Versand von Level 4 erkennbar bleiben. Lösung im Code (Step 3): `sendReminder` zählt die vorhandenen `SentDocument`-Zeilen mit `kind = "Reminder"` und `reminderLevel = MAX_REMINDER_LEVEL` für die Rechnung; existiert eine, wird mit dem Fehler abgebrochen. Der Unit-Test oben (`reminderLevel: 5`) deckt den Fall „Level über Deckel“ ab, der Integrationstest den Fall „Level 4 schon gesendet“. Im Unit-Test deshalb `sentDocument: { create: …, count: vi.fn().mockResolvedValue(0) }` in den Prisma-Mock aufnehmen.
+Damit der zweite Aufruf „letzte Stufe bereits versendet“ erkennt, bleibt der Zustand nach dem Versand von Level 4 an der `SentDocument`-Zeile erkennbar: `isLastReminderLevelSent` (Step 3) zählt die Zeilen mit `kind = "Reminder"` und `reminderLevel = 4` seit `PendingReminder.createdAt`. Der Unit-Test oben (`reminderLevel: 5`) deckt „Level über Deckel“ ab, der Integrationstest „Level 4 schon gesendet“. Im Unit-Test deshalb `sentDocument: { create: …, count: vi.fn().mockResolvedValue(0) }` in den Prisma-Mock aufnehmen (der Helper `isLastReminderLevelSent` ruft `count` erst ab Level 4 auf, Level 5 ist ohne Abfrage „gesperrt“).
 
 - [ ] **Step 2: Run to verify the tests fail**
 
 Run: `npx vitest run tests/unit/invoice-dispatch.test.ts tests/unit/invoice-sub-actions.test.ts tests/integration/invoice-dispatch.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: `lib/invoice-dispatch.ts`**
+- [ ] **Step 3: `lib/reminders.ts`, `lib/email.ts`, `lib/pdf/invoice-pdf.ts`, `lib/invoice-dispatch.ts`**
 
-Imports: `import type { ReminderCharges } from "@/lib/reminder-charges";`.
+`lib/reminders.ts`: Import `import { MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";` ergänzen und am Dateiende einfügen:
 
-`renderArchiveAndSend`: Parametertyp ergänzen:
+```ts
+/**
+ * True once the last level (4) has been sent for this reminder. Counted from the
+ * reminder's creation on, so a reminder that restarts after a reset (payment
+ * deleted, status back to Sent) is not blocked by an older level-4 notice.
+ */
+export async function isLastReminderLevelSent(
+  prisma: PrismaClient,
+  reminder: { invoiceId: number; reminderLevel: number; createdAt: Date }
+): Promise<boolean> {
+  if (reminder.reminderLevel > MAX_REMINDER_LEVEL) return true;
+  if (reminder.reminderLevel < MAX_REMINDER_LEVEL) return false;
+  const sent = await prisma.sentDocument.count({
+    where: {
+      invoiceId: reminder.invoiceId,
+      kind: "Reminder",
+      reminderLevel: MAX_REMINDER_LEVEL,
+      createdAt: { gte: reminder.createdAt },
+    },
+  });
+  return sent > 0;
+}
+```
+
+Test dazu in `tests/integration/reminders.test.ts` (neuer eigener `describe`, der Import der Datei wird zu `import { checkOverdueInvoices, isLastReminderLevelSent } from "@/lib/reminders";`):
+
+```ts
+describe("isLastReminderLevelSent", () => {
+  const db = createTestDatabase();
+
+  async function seed() {
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+    return db.prisma.invoice.create({
+      data: {
+        customerId: customer.customerId, documentNumber: "I-26090001", date: new Date(),
+        dueDate: new Date(Date.now() - 5 * 86_400_000), totalAmount: 500, state: "Overdue",
+      },
+    });
+  }
+  function sentLevel4(invoiceId: number, createdAt: Date) {
+    return db.prisma.sentDocument.create({
+      data: {
+        invoiceId, kind: "Reminder", reminderLevel: 4, documentNumber: "I-26090001",
+        path: `2026/x-${createdAt.getTime()}.pdf`, sha256: "a".repeat(64), size: 1,
+        sentTo: "a@b.ch", subject: "M", createdById: 1, createdAt,
+      },
+    });
+  }
+
+  it("is false below level 4 and true above it", async () => {
+    const inv = await seed();
+    const r = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 3 } });
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(false);
+    expect(await isLastReminderLevelSent(db.prisma, { ...r, reminderLevel: 5 })).toBe(true);
+  });
+
+  it("is true once a level-4 notice was sent for this reminder", async () => {
+    const inv = await seed();
+    const r = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(false);
+    await sentLevel4(inv.id, new Date(r.createdAt.getTime() + 1000));
+    expect(await isLastReminderLevelSent(db.prisma, r)).toBe(true);
+  });
+
+  it("ignores a level-4 notice from before the reminder was recreated", async () => {
+    const inv = await seed();
+    await sentLevel4(inv.id, new Date(Date.now() - 60_000));
+    const fresh = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
+    expect(await isLastReminderLevelSent(db.prisma, fresh)).toBe(false);
+  });
+});
+```
+
+`lib/email.ts`: `overrides?: { to?: string; subject?: string; body?: string }` ersetzen durch `overrides?: { to?: string; subject?: string; body?: string; attachmentName?: string }` und die Zeile `const filename = …` durch:
+
+```ts
+  const filename =
+    overrides?.attachmentName ?? `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
+```
+
+`lib/pdf/invoice-pdf.ts`: Parameter `options: { qrAmount?: number } = {}` samt Kommentar entfernen, `totalAmount: options.qrAmount ?? total` zu `totalAmount: total` ändern.
+
+`lib/invoice-dispatch.ts`: Import `import type { ReminderCharges } from "@/lib/reminder-charges";` ergänzen. In `renderArchiveAndSend` den Parameter `pdfOptions?: { qrAmount?: number };` samt Kommentar ersetzen durch:
 
 ```ts
   /** Replaces the default invoice rendering (reminders pass the Mahnbeleg renderer). */
   renderPdf?: () => Promise<Buffer>;
+  /** Attachment file name; defaults to the invoice naming in `sendInvoiceEmail`. */
+  attachmentName?: string;
 ```
 
-Destrukturierung `const { invoice, settings, kind, mail, pdfOptions, renderPdf } = params;` und
+Destrukturierung `const { invoice, settings, kind, mail, renderPdf, attachmentName } = params;`, das Rendern ersetzen durch
 
 ```ts
-  const pdf = renderPdf
-    ? await renderPdf()
-    : pdfOptions
-      ? await generateInvoicePdf(invoice, settings, pdfOptions)
-      : await generateInvoicePdf(invoice, settings);
+  const pdf = renderPdf ? await renderPdf() : await generateInvoicePdf(invoice, settings);
+```
+
+und den Versand `await sendInvoiceEmail(invoice, settings, pdf, mail);` ersetzen durch
+
+```ts
+  await sendInvoiceEmail(invoice, settings, pdf, attachmentName ? { ...mail, attachmentName } : mail);
 ```
 
 `sentDocumentData`: Parameter `charges?: ReminderCharges;` und im zurückgegebenen Objekt ergänzen:
@@ -893,26 +1146,25 @@ In `app/(app)/invoices/reminders/actions.ts` Imports ergänzen:
 ```ts
 import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
 import { computeReminderCharges, MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
+import { isLastReminderLevelSent } from "@/lib/reminders";
 ```
 
 Nach `if (!settings) return { error: "Einstellungen nicht konfiguriert." };` einfügen:
 
 ```ts
-  const lastLevelSent = await prisma.sentDocument.count({
-    where: { invoiceId: reminder.invoiceId, kind: "Reminder", reminderLevel: MAX_REMINDER_LEVEL },
-  });
-  if (reminder.reminderLevel > MAX_REMINDER_LEVEL || lastLevelSent > 0) {
+  if (await isLastReminderLevelSent(prisma, reminder)) {
     return { error: "Die letzte Mahnstufe wurde bereits versendet." };
   }
 ```
 
-Den Block `let archive: ArchiveResult; try { … }` ersetzen durch:
+Den Block `let archive: ArchiveResult; try { … }` ersetzen durch (der Rest-0-Check liegt vor dem Rendern):
 
 ```ts
   let archive: ArchiveResult;
   let charges: ReturnType<typeof computeReminderCharges>;
   try {
     const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
+    if (remainingRappen <= 0) return { error: "Die Rechnung ist bereits beglichen." };
     charges = computeReminderCharges({
       level: reminder.reminderLevel,
       openRappen: remainingRappen,
@@ -926,6 +1178,7 @@ Den Block `let archive: ArchiveResult; try { … }` ersetzen durch:
       kind: "Reminder",
       mail: { to, subject, body },
       renderPdf: () => generateReminderPdf(reminder.invoice, settings, charges),
+      attachmentName: `mahnung-${reminder.invoice.documentNumber}-stufe${reminder.reminderLevel}.pdf`,
     });
   } catch (err) {
     log.error({ reminderId, to, err }, "sendReminder failed");
@@ -959,7 +1212,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Modify: `app/(app)/invoices/reminders/page.tsx`, `app/(app)/invoices/reminders/ReminderRow.tsx`
 
 **Interfaces:**
-- Consumes: `reminderTitle`, `computeReminderCharges`, `MAX_REMINDER_LEVEL` (Task 2); `SentDocument`-Zählung wie in Task 4.
+- Consumes: `reminderTitle`, `computeReminderCharges` (Task 2); `isLastReminderLevelSent` (Task 4).
 - Produces: `ReminderRow` bekommt die Props `feeRappen: number`, `interestRappen: number`, `lastLevelSent: boolean`.
 
 Es gibt keine Komponententests für diese Seite; Prüfung über Typecheck, Lint und die Smoke-Prüfung in Step 4.
@@ -968,16 +1221,15 @@ Es gibt keine Komponententests für diese Seite; Prüfung über Typecheck, Lint 
 
 Imports: `import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";`.
 
-Nach der Berechnung von `remainingByInvoice` die letzten gesendeten Stufen laden:
+Import `import { isLastReminderLevelSent } from "@/lib/reminders";` ergänzen und nach der Berechnung von `remainingByInvoice` die gesperrten Mahnungen ermitteln (derselbe Helper wie in `sendReminder`):
 
 ```ts
   const lastLevelSentIds = new Set(
     (
-      await prisma.sentDocument.findMany({
-        where: { kind: "Reminder", reminderLevel: 4, invoiceId: { in: reminders.map((r) => r.invoiceId) } },
-        select: { invoiceId: true },
-      })
-    ).map((d) => d.invoiceId)
+      await Promise.all(
+        reminders.map(async (r) => ((await isLastReminderLevelSent(prisma, r)) ? r.id : null))
+      )
+    ).filter((id): id is number => id !== null)
   );
 ```
 
@@ -1002,7 +1254,7 @@ und beim `<ReminderRow …>` ergänzen:
 ```tsx
                 feeRappen={charges?.feeRappen ?? 0}
                 interestRappen={charges?.interestRappen ?? 0}
-                lastLevelSent={lastLevelSentIds.has(inv.id)}
+                lastLevelSent={lastLevelSentIds.has(r.id)}
 ```
 
 Der bestehende `defaultBody` bleibt unverändert (`Betrag:` zeigt weiterhin den offenen Betrag); ergänzen, wenn Gebühr oder Zins > 0 sind, eine Zeile im Text:
@@ -1073,7 +1325,130 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Doku und Gesamtprüfung
+### Task 6: Bankabgleich erkennt den Mahn-Total
+
+**Files:**
+- Modify: `lib/import/matching.ts`, `lib/import/queries.ts`
+- Test: `tests/unit/import-matching.test.ts`, `tests/integration/bank-import.test.ts`
+
+**Interfaces:**
+- Produces: `OpenInvoice.reminderTotal?: number` (CHF), gesetzt von `loadOpenInvoices`, wenn die zuletzt versendete Mahnung einen Total über dem offenen Betrag hat.
+
+- [ ] **Step 1: Write the failing tests**
+
+In `tests/unit/import-matching.test.ts` im `describe("matchStatementToInvoices", …)` ergänzen:
+
+```ts
+  it("treats the total of the latest Mahnbeleg as an amount match and pre-selects with the reference", () => {
+    const invoice: OpenInvoice = { id: 1, documentNumber: "I-26010042", openAmount: 123.45, reminderTotal: 133.45 };
+    const [withRef] = matchStatementToInvoices(
+      [tx({ amountCents: 13345, description: "Rechnung I-26010042" })],
+      [invoice],
+      PREFIX
+    );
+    expect(withRef.confidence).toBe("reference");
+    expect(withRef.preselectedInvoiceId).toBe(1);
+
+    const [amountOnly] = matchStatementToInvoices([tx({ amountCents: 13345 })], [invoice], PREFIX);
+    expect(amountOnly.confidence).toBe("amount");
+    expect(amountOnly.candidates).toEqual([{ invoiceId: 1, documentNumber: "I-26010042" }]);
+  });
+
+  it("still matches the plain open amount when a reminder total exists", () => {
+    const invoice: OpenInvoice = { id: 1, documentNumber: "I-26010042", openAmount: 123.45, reminderTotal: 133.45 };
+    const [result] = matchStatementToInvoices([tx({ amountCents: 12345 })], [invoice], PREFIX);
+    expect(result.confidence).toBe("amount");
+  });
+```
+
+In `tests/integration/bank-import.test.ts` einen Test ergänzen, der `loadOpenInvoices` aus `@/lib/import/queries` aufruft (Setup wie in den bestehenden Tests der Datei lesen und wiederverwenden: Kunde und Rechnung `Overdue` über CHF 100 anlegen), dann eine `SentDocument`-Zeile `kind: "Reminder"`, `reminderLevel: 2`, `openRappen: 10000`, `feeRappen: 1000`, `interestRappen: 250` (Pflichtfelder `documentNumber`, `path`, `sha256`, `size`, `sentTo`, `subject`, `createdById` wie im Integrationstest `tests/integration/reminders.test.ts` unter `sentLevel4` gesetzt) erzeugen und prüfen:
+
+```ts
+    const [open] = await loadOpenInvoices(db.prisma);
+    expect(open.openAmount).toBe(100);
+    expect(open.reminderTotal).toBe(112.5);
+```
+
+und einen zweiten Fall ohne Mahnung: `reminderTotal` ist `undefined`.
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `npx vitest run tests/unit/import-matching.test.ts tests/integration/bank-import.test.ts`
+Expected: FAIL.
+
+- [ ] **Step 3: `lib/import/matching.ts`**
+
+Im Interface `OpenInvoice` nach `openAmount` ergänzen:
+
+```ts
+  /** Francs requested by the latest Mahnbeleg (open + fee + interest); only set when above `openAmount`. */
+  reminderTotal?: number;
+```
+
+Nach `centsOf` einfügen:
+
+```ts
+/** The open amount, or the total printed on the latest Mahnbeleg, is a payment of this invoice. */
+function acceptsAmount(invoice: OpenInvoice, cents: number): boolean {
+  return (
+    centsOf(invoice.openAmount) === cents ||
+    (invoice.reminderTotal != null && centsOf(invoice.reminderTotal) === cents)
+  );
+}
+```
+
+Die zwei Vergleiche ersetzen:
+- `(invoice) => centsOf(invoice.openAmount) === transaction.amountCents` → `(invoice) => acceptsAmount(invoice, transaction.amountCents)`
+- `centsOf(referenced.openAmount) === transaction.amountCents` → `acceptsAmount(referenced, transaction.amountCents)`
+
+Den Kopfkommentar um den Punkt „… or the total of the latest Mahnbeleg“ bei „open amount“ ergänzen.
+
+- [ ] **Step 4: `lib/import/queries.ts`**
+
+In `loadOpenInvoices` im `select` ergänzen:
+
+```ts
+      sentDocuments: {
+        where: { kind: "Reminder" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { openRappen: true, feeRappen: true, interestRappen: true },
+      },
+```
+
+und im `.map` nach `const names = …`:
+
+```ts
+      const openRappen = Math.max(toRappen(invoice.totalAmount) - creditedRappen - paidRappen, 0);
+      const lastReminder = invoice.sentDocuments[0];
+      const reminderRappen = lastReminder
+        ? (lastReminder.openRappen ?? 0) + (lastReminder.feeRappen ?? 0) + (lastReminder.interestRappen ?? 0)
+        : 0;
+```
+
+Das zurückgegebene Objekt: `openAmount: openRappen / 100,` und
+
+```ts
+        ...(reminderRappen > openRappen ? { reminderTotal: reminderRappen / 100 } : {}),
+```
+
+- [ ] **Step 5: Run to verify they pass**
+
+Run: `npx vitest run tests/unit/import-matching.test.ts tests/integration/bank-import.test.ts tests/integration/camt-import-payments.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lib/import/matching.ts lib/import/queries.ts tests/unit/import-matching.test.ts tests/integration/bank-import.test.ts
+git commit -m "feat(import): match the dunning notice total in bank import
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: Doku und Gesamtprüfung
 
 **Files:**
 - Modify: `CLAUDE.md`, `FEATURE_ANALYSE.md`, `README.md`
@@ -1083,7 +1458,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 Im Abschnitt „Business document workflow“ den Eintrag `` `lib/reminders.ts` + `PendingReminder` model manage overdue payment reminders `` ersetzen durch:
 
 ```
-- **Reminders** (`lib/reminders.ts`, `lib/reminder-charges.ts`, `lib/pdf/reminder-pdf.ts`, `app/(app)/invoices/reminders/`): `PendingReminder` manages overdue reminders with four levels (1 Zahlungserinnerung, 2–4 = 1.–3. Mahnung, `MAX_REMINDER_LEVEL = 4`). `sendReminder` recomputes the amounts server-side (`computeReminderCharges`: open remainder from `getPaymentSummary`, fee per level from `ApplicationSettings.reminderFeeLevel{2,3,4}Rappen`, interest = open × `reminderInterestPercent` × days overdue / 365; all default 0 = off) and renders a dedicated Mahnbeleg (`generateReminderPdf`, the QR slip requests open + fee + interest) through `renderArchiveAndSend` with `renderPdf`. Fee and interest are not booked: the invoice, `Payment` and the open items list stay unchanged, and a payment above the remainder becomes an overpayment. The amounts and the dunning date are stored on the `SentDocument` row (`openRappen`, `feeRappen`, `interestRappen`, `interestPercent`, `dunningDate`). After level 4 no further reminder is sent (the list shows "Letzte Stufe erreicht"). No Betreibung/Inkasso state or export yet
+- **Reminders** (`lib/reminders.ts`, `lib/reminder-charges.ts`, `lib/pdf/reminder-pdf.ts`, `app/(app)/invoices/reminders/`): `PendingReminder` manages overdue reminders with four levels (1 Zahlungserinnerung, 2–4 = 1.–3. Mahnung, `MAX_REMINDER_LEVEL = 4`). `sendReminder` recomputes the amounts server-side (`computeReminderCharges`: open remainder from `getPaymentSummary`, fee per level from `ApplicationSettings.reminderFeeLevel{2,3,4}Rappen`, interest = open × `reminderInterestPercent` × days overdue / 365; all default 0 = off) and renders a dedicated Mahnbeleg (`generateReminderPdf`, the QR slip requests open + fee + interest; level 1 carries neither fee nor interest; the attachment is named `mahnung-<number>-stufe<level>.pdf`) through `renderArchiveAndSend` with `renderPdf`. Fee and interest are not booked: the invoice, `Payment` and the open items list stay unchanged, and a payment above the remainder becomes an overpayment. The amounts and the dunning date are stored on the `SentDocument` row (`openRappen`, `feeRappen`, `interestRappen`, `interestPercent`, `dunningDate`). After level 4 no further reminder is sent (`isLastReminderLevelSent` in `lib/reminders.ts`, counted from `PendingReminder.createdAt`; the list shows "Letzte Stufe erreicht"), and nothing is sent when the remainder is 0. The bank import also accepts the latest reminder total as an amount match (`OpenInvoice.reminderTotal`). Changes to fees/interest are audited (`UPDATE Settings`). No Betreibung/Inkasso state or export yet
 ```
 
 - [ ] **Step 2: `FEATURE_ANALYSE.md`**
@@ -1117,4 +1492,5 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 - **Spec-Abdeckung:** Stufen und Level-Deckel (Task 2, 4, 5), Datenmodell (Task 1), Berechnung (Task 2), Mahnbeleg-PDF (Task 3), Versand und Speicherung (Task 4), Mahnliste (Task 5), Einstellungen inkl. Rechtshinweis und Validierung (Task 1), Tests (je Task), Doku (Task 6). Nicht im Umfang bleiben Betreibung/Export und Verrechnung als Forderung.
 - **Typkonsistenz:** `ReminderCharges`, `computeReminderCharges`, `reminderTitle`, `MAX_REMINDER_LEVEL` (Task 2) werden in Task 3–5 mit denselben Namen verwendet; die Feldnamen `reminderFeeLevel{2,3,4}Rappen` und `reminderInterestPercent` stimmen zwischen Schema, Formular (`reminderFeeLevel2/3/4`, `reminderInterestPercent`), `saveSettings` und `computeReminderCharges` überein.
-- **Bekannte Abweichung zur Spec:** Der „letzte Stufe erreicht“-Zustand wird über eine `SentDocument`-Zeile mit `reminderLevel = 4` erkannt (kein Schema-Feld auf `PendingReminder` nötig), weil `PendingReminder.reminderLevel` nach Stufe 4 bei 4 stehen bleibt.
+- **Designhinweis:** Der „letzte Stufe“-Zustand wird über eine `SentDocument`-Zeile mit `reminderLevel = 4` seit `PendingReminder.createdAt` erkannt (kein Schema-Feld auf `PendingReminder`); die Spec beschreibt dasselbe.
+- **Review-Befunde eingearbeitet** (Opus-Review vom 2026-10-01): Tests mit `toEqual`/Mock-Zustand, Reset-sichere Stufensperre, Rest-0-Schutz, Settings-Audit, Anhangname, Bankabgleich-Total, Level 1 ohne Zins, kalendertagbasierte Zinstage, `pdfOptions`/`qrAmount` entfernt.

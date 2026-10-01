@@ -9,7 +9,7 @@ Eine Mahnung ist heute das normale Rechnungs-PDF mit Titel „Rechnung“ (QR-Be
 ## Nicht im Umfang
 
 - Status „Betreibung/Inkasso“ und Export der Forderungsdaten (eigener späterer Schritt).
-- Verrechnung von Gebühr und Zins als offene Forderung: Rechnungsbetrag, `Payment`, OP-Liste und GuV bleiben unverändert. Gebühr und Zins stehen nur auf dem Beleg und im QR-Betrag. Zahlt der Kunde mehr als den Rest, entsteht im bestehenden Abgleich eine Überzahlung.
+- Verrechnung von Gebühr und Zins als offene Forderung: Rechnungsbetrag, `Payment` und OP-Liste bleiben unverändert. Gebühr und Zins stehen nur auf dem Beleg, im QR-Betrag und in `SentDocument`. Zahlt der Kunde mehr als den Rest, entsteht im bestehenden Abgleich eine Überzahlung; diese Zahlung erscheint als `Payment.amount` im Journal und in den Einnahmen (die Gebühr wird nicht separat ausgewiesen).
 - Rechtliche Klärung (Zulässigkeit und Höhe von Gebühr und Zins) liegt beim Betreiber; die Einstellungen weisen darauf hin.
 
 ## Stufen
@@ -21,7 +21,7 @@ Eine Mahnung ist heute das normale Rechnungs-PDF mit Titel „Rechnung“ (QR-Be
 | 3 | 2. Mahnung | `reminderFeeLevel3Rappen` |
 | 4 | 3. Mahnung | `reminderFeeLevel4Rappen` |
 
-Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminder.reminderLevel` nicht über 4 und die Mahnliste zeigt „Letzte Stufe erreicht“ ohne Versandbutton (Ignorieren bleibt möglich).
+Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminder.reminderLevel` nicht über 4 und die Mahnliste zeigt „Letzte Stufe erreicht“ ohne Versandbutton (Ignorieren bleibt möglich). „Letzte Stufe versendet“ gilt, wenn `reminderLevel >= 4` und seit `PendingReminder.createdAt` ein `SentDocument` mit `kind = "Reminder"` und `reminderLevel = 4` existiert (Helper `isLastReminderLevelSent` in `lib/reminders.ts`, von Action und Liste gemeinsam genutzt). Wird die Mahnung zurückgesetzt (Zahlung gelöscht, Status zurück), beginnt sie mit einer neuen `PendingReminder`-Zeile wieder bei Level 1. Die Migration setzt bestehende `reminderLevel > 4` auf 4.
 
 ## Datenmodell (eine Migration)
 
@@ -36,19 +36,21 @@ Nach Level 4 gibt es keine weitere Stufe: `sendReminder` erhöht `PendingReminde
 
 Keine neue Tabelle: Level, Empfänger, Betreff und Archivpfad liegen bereits in `SentDocument`.
 
+Die Migration setzt ausserdem `PendingReminder.reminderLevel` auf höchstens 4 (`UPDATE … SET reminderLevel = 4 WHERE reminderLevel > 4`).
+
 ## Berechnung (`lib/reminder-charges.ts`)
 
-Reine Funktion `computeReminderCharges({ level, openRappen, dueDate, dunningDate, feeRappen, interestPercent })`:
-- `interest = round(open × percent/100 × days / 365)` mit `days = max(0, Tage von dueDate bis dunningDate)`; bei Satz 0 oder `days = 0` ist der Zins 0.
+Reine Funktion `computeReminderCharges({ level, openRappen, dueDate, dunningDate, settings })` (`settings` liefert die drei Gebühren und den Zinssatz):
+- `interest = round(open × percent/100 × days / 365)` mit `days` = Kalendertage von `dueDate` bis `dunningDate` (aus den UTC-Datumsteilen, damit Uhrzeit und Zeitumstellung nichts verschieben), mindestens 0. Bei Satz 0, `days = 0` oder Level 1 ist der Zins 0: die Zahlungserinnerung ist eine reine Erinnerung ohne Gebühr und ohne Zins.
 - `fee` = Gebühr der Stufe (Level 1: 0).
 - `total = open + fee + interest`.
 
-Der Restbetrag stammt aus `getPaymentSummary(...).remainingRappen` (berücksichtigt Teilzahlungen und Gutschriften). Alle Beträge in Rappen (`Int`), CHF nur an der Darstellungsgrenze.
+Der Restbetrag stammt aus `getPaymentSummary(...).remainingRappen` (berücksichtigt Teilzahlungen und Gutschriften). Ist er 0 (z. B. durch eine Gutschrift voll gedeckt), versendet `sendReminder` nichts und meldet „Die Rechnung ist bereits beglichen.“. Eine Teilzahlung entfernt die Mahnung (`lib/payments.ts`), und `PartiallyPaid` wird nicht wieder `Overdue`; ein reduzierter Rest entsteht im Mahnfluss daher praktisch nur durch Gutschriften. Alle Beträge in Rappen (`Int`), CHF nur an der Darstellungsgrenze.
 
 ## Mahnbeleg-PDF (`lib/pdf/reminder-pdf.ts`)
 
 `generateReminderPdf(invoice, settings, charges)`, gleiche Bausteine wie `invoice-pdf.ts` (`theme.ts`, `qrbill-helpers.ts`):
-- Titel nach Stufe, Mahndatum, Bezug auf Rechnungsnummer, Rechnungsdatum, Fälligkeit und Tage im Verzug.
+- Titel nach Stufe, Mahndatum, Bezug auf Rechnungsnummer, Rechnungsdatum, Fälligkeit und, falls überfällig, die Tage im Verzug.
 - Betragstabelle: Restbetrag; Mahngebühr und Verzugszins (inkl. Satz) nur bei Betrag > 0; Total.
 - Zahlungsfrist auf dem Beleg: `reminderCooldownDays`.
 - QR-Zahlteil über das Total. Keine Positionen der Originalrechnung.
@@ -57,19 +59,25 @@ Der Restbetrag stammt aus `getPaymentSummary(...).remainingRappen` (berücksicht
 
 - `lib/invoice-dispatch.ts`: `renderArchiveAndSend` erhält eine Reminder-Variante, die `generateReminderPdf` aufruft; sonst unverändert (einmal rendern, Bytes archivieren, dieselben Bytes anhängen; Archivfehler = kein Versand).
 - `sentDocumentData` übernimmt die Betragsspalten und das Mahndatum.
+- `lib/email.ts`: `sendInvoiceEmail` nimmt optional `attachmentName`; die Mahnung heisst `mahnung-<Rechnungsnummer>-stufe<level>.pdf` statt `rechnung-<Nummer>.pdf`.
 - `app/(app)/invoices/reminders/actions.ts` (`sendReminder`): berechnet die Beträge serverseitig neu (nie aus Formulardaten), Level-Deckel 4, Audit wie bisher (`SEND Reminder`, `CREATE SentDocument`), im Audit-Detail zusätzlich Gebühr und Zins.
 - `ReminderRow.tsx` und `page.tsx`: Stufe 4 im Label, Vorschau von Gebühr, Zins und Total, „Letzte Stufe erreicht“ nach Level 4.
 
 ## Einstellungen
 
-Neuer Abschnitt „Mahnwesen“ neben `reminderCooldownDays` in Einstellungen: drei Gebührenfelder (CHF, intern Rappen), Zinssatz (%), Hinweis zur rechtlichen Klärung. Validierung: Beträge ≥ 0, Zinssatz 0–100. Änderungen laufen durch die bestehende Settings-Action inkl. Audit.
+Neuer Abschnitt „Mahnwesen“ neben `reminderCooldownDays` in Einstellungen: drei Gebührenfelder (CHF, intern Rappen), Zinssatz (%), Hinweis zur rechtlichen Klärung. Validierung: Beträge ≥ 0 (ungültige Eingabe: „Ungültiger Betrag.“), Zinssatz 0–100. `saveSettings` schreibt einen Audit-Eintrag `UPDATE Settings` (`entityRef` „Mahnwesen“, Details mit den neuen Werten), wenn sich Gebühren oder Zinssatz ändern.
+
+## Bankabgleich
+
+`OpenInvoice` (`lib/import/matching.ts`) erhält optional `reminderTotal` (CHF: Offen + Gebühr + Zins der zuletzt versendeten Mahnung, nur wenn grösser als der offene Betrag). `matchStatementToInvoices` akzeptiert einen Betrag, der dem offenen Betrag oder dem `reminderTotal` entspricht, als Betragstreffer. `loadOpenInvoices` füllt das Feld aus der neuesten `SentDocument`-Zeile mit `kind = "Reminder"`. Die Zahlung wird über `recordPayment` gebucht; der Überschuss gegenüber dem Rest erscheint als Überzahlung.
 
 ## Tests
 
 - Unit `reminder-charges`: Satz 0, Rundung, Teilzahlung (kleinerer Rest), `days = 0`, Gebühr je Stufe.
 - Unit PDF: Titel je Stufe, Zeilen für Gebühr und Zins nur bei > 0, QR-Betrag = Total.
 - Integration `sendReminder`: `SentDocument` enthält Beträge und Mahndatum, Archiv-Hash stimmt, Level-Deckel bei 4, Archivfehler sendet nicht und belässt die Stufe.
-- Settings-Action: Validierung der neuen Felder.
+- Settings-Action: Validierung der neuen Felder, Audit bei Änderung.
+- `isLastReminderLevelSent` (inkl. Neustart der Mahnung nach Reset), Rest 0, Anhangname, Bankabgleich mit Mahn-Total.
 
 ## Doku
 
