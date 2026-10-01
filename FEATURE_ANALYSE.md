@@ -216,26 +216,26 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
 
-- [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung (#114)
+- [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung
 - [x] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
 - [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
 - [x] 4. F4 Belegarchiv und automatisches Backup (Teil A PDF-Archiv, Teil B Hash-Kette und Teil C Backup erledigt)
   - [x] C Automatisches nächtliches Backup (`lib/backup.ts`)
   - [x] A PDF-Archiv mit SHA-256-Hash (`lib/document-archive.ts`, `SentDocument`)
   - [x] B Hash-Kette im Audit-Log
-- [x] 5. Kleine Fixes (#113)
+- [x] 5. Kleine Fixes
   - [x] Import prüft Währung und IBAN (Z3)
   - [x] Audit-Log für Pending-E-Mails (U6)
 
 **Phase 2: mittelfristig (3–9 Monate) – Buchhaltungsfähigkeit**
 - [x] 6. F5 Zahlungen und offene Posten
-- [ ] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
-- [x] 8. F7 Bankabgleich 2.0 (PR #123)
-- [x] 9. F11 flexible Abos (#122)
+- [x] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
+- [x] 8. F7 Bankabgleich 2.0
+- [x] 9. F11 flexible Abos
 
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
-- [ ] 10. F8 Mahnwesen mit Mahnbelegen
-- [ ] 11. F9 Belege zu Ausgaben
+- [x] 10. F8 Mahnwesen mit Mahnbelegen
+- [x] 11. F9 Belege zu Ausgaben
 - [ ] 12. F10 erweitertes Kundenmodell
 - [ ] 13. F12 Verlauf und Aufgaben
 - [ ] 14. Optional: F13 Online-Bezahlung, F14 KI-Belegerfassung, eBill (erst nach Abklärung der Teilnahmebedingungen)
