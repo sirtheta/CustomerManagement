@@ -85,6 +85,43 @@ describe("QRBill data preparation", () => {
   });
 
   // Equivalent: CreateQRBill_WithoutCompanyName_ShouldUseContactPerson
+  it("uses the billing address as debtor when set", () => {
+    const data = buildQrBillData({
+      invoice: { documentNumber: "I-1", totalAmount: 100 },
+      company: {
+        companyIBAN: "CH93 0076 2011 6238 5295 7",
+        companyName: "Firma",
+        companyStreet: "Weg",
+        companyHouseNumber: "1",
+        companyZip: "8000",
+        companyCity: "Zürich",
+        companyCountry: "CH",
+      },
+      customer: {
+        contactInsteadOfCompany: false,
+        company: "Muster AG",
+        contactPerson: "Anna",
+        street: "Hauptstrasse",
+        houseNumber: "5",
+        zipCode: "8001",
+        city: "Zürich",
+        country: "CH",
+        billingName: "Muster AG, Buchhaltung",
+        billingStreet: "Postfach",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+      },
+    });
+    expect(data?.debtor).toEqual({
+      name: "Muster AG, Buchhaltung",
+      address: "Postfach",
+      zip: "3000",
+      city: "Bern",
+      country: "CH",
+    });
+  });
+
   it("should use contact person as debtor when company is null", () => {
     const data = buildQrBillData({
       invoice: validInvoice,
@@ -163,6 +200,16 @@ describe("QRBill data preparation", () => {
           phone: null,
           contactInsteadOfCompany: false,
           archivedAt: null,
+          customerNumber: null,
+          uid: null,
+          billingName: null,
+          billingStreet: null,
+          billingHouseNumber: null,
+          billingZipCode: null,
+          billingCity: null,
+          billingCountry: null,
+          billingEmail: null,
+          paymentTermDays: null,
         },
         items: [],
       },

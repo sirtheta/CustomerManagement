@@ -3,6 +3,7 @@ import type { ApplicationSettings, CompanyInformation, Customer, Invoice, Quote 
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { decryptSecret } from "@/lib/crypto";
 import { customerDisplayName } from "@/lib/customer-display";
+import { billingEmail } from "@/lib/customer-billing";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 type FullInvoice = Invoice & { customer: Customer };
@@ -75,7 +76,7 @@ export async function sendInvoiceEmail(
 
   const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, documentNumber, settings);
   const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, documentNumber, settings);
-  const to = overrides?.to ?? invoice.customer.email;
+  const to = overrides?.to ?? billingEmail(invoice.customer);
   const filename =
     overrides?.attachmentName ?? `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
 

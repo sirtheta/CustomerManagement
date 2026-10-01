@@ -5,6 +5,7 @@ import { advancePast, type SubscriptionIntervalName } from "@/lib/subscription-d
 import { logAuditEntry } from "@/lib/audit";
 import { formatDate } from "@/lib/utils";
 import logger from "@/lib/logger";
+import { billingEmail } from "@/lib/customer-billing";
 
 const log = logger.child({ module: "subscriptions" });
 
@@ -142,7 +143,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         const pendingEmail = await tx.pendingEmail.create({
           data: {
             invoiceId: invoice.id,
-            to: sub.customer.email,
+            to: billingEmail(sub.customer),
             subject: resolve(subjectTpl, vars),
             body: resolve(bodyTpl, vars),
           },

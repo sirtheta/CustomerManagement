@@ -1,4 +1,5 @@
 import type { InvoiceState, PrismaClient } from "@prisma/client";
+import { hasBillingAddress, type BillingFields } from "@/lib/customer-billing";
 import { customerDisplayName } from "@/lib/customer-display";
 import { toRappen } from "@/lib/payments";
 
@@ -45,7 +46,7 @@ export type ReceivableInput = {
     zipCode?: string;
     city?: string;
     country?: string;
-  };
+  } & BillingFields;
   payments: { date: Date; amount: { toNumber(): number } }[];
   creditNotes?: { date: Date; totalAmount: { toNumber(): number } }[];
 };
@@ -114,12 +115,19 @@ export function buildReceivables(invoices: ReceivableInput[], asOf: Date): Recei
       documentNumber: inv.documentNumber,
       customerId: inv.customer.customerId,
       customerName,
-      customerAddress: {
-        street: [inv.customer.street, inv.customer.houseNumber].filter(Boolean).join(" "),
-        zip: inv.customer.zipCode ?? "",
-        city: inv.customer.city ?? "",
-        country: inv.customer.country ?? "",
-      },
+      customerAddress: hasBillingAddress(inv.customer)
+        ? {
+            street: [inv.customer.billingStreet, inv.customer.billingHouseNumber].filter(Boolean).join(" "),
+            zip: inv.customer.billingZipCode ?? "",
+            city: inv.customer.billingCity ?? "",
+            country: inv.customer.billingCountry ?? "CH",
+          }
+        : {
+            street: [inv.customer.street, inv.customer.houseNumber].filter(Boolean).join(" "),
+            zip: inv.customer.zipCode ?? "",
+            city: inv.customer.city ?? "",
+            country: inv.customer.country ?? "",
+          },
       date: inv.date,
       dueDate: inv.dueDate,
       totalRappen,
@@ -168,6 +176,11 @@ export async function fetchReceivables(prisma: PrismaClient, asOf: Date): Promis
           zipCode: true,
           city: true,
           country: true,
+          billingStreet: true,
+          billingHouseNumber: true,
+          billingZipCode: true,
+          billingCity: true,
+          billingCountry: true,
         },
       },
       payments: { select: { date: true, amount: true } },

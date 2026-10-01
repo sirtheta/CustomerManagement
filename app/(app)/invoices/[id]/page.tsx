@@ -27,6 +27,7 @@ import { hasRole } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
+import { billingEmail } from "@/lib/customer-billing";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -398,7 +399,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         <div className="flex items-center gap-2 flex-wrap">
           <SendInvoiceButton
             invoiceId={invoice.id}
-            customerEmail={invoice.customer.email}
+            customerEmail={billingEmail(invoice.customer)}
             documentNumber={invoice.documentNumber}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}

@@ -80,6 +80,32 @@ describe("generateReminderPdf", () => {
     expect(pageText[1]).toMatch(/1[\s  ]020\.00/);
   });
 
+  it("addresses the notice to the billing address with UID and shows the QR debtor", async () => {
+    const withBilling = {
+      ...(invoice as object),
+      customer: {
+        ...customer,
+        customerNumber: 1042,
+        uid: "CHE-116.281.710",
+        billingName: "Muster AG, Buchhaltung",
+        billingStreet: "Postfach",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+      },
+    } as never;
+    const { pageText } = await extractText(await generateReminderPdf(withBilling, settings, charges(2)));
+    expect(pageText[0]).toContain("Muster AG, Buchhaltung");
+    expect(pageText[0]).toContain("3000 Bern");
+    expect(pageText[0]).toContain("UID: CHE-116.281.710");
+    expect(pageText[0]).toContain("Kunden-Nr.:");
+    // Company header also says "8000 Zürich"; the customer's own street must be gone.
+    expect(pageText[0]).not.toContain("Weg 1");
+    // The QR slip (page 2) names the same debtor.
+    expect(pageText[1]).toContain("Muster AG, Buchhaltung");
+    expect(pageText[1]).toContain("Postfach");
+  });
+
   it("prints no overdue note when the due date is the dunning date", async () => {
     const due = new Date("2026-01-31T00:00:00Z");
     const c = computeReminderCharges({ level: 2, openRappen: 100000, dueDate: due, dunningDate: due, settings: settings as never });

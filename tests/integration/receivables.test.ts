@@ -66,4 +66,36 @@ describe("fetchReceivables against a real database", () => {
     expect(before.rows).toHaveLength(1);
     expect(before.rows[0]).toMatchObject({ documentNumber: "R-2", openRappen: 10000 });
   });
+
+  it("carries the billing address of the customer into the report", async () => {
+    const { prisma } = db;
+    const customer = await prisma.customer.create({
+      data: {
+        ...createValidTestCustomer(),
+        billingStreet: "Postfach",
+        billingHouseNumber: "7",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+      },
+    });
+    await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-9",
+        date: new Date("2026-01-10"),
+        dueDate: new Date("2026-02-10"),
+        totalAmount: 100,
+        state: "Sent",
+      },
+    });
+
+    const report = await fetchReceivables(prisma, new Date("2026-12-31"));
+    expect(report.rows[0].customerAddress).toEqual({
+      street: "Postfach 7",
+      zip: "3000",
+      city: "Bern",
+      country: "CH",
+    });
+  });
 });
