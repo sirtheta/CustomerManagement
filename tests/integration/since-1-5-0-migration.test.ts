@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 // Replays the real migration folders in order (like scripts/startup.js) on a
 // throwaway SQLite file. Everything after release 1.5.0 lives in one migration;
 // legacy data is seeded at the 1.5.0 state before that migration runs.
-const MIGRATION = "20261001120000_addresses_payments_subscriptions_bank_import";
+const MIGRATION = "20261001120000_invoicing_and_banking";
 const migrationsDir = path.join(process.cwd(), "prisma", "migrations");
 const folders = fs
   .readdirSync(migrationsDir, { withFileTypes: true })
