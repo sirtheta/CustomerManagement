@@ -29,12 +29,7 @@ export default async function InvoicesImportPage() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Zahlungseingänge</h2>
-        {/* Keyed on the row ids: the tables derive their initial selection from the rows,
-            so a new upload or a booking must remount them instead of keeping stale state. */}
-        <IncomingTable
-          key={overview.incoming.map((r) => r.transaction.id).join(",")}
-          rows={overview.incoming}
-        />
+        <IncomingTable rows={overview.incoming} />
       </section>
 
       <section className="space-y-2">
@@ -43,7 +38,6 @@ export default async function InvoicesImportPage() {
           Es werden nur angekreuzte Zeilen als Ausgabe übernommen. Privates lässt du offen oder ignorierst es.
         </p>
         <ExpensesTable
-          key={overview.expenses.map((r) => r.transaction.id).join(",")}
           rows={overview.expenses}
           categories={overview.categories}
         />

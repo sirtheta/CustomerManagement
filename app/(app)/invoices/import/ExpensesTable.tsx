@@ -16,14 +16,9 @@ type Selection = { checked: boolean; categoryId: number | null };
 const NO_CATEGORY = "none";
 
 export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: Category[] }) {
-  const [selections, setSelections] = useState<Record<number, Selection>>(() =>
-    Object.fromEntries(
-      rows.map(({ transaction, hint }) => [
-        transaction.id,
-        { checked: hint.preselect, categoryId: hint.categoryId },
-      ])
-    )
-  );
+  // User overrides only: rows without an entry show their hint-based default,
+  // so the table keeps its state when rows are added or removed around it.
+  const [selections, setSelections] = useState<Record<number, Selection>>({});
   const [isPending, startTransition] = useTransition();
 
   if (rows.length === 0) {
@@ -32,54 +27,77 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
 
   const visible = rows.filter((row) => !row.hint.previouslyIgnored);
   const previouslyIgnored = rows.filter((row) => row.hint.previouslyIgnored);
-  const chosen = rows.filter((row) => selections[row.transaction.id]?.checked);
-  const unticked = visible.filter((row) => !selections[row.transaction.id]?.checked);
+  const selectionOf = ({ transaction, hint }: Row): Selection =>
+    selections[transaction.id] ?? { checked: hint.preselect, categoryId: hint.categoryId };
+  const chosen = rows.filter((row) => selectionOf(row).checked);
+  const unticked = visible.filter((row) => !selectionOf(row).checked);
 
-  function update(id: number, patch: Partial<Selection>) {
+  function update(row: Row, patch: Partial<Selection>) {
     setSelections((prev) => ({
       ...prev,
-      [id]: { ...(prev[id] ?? { checked: false, categoryId: null }), ...patch },
+      [row.transaction.id]: { ...selectionOf(row), ...patch },
     }));
   }
 
   function take() {
     startTransition(async () => {
-      const result = await bookExpenses(
-        chosen.map((row) => ({
-          transactionId: row.transaction.id,
-          categoryId: selections[row.transaction.id].categoryId,
-        }))
-      );
-      if (result.error) toast.error(result.error);
-      else toast.success(`${result.expenseCount ?? 0} Ausgabe(n) übernommen.`);
+      try {
+        const result = await bookExpenses(
+          chosen.map((row) => ({
+            transactionId: row.transaction.id,
+            categoryId: selectionOf(row).categoryId,
+          }))
+        );
+        if (result.error) toast.error(result.error);
+        else toast.success(`${result.expenseCount ?? 0} Ausgabe(n) übernommen.`);
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
   function ignoreUnticked() {
+    if (
+      !window.confirm(
+        `${unticked.length} Bewegungen ignorieren? Das lässt sich nur durch Rückgängig des ganzen Imports zurücknehmen.`
+      )
+    )
+      return;
     startTransition(async () => {
-      const result = await ignoreTransactions(unticked.map((row) => row.transaction.id));
-      if (result.error) toast.error(result.error);
-      else toast.success(`${result.ignoredCount ?? 0} Bewegung(en) ignoriert.`);
+      try {
+        const result = await ignoreTransactions(unticked.map((row) => row.transaction.id));
+        if (result.error) toast.error(result.error);
+        else toast.success(`${result.ignoredCount ?? 0} Bewegung(en) ignoriert.`);
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
   function ignoreOne(id: number) {
     startTransition(async () => {
-      const result = await ignoreTransactions([id]);
-      if (result.error) toast.error(result.error);
+      try {
+        const result = await ignoreTransactions([id]);
+        if (result.error) toast.error(result.error);
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
-  function renderRow({ transaction }: Row) {
-    const selection = selections[transaction.id];
+  function renderRow(row: Row) {
+    const { transaction } = row;
+    const selection = selectionOf(row);
+    const label = transaction.counterparty ?? transaction.description;
     return (
       <TableRow key={transaction.id}>
         <TableCell>
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-input accent-primary"
-            checked={selection?.checked ?? false}
-            onChange={(e) => update(transaction.id, { checked: e.target.checked })}
+            aria-label={`${label} auswählen`}
+            checked={selection.checked}
+            onChange={(e) => update(row, { checked: e.target.checked })}
           />
         </TableCell>
         <TableCell className="whitespace-nowrap">{formatDate(transaction.date)}</TableCell>
@@ -92,9 +110,9 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         </TableCell>
         <TableCell>
           <Select
-            value={selection?.categoryId ? String(selection.categoryId) : NO_CATEGORY}
+            value={selection.categoryId ? String(selection.categoryId) : NO_CATEGORY}
             onValueChange={(value) =>
-              update(transaction.id, { categoryId: !value || value === NO_CATEGORY ? null : Number(value) })
+              update(row, { categoryId: !value || value === NO_CATEGORY ? null : Number(value) })
             }
           >
             <SelectTrigger className="w-48">
@@ -117,7 +135,13 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
           </Select>
         </TableCell>
         <TableCell>
-          <Button variant="ghost" size="sm" disabled={isPending} onClick={() => ignoreOne(transaction.id)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isPending}
+            aria-label={`${label} ignorieren`}
+            onClick={() => ignoreOne(transaction.id)}
+          >
             Ignorieren
           </Button>
         </TableCell>

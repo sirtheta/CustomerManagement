@@ -19,53 +19,66 @@ const confidenceLabels: Record<MatchConfidence, string> = {
 
 type Selection = { checked: boolean; invoiceId: number | null };
 
+/** What a row shows until the user changes it. Name-only matches force an explicit choice. */
+function defaultFor(row: MatchedTransaction<OpenTransaction>): Selection {
+  return {
+    checked: row.confidence === "reference",
+    invoiceId:
+      row.preselectedInvoiceId ??
+      (row.confidence === "name" ? null : (row.candidates[0]?.invoiceId ?? null)),
+  };
+}
+
 export function IncomingTable({ rows }: { rows: MatchedTransaction<OpenTransaction>[] }) {
-  const [selections, setSelections] = useState<Record<number, Selection>>(() =>
-    Object.fromEntries(
-      rows.map((row) => [
-        row.transaction.id,
-        {
-          checked: row.confidence === "reference",
-          invoiceId: row.preselectedInvoiceId ?? row.candidates[0]?.invoiceId ?? null,
-        },
-      ])
-    )
-  );
+  // User overrides only: rows without an entry show their default, so the
+  // table can keep its state when rows are added or removed around it.
+  const [selections, setSelections] = useState<Record<number, Selection>>({});
   const [isPending, startTransition] = useTransition();
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground py-4">Keine offenen Zahlungseingänge.</p>;
   }
 
-  function update(id: number, patch: Partial<Selection>) {
+  const selectionOf = (row: MatchedTransaction<OpenTransaction>): Selection =>
+    selections[row.transaction.id] ?? defaultFor(row);
+
+  function update(row: MatchedTransaction<OpenTransaction>, patch: Partial<Selection>) {
     setSelections((prev) => ({
       ...prev,
-      [id]: { ...(prev[id] ?? { checked: false, invoiceId: null }), ...patch },
+      [row.transaction.id]: { ...(prev[row.transaction.id] ?? defaultFor(row)), ...patch },
     }));
   }
 
   const chosen = rows.filter((row) => {
-    const s = selections[row.transaction.id];
-    return s?.checked && s.invoiceId !== null;
+    const s = selectionOf(row);
+    return s.checked && s.invoiceId !== null;
   });
 
   function confirm() {
     startTransition(async () => {
-      const result = await bookPayments(
-        chosen.map((row) => ({
-          transactionId: row.transaction.id,
-          invoiceId: selections[row.transaction.id].invoiceId as number,
-        }))
-      );
-      if (result.error) toast.error(result.error);
-      else toast.success(`${result.paidCount ?? 0} Zahlung(en) verbucht.`);
+      try {
+        const result = await bookPayments(
+          chosen.map((row) => ({
+            transactionId: row.transaction.id,
+            invoiceId: selectionOf(row).invoiceId as number,
+          }))
+        );
+        if (result.error) toast.error(result.error);
+        else toast.success(`${result.paidCount ?? 0} Zahlung(en) verbucht.`);
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
   function ignore(id: number) {
     startTransition(async () => {
-      const result = await ignoreTransactions([id]);
-      if (result.error) toast.error(result.error);
+      try {
+        const result = await ignoreTransactions([id]);
+        if (result.error) toast.error(result.error);
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
@@ -84,8 +97,10 @@ export function IncomingTable({ rows }: { rows: MatchedTransaction<OpenTransacti
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(({ transaction, candidates, confidence }) => {
-              const selection = selections[transaction.id];
+            {rows.map((row) => {
+              const { transaction, candidates, confidence } = row;
+              const selection = selectionOf(row);
+              const label = transaction.counterparty ?? transaction.description;
               return (
                 <TableRow key={transaction.id}>
                   <TableCell>
@@ -93,8 +108,9 @@ export function IncomingTable({ rows }: { rows: MatchedTransaction<OpenTransacti
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded border-input accent-primary"
-                        checked={selection?.checked ?? false}
-                        onChange={(e) => update(transaction.id, { checked: e.target.checked })}
+                        aria-label={`${label} auswählen`}
+                        checked={selection.checked}
+                        onChange={(e) => update(row, { checked: e.target.checked })}
                       />
                     )}
                   </TableCell>
@@ -111,8 +127,8 @@ export function IncomingTable({ rows }: { rows: MatchedTransaction<OpenTransacti
                   <TableCell>
                     {candidates.length > 0 ? (
                       <Select
-                        value={selection?.invoiceId ? String(selection.invoiceId) : undefined}
-                        onValueChange={(value) => value && update(transaction.id, { invoiceId: Number(value) })}
+                        value={selection.invoiceId ? String(selection.invoiceId) : undefined}
+                        onValueChange={(value) => value && update(row, { invoiceId: Number(value) })}
                       >
                         <SelectTrigger className="w-56">
                           <SelectValue placeholder="Rechnung wählen">
@@ -141,7 +157,13 @@ export function IncomingTable({ rows }: { rows: MatchedTransaction<OpenTransacti
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" disabled={isPending} onClick={() => ignore(transaction.id)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isPending}
+                      aria-label={`${label} ignorieren`}
+                      onClick={() => ignore(transaction.id)}
+                    >
                       Ignorieren
                     </Button>
                   </TableCell>

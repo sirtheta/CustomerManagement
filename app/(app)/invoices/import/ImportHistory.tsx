@@ -18,9 +18,13 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
   function undo(id: number) {
     if (!window.confirm("Diesen Import mit allen seinen Bewegungen rückgängig machen?")) return;
     startTransition(async () => {
-      const result = await undoStatementImport(id);
-      if (result.error) toast.error(result.error);
-      else toast.success("Import rückgängig gemacht.");
+      try {
+        const result = await undoStatementImport(id);
+        if (result.error) toast.error(result.error);
+        else toast.success("Import rückgängig gemacht.");
+      } catch {
+        toast.error("Speichern fehlgeschlagen.");
+      }
     });
   }
 
@@ -34,7 +38,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
             <TableHead>Zeitraum</TableHead>
             <TableHead>Bewegungen</TableHead>
             <TableHead>Verbucht</TableHead>
-            <TableHead>Saldoprüfung</TableHead>
+            <TableHead>Warnungen</TableHead>
             <TableHead className="w-28"></TableHead>
           </TableRow>
         </TableHeader>

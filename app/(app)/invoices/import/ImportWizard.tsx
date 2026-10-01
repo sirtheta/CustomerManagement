@@ -38,8 +38,8 @@ export function ImportWizard() {
 
       {state.warnings && state.warnings.length > 0 && (
         <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
-          {state.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
+          {state.warnings.map((warning, index) => (
+            <li key={`${index}-${warning}`}>{warning}</li>
           ))}
         </ul>
       )}
