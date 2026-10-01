@@ -130,6 +130,10 @@ export type ExpenseRow = {
   description: string;
   categoryName: string | null;
   amount: number;
+  supplier: string | null;
+  dueDate: string | null;
+  paidDate: string | null;
+  receiptCount: number;
 };
 
 export async function fetchExpensesForYear(prisma: PrismaClient, year: number): Promise<ExpenseRow[]> {
@@ -139,7 +143,10 @@ export async function fetchExpensesForYear(prisma: PrismaClient, year: number): 
   const expenses = await prisma.expense.findMany({
     where: { date: { gte: yearStart, lt: yearEnd } },
     orderBy: { date: "desc" },
-    include: { category: { select: { name: true } } },
+    include: {
+      category: { select: { name: true } },
+      _count: { select: { receipts: true } },
+    },
   });
 
   return expenses.map((exp) => ({
@@ -148,5 +155,9 @@ export async function fetchExpensesForYear(prisma: PrismaClient, year: number): 
     description: exp.description,
     categoryName: exp.category?.name ?? null,
     amount: exp.amount.toNumber(),
+    supplier: exp.supplier,
+    dueDate: exp.dueDate?.toISOString() ?? null,
+    paidDate: exp.paidDate?.toISOString() ?? null,
+    receiptCount: exp._count.receipts,
   }));
 }
