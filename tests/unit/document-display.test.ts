@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DRAFT_LABEL, documentLabel, fillDocumentNumber } from "@/lib/document-display";
+import { DRAFT_LABEL, documentLabel, fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
 
 describe("documentLabel", () => {
   it("returns the number when set", () => {
@@ -25,5 +25,17 @@ describe("fillDocumentNumber", () => {
 
   it("leaves text without placeholder unchanged", () => {
     expect(fillDocumentNumber("Guten Tag", "R-1")).toBe("Guten Tag");
+  });
+});
+
+describe("fillTotalAmount", () => {
+  it("replaces every placeholder occurrence literally", () => {
+    expect(fillTotalAmount("über {totalAmount} / {totalAmount}", "CHF $& 1.00")).toBe(
+      "über CHF $& 1.00 / CHF $& 1.00"
+    );
+  });
+
+  it("leaves text without placeholder unchanged", () => {
+    expect(fillTotalAmount("Guten Tag", "CHF 1.00")).toBe("Guten Tag");
   });
 });

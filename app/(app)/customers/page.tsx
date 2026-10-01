@@ -24,7 +24,7 @@ type SortOrder = "asc" | "desc";
 
 type TableProps = {
   term: string;
-  yearlyOnly: boolean;
+  subscriptionOnly: boolean;
   archivedOnly: boolean;
   currentPage: number;
   sortField: SortField;
@@ -33,10 +33,10 @@ type TableProps = {
   sortHrefs: Record<SortField, string>;
 };
 
-async function CustomersTable({ term, yearlyOnly, archivedOnly, currentPage, sortField, sortOrder, baseHref, sortHrefs }: TableProps) {
+async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPage, sortField, sortOrder, baseHref, sortHrefs }: TableProps) {
   const where = {
     archivedAt: archivedOnly ? { not: null } : null,
-    ...(yearlyOnly ? { yearlyInvoice: true, nextInvoiceDate: { not: null } } : {}),
+    ...(subscriptionOnly ? { subscriptions: { some: { active: true } } } : {}),
     ...(term
       ? {
           OR: [
@@ -171,24 +171,24 @@ function CustomersTableSkeleton() {
 }
 
 type Props = {
-  searchParams: Promise<{ search?: string; page?: string; sortBy?: string; order?: string; yearlyInvoice?: string; archived?: string }>;
+  searchParams: Promise<{ search?: string; page?: string; sortBy?: string; order?: string; subscription?: string; archived?: string }>;
 };
 
 export default async function CustomersPage({ searchParams }: Props) {
-  const { search, page, sortBy, order, yearlyInvoice, archived } = await searchParams;
+  const { search, page, sortBy, order, subscription, archived } = await searchParams;
 
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const sortField: SortField =
     sortBy === "city" || sortBy === "email" ? sortBy : "contactPerson";
   const sortOrder: SortOrder = order === "desc" ? "desc" : "asc";
   const term = search?.trim() ?? "";
-  const yearlyOnly = yearlyInvoice === "true";
+  const subscriptionOnly = subscription === "true";
   const archivedOnly = archived === "true";
 
   function sortHref(col: SortField) {
     const p = new URLSearchParams();
     if (term) p.set("search", term);
-    if (yearlyOnly) p.set("yearlyInvoice", "true");
+    if (subscriptionOnly) p.set("subscription", "true");
     if (archivedOnly) p.set("archived", "true");
     p.set("sortBy", col);
     p.set("order", sortField === col && sortOrder === "asc" ? "desc" : "asc");
@@ -198,7 +198,7 @@ export default async function CustomersPage({ searchParams }: Props) {
   const baseHref = (() => {
     const p = new URLSearchParams();
     if (term) p.set("search", term);
-    if (yearlyOnly) p.set("yearlyInvoice", "true");
+    if (subscriptionOnly) p.set("subscription", "true");
     if (archivedOnly) p.set("archived", "true");
     if (sortField !== "contactPerson") p.set("sortBy", sortField);
     if (sortOrder !== "asc") p.set("order", sortOrder);
@@ -214,7 +214,7 @@ export default async function CustomersPage({ searchParams }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{archivedOnly ? "Archivierte Kunden" : yearlyOnly ? "Geplante Jahresrechnungen" : "Kunden"}</h1>
+        <h1 className="text-2xl font-semibold">{archivedOnly ? "Archivierte Kunden" : subscriptionOnly ? "Kunden mit Abo" : "Kunden"}</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" render={<Link href={archivedOnly ? "/customers" : "/customers?archived=true"} />}>
             {archivedOnly ? "Aktive Kunden" : "Archiv"}
@@ -231,7 +231,7 @@ export default async function CustomersPage({ searchParams }: Props) {
       <Suspense fallback={<CustomersTableSkeleton />}>
         <CustomersTable
           term={term}
-          yearlyOnly={yearlyOnly}
+          subscriptionOnly={subscriptionOnly}
           archivedOnly={archivedOnly}
           currentPage={currentPage}
           sortField={sortField}
