@@ -66,6 +66,7 @@ Kundennummer, UID und Rechnungsadresse sind Pflege-Felder des Kunden: Änderunge
 
 ## UI
 
+- Formular-Reset: Nach einem Validierungsfehler gibt die Action die abgeschickten Werte (`values` im `CustomerFormState`) zurück, und `CustomerForm` setzt sie als `defaultValue` wieder ein, weil React 19 `<form action>` nach jedem aufgelösten Lauf zurücksetzt. Das gilt für das ganze Formular, nicht nur für die neuen Felder.
 - `CustomerForm`: bisheriges Formular unverändert, darunter ein eingeklappter Abschnitt „Weitere Angaben“ mit Kundennummer, UID, Zahlungsfrist, Rechnungsadresse und Rechnungs-E-Mail. Der Abschnitt ist offen, wenn dort schon etwas gesetzt ist.
 - `customers/[id]/page.tsx`: neue Karte „Kontakte“ (Liste, Hinzufügen, Bearbeiten, Löschen) mit Server Actions in `customers/contact-actions.ts` (`requireEditor`), Audit-Einträge `CREATE/UPDATE/DELETE CustomerContact`. Nur Admin/Editor sehen die Bedienelemente (`hasRole`).
 - Kundenliste und -suche: Kundennummer als Spalte und durchsuchbar. Detailseite zeigt UID, Rechnungsadresse und Frist, wenn gesetzt.

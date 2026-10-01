@@ -650,7 +650,7 @@ git commit -m "feat(customers): add customer number, billing fields and contact 
 
 **Interfaces:**
 - Consumes: `isValidUid`, `normalizeUid` (Task 1), `nextCustomerNumber` (Task 2).
-- Produces: `createCustomer`/`updateCustomer` lesen zusätzlich die FormData-Felder `customerNumber`, `uid`, `paymentTermDays`, `billingName`, `billingStreet`, `billingHouseNumber`, `billingZipCode`, `billingCity`, `billingCountry`, `billingEmail`; Fehler stehen in `fieldErrors` unter denselben Schlüsseln.
+- Produces: `createCustomer`/`updateCustomer` lesen zusätzlich die FormData-Felder `customerNumber`, `uid`, `paymentTermDays`, `billingName`, `billingStreet`, `billingHouseNumber`, `billingZipCode`, `billingCity`, `billingCountry`, `billingEmail`; Fehler stehen in `fieldErrors` unter denselben Schlüsseln. Bei jedem Fehler (Validierung, doppelte Kundennummer) liefert der State zusätzlich `values` mit den abgeschickten Formularwerten, damit das Formular sie wieder einsetzen kann (React 19 setzt `<form action>` nach jedem aufgelösten Action-Lauf zurück).
 
 - [ ] **Step 1: Bestehende Mocks erweitern**
 
@@ -700,6 +700,33 @@ Am Ende des `describe("customer actions", …)`-Blocks (vor der schliessenden `}
       expect(prisma.customer.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ customerNumber: 1042 }) })
       );
+    });
+
+    it("returns the submitted values with validation errors so the form can refill", async () => {
+      const result = await create({ company: "Muster AG", uid: "CHE-116.281.711", billingCity: "Bern" });
+      expect(result.fieldErrors?.uid).toBeDefined();
+      expect(result.values).toMatchObject({
+        company: "Muster AG",
+        contactPerson: "Max Muster",
+        email: "max@muster.ch",
+        uid: "CHE-116.281.711",
+        billingCity: "Bern",
+      });
+    });
+
+    it("returns the submitted values with a duplicate customer number", async () => {
+      vi.mocked(prisma.customer.create).mockRejectedValueOnce(
+        Object.assign(new Error("unique"), { code: "P2002" })
+      );
+      const result = await create({ customerNumber: "77", company: "Muster AG" });
+      expect(result.fieldErrors?.customerNumber).toBe("Kundennummer bereits vergeben.");
+      expect(result.values).toMatchObject({ customerNumber: "77", company: "Muster AG" });
+    });
+
+    it("does not return values on success", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      const result = await createCustomer({}, form(VALID_FIELDS));
+      expect(result?.values).toBeUndefined();
     });
 
     it("keeps an explicit customer number", async () => {
@@ -828,6 +855,17 @@ Expected: FAIL (neue Tests); bestehende Tests PASS.
 
 - [ ] **Step 4: `actions.ts` umbauen**
 
+Den bestehenden Typ `CustomerFormState` am Dateianfang erweitern:
+
+```ts
+export type CustomerFormState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  /** Submitted form values, returned with errors so the form can refill itself. */
+  values?: Record<string, string>;
+};
+```
+
 Imports ergänzen (oben):
 
 ```ts
@@ -930,6 +968,15 @@ function readCustomerForm(formData: FormData) {
 
 type ParsedCustomer = z.infer<typeof customerSchema>;
 
+/** All text fields as submitted (a ticked checkbox is "on"; unticked ones are absent). */
+function submittedValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === "string") values[key] = value;
+  }
+  return values;
+}
+
 function validate(formData: FormData):
   | { ok: true; data: ParsedCustomer }
   | { ok: false; state: CustomerFormState } {
@@ -940,17 +987,23 @@ function validate(formData: FormData):
     const field = issue.path[0] as string;
     if (!fieldErrors[field]) fieldErrors[field] = issue.message;
   }
-  return { ok: false, state: { error: "Bitte alle Pflichtfelder korrekt ausfüllen.", fieldErrors } };
+  return {
+    ok: false,
+    state: { error: "Bitte alle Pflichtfelder korrekt ausfüllen.", fieldErrors, values: submittedValues(formData) },
+  };
 }
 
 function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
 }
 
-const DUPLICATE_NUMBER: CustomerFormState = {
-  error: "Bitte alle Pflichtfelder korrekt ausfüllen.",
-  fieldErrors: { customerNumber: "Kundennummer bereits vergeben." },
-};
+function duplicateNumber(formData: FormData): CustomerFormState {
+  return {
+    error: "Bitte alle Pflichtfelder korrekt ausfüllen.",
+    fieldErrors: { customerNumber: "Kundennummer bereits vergeben." },
+    values: submittedValues(formData),
+  };
+}
 
 /** Columns shared by create and update (everything except the customer number). */
 function customerData(d: ParsedCustomer, formData: FormData) {
@@ -1004,10 +1057,15 @@ export async function createCustomer(
       customer = await prisma.customer.create({ data: { ...data, customerNumber } });
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
-      if (explicitNumber !== null) return DUPLICATE_NUMBER;
+      if (explicitNumber !== null) return duplicateNumber(formData);
     }
   }
-  if (!customer) return { error: "Kundennummer konnte nicht vergeben werden. Bitte erneut versuchen." };
+  if (!customer) {
+    return {
+      error: "Kundennummer konnte nicht vergeben werden. Bitte erneut versuchen.",
+      values: submittedValues(formData),
+    };
+  }
 
   await logAudit(session, "CREATE", "Customer", customer.customerId, result.data.contactPerson);
 
@@ -1030,7 +1088,7 @@ export async function updateCustomer(
   try {
     await prisma.customer.update({ where: { customerId: id }, data: { ...data, ...customerNumber } });
   } catch (err) {
-    if (isUniqueViolation(err)) return DUPLICATE_NUMBER;
+    if (isUniqueViolation(err)) return duplicateNumber(formData);
     throw err;
   }
   await logAudit(session, "UPDATE", "Customer", id, result.data.contactPerson);
@@ -2189,7 +2247,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="customerNumber"
                       name="customerNumber"
                       inputMode="numeric"
-                      defaultValue={customer?.customerNumber ?? ""}
+                      defaultValue={val("customerNumber", customer?.customerNumber)}
                       placeholder={customer ? "" : "automatisch"}
                       aria-invalid={!!fe.customerNumber}
                       aria-describedby={fe.customerNumber ? "customerNumber-error" : undefined}
@@ -2201,7 +2259,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                     <Input
                       id="uid"
                       name="uid"
-                      defaultValue={customer?.uid ?? ""}
+                      defaultValue={val("uid", customer?.uid)}
                       placeholder="CHE-123.456.789"
                       aria-invalid={!!fe.uid}
                       aria-describedby={fe.uid ? "uid-error" : undefined}
@@ -2214,7 +2272,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="paymentTermDays"
                       name="paymentTermDays"
                       inputMode="numeric"
-                      defaultValue={customer?.paymentTermDays ?? ""}
+                      defaultValue={val("paymentTermDays", customer?.paymentTermDays)}
                       placeholder="Standard"
                       aria-invalid={!!fe.paymentTermDays}
                       aria-describedby={fe.paymentTermDays ? "paymentTermDays-error" : undefined}
@@ -2233,7 +2291,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                     id="billingName"
                     name="billingName"
                     maxLength={70}
-                    defaultValue={customer?.billingName ?? ""}
+                    defaultValue={val("billingName", customer?.billingName)}
                     placeholder="Firma AG, Kreditorenbuchhaltung"
                   />
                 </div>
@@ -2244,7 +2302,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="billingStreet"
                       name="billingStreet"
                       maxLength={ADDRESS_LIMITS.street}
-                      defaultValue={customer?.billingStreet ?? ""}
+                      defaultValue={val("billingStreet", customer?.billingStreet)}
                       aria-invalid={!!fe.billingStreet}
                       aria-describedby={fe.billingStreet ? "billingStreet-error" : undefined}
                     />
@@ -2256,7 +2314,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="billingHouseNumber"
                       name="billingHouseNumber"
                       maxLength={ADDRESS_LIMITS.houseNumber}
-                      defaultValue={customer?.billingHouseNumber ?? ""}
+                      defaultValue={val("billingHouseNumber", customer?.billingHouseNumber)}
                     />
                   </div>
                 </div>
@@ -2267,7 +2325,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="billingZipCode"
                       name="billingZipCode"
                       maxLength={ADDRESS_LIMITS.zip}
-                      defaultValue={customer?.billingZipCode ?? ""}
+                      defaultValue={val("billingZipCode", customer?.billingZipCode)}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -2276,12 +2334,12 @@ In `app/(app)/customers/CustomerForm.tsx`:
                       id="billingCity"
                       name="billingCity"
                       maxLength={ADDRESS_LIMITS.city}
-                      defaultValue={customer?.billingCity ?? ""}
+                      defaultValue={val("billingCity", customer?.billingCity)}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="billingCountry">Land</Label>
-                    <Select name="billingCountry" defaultValue={customer?.billingCountry ?? "CH"}>
+                    <Select name="billingCountry" defaultValue={submitted?.billingCountry ?? customer?.billingCountry ?? "CH"}>
                       <SelectTrigger id="billingCountry" className="w-full">
                         <SelectValue>
                           {(value: string | null) =>
@@ -2308,7 +2366,7 @@ In `app/(app)/customers/CustomerForm.tsx`:
                     id="billingEmail"
                     name="billingEmail"
                     type="email"
-                    defaultValue={customer?.billingEmail ?? ""}
+                    defaultValue={val("billingEmail", customer?.billingEmail)}
                     placeholder="buchhaltung@beispiel.ch"
                     aria-invalid={!!fe.billingEmail}
                     aria-describedby={fe.billingEmail ? "billingEmail-error" : undefined}
@@ -2319,7 +2377,32 @@ In `app/(app)/customers/CustomerForm.tsx`:
             </details>
 ```
 
-Bekannte Einschränkung (bestehendes Verhalten, nicht Teil von F10): React 19 setzt ein `<form action>` nach jedem aufgelösten Action-Lauf zurück, auch wenn dieser `fieldErrors` liefert. Nach einem Validierungsfehler im Formular sind die eingegebenen Werte deshalb weg, der Abschnitt „Weitere Angaben“ bleibt aber offen und zeigt die Fehlermeldung. Wer das beheben will, gibt die Eingaben im `CustomerFormState` zurück und nutzt sie als `defaultValue` (eigener Schritt).
+**Eingaben nach einem Fehler erhalten (gilt für das ganze Formular):** React 19 setzt ein `<form action>` nach jedem aufgelösten Action-Lauf zurück, auch wenn der Lauf `fieldErrors` liefert. Damit nach einem Validierungsfehler nichts verloren geht, setzt die Form die von der Action zurückgegebenen `values` wieder als `defaultValue` ein (der Reset stellt auf die zuletzt gerenderten `defaultValue` zurück). Direkt nach `const fe = state.fieldErrors ?? {};` einfügen:
+
+```tsx
+  // After a failed submit the action returns what was typed; React resets the form
+  // to its defaultValues, so those must come from the submitted values.
+  const submitted = state.values;
+  const val = (name: string, fallback: string | number | null | undefined) =>
+    submitted ? (submitted[name] ?? "") : (fallback ?? "");
+```
+
+Dann im Bearbeiten/Neu-Formular die bestehenden Felder umstellen (jeweils nur die `defaultValue`-/`defaultChecked`-Prop ersetzen):
+
+| Feld | alt | neu |
+|---|---|---|
+| `company` | `defaultValue={customer?.company ?? ""}` | `defaultValue={val("company", customer?.company)}` |
+| `contactPerson` | `defaultValue={customer?.contactPerson ?? ""}` | `defaultValue={val("contactPerson", customer?.contactPerson)}` |
+| `street` | `defaultValue={customer?.street ?? ""}` | `defaultValue={val("street", customer?.street)}` |
+| `houseNumber` | `defaultValue={customer?.houseNumber ?? ""}` | `defaultValue={val("houseNumber", customer?.houseNumber)}` |
+| `zipCode` | `defaultValue={customer?.zipCode ?? ""}` | `defaultValue={val("zipCode", customer?.zipCode)}` |
+| `city` | `defaultValue={customer?.city ?? ""}` | `defaultValue={val("city", customer?.city)}` |
+| `country` | `<Select name="country" defaultValue={customer?.country ?? "CH"}>` | `<Select name="country" defaultValue={submitted?.country ?? customer?.country ?? "CH"}>` |
+| `email` | `defaultValue={customer?.email ?? ""}` | `defaultValue={val("email", customer?.email)}` |
+| `phone` | `defaultValue={customer?.phone ?? ""}` | `defaultValue={val("phone", customer?.phone)}` |
+| `contactInsteadOfCompany` | `defaultChecked={customer?.contactInsteadOfCompany ?? false}` | `defaultChecked={submitted ? submitted.contactInsteadOfCompany === "on" : (customer?.contactInsteadOfCompany ?? false)}` |
+
+Die neuen Felder aus dem Block oben verwenden `val(...)` bzw. `submitted?.billingCountry` bereits.
 
 Hinweis: Das Land-Select sendet immer einen Wert („CH“); ohne Strasse/PLZ/Ort verwirft `customerData` (Task 3) Land und Name, ein leerer Abschnitt bleibt also folgenlos.
 
@@ -2330,7 +2413,7 @@ Expected: alles grün.
 
 - [ ] **Step 8: UI manuell prüfen**
 
-Mit `npm run dev`: (a) Neuer Kunde ohne Weitere Angaben → Formular wie vorher, Kunde bekommt automatisch die nächste Kundennummer; (b) „Weitere Angaben“ ausfüllen (UID `CHE-116.281.710`, Frist 10, Rechnungsadresse und -E-Mail) → Detailansicht zeigt die Werte, Bearbeiten öffnet den Abschnitt; (c) ungültige UID und halbe Rechnungsadresse zeigen Fehler und der Abschnitt bleibt offen; (d) Kontakt hinzufügen/ändern/löschen; (e) Kundenliste zeigt „Kunden-Nr.“ und die Suche nach der Nummer findet den Kunden; (f) Kunden-Export (CSV) enthält die neuen Spalten.
+Mit `npm run dev`: (a) Neuer Kunde ohne Weitere Angaben → Formular wie vorher, Kunde bekommt automatisch die nächste Kundennummer; (b) „Weitere Angaben“ ausfüllen (UID `CHE-116.281.710`, Frist 10, Rechnungsadresse und -E-Mail) → Detailansicht zeigt die Werte, Bearbeiten öffnet den Abschnitt; (c) ungültige UID, halbe Rechnungsadresse und eine doppelte Kundennummer zeigen Fehler, der Abschnitt „Weitere Angaben“ bleibt offen, und **alle zuvor eingegebenen Werte** (auch Land, Checkbox „Kontaktperson statt Firma“ und Felder ausserhalb des Abschnitts) bleiben stehen, sowohl bei „Neuer Kunde“ als auch beim Bearbeiten; (d) Kontakt hinzufügen/ändern/löschen; (e) Kundenliste zeigt „Kunden-Nr.“ und die Suche nach der Nummer findet den Kunden; (f) Kunden-Export (CSV) enthält die neuen Spalten.
 
 - [ ] **Step 9: Commit**
 
