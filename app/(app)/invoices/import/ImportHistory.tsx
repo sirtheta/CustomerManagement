@@ -54,14 +54,14 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
               </TableCell>
               <TableCell>{entry.importedCount}</TableCell>
               <TableCell>{entry.bookedCount}</TableCell>
-              <TableCell className="max-w-xs text-xs" title={entry.balanceWarning ?? undefined}>
+              <TableCell className="min-w-64 max-w-sm whitespace-normal break-words text-xs" title={entry.balanceWarning ?? undefined}>
                 {entry.balanceWarning ? (
                   <span className="text-destructive">Warnung: {entry.balanceWarning}</span>
                 ) : (
                   <span className="text-muted-foreground">in Ordnung</span>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell className="align-top">
                 <Button
                   variant="ghost"
                   size="sm"
