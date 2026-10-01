@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
+import type { Session } from "next-auth";
 import { matchAndMarkPaid } from "@/lib/payment-matching";
+import { recordPayment } from "@/lib/payments";
 
 // Finding #14: matchAndMarkPaid was only ever exercised against a mocked
 // Prisma client. Run it against a real SQLite database — real Decimal
@@ -133,5 +135,44 @@ describe("matchAndMarkPaid against a real database", () => {
     );
 
     expect(result).toEqual({ matched: false });
+  });
+
+  it("stores the bank reference and does not book the same reference twice", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const invoice = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId,
+        documentNumber: "R-26030001",
+        date: new Date("2026-03-01"),
+        dueDate: new Date("2099-01-01"),
+        totalAmount: 100,
+        state: "Sent",
+      },
+    });
+    const actor = { user: { id: "1", name: "T", email: "t@test.ch", role: "Editor" } } as Session;
+    // A first partial payment already carries the reference.
+    await recordPayment(
+      { invoiceId: invoice.id, amount: 40, date: new Date("2026-03-02"), source: "manual", bankReference: "REF-API", actor },
+      prisma
+    );
+
+    // The remainder with the same reference is the same bank entry: not booked again.
+    const duplicate = await matchAndMarkPaid(
+      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API" },
+      prisma
+    );
+    expect(duplicate.matched).toBe(false);
+    expect(await prisma.payment.count({ where: { invoiceId: invoice.id } })).toBe(1);
+
+    // A different reference books the remainder and stores the reference.
+    const booked = await matchAndMarkPaid(
+      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API-2" },
+      prisma
+    );
+    expect(booked.matched).toBe(true);
+    const payments = await prisma.payment.findMany({ where: { invoiceId: invoice.id }, orderBy: { id: "asc" } });
+    expect(payments).toHaveLength(2);
+    expect(payments[1].bankReference).toBe("REF-API-2");
   });
 });

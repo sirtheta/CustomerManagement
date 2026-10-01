@@ -23,6 +23,7 @@ const bodySchema = z.object({
   description: z.string().min(1).max(500),
   amountRappen: z.number().int(),
   bookingDate: z.string().optional(),
+  bankReference: z.string().max(100).optional(),
 });
 
 function isAuthorized(req: NextRequest): boolean {

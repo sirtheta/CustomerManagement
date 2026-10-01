@@ -100,6 +100,29 @@ describe("POST /api/external/payments", () => {
     expect(revalidateTag).not.toHaveBeenCalled();
   });
 
+  it("passes an optional bankReference through and rejects an oversized one", async () => {
+    vi.mocked(matchAndMarkPaid).mockResolvedValue({ matched: false });
+
+    const ok = await POST(
+      req(
+        { description: "R-2607", amountRappen: 100, bankReference: "REF-1" },
+        { "x-api-key": API_KEY }
+      )
+    );
+    expect(ok.status).toBe(200);
+    expect(matchAndMarkPaid).toHaveBeenCalledWith(
+      expect.objectContaining({ bankReference: "REF-1" })
+    );
+
+    const tooLong = await POST(
+      req(
+        { description: "R-2607", amountRappen: 100, bankReference: "x".repeat(101) },
+        { "x-api-key": API_KEY }
+      )
+    );
+    expect(tooLong.status).toBe(400);
+  });
+
   it("swallows a matchAndMarkPaid exception into a silent 200 matched:false", async () => {
     vi.mocked(matchAndMarkPaid).mockRejectedValue(new Error("db down"));
 
