@@ -75,6 +75,42 @@ describe("checkSubscriptions with autoSend", () => {
     expect(notifyAdmins.mock.calls[0][3]).toBe("/invoices/pending");
   });
 
+  it("names the invoice by number and customer, not by database id", async () => {
+    sendPendingInvoice.mockImplementation(async () => {
+      // The send path has assigned the number before it fails.
+      await db.prisma.invoice.updateMany({ data: { documentNumber: "R-26100007" } });
+      return { error: "SMTP down" };
+    });
+    await seed({ autoSend: true, template: "items" });
+    await checkSubscriptions(db.prisma);
+
+    const message = notifyAdmins.mock.calls[0][2] as string;
+    expect(message).toContain("R-26100007");
+    expect(message).toContain("Client AG");
+    expect(message).not.toMatch(/Entwurf \d+/);
+  });
+
+  it("says so when the draft has no number yet", async () => {
+    sendPendingInvoice.mockResolvedValue({ error: "Einstellungen nicht konfiguriert." });
+    await seed({ autoSend: true, template: "items" });
+    await checkSubscriptions(db.prisma);
+
+    expect(notifyAdmins.mock.calls[0][2]).toContain("noch ohne Nummer");
+  });
+
+  it("warns not to approve again when the mail was sent but not recorded", async () => {
+    sendPendingInvoice.mockResolvedValue({ error: "Die E-Mail wurde bereits versendet, konnte aber nicht verbucht werden.", mailSent: true });
+    await seed({ autoSend: true, template: "items" });
+    await checkSubscriptions(db.prisma);
+
+    expect(notifyAdmins).toHaveBeenCalledTimes(1);
+    expect(notifyAdmins.mock.calls[0][1]).toContain("nicht verbucht");
+    const message = notifyAdmins.mock.calls[0][2] as string;
+    expect(message).toContain("bereits per E-Mail versendet");
+    expect(message).toContain("NICHT erneut freigeben");
+    expect(message).not.toContain("wartet");
+  });
+
   it("does not throw, keeps the pending email and notifies when sending throws", async () => {
     sendPendingInvoice.mockRejectedValue(new Error("boom"));
     await seed({ autoSend: true, template: "items" });

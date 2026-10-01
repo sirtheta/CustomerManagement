@@ -26,21 +26,37 @@ class SubscriptionChangedError extends Error {
 
 type JobSettings = NonNullable<Awaited<ReturnType<PrismaClient["applicationSettings"]["findFirst"]>>>;
 
-/** Logs and tells the admins (notify e-mail / Telegram); draft and PendingEmail stay for manual approval. */
+type AutoSendFailure = {
+  subscriptionId: number;
+  invoiceId: number;
+  customerName: string;
+  error: string;
+  /** The mail is already out; only recording the send failed. Approving again would mail it twice. */
+  mailSent: boolean;
+};
+
+/**
+ * Logs and tells the admins (notify e-mail / Telegram). The invoice is named by
+ * its number (the draft may not have one yet) and customer, never by database id.
+ */
 async function reportAutoSendFailure(
+  prisma: PrismaClient,
   settings: (JobSettings & { companyInfo: unknown }) | null,
-  subscriptionId: number,
-  invoiceId: number,
-  error: string
+  failure: AutoSendFailure
 ): Promise<void> {
-  log.error({ subscriptionId, invoiceId, error }, "Auto-send failed, invoice waits for manual approval");
+  const { subscriptionId, invoiceId, customerName, error, mailSent } = failure;
+  log.error({ subscriptionId, invoiceId, error, mailSent }, "Auto-send failed");
   if (!settings) return;
   try {
+    const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { documentNumber: true } });
+    const label = invoice?.documentNumber ? `Nr. ${invoice.documentNumber}` : "(Entwurf, noch ohne Nummer)";
     const { notifyAdmins } = await import("@/lib/notifications");
     await notifyAdmins(
       settings as Parameters<typeof notifyAdmins>[0],
-      "Abo-Rechnung konnte nicht versendet werden",
-      `Die Abo-Rechnung (Entwurf ${invoiceId}) konnte nicht automatisch versendet werden: ${error}. Sie wartet auf die manuelle Freigabe.`,
+      mailSent ? "Abo-Rechnung versendet, aber nicht verbucht" : "Abo-Rechnung konnte nicht versendet werden",
+      mailSent
+        ? `Die Abo-Rechnung ${label} für ${customerName} wurde bereits per E-Mail versendet, konnte aber nicht verbucht werden. Bitte NICHT erneut freigeben, sonst geht die Rechnung ein zweites Mal raus. Entwurf prüfen und die Rechnung manuell als versendet markieren.`
+        : `Die Abo-Rechnung ${label} für ${customerName} konnte nicht automatisch versendet werden: ${error}${/[.!?]$/.test(error) ? "" : "."} Sie wartet unter «Offene E-Mails» auf die manuelle Freigabe.`,
       "/invoices/pending"
     );
   } catch (err) {
@@ -160,6 +176,13 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
 
       // Only a template with items is sent unattended, never a CHF 0 invoice.
       if (sub.autoSend && items.length > 0) {
+        const failureBase = {
+          subscriptionId: sub.id,
+          invoiceId,
+          customerName: sub.customer.contactInsteadOfCompany
+            ? sub.customer.contactPerson
+            : sub.customer.company || sub.customer.contactPerson,
+        };
         try {
           // Loaded lazily: the PDF/mail stack is only needed when something is actually sent.
           const { sendPendingInvoice } = await import("@/lib/pending-email-send");
@@ -170,9 +193,15 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
             body: pending.body,
             actor: SYSTEM_ACTOR,
           });
-          if ("error" in result) await reportAutoSendFailure(settings, sub.id, invoiceId, result.error);
+          if ("error" in result) {
+            await reportAutoSendFailure(prisma, settings, { ...failureBase, error: result.error, mailSent: result.mailSent === true });
+          }
         } catch (err) {
-          await reportAutoSendFailure(settings, sub.id, invoiceId, err instanceof Error ? err.message : "Unbekannter Fehler");
+          await reportAutoSendFailure(prisma, settings, {
+            ...failureBase,
+            error: err instanceof Error ? err.message : "Unbekannter Fehler",
+            mailSent: false,
+          });
         }
       }
     } catch (err) {
