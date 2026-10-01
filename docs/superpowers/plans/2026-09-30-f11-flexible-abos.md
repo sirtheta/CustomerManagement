@@ -10,6 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-f11-flexible-abos-design.md`
 
+**Status:** Umgesetzt in PR #122. Beim Gesamt-Review kamen Änderungen gegenüber diesem Plan dazu, die auch in der Spec stehen:
+- Das Datum im Abo-Formular wird mit `parseDate` / `toDateString` (`lib/date.ts`) gelesen und angezeigt, und das Bearbeiten-Formular sendet `loadedNextInvoiceDate` mit. Ein unverändertes Datum wird nicht geschrieben (Schutz vor Doppelabrechnung durch veraltete Tabs).
+- `{totalAmount}` bleibt in der Pending-E-Mail ein Platzhalter und wird in `sendPendingInvoice` über `fillTotalAmount` (`lib/document-display.ts`) eingesetzt. Task 3 und Task 4 setzen den Betrag im Plantext noch beim Anlegen ein.
+- `autoSend` wird in `parseSubscriptionForm` für eine Vorlage ohne Positionen abgelehnt.
+- Die Pause-Schaltfläche hat einen Ladezustand (`useTransition`) und zeigt Fehler per Toast.
+- Task 7 Step 4 (Spec abgleichen) entfiel im PR, weil die Spec nur auf dem Docs-Branch liegt; er ist hier nachgeholt, ebenso das F11-Häkchen in `FEATURE_ANALYSE.md`.
+
 ## Global Constraints
 
 - UI-Texte, Fehlermeldungen und Doku sind **auf Deutsch**; Commit-Messages **auf Englisch** (Conventional Commits, z. B. `feat(subscriptions): …`). Jede Commit-Message endet mit `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.

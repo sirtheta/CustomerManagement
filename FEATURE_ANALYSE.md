@@ -72,7 +72,7 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 | Z4 | **camt.054 wird nicht unterstützt.** Das ist bewusst so entschieden (siehe Kommentar). Bankbewegungen werden nicht gespeichert: Es gibt keine Historie und keinen Kontoabgleich. | [Code] `lib/import/camt.ts` Kopfkommentar, `lib/import/matching.ts` Kopfkommentar |
 | Z5 | **Die Mahnung ist das normale Rechnungs-PDF mit Titel „Rechnung“.** Es gibt keine Mahngebühren, keinen Verzugszins, keinen eigenen Mahnbeleg und keinen Übergang zu Betreibung oder Inkasso. | [Code] `app/(app)/invoices/reminders/actions.ts` (`generateInvoicePdf`). Suche `mahngeb\|verzugszins\|zins\|betreibung\|inkasso`: keine Treffer |
 | Z6 | **Kein pain.001, kein eBill, keine E-Rechnung, keine Online-Zahlung.** | [Code] Suche `pain\|ebill\|twint\|stripe\|payrexx\|postfinance\|peppol\|zugferd`: keine Treffer |
-| Z7 | **Die Jahresrechnung wird als leerer Entwurf (CHF 0.00) angelegt.** Wird die E-Mail verworfen, bleibt eine nummerierte Rechnung über 0 CHF bestehen. | [Code] `lib/yearly-invoices.ts` (`totalAmount: 0`, keine Positionen), `invoices/pending/actions.ts` `discardPendingEmail` löscht nur die E-Mail |
+| Z7 | **Erledigt mit F11 (#122): Der Abo-Job legt den Entwurf mit den Positionen der Vorlage an; ohne Vorlage bleibt es ein leerer Entwurf, wird aber nie automatisch versendet.** Ursprünglich: Die Jahresrechnung wird als leerer Entwurf (CHF 0.00) angelegt. Wird die E-Mail verworfen, bleibt eine nummerierte Rechnung über 0 CHF bestehen. | [Code] `lib/yearly-invoices.ts` (`totalAmount: 0`, keine Positionen), `invoices/pending/actions.ts` `discardPendingEmail` löscht nur die E-Mail |
 
 Zur Einordnung: Verzug durch Mahnung (Art. 102 OR), Verzugszins 5 % (Art. 104 OR), Mahngebühren nur bei Vereinbarung [alles bitte prüfen]. Die Bundesverwaltung verlangt E-Rechnungen ab CHF 5'000 Vertragswert (seit 2016) [Quelle: [Bundeskanzlei E-Rechnung](https://www.bk.admin.ch/bk/de/home/digitale-transformation-ikt-lenkung/e-services-bund/services/e-rechnung.html), [verband-e-rechnung.org](https://www.verband-e-rechnung.org/schweiz-macht-e-invoicing-fuer-bundeslieferanten-zur-pflicht/)].
 
@@ -185,6 +185,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - **Nutzen:** Weniger manuelle Arbeit. Das 0-CHF-Risiko fällt weg (Z7). Für Vereine eignet sich das für Mitgliederbeiträge.
 - **Aufwand:** gering–mittel
 - **Code:** `lib/yearly-invoices.ts`, `schema.prisma` (`Customer.yearlyInvoice` wird zu `Subscription`), `invoices/templates/*`, `invoices/pending/*`.
+- **Umsetzung (#122):** Erledigt. Mehrere Abos pro Kunde (`Subscription`: Intervall, Vorlage, nächstes Datum, `autoSend`, `active`). Der Job `checkSubscriptions` (`lib/subscriptions.ts`) ersetzt `lib/yearly-invoices.ts` und erzeugt den Entwurf mit den Positionen der Vorlage. Pro Lauf entsteht höchstens eine Rechnung pro Abo. Nach einem Ausfall wird das Datum nachgeführt (kein Rückstau). `autoSend` gibt es nur für Vorlagen mit mindestens einer Position und nutzt `lib/pending-email-send.ts`; bei einem Fehler bleiben Entwurf und Pending-E-Mail bestehen und die Admins werden benachrichtigt. Bestehende Jahreskunden wurden als `Yearly`-Abo ohne Vorlage übernommen. Verwaltung: Sektion «Abos» auf der Kundenseite (`customers/subscription-actions.ts`, `SubscriptionsSection.tsx`).
 
 ### F12 · Kundenverlauf, Aufgaben und Wiedervorlagen — **Kann**
 - **Beschreibung:** Chronologischer Verlauf pro Kunde aus bestehenden Daten (Offerten, Rechnungen, `InvoiceSentLog`, Zahlungen, Notizen, Audit-Log). Dazu Aufgaben mit Fälligkeit und Zuständigem, z. B. automatisch „Offerte nachfassen“ 7 Tage nach dem Versand.
@@ -229,7 +230,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 - [x] 6. F5 Zahlungen und offene Posten
 - [ ] 7. F6 Jahresabschluss-Paket (ZIP mit Journal, GuV, Debitorenliste, PDFs)
 - [ ] 8. F7 Bankabgleich 2.0
-- [ ] 9. F11 flexible Abos
+- [x] 9. F11 flexible Abos (#122)
 
 **Phase 3: langfristig (9–18 Monate) – Komfort und Reichweite**
 - [ ] 10. F8 Mahnwesen mit Mahnbelegen
