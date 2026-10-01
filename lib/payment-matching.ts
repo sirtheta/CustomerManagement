@@ -27,6 +27,7 @@ export async function matchAndMarkPaid(
     description: string;
     amountRappen: number;
     bookingDate?: string;
+    bankReference?: string;
   },
   prisma: PrismaClient = defaultPrisma
 ): Promise<PaymentMatchResult> {
@@ -43,6 +44,16 @@ export async function matchAndMarkPaid(
     const { remainingRappen } = await getPaymentSummary(invoice.id, prisma);
     if (remainingRappen !== params.amountRappen) continue;
 
+    // The same bank entry must not be booked twice on one invoice.
+    if (
+      params.bankReference &&
+      (await prisma.payment.count({
+        where: { invoiceId: invoice.id, bankReference: params.bankReference },
+      })) > 0
+    ) {
+      continue;
+    }
+
     const parsed = params.bookingDate ? new Date(params.bookingDate) : new Date();
     const paidDate = isNaN(parsed.getTime()) ? new Date() : parsed;
 
@@ -52,6 +63,7 @@ export async function matchAndMarkPaid(
         amount: params.amountRappen / 100,
         date: paidDate,
         source: "budget-import",
+        bankReference: params.bankReference,
         actor: SYSTEM_ACTOR,
       },
       prisma

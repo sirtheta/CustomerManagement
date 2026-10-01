@@ -50,6 +50,8 @@ export function createTestDatabase() {
     const p = state.prisma;
     // Delete in FK-safe order (children before parents)
     await p.auditLog.deleteMany();
+    await p.bankTransaction.deleteMany();
+    await p.bankStatementImport.deleteMany();
     await p.payment.deleteMany();
     await p.invoiceSentLog.deleteMany();
     await p.pendingReminder.deleteMany();

@@ -5,6 +5,8 @@ import { faker } from "@faker-js/faker";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 
+import { fingerprint } from "../lib/import/dedupe";
+
 loadEnvConfig(process.cwd());
 
 function createClient() {
@@ -300,9 +302,78 @@ async function main() {
   );
   invoiceCounter = pendingYearly.invoiceCounter;
 
+  const bankCount = await seedBankStatement(company.companyIBAN);
+
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails, ${bankCount} open bank transactions.`,
   );
+}
+
+// One imported statement (nothing booked) for the bank import page: payments
+// that match open numbered invoices (one by reference, one partial, one with
+// the number written differently), plus an expense-like debit and a stray credit.
+async function seedBankStatement(iban: string | null): Promise<number> {
+  const open = await prisma.invoice.findMany({
+    where: {
+      documentNumber: { not: null },
+      creditNoteForId: null,
+      state: { in: [InvoiceState.Sent, InvoiceState.Overdue] },
+    },
+    include: { customer: true },
+    orderBy: { date: "desc" },
+    take: 3,
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const day = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset);
+    return d.toISOString().slice(0, 10);
+  };
+  const rows: Array<{
+    date: string;
+    amountCents: number;
+    description: string;
+    counterparty: string | null;
+    bankReference: string | null;
+  }> = [];
+  open.forEach((invoice, i) => {
+    const cents = Math.round(invoice.totalAmount * 100);
+    const number = invoice.documentNumber as string;
+    rows.push({
+      date: day(i + 1),
+      amountCents: i === 1 ? Math.round(cents / 2) : cents,
+      description: i === 2 ? `Rechnung ${number.replace("-", " ")}` : `Zahlung ${number}`,
+      counterparty: invoice.customer.company,
+      bankReference: `SEED-REF-${invoice.id}`,
+    });
+  });
+  rows.push(
+    { date: day(4), amountCents: -184050, description: "Büromiete", counterparty: "Immobilien AG", bankReference: "SEED-REF-RENT" },
+    { date: day(5), amountCents: 25000, description: "Überweisung ohne Zuordnung", counterparty: "Hans Muster", bankReference: null },
+  );
+  const rowDates = rows.map((r) => r.date).sort();
+  const statement = await prisma.bankStatementImport.create({
+    data: {
+      filename: "camt053-demo.xml",
+      iban,
+      currency: "CHF",
+      periodFrom: rowDates[0],
+      periodTo: rowDates[rowDates.length - 1] ?? today,
+      importedCount: rows.length,
+      skippedCount: 0,
+      transactions: {
+        create: rows.map((r) => ({
+          date: new Date(`${r.date}T00:00:00.000Z`),
+          amountRappen: r.amountCents,
+          description: r.description,
+          counterparty: r.counterparty,
+          bankReference: r.bankReference,
+          fingerprint: fingerprint(iban, r, 0),
+        })),
+      },
+    },
+  });
+  return statement.importedCount;
 }
 
 // Mirrors lib/subscriptions.ts: per due subscription a Draft invoice
