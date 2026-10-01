@@ -23,9 +23,10 @@ type Props = {
   customers: Customer[]
   defaultValue?: Customer | null
   required?: boolean
+  onValueChange?: (customer: Customer | null) => void
 }
 
-export function CustomerCombobox({ id, name, customers, defaultValue, required }: Props) {
+export function CustomerCombobox({ id, name, customers, defaultValue, required, onValueChange }: Props) {
   const textFilter = Combobox.useFilter({ sensitivity: "base" })
 
   return (
@@ -37,6 +38,7 @@ export function CustomerCombobox({ id, name, customers, defaultValue, required }
       isItemEqualToValue={(a, b) => a.customerId === b.customerId}
       filter={(item, query) => textFilter.contains(item, query, customerSearchText)}
       name={name}
+      onValueChange={(value) => onValueChange?.((value as Customer | null) ?? null)}
       required={required}
     >
       <ComboboxInputGroup>

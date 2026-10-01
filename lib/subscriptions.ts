@@ -5,7 +5,7 @@ import { advancePast, type SubscriptionIntervalName } from "@/lib/subscription-d
 import { logAuditEntry } from "@/lib/audit";
 import { formatDate } from "@/lib/utils";
 import logger from "@/lib/logger";
-import { billingEmail } from "@/lib/customer-billing";
+import { billingEmail, effectivePaymentTermDays } from "@/lib/customer-billing";
 
 const log = logger.child({ module: "subscriptions" });
 
@@ -90,9 +90,10 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
   const companyName = settings?.companyInfo.companyName ?? "";
   const subjectTpl = settings?.emailSubjectTemplate || DEFAULT_SUBJECT;
   const bodyTpl = settings?.emailBodyTemplate || DEFAULT_BODY;
-  const paymentDays = settings?.defaultPaymentTermDays ?? 30;
+  const defaultPaymentDays = settings?.defaultPaymentTermDays ?? 30;
 
   for (const sub of due) {
+    const paymentDays = effectivePaymentTermDays(sub.customer, defaultPaymentDays);
     const dueDate = new Date(today);
     dueDate.setDate(dueDate.getDate() + paymentDays);
 

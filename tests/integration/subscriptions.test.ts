@@ -85,6 +85,17 @@ describe("checkSubscriptions", () => {
     expect(pending[0].to).toBe("buchhaltung@clientag.ch");
   });
 
+  it("uses the customer's payment term for the invoice due date", async () => {
+    await db.prisma.applicationSettings.create({
+      data: { defaultPaymentTermDays: 30, companyInfo: { create: {} } },
+    });
+    await seedSubscription({ customer: { paymentTermDays: 14 } });
+    await checkSubscriptions(db.prisma);
+    const [invoice] = await db.prisma.invoice.findMany();
+    const days = Math.round((invoice.dueDate.getTime() - invoice.date.getTime()) / 86_400_000);
+    expect(days).toBe(14);
+  });
+
   it("advances nextInvoiceDate by the interval", async () => {
     const sub = await seedSubscription({ interval: "Quarterly", nextInvoiceDate: new Date(2026, 0, 15) });
     await checkSubscriptions(db.prisma);

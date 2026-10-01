@@ -1,5 +1,6 @@
 "use server";
 
+import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
@@ -171,13 +172,13 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   const session = await requireEditor();
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
-    include: { items: true },
+    include: { items: true, customer: { select: { paymentTermDays: true } } },
   });
 
   if (!quote) return { error: "Offerte nicht gefunden." };
 
   const settings = await prisma.applicationSettings.findFirst();
-  const paymentTermDays = settings?.defaultPaymentTermDays ?? 30;
+  const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);
 
   const today = new Date();
   const dueDate = new Date(today);
