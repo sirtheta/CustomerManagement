@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { logAudit } from "@/lib/audit";
+import { swissDateString } from "@/lib/date";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -39,9 +40,11 @@ async function generateNumber(
   prefix: string,
   type: "invoice" | "quote"
 ): Promise<string> {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  // Swiss calendar day, not server time: a container without TZ runs in UTC and would
+  // still number an invoice sent at 00:30 on 1 January with the December period.
+  const [year, month] = swissDateString().split("-");
+  const yy = year.slice(-2);
+  const mm = month;
 
   let maxSeq = 0;
 

@@ -232,7 +232,7 @@ export default async function CustomersPage({ searchParams }: Props) {
           <Button variant="outline" render={<Link href={archivedOnly ? "/customers" : "/customers?archived=true"} />}>
             {archivedOnly ? "Aktive Kunden" : "Archiv"}
           </Button>
-          <ExportButton href="/api/export/customers" />
+          {canEdit && <ExportButton href="/api/export/customers" />}
           {canEdit && <Button render={<Link href="/customers/new" />}>Neuer Kunde</Button>}
         </div>
       </div>

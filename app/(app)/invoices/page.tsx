@@ -311,7 +311,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">Rechnungen</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <ExportButton href={exportHref} />
+          {canEdit && <ExportButton href={exportHref} />}
           {canEdit && modules.bankImport && (
             <Button variant="outline" size="sm" render={<Link href="/invoices/import" />}>
               Zahlungen importieren

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { assignDocumentNumber, isDocumentNumberCollision } from "@/lib/document-number";
+import { swissDateString } from "@/lib/date";
 
 vi.mock("@/lib/logger", () => ({
   default: { child: () => ({ error: () => {}, info: () => {}, warn: () => {} }) },
@@ -11,8 +12,8 @@ const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Edit
 
 /** Year/month part of a number assigned "now" (computed per call, never at module load). */
 function period(): string {
-  const now = new Date();
-  return `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [year, month] = swissDateString().split("-");
+  return `${year.slice(-2)}${month}`;
 }
 
 describe("assignDocumentNumber", () => {
@@ -221,10 +222,11 @@ describe("assignDocumentNumber", () => {
     expect(await db.prisma.auditLog.count()).toBe(0);
   });
 
-  describe("at the turn of the year (Swiss time, TZ=Europe/Zurich as DEPLOYMENT.md recommends)", () => {
+  // The period follows the Swiss day whatever the server zone is (a container is UTC without TZ).
+  describe.each(["Europe/Zurich", "UTC"])("at the turn of the year (server TZ=%s)", (serverTz) => {
     const originalTz = process.env.TZ;
     beforeEach(() => {
-      process.env.TZ = "Europe/Zurich";
+      process.env.TZ = serverTz;
     });
     afterEach(() => {
       if (originalTz === undefined) delete process.env.TZ;

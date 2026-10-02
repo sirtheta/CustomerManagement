@@ -158,7 +158,7 @@ export default async function QuotesPage({ searchParams }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">Offerten</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <ExportButton href={`/api/export/quotes${activeFilter !== "all" || dateFrom || dateTo ? "?" + new URLSearchParams({ ...(activeFilter !== "all" ? { state: activeFilter } : {}), ...(dateFrom ? { dateFrom } : {}), ...(dateTo ? { dateTo } : {}) }).toString() : ""}`} />
+          {canEdit && <ExportButton href={`/api/export/quotes${activeFilter !== "all" || dateFrom || dateTo ? "?" + new URLSearchParams({ ...(activeFilter !== "all" ? { state: activeFilter } : {}), ...(dateFrom ? { dateFrom } : {}), ...(dateTo ? { dateTo } : {}) }).toString() : ""}`} />}
           {canEdit && <Button render={<Link href="/quotes/new" />}>Neue Offerte</Button>}
         </div>
       </div>
