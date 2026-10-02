@@ -107,7 +107,13 @@ function snapshotBeforeMigration(db, migrationName) {
     fs.renameSync(tmp, target);
     console.log(`[startup] Snapshot before migration written: ${target}`);
   } catch (err) {
-    fs.rmSync(tmp, { force: true });
+    // `force` only ignores ENOENT; with a file in place of the directory Linux reports
+    // ENOTDIR, and a failing cleanup must not turn the warning into a crash.
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // nothing left to clean up that we could reach
+    }
     console.warn(`[startup] Snapshot before migration failed (continuing): ${err.message}`);
   }
 }
