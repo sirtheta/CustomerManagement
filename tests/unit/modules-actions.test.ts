@@ -90,6 +90,8 @@ describe("saveModules", () => {
     const result = await saveModules({}, form(MODULE_KEYS.filter((k) => k !== "subscriptions")));
 
     expect(result.error).toContain("3 aktive Abos");
+    // the other switches the user changed come back, so the form keeps them
+    expect(result.values).toMatchObject({ subscriptions: false, tasks: true, quotes: true });
     expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
   });
 

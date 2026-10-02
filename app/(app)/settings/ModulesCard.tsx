@@ -11,6 +11,8 @@ import { MODULE_INFO, MODULE_KEYS, type ModuleFlags } from "@/lib/modules";
 export default function ModulesCard({ modules }: { modules: ModuleFlags }) {
   const [state, action, pending] = useActionState(saveModules, {});
   useActionToast(state, "Module gespeichert");
+  // After a refused save the form shows what was submitted, not the stored values
+  const current = state.values ?? modules;
 
   return (
     <Card>
@@ -23,14 +25,14 @@ export default function ModulesCard({ modules }: { modules: ModuleFlags }) {
       </CardHeader>
       <CardContent>
         {/* Eigene <form>, nie in die grosse Einstellungs-Form verschachtelt */}
-        <form action={action} className="space-y-3">
+        <form key={state._ts ?? 0} action={action} className="space-y-3">
           {MODULE_KEYS.map((key) => (
             <div key={key} className="flex items-start gap-3">
               <input
                 type="checkbox"
                 id={`module_${key}`}
                 name={`module_${key}`}
-                defaultChecked={modules[key]}
+                defaultChecked={current[key]}
                 className="mt-0.5 h-4 w-4 accent-primary"
               />
               <div>

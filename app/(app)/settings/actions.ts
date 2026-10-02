@@ -14,7 +14,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
-import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO } from "@/lib/modules";
+import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleFlags } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
@@ -406,17 +406,22 @@ export async function testTelegramNotification(
   }
 }
 
+// `values` carries the submitted switches back to the form: React resets an
+// uncontrolled form after every action, which would otherwise also undo the
+// other checkboxes when one change is refused.
+export type ModulesActionState = ActionState & { values?: ModuleFlags };
+
 export async function saveModules(
-  _prev: ActionState,
+  _prev: ModulesActionState,
   formData: FormData
-): Promise<ActionState> {
+): Promise<ModulesActionState> {
   const session = await requireAdmin();
   const settings = await prisma.applicationSettings.findFirst();
   if (!settings) return { error: "Keine Einstellungen gefunden", _ts: Date.now() };
 
   const wanted = Object.fromEntries(
     MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
-  ) as Record<(typeof MODULE_KEYS)[number], boolean>;
+  ) as ModuleFlags;
 
   // Active subscriptions would keep creating invoices in the background, and
   // drafts waiting for approval would be unreachable once the page is hidden.
@@ -428,12 +433,14 @@ export async function saveModules(
     if (activeSubscriptions > 0) {
       return {
         _ts: Date.now(),
+        values: wanted,
         error: `Abos können nicht ausgeblendet werden, solange noch ${activeSubscriptions} aktive Abos bestehen. Bitte zuerst alle Abos beenden.`,
       };
     }
     if (pendingEmails > 0) {
       return {
         _ts: Date.now(),
+        values: wanted,
         error: `Abos können nicht ausgeblendet werden, solange noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe warten.`,
       };
     }
@@ -454,5 +461,5 @@ export async function saveModules(
 
   // The navigation lives in the layout, so everything has to be re-rendered.
   revalidatePath("/", "layout");
-  return { success: true, _ts: Date.now() };
+  return { success: true, _ts: Date.now(), values: wanted };
 }
