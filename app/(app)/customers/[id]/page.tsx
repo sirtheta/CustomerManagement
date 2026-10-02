@@ -7,6 +7,9 @@ import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import SubscriptionsSection from "../SubscriptionsSection";
+import TasksSection from "../TasksSection";
+import HistorySection from "../HistorySection";
+import { loadCustomerHistory } from "@/lib/customer-history";
 import { toDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,8 +85,10 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   const isEditing = edit === "true" && canEdit;
 
   const DETAIL_LIST_LIMIT = 25;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates] =await Promise.all([
+  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates, tasks, users, history] = await Promise.all([
     prisma.customer.findUnique({ where: { customerId } }),
     prisma.document.findMany({
       where: { customerId },
@@ -118,6 +123,13 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       orderBy: { nextInvoiceDate: "asc" },
     }),
     prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.task.findMany({
+      where: { customerId },
+      include: { assignee: { select: { name: true } } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+    }),
+    prisma.user.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    loadCustomerHistory(prisma, customerId),
   ]);
 
   if (!customer) notFound();
@@ -161,6 +173,19 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
               active: s.active,
               templateId: s.templateId,
               templateName: s.template?.name ?? null,
+            }))}
+          />
+          <TasksSection
+            customerId={customerId}
+            canEdit={canEdit}
+            users={users}
+            tasks={tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              dueDate: toDateString(t.dueDate),
+              overdue: t.dueDate < startOfToday,
+              done: t.doneAt !== null,
+              assigneeName: t.assignee?.name ?? null,
             }))}
           />
           <DocumentsSection customerId={customerId} documents={documents} />
@@ -304,6 +329,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         </CardContent>
       </Card>
       </div>
+
+      <HistorySection events={history} />
 
       {canDelete && (
         <div className="flex justify-start">
