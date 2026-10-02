@@ -267,6 +267,25 @@ describe("generateDocumentPdf byte assembly", () => {
     expect(pageText[0]).toContain("Rundung");
     expect(pageText[0]).toContain("- CHF 0.02");
   });
+
+  it("prints a credit note's discount without a double minus and no phantom rounding", async () => {
+    // Invoice 100.05 - 10 % = 90.05; the credit note stores the mirrored amounts.
+    const buf = await generateDocumentPdf(
+      baseDoc({
+        discountPercent: 10,
+        totalAmount: -90.05,
+        items: [{ name: "Pos 1", description: null, unit: "Hour", quantity: -1, unitPrice: 100.05, totalAmount: -100.05 }],
+      }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Rabatt (10");
+    expect(pageText[0]).toContain("- CHF 10.00");
+    expect(pageText[0]).not.toContain("CHF -10.0");
+    expect(pageText[0]).not.toContain("Rundung");
+  });
 });
 
 describe("draft watermark", () => {

@@ -13,6 +13,7 @@ import {
   recordRemainingPayment,
   toRappen,
 } from "@/lib/payments";
+import { isValidDateString, swissToday } from "@/lib/date";
 
 const log = logger.child({ module: "payment-actions" });
 
@@ -38,13 +39,16 @@ export async function recordPaymentAction(
 ): Promise<{ error?: string; needsConfirmation?: { overpaidBy: number } }> {
   const session = await requireEditor();
   const amount = parseAmount(amountRaw);
-  const date = new Date(dateRaw);
   if (!Number.isFinite(amount) || amount <= 0) return { error: "Der Betrag muss grösser als 0 sein." };
-  if (isNaN(date.getTime())) return { error: "Ungültiges Datum." };
+  // A calendar day, stored as UTC midnight like the bank import does.
+  if (!isValidDateString(dateRaw)) return { error: "Ungültiges Datum." };
+  const date = new Date(`${dateRaw}T00:00:00.000Z`);
 
   try {
     const summary = await getPaymentSummary(invoiceId);
-    const overpaidRappen = summary.paidRappen + toRappen(amount) - summary.totalRappen;
+    // Sent credit notes lower what is still owed, just like payments.
+    const overpaidRappen =
+      summary.paidRappen + summary.creditedRappen + toRappen(amount) - summary.totalRappen;
     if (overpaidRappen > 0 && !confirmOverpayment) {
       return { needsConfirmation: { overpaidBy: overpaidRappen / 100 } };
     }
@@ -61,7 +65,7 @@ export async function recordPaymentAction(
 export async function markInvoicePaidAction(invoiceId: number): Promise<{ error?: string }> {
   const session = await requireEditor();
   try {
-    await recordRemainingPayment({ invoiceId, date: new Date(), source: "manual", actor: session });
+    await recordRemainingPayment({ invoiceId, date: swissToday(), source: "manual", actor: session });
   } catch (err) {
     if (err instanceof PaymentError) return { error: err.message };
     log.error({ invoiceId, err }, "markInvoicePaidAction failed");

@@ -95,8 +95,14 @@ export async function assertCreditWithinOriginal(
   db: Db,
   creditNote: { id: number; creditNoteForId: number; totalAmount: { toNumber(): number } | number }
 ): Promise<void> {
-  const ownRappen = Math.abs(toRappen(creditNote.totalAmount));
-  if (ownRappen === 0) throw new CreditNoteError("Die Gutschrift muss einen Betrag haben.");
+  const storedRappen = toRappen(creditNote.totalAmount);
+  if (storedRappen === 0) throw new CreditNoteError("Die Gutschrift muss einen Betrag haben.");
+  // Stored negative; a positive one would charge the customer, yet still count
+  // (as absolute value) against the original's open amount.
+  if (storedRappen > 0) {
+    throw new CreditNoteError("Eine Gutschrift muss den Rechnungsbetrag verringern, nicht erhöhen.");
+  }
+  const ownRappen = -storedRappen;
 
   const original = await db.invoice.findUniqueOrThrow({
     where: { id: creditNote.creditNoteForId },

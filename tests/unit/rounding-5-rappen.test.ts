@@ -87,4 +87,39 @@ describe("splitTotals", () => {
   it("works for credit notes", () => {
     expect(splitTotals(-10.03, 0, -10.05)).toEqual({ discountAmount: 0, rounding: -0.02 });
   });
+
+  it("mirrors a credit note with a half-Rappen discount instead of a phantom rounding", () => {
+    // Invoice 100.05 - 10 % = 90.045 -> 90.05; the credit note stores -100.05 / -90.05.
+    expect(splitTotals(100.05, 10, 90.05)).toEqual({ discountAmount: 10, rounding: 0 });
+    expect(splitTotals(-100.05, 10, -90.05)).toEqual({ discountAmount: -10, rounding: 0 });
+  });
+
+  it("gives a credit note exactly the mirrored lines of its invoice", () => {
+    const discounts = [0, 0.5, 1, 2.5, 3, 5, 7.5, 10, 12.5, 15, 20, 25, 33, 33.33, 50, 66.67, 75, 90, 99.5, 100];
+    for (const roundTo5Rappen of [false, true]) {
+      for (let cents = 0; cents <= 2000; cents += 7) {
+        for (const discount of discounts) {
+          const items = [{ quantity: 1, unitPrice: cents / 100 }];
+          const subtotal = calculateItemTotal(items[0]);
+          // The credit note form computes the positive total and stores it negated.
+          const total = calculateInvoiceTotal(items, discount, { roundTo5Rappen });
+          const invoice = splitTotals(subtotal, discount, total);
+          const credit = splitTotals(-subtotal, discount, -total);
+          const context = { cents, discount, roundTo5Rappen, invoice, credit };
+
+          expect({ ...context, discountAmount: credit.discountAmount + 0 }).toEqual({
+            ...context,
+            discountAmount: -invoice.discountAmount + 0,
+          });
+          expect({ ...context, rounding: credit.rounding + 0 }).toEqual({ ...context, rounding: -invoice.rounding + 0 });
+          expect(invoice.discountAmount).toBeGreaterThanOrEqual(0);
+          if (!roundTo5Rappen) expect({ ...context, rounding: invoice.rounding }).toEqual({ ...context, rounding: 0 });
+          // The lines add up to the stored total.
+          expect(Math.round((subtotal - invoice.discountAmount + invoice.rounding) * 100) + 0).toBe(
+            Math.round(total * 100) + 0
+          );
+        }
+      }
+    }
+  });
 });

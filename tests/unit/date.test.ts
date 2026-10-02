@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { parseDate, toDateString, addDays } from "@/lib/date";
+import { describe, it, expect, afterEach } from "vitest";
+import { parseDate, toDateString, addDays, swissDateString, swissToday } from "@/lib/date";
 
 describe("parseDate", () => {
   it("parses YYYY-MM-DD into a local-time date", () => {
@@ -51,5 +51,33 @@ describe("addDays", () => {
 
   it("returns the input unchanged when it is not parseable", () => {
     expect(addDays("", 30)).toBe("");
+  });
+});
+
+describe("swissDateString / swissToday", () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it.each([
+    // 00:30 on 1 January in Zurich (CET, UTC+1) is still 31 December in UTC.
+    ["2025-12-31T23:30:00Z", "2026-01-01"],
+    ["2025-12-31T22:59:59Z", "2025-12-31"],
+    ["2026-01-01T00:30:00Z", "2026-01-01"],
+    // Summer time (CEST, UTC+2).
+    ["2026-06-30T22:30:00Z", "2026-07-01"],
+    ["2026-06-30T21:59:59Z", "2026-06-30"],
+    // Day of the spring DST switch.
+    ["2026-03-28T23:30:00Z", "2026-03-29"],
+  ])("maps the instant %s to the Swiss day %s", (instant, day) => {
+    expect(swissDateString(new Date(instant))).toBe(day);
+    expect(swissToday(new Date(instant)).toISOString()).toBe(`${day}T00:00:00.000Z`);
+  });
+
+  it.each(["UTC", "Europe/Zurich", "America/New_York"])("does not depend on the server time zone (TZ=%s)", (tz) => {
+    process.env.TZ = tz;
+    expect(swissDateString(new Date("2025-12-31T23:30:00Z"))).toBe("2026-01-01");
+    expect(swissToday(new Date("2025-12-31T23:30:00Z")).toISOString()).toBe("2026-01-01T00:00:00.000Z");
   });
 });

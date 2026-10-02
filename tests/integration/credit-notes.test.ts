@@ -116,6 +116,23 @@ describe("credit notes against a real database", () => {
     ).rejects.toThrow("Die Gutschrift muss einen Betrag haben.");
   });
 
+  it("refuses a credit note with a positive (charging) total", async () => {
+    const original = await seedInvoice("Sent", 200);
+    const draft = await db.prisma.invoice.create({
+      data: {
+        customerId: original.customerId,
+        date: new Date(),
+        dueDate: new Date(),
+        totalAmount: 100,
+        state: "Draft",
+        creditNoteForId: original.id,
+      },
+    });
+    await expect(
+      assertCreditWithinOriginal(db.prisma, { id: draft.id, creditNoteForId: original.id, totalAmount: 100 })
+    ).rejects.toBeInstanceOf(CreditNoteError);
+  });
+
   it("a sent full credit note cancels the unpaid original; a partial one lowers the open amount", async () => {
     const full = await seedInvoice("Sent", 100);
     await db.prisma.invoice.create({

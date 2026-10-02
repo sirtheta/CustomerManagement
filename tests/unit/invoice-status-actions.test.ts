@@ -96,6 +96,22 @@ describe("updateInvoiceStatus", () => {
     expect(prisma.invoice.update).not.toHaveBeenCalled();
   });
 
+  it("dates the payment on the Swiss calendar day, stored as UTC midnight", async () => {
+    vi.useFakeTimers();
+    try {
+      // 00:30 on 1 January in Zurich is still 31 December in UTC.
+      vi.setSystemTime(new Date("2025-12-31T23:30:00Z"));
+      mockInvoice("Sent", "I-25060001");
+
+      await updateInvoiceStatus(1, "Paid");
+
+      const { date } = vi.mocked(recordRemainingPayment).mock.calls[0][0];
+      expect(date.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses to leave Paid and changes nothing", async () => {
     mockInvoice("Paid", "I-25060002");
 

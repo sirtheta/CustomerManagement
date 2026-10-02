@@ -27,6 +27,32 @@ export function addDays(str: string, days: number): string {
   return toDateString(d);
 }
 
+const SWISS_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Zurich",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
+ * Today's calendar day (`YYYY-MM-DD`) in Swiss time. The container runs in UTC
+ * unless TZ is set, so a payment at 00:30 on 1 January would otherwise land in
+ * the previous year.
+ */
+export function swissDateString(now: Date = new Date()): string {
+  const parts = Object.fromEntries(SWISS_DAY.formatToParts(now).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/**
+ * UTC midnight of today's Swiss calendar day: the form of `Payment.date` that
+ * the payment form and the bank import store (`new Date("YYYY-MM-DD")`) and
+ * that the UTC year bounds of analytics and the open items list expect.
+ */
+export function swissToday(now: Date = new Date()): Date {
+  return new Date(`${swissDateString(now)}T00:00:00.000Z`);
+}
+
 /** True for a syntactically valid `YYYY-MM-DD` that is also a real calendar day. */
 export function isValidDateString(str: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;

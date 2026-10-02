@@ -15,6 +15,7 @@ import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { PaymentError, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
 import { canTransitionInvoice } from "@/lib/state-manager";
+import { swissToday } from "@/lib/date";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
@@ -133,6 +134,13 @@ export async function updateInvoice(
     if (items.length === 0 || items.some((item) => item.quantity <= 0)) {
       return { error: "Eine Gutschrift braucht mindestens eine Position mit positiver Menge." };
     }
+    // Negated below; a negative price would turn the credit note into a charge.
+    if (items.some((item) => item.unitPrice < 0)) {
+      return { error: "Eine Gutschrift darf keine negativen Preise enthalten." };
+    }
+    if (toRappen(totalAmount) <= 0) {
+      return { error: "Der Betrag der Gutschrift muss grösser als 0 sein." };
+    }
     input = negateDocumentInput(input);
     try {
       await assertCreditWithinOriginal(prisma, {
@@ -216,7 +224,7 @@ export async function updateInvoiceStatus(
       });
     }
     try {
-      await recordRemainingPayment({ invoiceId: id, date: new Date(), source: "manual", actor: session });
+      await recordRemainingPayment({ invoiceId: id, date: swissToday(), source: "manual", actor: session });
     } catch (err) {
       if (err instanceof PaymentError) return { error: err.message };
       throw err;

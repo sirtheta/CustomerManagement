@@ -51,15 +51,20 @@ export function calculateInvoiceTotal(
 /**
  * Splits the difference between the item subtotal and the stored total into the
  * invoice discount and the rounding, so the PDF shows each on its own line.
+ * A credit note (negative subtotal) gets the mirrored lines of its invoice.
  */
 export function splitTotals(
   subtotal: number,
   discountPercent: number,
   totalAmount: number
 ): { discountAmount: number; rounding: number } {
-  const discounted = roundCents(subtotal * (1 - discountPercent / 100));
+  // roundCents rounds half-Rappen towards +infinity, so compute on the positive
+  // form (as the credit note form did) and apply the sign afterwards.
+  const sign = subtotal < 0 ? -1 : 1;
+  const positive = subtotal * sign;
+  const discounted = roundCents(positive * (1 - discountPercent / 100));
   return {
-    discountAmount: roundCents(subtotal - discounted) + 0,
-    rounding: roundCents(totalAmount - discounted) + 0,
+    discountAmount: sign * roundCents(positive - discounted) + 0,
+    rounding: sign * roundCents(totalAmount * sign - discounted) + 0,
   };
 }

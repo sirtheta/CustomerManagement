@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { swissDateString } from "@/lib/date";
 import {
   deletePaymentAction,
   markInvoicePaidAction,
@@ -40,7 +41,7 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState(summary.remaining > 0 ? summary.remaining.toFixed(2) : "");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => swissDateString());
   const [overpaidBy, setOverpaidBy] = useState<number | null>(null);
 
   const canPay = canEdit && (state === "Sent" || state === "Overdue" || state === "PartiallyPaid" || state === "Paid");

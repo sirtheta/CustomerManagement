@@ -394,7 +394,8 @@ export async function generateDocumentPdf(
         y += LINE_HEIGHT + 4;
         if (invoiceDiscount > 0) {
           pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
-          pdf.text(`- CHF ${fmt(discountAmount, locale)}`, MARGIN, y, {
+          // Negative on a credit note; the line already reads as a deduction.
+          pdf.text(`- CHF ${fmt(Math.abs(discountAmount), locale)}`, MARGIN, y, {
             width: CONTENT_W,
             align: "right",
           });
