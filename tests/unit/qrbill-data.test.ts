@@ -220,7 +220,6 @@ describe("QRBill data preparation", () => {
         defaultQuoteValidityDays: 30,
         invoiceNumberPrefix: "I-",
         quoteNumberPrefix: "Q-",
-        defaultYearlyInvoice: false,
         useHolderNameOnQR: false,
         smtpHost: null,
         smtpPort: null,

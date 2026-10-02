@@ -131,7 +131,6 @@ export async function saveSettings(
     defaultQuoteValidityDays: isNaN(quoteValidityDays) ? 30 : quoteValidityDays,
     invoiceNumberPrefix: (formData.get("invoiceNumberPrefix") as string) || "R-",
     quoteNumberPrefix: (formData.get("quoteNumberPrefix") as string) || "A-",
-    defaultYearlyInvoice: formData.get("defaultYearlyInvoice") === "on",
     smtpHost: (formData.get("smtpHost") as string) || null,
     smtpPort: (smtpPort !== null && !isNaN(smtpPort)) ? smtpPort : null,
     smtpUser: (formData.get("smtpUser") as string) || null,

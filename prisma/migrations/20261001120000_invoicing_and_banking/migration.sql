@@ -361,3 +361,6 @@ ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleAnalytics" BOOLEAN NOT NULL 
 
 -- Round document totals to 5 Rappen (opt-in, Einstellungen)
 ALTER TABLE "ApplicationSettings" ADD COLUMN "roundTotalTo5Rappen" BOOLEAN NOT NULL DEFAULT false;
+
+-- Remove the unused "yearly invoice" default (replaced by subscriptions)
+ALTER TABLE "ApplicationSettings" DROP COLUMN "defaultYearlyInvoice";

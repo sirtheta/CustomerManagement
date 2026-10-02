@@ -368,7 +368,6 @@ model ApplicationSettings {
   defaultQuoteValidityDays Int                @default(30)
   invoiceNumberPrefix      String             @default("I-")
   quoteNumberPrefix        String             @default("Q-")
-  defaultYearlyInvoice     Boolean            @default(false)
   useHolderNameOnQR        Boolean            @default(false)
   roundTotalTo5Rappen      Boolean            @default(false)
   smtpHost                String?

@@ -22,7 +22,6 @@ function baseSettings() {
     defaultQuoteValidityDays: 30,
     invoiceNumberPrefix: "R-",
     quoteNumberPrefix: "A-",
-    defaultYearlyInvoice: false,
     useHolderNameOnQR: false,
     smtpHost: "smtp.example.com",
     smtpPort: 587,
