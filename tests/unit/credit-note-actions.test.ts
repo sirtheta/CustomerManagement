@@ -27,6 +27,7 @@ vi.mock("@/lib/credit-notes", () => ({
   CreditNoteError: class extends Error {},
   createCreditNoteDraft: vi.fn(),
   assertCreditWithinOriginal: vi.fn(),
+  alignCreditToOriginal: vi.fn(async (_db: unknown, credit: { totalAmount: number }) => credit.totalAmount),
   negateDocumentInput: vi.fn(),
 }));
 

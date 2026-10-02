@@ -4,7 +4,12 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
 import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
-import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
+import {
+  acquireSendLock,
+  invoiceSendLockKey,
+  SEND_IN_PROGRESS_ERROR,
+  CANCELED_INVOICE_SEND_ERROR,
+} from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { getPaymentSummary } from "@/lib/payments";
 import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
@@ -74,6 +79,7 @@ async function sendReminderLocked(input: {
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
+  if (reminder.invoice.state === "Canceled") return { error: CANCELED_INVOICE_SEND_ERROR };
   if (await isLastReminderLevelSent(prisma, reminder)) {
     return { error: "Die letzte Mahnstufe wurde bereits versendet." };
   }

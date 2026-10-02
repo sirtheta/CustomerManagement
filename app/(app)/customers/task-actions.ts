@@ -7,6 +7,7 @@ import { requireEditor } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { isValidDateString, parseDate } from "@/lib/date";
 import { requireModule } from "@/lib/module-guard";
+import { assertCustomerActive } from "@/lib/customer-archive";
 
 const MAX_TITLE_LENGTH = 200;
 
@@ -40,8 +41,8 @@ export async function createTask(
     if (!user) return { error: "Benutzer nicht gefunden." };
   }
 
-  const customer = await prisma.customer.findUnique({ where: { customerId }, select: { customerId: true } });
-  if (!customer) return { error: "Kunde nicht gefunden." };
+  const customerError = await assertCustomerActive(prisma, customerId);
+  if (customerError) return { error: customerError };
 
   const task = await prisma.task.create({ data: { customerId, title, dueDate, assigneeId } });
   await logAudit(session, "CREATE", "Task", task.id, title, { customerId });

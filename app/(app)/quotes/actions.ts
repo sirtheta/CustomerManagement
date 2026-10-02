@@ -1,6 +1,7 @@
 "use server";
 
 import { effectivePaymentTermDays } from "@/lib/customer-billing";
+import { assertCustomerActive, CUSTOMER_ARCHIVED_ERROR } from "@/lib/customer-archive";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
@@ -43,6 +44,8 @@ export async function createQuote(
   }
 
   const customerId = parseInt(customerIdRaw, 10);
+  const customerError = await assertCustomerActive(prisma, customerId);
+  if (customerError) return { error: customerError };
 
   let items: ItemData[];
   let totalAmount: number;
@@ -93,6 +96,12 @@ export async function updateQuote(
   }
 
   const customerId = parseInt(customerIdRaw, 10);
+  // Keeping the current customer is fine (drafts of customers archived later
+  // stay editable); moving the quote to an archived one is not.
+  const existing = await prisma.quote.findUnique({ where: { id }, select: { customerId: true } });
+  if (!existing) return { error: "Offerte nicht gefunden." };
+  const customerError = await assertCustomerActive(prisma, customerId, existing.customerId);
+  if (customerError) return { error: customerError };
 
   let items: ItemData[];
   let totalAmount: number;
@@ -188,10 +197,12 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   await requireModule("quotes");
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
-    include: { items: true, customer: { select: { paymentTermDays: true } } },
+    include: { items: true, customer: { select: { paymentTermDays: true, archivedAt: true } } },
   });
 
   if (!quote) return { error: "Offerte nicht gefunden." };
+  // No new invoice for an archived customer; restoring the customer first is the way.
+  if (quote.customer.archivedAt) return { error: CUSTOMER_ARCHIVED_ERROR };
 
   const settings = await prisma.applicationSettings.findFirst();
   const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);

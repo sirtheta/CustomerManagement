@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { isValidDateString, parseDate } from "@/lib/date";
 import { requireModule } from "@/lib/module-guard";
+import { assertCustomerActive } from "@/lib/customer-archive";
 
 type SubscriptionFields = {
   interval: SubscriptionIntervalName;
@@ -59,6 +60,8 @@ export async function createSubscription(
 ): Promise<ActionState> {
   const session = await requireEditor();
   await requireModule("subscriptions");
+  const customerError = await assertCustomerActive(prisma, customerId);
+  if (customerError) return { error: customerError };
   const parsed = await parseSubscriptionForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 

@@ -217,6 +217,75 @@ describe("invoice actions against a real database", () => {
         expect(credit.creditNoteForId).toBe(originalId);
         expect(credit.state).toBe("Draft");
       });
+
+      describe("switch toggled between original and credit note", () => {
+        const items = [{ unitPrice: 10.02, quantity: 1 }, { unitPrice: 10.02, quantity: 1 }]; // plain total 20.04
+
+        /** Sent original created through createInvoice with the switch as it is right now. */
+        async function originalMadeNow() {
+          const id = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, items)));
+          await db.prisma.invoice.update({ where: { id }, data: { state: "Sent", documentNumber: "I-26060002" } });
+          return id;
+        }
+
+        async function summary(originalId: number) {
+          const { getPaymentSummary } = await import("@/lib/payments");
+          return getPaymentSummary(originalId, db.prisma as never);
+        }
+
+        it("covers a rounded original (20.05) fully although the switch is off now", async () => {
+          await setRounding(true);
+          const originalId = await originalMadeNow();
+          expect((await total(originalId)).total).toBe(20.05);
+          await setRounding(false);
+
+          const creditId = await idFromRedirect(() => createCreditNote(originalId));
+          await idFromRedirect(() => updateInvoice(creditId, {}, invoiceForm(customerId, items)));
+
+          expect((await total(creditId)).total).toBe(-20.05);
+          await db.prisma.invoice.update({ where: { id: creditId }, data: { state: "Sent", documentNumber: "I-26060003" } });
+          expect((await summary(originalId)).remainingRappen).toBe(0);
+        });
+
+        it("accepts a full credit (20.04) of an unrounded original although the switch is on now", async () => {
+          const originalId = await originalMadeNow();
+          expect((await total(originalId)).total).toBe(20.04);
+          await setRounding(true);
+
+          const creditId = await idFromRedirect(() => createCreditNote(originalId));
+          // Not refused with "Gutschriften dürfen zusammen den Rechnungsbetrag nicht übersteigen".
+          await idFromRedirect(() => updateInvoice(creditId, {}, invoiceForm(customerId, items)));
+
+          expect((await total(creditId)).total).toBe(-20.04);
+          await db.prisma.invoice.update({ where: { id: creditId }, data: { state: "Sent", documentNumber: "I-26060003" } });
+          expect((await summary(originalId)).remainingRappen).toBe(0);
+        });
+
+        it("leaves a deliberate partial credit alone", async () => {
+          await setRounding(true);
+          const originalId = await originalMadeNow(); // 20.05
+          await setRounding(false);
+
+          const creditId = await idFromRedirect(() => createCreditNote(originalId));
+          await idFromRedirect(() => updateInvoice(creditId, {}, invoiceForm(customerId, [{ unitPrice: 10.02, quantity: 1 }])));
+          expect((await total(creditId)).total).toBe(-10.02);
+        });
+
+        it("does not tolerate anything while neither side is rounded", async () => {
+          const originalId = await originalMadeNow(); // 20.04, switch off
+          const creditId = await idFromRedirect(() => createCreditNote(originalId));
+          await idFromRedirect(() => updateInvoice(creditId, {}, invoiceForm(customerId, [{ unitPrice: 20.03, quantity: 1 }])));
+          expect((await total(creditId)).total).toBe(-20.03);
+        });
+
+        it("still refuses a credit note 5 Rappen or more above the original", async () => {
+          await setRounding(true);
+          const originalId = await originalMadeNow(); // 20.05
+          const creditId = await idFromRedirect(() => createCreditNote(originalId));
+          const result = await updateInvoice(creditId, {}, invoiceForm(customerId, [{ unitPrice: 20.1, quantity: 1 }]));
+          expect(result).toEqual({ error: "Die Gutschriften dürfen zusammen den Rechnungsbetrag nicht übersteigen." });
+        });
+      });
     });
   });
 

@@ -26,8 +26,8 @@ Legende: `[ ]` offen, `[x]` erledigt, `[-]` bewusst übersprungen.
 - [x] Zahlungsdatum an der Jahresgrenze: `new Date()` mit Uhrzeit bzw. UTC-Tag (`payments/actions.ts:64`, `invoices/actions.ts:219`, `PaymentsPanel.tsx:43`). Als Kalendertag in Schweizer Zeit normalisieren.
 - [x] Aus Bankimport übernommene Ausgaben stehen als «Offen» (`bookExpenses` setzt kein `paidDate`).
 - [x] Gutschrift-Validierung prüft nur die Menge: negativer Stückpreis ergibt belastenden Beleg (`invoices/actions.ts:133`, `lib/credit-notes.ts:98`).
-- [ ] Rundungs-Schalter zwischen Original und Gutschrift kann 2 Rappen Rest lassen (`lib/credit-notes.ts:110`).
-- [ ] Stornierte Rechnung lässt sich erneut senden, QR über vollen Betrag (`document-actions.ts:187-257`).
+- [x] Rundungs-Schalter zwischen Original und Gutschrift kann 2 Rappen Rest lassen (`lib/credit-notes.ts:110`).  (`alignCreditToOriginal`: 1–4 Rappen Abweichung zum offenen Betrag werden beim Speichern der Gutschrift angeglichen; ältere Entwürfe werden beim erneuten Speichern korrigiert)
+- [x] Stornierte Rechnung lässt sich erneut senden, QR über vollen Betrag (`document-actions.ts:187-257`).  (alle drei Versandwege lehnen ab, Knopf ausgeblendet; bezahlte Rechnungen dürfen weiter als Kopie gesendet werden)
 - [x] Budget-API kann bei gleichzeitigen Requests doppelt buchen (`lib/payment-matching.ts:44-69`). Entschieden: bleibt optional (Spec F7, FEATURE_ANALYSE).
 
 ### Zugriff und Audit
@@ -40,7 +40,7 @@ Legende: `[ ]` offen, `[x]` erledigt, `[-]` bewusst übersprungen.
 - [x] `convertQuoteToInvoice` ohne Audit.
 - [x] Kontakt-Audit ohne `customerId`, `createContact` prüft Kunde nicht.
 - [x] Unsanitierter Dateiname im Header (`app/api/reminders/[id]/pdf/route.ts:56`).
-- [ ] Archivierte Kunden nur in der UI gefiltert (`createInvoice`, `updateInvoice`, `convertQuoteToInvoice`).
+- [x] Archivierte Kunden nur in der UI gefiltert (`createInvoice`, `updateInvoice`, `convertQuoteToInvoice`).  (`assertCustomerActive`: Rechnung/Offerte anlegen, auf archivierten Kunden verschieben, Offerte umwandeln, Abo, Aufgabe; Entwürfe bestehender Kunden bleiben bearbeitbar)
 
 Stand 2026-10-02: Commits `04f46a4`, `f5148b1`, `aec19c9`, `82b2cc5`, `06453fd`. Offen aus der Fix-Runde: `Invoice.paidDate` entfernen (nur noch geschrieben, eigene Migration), Altdaten mit positiven «Gutschriften» (`sumCreditedRappen` rechnet mit `Math.abs`), Budget-API und OP-Stichtag nutzen noch UTC-Tag/Uhrzeit, `/quotes/[id]` und `/services/[id]` ohne Viewer-Handling, Navi-Badge für Viewer.
 
@@ -132,7 +132,7 @@ Doku:
 - [x] Teilzahlung auf überfälliger Rechnung nimmt sie dauerhaft aus dem Mahnwesen (`lib/payments.ts:33,88`). Spec-Entscheid, nicht in CLAUDE.md. Weiter mahnen bei Restbetrag > 0? Entschieden: weiter mahnen. Teilzahlung behält `PendingReminder` (Stufe, Belege, Zurückstellung), Status bleibt `PartiallyPaid`; Tagesjob legt für überfällige teilbezahlte Rechnungen eine an (`overdueInvoiceWhere`); Mahnbeleg/Karte zeigen Rest; Viewer-Banner und Filter «Überfällig» zählen sie mit. Tests: `tests/integration/reminders-partial-payment.test.ts`.
 - [x] Editoren dürfen Zahlungen löschen (auch CAMT/Budget). Admin-only machen oder in CLAUDE.md dokumentieren? Entschieden: Editoren dürfen, in CLAUDE.md dokumentiert.
 - [x] «Verwerfen» bei Abo-Entwürfen: Entwurf mitlöschen oder nur Audit-Aktion korrigieren? Entschieden: Entwurf mitlöschen (Abo-Periode wird übersprungen; bleibt Editor-Aufgabe).
-- [ ] Budget-API (`POST /api/external/payments`) weiter betreiben? Sonst entfällt ein Matching-Weg.
+- [x] Budget-API (`POST /api/external/payments`) weiter betreiben? Entschieden: wird weiter benötigt, bleibt.
 - [x] `InvoiceSentLog` und `SentDocument` sind inhaltlich doppelt. Agent rät: vorerst behalten (Datenmigration nötig). Entschieden: beide behalten, Unterschied in CLAUDE.md. Zusammenlegen frühestens als eigene Migration nach dem Major-Release.
 
 ## Übersprungen

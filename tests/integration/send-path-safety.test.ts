@@ -44,7 +44,7 @@ import { sendPendingInvoice } from "@/lib/pending-email-send";
 import { sendReminder } from "@/app/(app)/invoices/reminders/actions";
 import { sendInvoiceEmail } from "@/lib/email";
 import { createCreditNoteDraft } from "@/lib/credit-notes";
-import { SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
+import { SEND_IN_PROGRESS_ERROR, CANCELED_INVOICE_SEND_ERROR } from "@/lib/send-lock";
 
 const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Editor" } } as Session;
 
@@ -185,6 +185,67 @@ describe("send paths after the mail went out", () => {
       const second = await send(b);
       expect(second.error).toMatch(/übersteig/i);
       expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("a Canceled (fully credited) invoice", () => {
+    const send = (id: number) =>
+      sendDocument({ kind: "invoice", id, to: "kunde@example.ch", subject: "Rechnung", body: "Text", actor });
+
+    it("is refused by sendDocument before a number is assigned or a mail goes out", async () => {
+      const invoice = await seedInvoice({ state: "Canceled" });
+
+      expect(await send(invoice.id)).toEqual({ error: CANCELED_INVOICE_SEND_ERROR });
+
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+      const after = await db.prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+      expect(after.documentNumber).toBeNull();
+      expect(after.state).toBe("Canceled");
+      expect(await db.prisma.sentDocument.count({ where: { invoiceId: invoice.id } })).toBe(0);
+      expect(await db.prisma.invoiceSentLog.count({ where: { invoiceId: invoice.id } })).toBe(0);
+    });
+
+    it("is refused by sendPendingInvoice without numbering, mailing or consuming the pending entry", async () => {
+      const invoice = await seedInvoice({ state: "Canceled" });
+      const pending = await db.prisma.pendingEmail.create({
+        data: { invoiceId: invoice.id, to: "a@b.ch", subject: "s", body: "b" },
+      });
+
+      expect(await sendPendingInvoice({ pendingId: pending.id, to: "a@b.ch", subject: "s", body: "b", actor })).toEqual({
+        error: CANCELED_INVOICE_SEND_ERROR,
+      });
+
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+      expect((await db.prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).documentNumber).toBeNull();
+    });
+
+    it("is refused by sendReminder", async () => {
+      const invoice = await seedInvoice({ state: "Canceled", documentNumber: "I-CAN1" });
+      const reminder = await db.prisma.pendingReminder.create({ data: { invoiceId: invoice.id, reminderLevel: 1 } });
+      const formData = new FormData();
+      formData.set("reminderId", String(reminder.id));
+      formData.set("to", "kunde@example.ch");
+      formData.set("subject", "Zahlungserinnerung");
+      formData.set("body", "Text");
+
+      expect(await sendReminder({}, formData)).toMatchObject({ error: CANCELED_INVOICE_SEND_ERROR });
+
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+    });
+
+    it("still lets a Paid invoice be sent again (a copy of a settled invoice)", async () => {
+      const invoice = await seedInvoice({ state: "Paid", documentNumber: "I-PAID1" });
+
+      expect(await send(invoice.id)).toEqual({ success: true });
+
+      expect((await db.prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } })).state).toBe("Paid");
+    });
+
+    it("does not affect a credit note", async () => {
+      const original = await seedInvoice({ state: "Sent", documentNumber: "I-ORIG2" });
+      const creditId = await createCreditNoteDraft(original.id, db.prisma);
+
+      expect(await send(creditId)).toEqual({ success: true });
     });
   });
 

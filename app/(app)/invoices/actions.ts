@@ -9,6 +9,7 @@ import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
 import { loadTotalOptions } from "@/lib/total-options";
+import { assertCustomerActive } from "@/lib/customer-archive";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
@@ -25,6 +26,7 @@ import {
 } from "@/lib/document-actions";
 import {
   CreditNoteError,
+  alignCreditToOriginal,
   assertCreditWithinOriginal,
   createCreditNoteDraft,
   negateDocumentInput,
@@ -51,6 +53,8 @@ export async function createInvoice(
   }
 
   const customerId = parseInt(customerIdRaw, 10);
+  const customerError = await assertCustomerActive(prisma, customerId);
+  if (customerError) return { error: customerError };
 
   let items: ItemData[];
   let totalAmount: number;
@@ -109,6 +113,10 @@ export async function updateInvoice(
   // A credit note always belongs to the customer of its original; the form
   // only sends a hidden field, which must not be trusted.
   const customerId = isCreditNote ? existing.customerId : parseInt(customerIdRaw, 10);
+  // Keeping the current customer is fine (drafts of customers archived later
+  // stay editable); moving the draft to an archived one is not.
+  const customerError = await assertCustomerActive(prisma, customerId, existing.customerId);
+  if (customerError) return { error: customerError };
 
   let items: ItemData[];
   let totalAmount: number;
@@ -144,6 +152,15 @@ export async function updateInvoice(
     }
     input = negateDocumentInput(input);
     try {
+      // The rounding switch may have changed since the original was issued.
+      input = {
+        ...input,
+        totalAmount: await alignCreditToOriginal(
+          prisma,
+          { id, creditNoteForId: existing.creditNoteForId!, totalAmount: input.totalAmount },
+          totalOptions
+        ),
+      };
       await assertCreditWithinOriginal(prisma, {
         id,
         creditNoteForId: existing.creditNoteForId!,

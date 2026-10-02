@@ -11,7 +11,12 @@ import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendQuoteEmail } from "@/lib/email";
 import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
-import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
+import {
+  acquireSendLock,
+  invoiceSendLockKey,
+  SEND_IN_PROGRESS_ERROR,
+  CANCELED_INVOICE_SEND_ERROR,
+} from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
@@ -256,6 +261,12 @@ async function sendInvoiceLocked(input: SendDocumentInput, settings: DispatchSet
     },
   });
   if (!invoice) return { error: "Rechnung nicht gefunden." };
+
+  // A fully credited invoice has nothing left to pay; its QR slip would still ask for the full
+  // amount. Checked before a number is assigned or a mail goes out.
+  if (invoice.creditNoteForId == null && invoice.state === "Canceled") {
+    return { error: CANCELED_INVOICE_SEND_ERROR };
+  }
 
   // Drafts are not counted when a credit note is saved, so this is the real
   // enforcement of the credit limit. It must run before a number is assigned.

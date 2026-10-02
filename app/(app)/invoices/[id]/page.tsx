@@ -426,7 +426,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <span />
         )}
         <div className="flex items-center gap-2 flex-wrap">
-          {canEdit && (
+          {/* A fully credited invoice is not sent again (the server refuses it too); credit notes stay sendable. */}
+          {canEdit && (isCreditNote || invoice.state !== "Canceled") && (
             <SendInvoiceButton
               invoiceId={invoice.id}
               customerEmail={billingEmail(invoice.customer)}

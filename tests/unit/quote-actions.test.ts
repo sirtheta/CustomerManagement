@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     $transaction: vi.fn(),
+    customer: { findUnique: vi.fn() },
     quote: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
     item: { createMany: vi.fn(), deleteMany: vi.fn() },
     task: { updateMany: vi.fn() },
@@ -66,6 +67,7 @@ const BASE_FORM = { customerId: "1", date: "2026-01-15", validUntil: "2026-02-15
 describe("quote actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: null } as never);
   });
 
   describe("createQuote", () => {
@@ -82,6 +84,22 @@ describe("quote actions", () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       const result = await createQuote({}, form({ date: "2026-01-15" }));
       expect(result.error).toBe("Bitte alle Pflichtfelder ausfüllen.");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses an archived customer", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: new Date() } as never);
+      const result = await createQuote({}, form(BASE_FORM));
+      expect(result.error).toBe("Der Kunde ist archiviert. Bitte zuerst wiederherstellen.");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses an unknown customer", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue(null);
+      const result = await createQuote({}, form(BASE_FORM));
+      expect(result.error).toBe("Kunde nicht gefunden.");
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
@@ -171,6 +189,37 @@ describe("quote actions", () => {
   });
 
   describe("updateQuote", () => {
+    beforeEach(() => {
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({ customerId: 1 } as never);
+    });
+
+    it("refuses moving the quote to an archived customer", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: new Date() } as never);
+      const result = await updateQuote(1, {}, form({ ...BASE_FORM, customerId: "2" }));
+      expect(result.error).toBe("Der Kunde ist archiviert. Bitte zuerst wiederherstellen.");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("keeps working for the quote's own customer even if archived later", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: new Date() } as never);
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 200, discountPercent: 0 });
+      vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/quotes/1");
+      });
+      await expect(updateQuote(1, {}, form(BASE_FORM))).rejects.toThrow("REDIRECT:/quotes/1");
+      expect(prisma.quote.update).toHaveBeenCalled();
+    });
+
+    it("returns error when the quote does not exist", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue(null);
+      const result = await updateQuote(1, {}, form(BASE_FORM));
+      expect(result.error).toBe("Offerte nicht gefunden.");
+    });
+
     it("rejects Viewer role", async () => {
       vi.mocked(auth).mockResolvedValue(viewerSession);
       vi.mocked(redirect).mockImplementation(() => {
@@ -475,9 +524,25 @@ describe("quote actions", () => {
       expect(result.error).toBe("Offerte nicht gefunden.");
     });
 
+    it("refuses an archived customer before numbering or creating anything", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        id: 1,
+        customerId: 10,
+        documentNumber: null,
+        items: [],
+        customer: { paymentTermDays: null, archivedAt: new Date() },
+      } as never);
+      const result = await convertQuoteToInvoice(1);
+      expect(result.error).toBe("Der Kunde ist archiviert. Bitte zuerst wiederherstellen.");
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it("creates invoice, marks quote as Accepted, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 1,
         customerId: 10,
         customUserText: null,
@@ -516,6 +581,7 @@ describe("quote actions", () => {
     it("audits the new invoice and the accepted quote after the transaction", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 1,
         customerId: 10,
         customUserText: null,
@@ -584,6 +650,7 @@ describe("quote actions", () => {
     it("does not assign a number when the quote already has one", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 1,
         customerId: 10,
         documentNumber: "O-26090001",
@@ -605,6 +672,7 @@ describe("quote actions", () => {
     it("calculates due date using defaultPaymentTermDays from settings", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 2,
         customerId: 5,
         customUserText: null,
@@ -636,6 +704,7 @@ describe("quote actions", () => {
     it("copies items from quote to the new invoice", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 3,
         customerId: 7,
         customUserText: null,
@@ -675,6 +744,7 @@ describe("quote actions", () => {
     it("carries document-level and item-level discounts over to the invoice", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        customer: {},
         id: 4,
         customerId: 7,
         customUserText: null,

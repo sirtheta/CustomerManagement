@@ -2,7 +2,12 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import type { Session } from "next-auth";
 import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
-import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
+import {
+  acquireSendLock,
+  invoiceSendLockKey,
+  SEND_IN_PROGRESS_ERROR,
+  CANCELED_INVOICE_SEND_ERROR,
+} from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
@@ -69,6 +74,7 @@ async function sendLocked(input: {
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
   // Checked before the number is assigned, so a refused send does not use one up.
+  if (pending.invoice.state === "Canceled") return { error: CANCELED_INVOICE_SEND_ERROR };
   if (pending.invoice.items.length === 0) {
     return { error: "Die Rechnung hat noch keine Positionen. Bitte zuerst Positionen eintragen." };
   }

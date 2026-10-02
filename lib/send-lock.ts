@@ -1,6 +1,9 @@
 export const SEND_IN_PROGRESS_ERROR =
   "Diese Rechnung wird gerade versendet. Bitte kurz warten und die Seite neu laden.";
 
+/** A fully credited invoice has nothing open; mailing it again would carry a QR slip for the full amount. */
+export const CANCELED_INVOICE_SEND_ERROR = "Eine stornierte Rechnung kann nicht erneut versendet werden.";
+
 // The scheduler and the Server Actions are bundled separately, so the set lives on
 // globalThis (same reason as the scheduler's start flags).
 const globalForLocks = globalThis as unknown as { __sendLocks?: Set<string> };

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
+    customer: { findUnique: vi.fn() },
     subscription: { create: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
     invoiceTemplate: { findUnique: vi.fn() },
   },
@@ -47,10 +48,19 @@ describe("subscription actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue(editorSession);
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: null } as never);
     vi.mocked(prisma.invoiceTemplate.findUnique).mockResolvedValue({ id: 5, _count: { items: 2 } } as never);
   });
 
   describe("createSubscription", () => {
+    it("refuses an archived customer", async () => {
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue({ archivedAt: new Date() } as never);
+      const res = await createSubscription(1, {}, form(VALID));
+      expect(res.error).toBe("Der Kunde ist archiviert. Bitte zuerst wiederherstellen.");
+      expect(prisma.subscription.create).not.toHaveBeenCalled();
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
     it("creates, audits and returns success", async () => {
       vi.mocked(prisma.subscription.create).mockResolvedValue({ id: 11 } as never);
       const res = await createSubscription(1, {}, form(VALID));
