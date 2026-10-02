@@ -234,6 +234,9 @@ export async function updateInvoiceStatus(
   if (state !== "Overdue") {
     await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
   }
+  // A subscription draft waiting for approval is no longer a draft: approving it
+  // later would mail an invoice that is already out (or even paid).
+  await prisma.pendingEmail.deleteMany({ where: { invoiceId: id } });
 
   revalidatePath(`/invoices/${id}`);
   revalidatePath("/invoices");

@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     $transaction: vi.fn(),
-    pendingReminder: { findUnique: vi.fn(), update: vi.fn() },
+    pendingReminder: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
     sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }), count: vi.fn().mockResolvedValue(0) },
     invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
-    pendingEmail: { findUnique: vi.fn(), delete: vi.fn() },
+    pendingEmail: { findUnique: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     invoiceTemplate: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     templateItem: { deleteMany: vi.fn() },
   },
@@ -190,7 +190,7 @@ describe("invoices/reminders actions", () => {
       vi.mocked(generateReminderPdf).mockResolvedValue(Buffer.from("pdf") as never);
       vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
       vi.mocked(prisma.invoiceSentLog.create).mockResolvedValue({} as never);
-      vi.mocked(prisma.pendingReminder.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.pendingReminder.updateMany).mockResolvedValue({} as never);
       vi.mocked(prisma.$transaction).mockImplementation((arg: ((tx: typeof prisma) => Promise<unknown>) | Promise<unknown>[]) =>
         Array.isArray(arg) ? Promise.all(arg) as never : arg(prisma) as never
       );
@@ -249,7 +249,7 @@ describe("invoices/reminders actions", () => {
 
       expect(result.error).toBe("PDF konnte nicht archiviert werden. Die E-Mail wurde nicht versendet.");
       expect(sendInvoiceEmail).not.toHaveBeenCalled();
-      expect(prisma.pendingReminder.update).not.toHaveBeenCalled();
+      expect(prisma.pendingReminder.updateMany).not.toHaveBeenCalled();
       expect(prisma.sentDocument.create).not.toHaveBeenCalled();
     });
   });

@@ -3,7 +3,8 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
-import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { getPaymentSummary } from "@/lib/payments";
 import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
@@ -13,8 +14,12 @@ import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { requireModule } from "@/lib/module-guard";
+import type { Session } from "next-auth";
 
 const log = logger.child({ module: "invoices.reminders" });
+
+const MAIL_SENT_NOT_RECORDED_ERROR =
+  "Die Mahnung wurde bereits versendet, konnte aber nicht verbucht werden. Bitte nicht erneut senden, sondern die Rechnung prüfen.";
 
 export async function sendReminder(
   _prev: ActionState,
@@ -27,6 +32,31 @@ export async function sendReminder(
   const to = (formData.get("to") as string).trim();
   const subject = (formData.get("subject") as string).trim();
   const body = (formData.get("body") as string).trim();
+
+  const ref = await prisma.pendingReminder.findUnique({
+    where: { id: reminderId },
+    select: { invoiceId: true },
+  });
+  if (!ref) return { error: "Mahnung nicht gefunden." };
+
+  const release = acquireSendLock(invoiceSendLockKey(ref.invoiceId));
+  if (!release) return { error: SEND_IN_PROGRESS_ERROR, _ts: Date.now() };
+  try {
+    return await sendReminderLocked({ session, reminderId, to, subject, body });
+  } finally {
+    release();
+  }
+}
+
+// Reads the reminder again: it may have been sent or removed by a payment by the time the lock is ours.
+async function sendReminderLocked(input: {
+  session: Session;
+  reminderId: number;
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<ActionState> {
+  const { session, reminderId, to, subject, body } = input;
 
   const reminder = await prisma.pendingReminder.findUnique({
     where: { id: reminderId },
@@ -76,31 +106,46 @@ export async function sendReminder(
   const cooldownDays = settings.reminderCooldownDays ?? 14;
   const snoozedUntil = new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000);
 
-  const [, , sentDocument] = await prisma.$transaction([
-    prisma.invoiceSentLog.create({
-      data: { invoiceId: reminder.invoiceId, sentTo: to, subject },
-    }),
-    prisma.pendingReminder.update({
-      where: { id: reminderId },
-      data: {
-        reminderLevel: Math.min(reminder.reminderLevel + 1, MAX_REMINDER_LEVEL),
-        snoozedUntil,
-      },
-    }),
-    prisma.sentDocument.create({
-      data: sentDocumentData({
-        invoiceId: reminder.invoiceId,
-        documentNumber: reminder.invoice.documentNumber!,
-        kind: "Reminder",
-        reminderLevel: reminder.reminderLevel,
-        archive,
-        sentTo: to,
-        subject,
-        actor: session,
-        charges,
-      }),
-    }),
-  ]);
+  const recorded = await recordSend(
+    () =>
+      prisma.$transaction([
+        prisma.invoiceSentLog.create({
+          data: { invoiceId: reminder.invoiceId, sentTo: to, subject },
+        }),
+        // updateMany: a payment may have removed the PendingReminder while the mail was going out,
+        // and that must not roll back the booking of a notice that is already out.
+        prisma.pendingReminder.updateMany({
+          where: { id: reminderId },
+          data: {
+            reminderLevel: Math.min(reminder.reminderLevel + 1, MAX_REMINDER_LEVEL),
+            snoozedUntil,
+          },
+        }),
+        prisma.sentDocument.create({
+          data: sentDocumentData({
+            invoiceId: reminder.invoiceId,
+            documentNumber: reminder.invoice.documentNumber!,
+            kind: "Reminder",
+            reminderLevel: reminder.reminderLevel,
+            archive,
+            sentTo: to,
+            subject,
+            actor: session,
+            charges,
+          }),
+        }),
+      ]),
+    {
+      reminderId,
+      invoiceId: reminder.invoiceId,
+      documentNumber: reminder.invoice.documentNumber,
+      to,
+      archivePath: archive.path,
+      sha256: archive.sha256,
+    }
+  );
+  if (!recorded.ok) return { error: MAIL_SENT_NOT_RECORDED_ERROR, _ts: Date.now() };
+  const sentDocument = recorded.value[2];
 
   await logAudit(session, "SEND", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
     to,

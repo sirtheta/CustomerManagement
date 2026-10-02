@@ -44,6 +44,29 @@ export async function renderArchiveAndSend(params: {
   return archive;
 }
 
+/**
+ * Books a send that already went out. The mail cannot be recalled, so a failing
+ * write must never look like an ordinary send failure (the user would just send
+ * again): retry once (transient lock), then report `ok: false` for the caller to
+ * turn into a "do not resend" message.
+ */
+export async function recordSend<T>(
+  record: () => Promise<T>,
+  context: Record<string, unknown>
+): Promise<{ ok: true; value: T } | { ok: false }> {
+  try {
+    try {
+      return { ok: true, value: await record() };
+    } catch (firstErr) {
+      log.warn({ ...context, err: firstErr }, "Recording the send failed, retrying once");
+      return { ok: true, value: await record() };
+    }
+  } catch (err) {
+    log.error({ ...context, err }, "Mail was sent but recording the send failed");
+    return { ok: false };
+  }
+}
+
 /** Create input for the `SentDocument` row that callers add to their existing send transaction. */
 export function sentDocumentData(params: {
   invoiceId: number;

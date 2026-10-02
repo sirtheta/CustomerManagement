@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import type { Session } from "next-auth";
-import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
@@ -19,6 +20,29 @@ export const MAIL_SENT_NOT_RECORDED_ERROR =
  * approval and the subscription job (autoSend). Uses the shared Prisma client.
  */
 export async function sendPendingInvoice(input: {
+  pendingId: number;
+  to: string;
+  subject: string;
+  body: string;
+  actor: Session;
+}): Promise<{ error: string; mailSent?: true } | { invoiceId: number }> {
+  const ref = await prisma.pendingEmail.findUnique({
+    where: { id: input.pendingId },
+    select: { invoiceId: true },
+  });
+  if (!ref) return { error: "Eintrag nicht gefunden." };
+
+  const release = acquireSendLock(invoiceSendLockKey(ref.invoiceId));
+  if (!release) return { error: SEND_IN_PROGRESS_ERROR };
+  try {
+    return await sendLocked(input);
+  } finally {
+    release();
+  }
+}
+
+// Reads the entry again: it may be gone or its invoice sent by the time the lock is ours.
+async function sendLocked(input: {
   pendingId: number;
   to: string;
   subject: string;
@@ -92,24 +116,16 @@ export async function sendPendingInvoice(input: {
       }),
     ]);
 
-  // The mail is out and cannot be recalled. A failing write here must never look
-  // like an ordinary send failure, or an approval would mail the invoice a second
-  // time: retry once (transient lock), then report mailSent with a warning.
-  let sentDocument;
-  try {
-    try {
-      [, , , sentDocument] = await record();
-    } catch (firstErr) {
-      log.warn({ pendingId: id, err: firstErr }, "Recording the send failed, retrying once");
-      [, , , sentDocument] = await record();
-    }
-  } catch (err) {
-    log.error(
-      { pendingId: id, invoiceId: pending.invoiceId, documentNumber, to, archivePath: archive.path, sha256: archive.sha256, err },
-      "Mail was sent but recording the send failed"
-    );
-    return { error: MAIL_SENT_NOT_RECORDED_ERROR, mailSent: true };
-  }
+  const recorded = await recordSend(record, {
+    pendingId: id,
+    invoiceId: pending.invoiceId,
+    documentNumber,
+    to,
+    archivePath: archive.path,
+    sha256: archive.sha256,
+  });
+  if (!recorded.ok) return { error: MAIL_SENT_NOT_RECORDED_ERROR, mailSent: true };
+  const sentDocument = recorded.value[3];
 
   await logAudit(actor, "SEND", "Invoice", pending.invoiceId, documentNumber, {
     to,

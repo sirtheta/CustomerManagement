@@ -8,6 +8,7 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
     },
     pendingReminder: { deleteMany: vi.fn() },
+    pendingEmail: { deleteMany: vi.fn() },
     payment: { count: vi.fn() },
   },
 }));
@@ -207,6 +208,15 @@ describe("updateInvoiceStatus", () => {
       from: "Draft",
       to: "Sent",
     });
+  });
+
+  it("removes the waiting subscription e-mail, so approving it later cannot mail the invoice again", async () => {
+    mockInvoice("Draft", null);
+    vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
+
+    await updateInvoiceStatus(10, "Sent");
+
+    expect(prisma.pendingEmail.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 10 } });
   });
 
   it.each(["Paid"] as const)("assigns a number when a draft goes straight to %s", async (state) => {

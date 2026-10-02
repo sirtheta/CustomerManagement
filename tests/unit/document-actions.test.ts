@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
     quote: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     item: { createMany: vi.fn(), deleteMany: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
+    pendingEmail: { deleteMany: vi.fn() },
     sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }) },
     quoteSentLog: { create: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
@@ -258,6 +259,7 @@ describe("sendDocument", () => {
     expect(prisma.invoiceSentLog.create).toHaveBeenCalledWith({
       data: { invoiceId: 1, sentTo: "a@b.ch", subject: "s" },
     });
+    expect(prisma.pendingEmail.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
   });
 
   it.each(["Paid", "PartiallyPaid", "Canceled"])(

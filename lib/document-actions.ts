@@ -10,7 +10,8 @@ import { type ItemData } from "@/components/items-editor-schema";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { sendQuoteEmail } from "@/lib/email";
-import { renderArchiveAndSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
+import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
@@ -19,6 +20,9 @@ import logger from "@/lib/logger";
 import { createQuoteFollowUp } from "@/lib/tasks";
 
 const log = logger.child({ module: "document-actions" });
+
+const MAIL_SENT_NOT_RECORDED_ERROR =
+  "Die E-Mail wurde bereits versendet, konnte aber nicht verbucht werden. Bitte nicht erneut senden, sondern die Rechnung prüfen und manuell als versendet markieren.";
 
 /**
  * Shared by `app/(app)/invoices/actions.ts` and `app/(app)/quotes/actions.ts`,
@@ -184,135 +188,173 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
 
-  if (input.kind === "invoice") {
-    const invoice = await defaultPrisma.invoice.findUnique({
-      where: { id: input.id },
-      include: {
-        customer: true,
-        items: { orderBy: { id: "asc" } },
-        creditNoteFor: { select: { documentNumber: true } },
-      },
-    });
-    if (!invoice) return { error: "Rechnung nicht gefunden." };
+  if (input.kind === "invoice") return sendInvoice(input, settings);
 
-    // Drafts are not counted when a credit note is saved, so this is the real
-    // enforcement of the credit limit. It must run before a number is assigned.
-    if (invoice.creditNoteForId != null) {
-      try {
-        await assertCreditWithinOriginal(defaultPrisma, {
-          id: invoice.id,
-          creditNoteForId: invoice.creditNoteForId,
-          totalAmount: invoice.totalAmount,
-        });
-      } catch (err) {
-        if (err instanceof CreditNoteError) return { error: err.message };
-        throw err;
-      }
-    }
+  const quote = await defaultPrisma.quote.findUnique({
+    where: { id: input.id },
+    include: { customer: true, items: { orderBy: { id: "asc" } } },
+  });
+  if (!quote) return { error: "Offerte nicht gefunden." };
 
-    let documentNumber: string;
-    try {
-      documentNumber = await assignDocumentNumber("invoice", input.id, { actor: input.actor });
-    } catch (err) {
-      log.error({ invoiceId: input.id, err }, "sendDocument (invoice): number assignment failed");
-      return { error: "Rechnungsnummer konnte nicht vergeben werden." };
-    }
-    const numbered = { ...invoice, documentNumber };
-    const subject = fillDocumentNumber(input.subject, documentNumber);
-    const body = fillDocumentNumber(input.body, documentNumber);
-
-    let archive: ArchiveResult;
-    try {
-      archive = await renderArchiveAndSend({
-        invoice: numbered,
-        settings,
-        kind: "Invoice",
-        mail: { to: input.to, subject, body },
-      });
-    } catch (err) {
-      log.error({ invoiceId: input.id, to: input.to, err }, "sendDocument (invoice) failed");
-      return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
-    }
-
-    const [, , sentDocument] = await defaultPrisma.$transaction([
-      // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
-      defaultPrisma.invoice.updateMany({
-        where: { id: input.id, state: { in: ["Draft", "Sent", "Overdue"] } },
-        data: { state: "Sent" },
-      }),
-      defaultPrisma.invoiceSentLog.create({
-        data: { invoiceId: input.id, sentTo: input.to, subject },
-      }),
-      defaultPrisma.sentDocument.create({
-        data: sentDocumentData({
-          invoiceId: input.id,
-          documentNumber,
-          kind: "Invoice",
-          archive,
-          sentTo: input.to,
-          subject,
-          actor: input.actor,
-        }),
-      }),
-    ]);
-    await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
-      to: input.to,
-      ...(invoice.creditNoteForId != null ? { creditNoteFor: invoice.creditNoteForId } : {}),
-    });
-    await auditArchived(input.actor, sentDocument, documentNumber, archive);
-    if (invoice.creditNoteForId != null) {
-      await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });
-      revalidatePath(`/invoices/${invoice.creditNoteForId}`);
-      revalidatePath("/accounting/receivables");
-      revalidatePath("/dashboard");
-    }
-    revalidatePath(`/invoices/${input.id}`);
-    revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  } else {
-    const quote = await defaultPrisma.quote.findUnique({
-      where: { id: input.id },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
-    });
-    if (!quote) return { error: "Offerte nicht gefunden." };
-
-    let documentNumber: string;
-    try {
-      documentNumber = await assignDocumentNumber("quote", input.id, { actor: input.actor });
-    } catch (err) {
-      log.error({ quoteId: input.id, err }, "sendDocument (quote): number assignment failed");
-      return { error: "Offertennummer konnte nicht vergeben werden." };
-    }
-    const numbered = { ...quote, documentNumber };
-    const subject = fillDocumentNumber(input.subject, documentNumber);
-    const body = fillDocumentNumber(input.body, documentNumber);
-
-    try {
-      const pdf = await generateQuotePdf(numbered, settings);
-      await sendQuoteEmail(numbered, settings, pdf, {
-        to: input.to,
-        subject,
-        body,
-      });
-    } catch (err) {
-      log.error({ quoteId: input.id, to: input.to, err }, "sendDocument (quote) failed");
-      return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
-    }
-
-    await defaultPrisma.$transaction([
-      defaultPrisma.quote.update({ where: { id: input.id }, data: { state: "Sent" } }),
-      defaultPrisma.quoteSentLog.create({
-        data: { quoteId: input.id, sentTo: input.to, subject },
-      }),
-    ]);
-    await logAudit(input.actor, "SEND", "Quote", input.id, documentNumber, {
-      to: input.to,
-    });
-    await createQuoteFollowUp(defaultPrisma, {
-      quoteId: input.id,
-      assigneeId: parseInt(input.actor.user.id, 10),
-    });
-    revalidatePath(`/quotes/${input.id}`);
+  let documentNumber: string;
+  try {
+    documentNumber = await assignDocumentNumber("quote", input.id, { actor: input.actor });
+  } catch (err) {
+    log.error({ quoteId: input.id, err }, "sendDocument (quote): number assignment failed");
+    return { error: "Offertennummer konnte nicht vergeben werden." };
   }
+  const numbered = { ...quote, documentNumber };
+  const subject = fillDocumentNumber(input.subject, documentNumber);
+  const body = fillDocumentNumber(input.body, documentNumber);
+
+  try {
+    const pdf = await generateQuotePdf(numbered, settings);
+    await sendQuoteEmail(numbered, settings, pdf, {
+      to: input.to,
+      subject,
+      body,
+    });
+  } catch (err) {
+    log.error({ quoteId: input.id, to: input.to, err }, "sendDocument (quote) failed");
+    return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
+  }
+
+  await defaultPrisma.$transaction([
+    defaultPrisma.quote.update({ where: { id: input.id }, data: { state: "Sent" } }),
+    defaultPrisma.quoteSentLog.create({
+      data: { quoteId: input.id, sentTo: input.to, subject },
+    }),
+  ]);
+  await logAudit(input.actor, "SEND", "Quote", input.id, documentNumber, {
+    to: input.to,
+  });
+  await createQuoteFollowUp(defaultPrisma, {
+    quoteId: input.id,
+    assigneeId: parseInt(input.actor.user.id, 10),
+  });
+  revalidatePath(`/quotes/${input.id}`);
+
+  return { success: true };
+}
+
+type DispatchSettings = Parameters<typeof renderArchiveAndSend>[0]["settings"];
+
+async function sendInvoice(input: SendDocumentInput, settings: DispatchSettings): Promise<SendDocumentResult> {
+  // A credit note locks its original: checking the credit limit and booking two
+  // credit notes against the same invoice must not interleave.
+  const ref = await defaultPrisma.invoice.findUnique({
+    where: { id: input.id },
+    select: { creditNoteForId: true },
+  });
+  if (!ref) return { error: "Rechnung nicht gefunden." };
+
+  const release = acquireSendLock(invoiceSendLockKey(ref.creditNoteForId ?? input.id));
+  if (!release) return { error: SEND_IN_PROGRESS_ERROR };
+  try {
+    return await sendInvoiceLocked(input, settings);
+  } finally {
+    release();
+  }
+}
+
+async function sendInvoiceLocked(input: SendDocumentInput, settings: DispatchSettings): Promise<SendDocumentResult> {
+  const invoice = await defaultPrisma.invoice.findUnique({
+    where: { id: input.id },
+    include: {
+      customer: true,
+      items: { orderBy: { id: "asc" } },
+      creditNoteFor: { select: { documentNumber: true } },
+    },
+  });
+  if (!invoice) return { error: "Rechnung nicht gefunden." };
+
+  // Drafts are not counted when a credit note is saved, so this is the real
+  // enforcement of the credit limit. It must run before a number is assigned.
+  if (invoice.creditNoteForId != null) {
+    try {
+      await assertCreditWithinOriginal(defaultPrisma, {
+        id: invoice.id,
+        creditNoteForId: invoice.creditNoteForId,
+        totalAmount: invoice.totalAmount,
+      });
+    } catch (err) {
+      if (err instanceof CreditNoteError) return { error: err.message };
+      throw err;
+    }
+  }
+
+  let documentNumber: string;
+  try {
+    documentNumber = await assignDocumentNumber("invoice", input.id, { actor: input.actor });
+  } catch (err) {
+    log.error({ invoiceId: input.id, err }, "sendDocument (invoice): number assignment failed");
+    return { error: "Rechnungsnummer konnte nicht vergeben werden." };
+  }
+  const numbered = { ...invoice, documentNumber };
+  const subject = fillDocumentNumber(input.subject, documentNumber);
+  const body = fillDocumentNumber(input.body, documentNumber);
+
+  let archive: ArchiveResult;
+  try {
+    archive = await renderArchiveAndSend({
+      invoice: numbered,
+      settings,
+      kind: "Invoice",
+      mail: { to: input.to, subject, body },
+    });
+  } catch (err) {
+    log.error({ invoiceId: input.id, to: input.to, err }, "sendDocument (invoice) failed");
+    return { error: err instanceof Error ? err.message : "Unbekannter Fehler" };
+  }
+
+  const recorded = await recordSend(
+    () =>
+      defaultPrisma.$transaction([
+        // Paid/PartiallyPaid/Canceled keep their state: it is derived from payments.
+        defaultPrisma.invoice.updateMany({
+          where: { id: input.id, state: { in: ["Draft", "Sent", "Overdue"] } },
+          data: { state: "Sent" },
+        }),
+        defaultPrisma.invoiceSentLog.create({
+          data: { invoiceId: input.id, sentTo: input.to, subject },
+        }),
+        defaultPrisma.sentDocument.create({
+          data: sentDocumentData({
+            invoiceId: input.id,
+            documentNumber,
+            kind: "Invoice",
+            archive,
+            sentTo: input.to,
+            subject,
+            actor: input.actor,
+          }),
+        }),
+        // A subscription draft waiting for approval is now sent; approving it later would mail it twice.
+        defaultPrisma.pendingEmail.deleteMany({ where: { invoiceId: input.id } }),
+      ]),
+    {
+      invoiceId: input.id,
+      documentNumber,
+      to: input.to,
+      archivePath: archive.path,
+      sha256: archive.sha256,
+    }
+  );
+  if (!recorded.ok) return { error: MAIL_SENT_NOT_RECORDED_ERROR };
+  const sentDocument = recorded.value[2];
+  await logAudit(input.actor, "SEND", "Invoice", input.id, documentNumber, {
+    to: input.to,
+    ...(invoice.creditNoteForId != null ? { creditNoteFor: invoice.creditNoteForId } : {}),
+  });
+  await auditArchived(input.actor, sentDocument, documentNumber, archive);
+  if (invoice.creditNoteForId != null) {
+    await syncInvoiceState({ invoiceId: invoice.creditNoteForId, actor: input.actor, source: "credit-note" });
+    revalidatePath(`/invoices/${invoice.creditNoteForId}`);
+    revalidatePath("/accounting/receivables");
+    revalidatePath("/dashboard");
+  }
+  revalidatePath(`/invoices/${input.id}`);
+  revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 
   return { success: true };
 }
