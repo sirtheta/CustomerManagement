@@ -155,14 +155,14 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <CustomerForm
-          key={`${customer.customerId}-${isEditing}`}
-          customer={customer}
-          readOnly={!isEditing}
-          cancelHref={`/customers/${customerId}`}
-          editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
-        />
         <div className="space-y-6">
+          <CustomerForm
+            key={`${customer.customerId}-${isEditing}`}
+            customer={customer}
+            readOnly={!isEditing}
+            cancelHref={`/customers/${customerId}`}
+            editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
+          />
           <ContactsSection
             customerId={customerId}
             canEdit={canEdit}
@@ -188,6 +188,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
               templateName: s.template?.name ?? null,
             }))}
           />
+        </div>
+        <div className="space-y-6">
           <TasksSection
             customerId={customerId}
             canEdit={canEdit}
