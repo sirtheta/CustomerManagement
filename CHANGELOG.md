@@ -1,5 +1,61 @@
 # Changelog
 
+## [1.6.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.5.0...customer-management-v1.6.0) (2026-10-02)
+
+
+### Features
+
+* **accounting:** receipts, supplier and payment status for expenses (F9) ([#124](https://github.com/sirtheta/CustomerManagement/issues/124)) ([bce0ede](https://github.com/sirtheta/CustomerManagement/commit/bce0ede9483c276e23cda0deb27d802f26538833))
+* **backup:** automatic nightly database backup (F4 part C) ([#117](https://github.com/sirtheta/CustomerManagement/issues/117)) ([4b1694e](https://github.com/sirtheta/CustomerManagement/commit/4b1694efcf656839311405f3e1e193c5eac0d1ae))
+* **bank-import:** reopen ignored entries, pick invoices manually, clearer messages ([00ea20c](https://github.com/sirtheta/CustomerManagement/commit/00ea20c048cf7da1ef6ba9b75e284093a2d3da74))
+* **customers:** add follow-up tasks and customer history (F12) ([#128](https://github.com/sirtheta/CustomerManagement/issues/128)) ([bcd9856](https://github.com/sirtheta/CustomerManagement/commit/bcd98563ca9c44bdbcee9fc7348fcafe9a2caf66))
+* **customers:** extended customer model (F10) ([#129](https://github.com/sirtheta/CustomerManagement/issues/129)) ([221e720](https://github.com/sirtheta/CustomerManagement/commit/221e7201c820cfdd6d1a770ecc0e8051619af051))
+* **documents:** assign document number on first send ([#114](https://github.com/sirtheta/CustomerManagement/issues/114)) ([2d3e938](https://github.com/sirtheta/CustomerManagement/commit/2d3e938404fbc97150a99e1ecd3e294ad4d7997a))
+* **export:** year-end package for self-filing (F6) ([#121](https://github.com/sirtheta/CustomerManagement/issues/121)) ([5c676cd](https://github.com/sirtheta/CustomerManagement/commit/5c676cdafb9ecd14cf7f3cb1bae8405fb9f65c17))
+* **import:** bank reconciliation 2.0 (F7) ([#123](https://github.com/sirtheta/CustomerManagement/issues/123)) ([343a953](https://github.com/sirtheta/CustomerManagement/commit/343a9535d6788fad7dd2e206ea46a890b1748546))
+* **invoices:** lock invoices, credit notes and customer archive (F3) ([#116](https://github.com/sirtheta/CustomerManagement/issues/116)) ([e6a95e5](https://github.com/sirtheta/CustomerManagement/commit/e6a95e507476b3d95408a9bac2a3fd8b376c98ba))
+* **invoices:** optionally round document totals to 5 Rappen ([#133](https://github.com/sirtheta/CustomerManagement/issues/133)) ([120d3ec](https://github.com/sirtheta/CustomerManagement/commit/120d3ecab8283bd804d0e7f04ffdd516772838c3))
+* **payments:** partial payments and open items list ([#115](https://github.com/sirtheta/CustomerManagement/issues/115)) ([5f2ff0a](https://github.com/sirtheta/CustomerManagement/commit/5f2ff0a069e314b8f6a6e810f4565825b6738214))
+* PDF archive and audit log hash chain (F4 parts A and B) ([#120](https://github.com/sirtheta/CustomerManagement/issues/120)) ([bdc9545](https://github.com/sirtheta/CustomerManagement/commit/bdc9545921d597ab296a9a2fa5af6878c3bf31e9))
+* **reminders:** confirm status change of drafts, explain reminder availability ([aa5e824](https://github.com/sirtheta/CustomerManagement/commit/aa5e8243fe712af03bb257977b34667bd161d276))
+* **reminders:** dunning notices with fees and interest (F8) ([#126](https://github.com/sirtheta/CustomerManagement/issues/126)) ([049db11](https://github.com/sirtheta/CustomerManagement/commit/049db116baaf92f46d70777eda9aa8c68d5b2458))
+* **reminders:** keep reminding partially paid overdue invoices ([33b19af](https://github.com/sirtheta/CustomerManagement/commit/33b19af42b90a171da747683f303657a721c8521))
+* **settings:** let admins switch optional modules off ([#131](https://github.com/sirtheta/CustomerManagement/issues/131)) ([3cd8204](https://github.com/sirtheta/CustomerManagement/commit/3cd82042a9e81cf82a34828e22b4ae5a33287a71))
+* **settings:** save checkboxes on click and show a save bar for the form ([#136](https://github.com/sirtheta/CustomerManagement/issues/136)) ([fd8c444](https://github.com/sirtheta/CustomerManagement/commit/fd8c444466b8400fa0420806fe58cb41987c0c8c))
+* **subscriptions:** add subscription overview with per-subscription actions ([#132](https://github.com/sirtheta/CustomerManagement/issues/132)) ([b43f795](https://github.com/sirtheta/CustomerManagement/commit/b43f7952cd4429a0bec425f605a15d56ce043dee))
+* **subscriptions:** flexible subscriptions with templates and optional auto-send (F11) ([#122](https://github.com/sirtheta/CustomerManagement/issues/122)) ([61dd61e](https://github.com/sirtheta/CustomerManagement/commit/61dd61ead54c180427b01ce071cf5333bdde8cdf))
+* **ux:** add missing menu entries and one clear banner per topic ([ffea71c](https://github.com/sirtheta/CustomerManagement/commit/ffea71ca4c026fdee0a02d4fcdb674686bcbf252))
+* **ux:** clearer settings, subscriptions, reminders, credit notes and forms ([f60854b](https://github.com/sirtheta/CustomerManagement/commit/f60854b6230364189666923a8db2bc7d48f5a622))
+
+
+### Bug Fixes
+
+* address re-review findings in migration, startup, send checks and forms ([5305041](https://github.com/sirtheta/CustomerManagement/commit/5305041e7166ec641a3885fe4f82e9712f28707a))
+* **analytics:** split income by category per payment, and fix bank import booking ([f5148b1](https://github.com/sirtheta/CustomerManagement/commit/f5148b17107777bce6c5298dbb2a606344547951))
+* **archive:** silence Turbopack file-tracing warning in verifyArchived ([389e6ea](https://github.com/sirtheta/CustomerManagement/commit/389e6eaab5b7b4b12359c3d0b273dfb5f5c6cd80))
+* **bank-import:** wrap on mobile, recognise spaced invoice numbers, clearer errors ([7d50eb7](https://github.com/sirtheta/CustomerManagement/commit/7d50eb794535054218e0af316262c2dff756bc18))
+* close small review findings in export, import, CAMT, subscriptions, tasks and reminders ([42fdd5d](https://github.com/sirtheta/CustomerManagement/commit/42fdd5d1773842e0e9e814fc898c90146f2ce597))
+* **dashboard:** prevent revenue KPI from being truncated on narrow screens ([#119](https://github.com/sirtheta/CustomerManagement/issues/119)) ([65355d9](https://github.com/sirtheta/CustomerManagement/commit/65355d9de446b67d4b607fdd16c38b8121c39bbc))
+* delete items with their invoice or quote, toast pending mail sends ([0bad950](https://github.com/sirtheta/CustomerManagement/commit/0bad950709ffcfe783cef2a347d5b82e80e2fb91))
+* **document-number:** detect unique collisions reported by the driver adapter ([#118](https://github.com/sirtheta/CustomerManagement/issues/118)) ([7fac6a7](https://github.com/sirtheta/CustomerManagement/commit/7fac6a70cb11b68e7610403c2e1e2a0580cfd5ba))
+* **forms:** step discount percent fields by whole numbers ([#127](https://github.com/sirtheta/CustomerManagement/issues/127)) ([e417d10](https://github.com/sirtheta/CustomerManagement/commit/e417d10a4529cefd6c599bbe6894ca5252a158da))
+* **invoices:** never mail an invoice or reminder twice, and book sends that already went out ([04f46a4](https://github.com/sirtheta/CustomerManagement/commit/04f46a4b31fb627f31b5a9620d74011e03aaba0b))
+* number documents by the Swiss day and hide CSV export from viewers ([bb7d1e8](https://github.com/sirtheta/CustomerManagement/commit/bb7d1e8048d359ad28a974c293639ff540d5aea7))
+* **payments:** mirror credit note PDF lines, count credits in overpayment check, use Swiss day for payments ([aec19c9](https://github.com/sirtheta/CustomerManagement/commit/aec19c98a7f25df05e290a468e0ccfc2b9b0c685))
+* phase 1 quick fixes (IBAN check, import warnings, pending-mail audit) ([#113](https://github.com/sirtheta/CustomerManagement/issues/113)) ([a5a20c7](https://github.com/sirtheta/CustomerManagement/commit/a5a20c7a91ee18f1e3531deb8772f9eda7410c40))
+* **qr-bill:** structured addresses with separate street, house number and country ([#111](https://github.com/sirtheta/CustomerManagement/issues/111)) ([85d3d8b](https://github.com/sirtheta/CustomerManagement/commit/85d3d8b5610b6cd7be336a24f2d25dc63e8b3d50))
+* refuse sending canceled invoices, align credit-note rounding and guard archived customers ([30666e5](https://github.com/sirtheta/CustomerManagement/commit/30666e52230b787d1e8d54ac0367577061f21310))
+* **reminders:** toast and undo for snoozing, highlight target card, ignore finished reminders in counts ([9882de2](https://github.com/sirtheta/CustomerManagement/commit/9882de22dac96397a11b0f83b05d49d0da049555))
+* **security:** close access gaps and audit sensitive changes ([82b2cc5](https://github.com/sirtheta/CustomerManagement/commit/82b2cc51a50af4a8e88e73f06376a7779d36ec05))
+* **startup:** ignore cleanup errors when the pre-migration snapshot fails ([54fcc81](https://github.com/sirtheta/CustomerManagement/commit/54fcc81c3d5930805c74dd0dfc6cfa268cbb3e10))
+* **subscriptions:** discarding a pending subscription invoice deletes the draft ([59d0d41](https://github.com/sirtheta/CustomerManagement/commit/59d0d415bef70f5a860d0a47fca18de7911bbbfd))
+* **subscriptions:** refuse sending pending invoices without items or with an invalid address ([76fcce0](https://github.com/sirtheta/CustomerManagement/commit/76fcce048b47246fe6cc72a2912e554bc8d74eb7))
+* **users:** close create/edit user dialogs after a successful save ([#130](https://github.com/sirtheta/CustomerManagement/issues/130)) ([4eed8cf](https://github.com/sirtheta/CustomerManagement/commit/4eed8cf03fbeca6698b4a586fb5fbd46be1f130c))
+* **ux:** close send dialog from an effect and cap the invoice picker height ([28219ed](https://github.com/sirtheta/CustomerManagement/commit/28219ed5e46888537f4edd0deddbf3df05d3440f))
+* **ux:** follow up on browser check findings ([c9fa229](https://github.com/sirtheta/CustomerManagement/commit/c9fa2296f51035c8ff4e82c0f8a7371befa4368a))
+* **ux:** readable nav badges, wider status dialog, hide editor actions from viewers ([49d5cca](https://github.com/sirtheta/CustomerManagement/commit/49d5ccaa7497eb625cf16dc7b94cf5facfbd6a1f))
+* **ux:** show action errors, keep input after errors, hide editor actions from viewers ([06453fd](https://github.com/sirtheta/CustomerManagement/commit/06453fd573b8dc7733c4347e8a5beed9d3868024))
+
 ## [1.5.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.4.2...customer-management-v1.5.0) (2026-09-21)
 
 
