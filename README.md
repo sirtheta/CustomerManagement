@@ -15,7 +15,7 @@ versende sie per E-Mail und behalte offene Zahlungen, Mahnungen und deinen Umsat
 
 ## Funktionen
 
-- 👥 **Kundenverwaltung** mit Firmen-/Kontaktdaten und Datei-Uploads pro Kunde
+- 👥 **Kundenverwaltung** mit Firmen-/Kontaktdaten, Kundennummer, UID, abweichender Rechnungsadresse und -E-Mail, eigener Zahlungsfrist und Datei-Uploads pro Kunde; Kunden mit Rechnungen werden archiviert statt gelöscht
 - 📄 **Offerten & Rechnungen** mit klarem Status-Workflow (Entwurf → Versendet → Bezahlt …)
 - 🇨🇭 **Schweizer QR-Rechnung** als fertiges PDF inkl. IBAN und Firmenlogo, optional mit Rundung auf 5 Rappen
 - ↩️ **Gutschriften** zu versendeten Rechnungen, die den offenen Betrag reduzieren
@@ -26,16 +26,17 @@ versende sie per E-Mail und behalte offene Zahlungen, Mahnungen und deinen Umsat
 - ✉️ **E-Mail-Versand** von Rechnungen, Offerten und Mahnungen direkt aus der App (eigener SMTP-Server)
 - 🗄️ **PDF-Archiv**: jede versendete Rechnung und Mahnung wird unverändert mit Prüfsumme abgelegt
 - ✅ **Aufgaben & Kundenverlauf**: Wiedervorlagen pro Kunde (z. B. automatisch «Offerte nachfassen») und eine Chronik aller Dokumente, Zahlungen und Notizen
-- 🔔 **Benachrichtigungen** über überfällige Posten per E-Mail oder Telegram
+- 🔔 **Benachrichtigungen** über überfällige Posten, fällige Aufgaben und Rechnungsentwürfe, die auf Freigabe warten, per E-Mail oder Telegram
 - 💰 **Buchhaltung & GuV** mit Ausgaben-Erfassung und visualisierter Gewinn-/Verlust-Rechnung (Einnahmen − Ausgaben pro Monat)
 - 📊 **Auswertungen** zu Umsatz, Rechnungsstatus, Kategorien und Top-Kunden
 - 🗂️ **Vorlagen & Dienstleistungen** für schnelles Erstellen wiederkehrender Positionen
 - 🔍 **Volltextsuche** über Kunden, Rechnungen und Offerten
-- 👤 **Benutzer & Rollen** (Admin, Editor, Viewer) mit optionaler **2-Faktor-Authentifizierung**
+- 👤 **Benutzer & Rollen** (Admin, Editor, Viewer) mit optionaler **2-Faktor-Authentifizierung** und Passwort-zurücksetzen per E-Mail
 - 📝 **Audit-Log** protokolliert alle wichtigen Änderungen (fälschungserkennend verkettet)
 - 🧩 **Module**: Offerten, Abos, Mahnwesen, Bankimport, Buchhaltung, Auswertungen und Aufgaben lassen sich einzeln ausblenden
 - 💾 **Nächtliche Datenbank-Backups** und Log-Dateien, als Admin direkt in der App herunterladbar
 - 📤 **CSV-Export** von Kunden, Rechnungen und Offerten sowie ein **Jahrespaket (ZIP)** für die Steuererklärung (Journal, Jahresübersicht, offene Posten, archivierte Rechnungs-PDFs)
+- 📖 **Benutzerhandbuch** direkt in der App, erreichbar über das Benutzermenü
 
 ---
 
@@ -62,7 +63,10 @@ Die App läuft anschliessend unter `http://localhost:3000` (bzw. deiner `AUTH_UR
 Beim ersten Start wird automatisch ein Admin-Konto angelegt; ist kein Passwort gesetzt,
 wird ein einmaliges Passwort ins Log geschrieben — nach dem ersten Login sofort ändern.
 
-Deine Daten (SQLite-Datenbank, hochgeladene Dokumente) liegen persistent im Ordner `./data`.
+Deine Daten liegen persistent im Ordner `./data`: die SQLite-Datenbank, hochgeladene
+Dokumente, das PDF-Archiv (`archive/`), die nächtlichen Backups (`backups/`) und die Logs
+(`logs/`). Sichere diesen Ordner, am besten auch ausserhalb des Servers. Hinweise zu
+Update und Wiederherstellung stehen in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
@@ -76,6 +80,11 @@ Die wichtigsten Umgebungsvariablen in der `.env`:
 | `AUTH_URL` | Öffentliche URL der Anwendung (z. B. `https://kunden.meine-firma.ch`) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Zugangsdaten des ersten Admin-Kontos (optional) |
 | `NOTIFY_CRON_SCHEDULE` | Zeitplan für Benachrichtigungen (Standard: täglich 08:00) |
+| `TRUST_PROXY_HEADERS` | Anzahl Reverse-Proxies vor der App (z. B. `1`), damit das Rate-Limiting die echte Client-IP verwendet |
+| `BUDGET_INTEGRATION_API_KEY` | Shared Secret für die Anbindung der Budget-App (ohne Wert deaktiviert) |
+
+Alle weiteren Optionen (Session-Dauer, Backup- und Log-Aufbewahrung, PDF-Archiv-Pfad usw.)
+sind in der [`.env.example`](.env.example) dokumentiert.
 
 Firmendaten, Logo, SMTP-Zugang, Nummern-Präfixe und Benachrichtigungen werden bequem
 in der App unter **Einstellungen** verwaltet — nicht über Umgebungsvariablen.
