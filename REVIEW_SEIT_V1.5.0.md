@@ -91,14 +91,14 @@ Stand 2026-10-02: Commits `04f46a4`, `f5148b1`, `aec19c9`, `82b2cc5`, `06453fd`.
 - [ ] Offerten-Senden-Dialog zeigt bei Entwürfen `{documentNumber}`; Sperrtext bei «Rückgängig» macht Zeilen im Importverlauf hoch.
 
 ## 4. Tests
-- [ ] Kein Test der 5-Rappen-Rundung für `createInvoice`/`updateInvoice`.
-- [ ] Kein Test vergleicht Migrationen mit `schema.prisma` (`prisma migrate diff`).
-- [ ] Migrationstest bildet v1.5.0 nicht korrekt nach (`legacyDb()` lässt `2_add_password_reset_token` aus).
-- [ ] Kein Test, dass Actions/Routen den Modul-Guard aufrufen (`tests/setup.ts` mockt ihn).
-- [ ] `assign-document-number.test.ts`: Datum aus Modul-Load, flaky am Monatswechsel.
-- [ ] Seed erzeugt `Canceled` ohne Gutschrift und `Overdue` mit zukünftigem Fälligkeitsdatum.
+- [x] Kein Test der 5-Rappen-Rundung für `createInvoice`/`updateInvoice`. `tests/integration/invoice-actions-db.test.ts` (echte Test-DB): aus = exakt, ein = Total nach Rabatt gerundet (Positionen nicht), Draft-Update rechnet neu, Gutschrift rundet gespiegelt, Umschalten via `setSetting` lässt bestehende Dokumente stehen.
+- [x] Kein Test vergleicht Migrationen mit `schema.prisma` (`prisma migrate diff`). `tests/integration/migrations-match-schema.test.ts`: Neuinstallation und Upgrade ab v1.5.0 per SQL wie `startup.js`, dann `migrate diff --from-config-datasource --to-schema --exit-code` = 0; Gegenprobe mit Drift = 2 (~2 s).
+- [x] Migrationstest bildet v1.5.0 nicht korrekt nach (`legacyDb()` lässt `2_add_password_reset_token` aus). Jetzt feste Liste der v1.5.0-Migrationen, danach alle neueren; neue Fälle für Item-Waisen, `defaultYearlyInvoice` und Passwort-Reset-Tokens.
+- [x] Kein Test, dass Actions/Routen den Modul-Guard aufrufen (`tests/setup.ts` mockt ihn). `tests/integration/module-guard-wiring.test.ts` (echter Guard, tabellengetrieben, Daten-Snapshot unverändert, Gegenprobe mit Modul an) und `tests/unit/module-guard-coverage.test.ts` (jede exportierte Action, Page und Route der Modulpfade ruft den Guard). Tasks, Abos, Bankimport und Auswertung haben keine API-Route; Auswertung auch keine Action (Page getestet).
+- [x] `assign-document-number.test.ts`: Datum aus Modul-Load, flaky am Monatswechsel. Feste Systemzeit pro Test (`vi.setSystemTime`, nur `Date` gefälscht), Jahreswechsel 31.12. 23:59 / 1.1. 00:00 Schweizer Zeit mit `TZ=Europe/Zurich` geprüft.
+- [x] Seed erzeugt `Canceled` ohne Gutschrift und `Overdue` mit zukünftigem Fälligkeitsdatum. Canceled bekommt eine versendete Gutschrift über den vollen Betrag, Overdue ein Fälligkeitsdatum in der Vergangenheit; `tests/integration/seed.test.ts` lässt den Seed gegen eine Temp-DB laufen und prüft die Invarianten (~5 s).
 - [x] Flaky: `pdf-cache.test.ts`. Ursache war die 50-ms-Lebensdauer im Test (nicht die mtime-Auflösung): unter Last liefen `evict-b/c` vor dem Lesen ab. Jetzt mtimes per `utimes` gesetzt, keine Pausen mehr.
-- [ ] Vite-Warnung: ESM-Syntax in `vitest.config.ts`.
+- [x] Vite-Warnung: ESM-Syntax in `vitest.config.ts`. Umbenannt in `vitest.config.mts` (`__dirname` → `import.meta.url`), `package.json` unverändert.
 
 ## 5. Aufräumen
 Löschen (per Grep belegt):

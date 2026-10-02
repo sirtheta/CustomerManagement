@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { assignDocumentNumber, isDocumentNumberCollision } from "@/lib/document-number";
@@ -9,10 +9,26 @@ vi.mock("@/lib/logger", () => ({
 
 const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Editor" } } as never;
 
+/** Year/month part of a number assigned "now" (computed per call, never at module load). */
+function period(): string {
+  const now = new Date();
+  return `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 describe("assignDocumentNumber", () => {
   const db = createTestDatabase();
-  const yy = String(new Date().getFullYear()).slice(-2);
-  const mm = String(new Date().getMonth() + 1).padStart(2, "0");
+  let yy_mm: string;
+
+  // Only Date is faked: the clock stays put between computing the expected
+  // number and assigning it, so a test running across a month change cannot flake.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15T10:00:00.000Z"));
+    yy_mm = period();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   async function draftInvoice(documentNumber: string | null = null) {
     const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
@@ -34,7 +50,7 @@ describe("assignDocumentNumber", () => {
 
     const number = await assignDocumentNumber("invoice", invoice.id, { client: db.prisma });
 
-    expect(number).toBe(`I-${yy}${mm}0001`);
+    expect(number).toBe(`I-${yy_mm}0001`);
     const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
     expect(stored?.documentNumber).toBe(number);
   });
@@ -56,7 +72,7 @@ describe("assignDocumentNumber", () => {
     const kept = await draftInvoice();
     await db.prisma.invoice.delete({ where: { id: deleted.id } });
 
-    expect(await assignDocumentNumber("invoice", kept.id, { client: db.prisma })).toBe(`I-${yy}${mm}0001`);
+    expect(await assignDocumentNumber("invoice", kept.id, { client: db.prisma })).toBe(`I-${yy_mm}0001`);
   });
 
   it("numbers sequentially across concurrent calls", async () => {
@@ -80,7 +96,7 @@ describe("assignDocumentNumber", () => {
         state: "Draft",
       },
     });
-    expect(await assignDocumentNumber("quote", quote.id, { client: db.prisma })).toBe(`Q-${yy}${mm}0001`);
+    expect(await assignDocumentNumber("quote", quote.id, { client: db.prisma })).toBe(`Q-${yy_mm}0001`);
   });
 
   it("writes an UPDATE audit entry only when a number is newly assigned", async () => {
@@ -203,6 +219,51 @@ describe("assignDocumentNumber", () => {
     const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
     expect(stored?.documentNumber).toBe("R-99990001");
     expect(await db.prisma.auditLog.count()).toBe(0);
+  });
+
+  describe("at the turn of the year (Swiss time, TZ=Europe/Zurich as DEPLOYMENT.md recommends)", () => {
+    const originalTz = process.env.TZ;
+    beforeEach(() => {
+      process.env.TZ = "Europe/Zurich";
+    });
+    afterEach(() => {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    });
+
+    it.each([
+      // 31.12.2026 23:59 CET = 22:59 UTC
+      ["31.12. 23:59", "2026-12-31T22:59:00.000Z", "2612"],
+      // 01.01.2027 00:00 CET = 31.12.2026 23:00 UTC
+      ["1.1. 00:00", "2026-12-31T23:00:00.000Z", "2701"],
+    ])("numbers an invoice and a quote at %s with the Swiss year/month", async (_label, instant, expected) => {
+      vi.setSystemTime(new Date(instant));
+      expect(period()).toBe(expected);
+
+      const invoice = await draftInvoice();
+      expect(await assignDocumentNumber("invoice", invoice.id, { client: db.prisma })).toBe(`I-${expected}0001`);
+
+      const quote = await db.prisma.quote.create({
+        data: {
+          customerId: invoice.customerId,
+          date: new Date(),
+          validUntil: new Date(),
+          totalAmount: 100,
+          state: "Draft",
+        },
+      });
+      expect(await assignDocumentNumber("quote", quote.id, { client: db.prisma })).toBe(`Q-${expected}0001`);
+    });
+
+    it("starts again at 0001 in the new year after numbers of December exist", async () => {
+      vi.setSystemTime(new Date("2026-12-31T22:59:00.000Z"));
+      const december = await draftInvoice();
+      expect(await assignDocumentNumber("invoice", december.id, { client: db.prisma })).toBe("I-26120001");
+
+      vi.setSystemTime(new Date("2026-12-31T23:00:00.000Z"));
+      const january = await draftInvoice();
+      expect(await assignDocumentNumber("invoice", january.id, { client: db.prisma })).toBe("I-27010001");
+    });
   });
 
   it("throws for an unknown id", async () => {

@@ -26,6 +26,8 @@ const INVOICE_STATES = Object.values(InvoiceState);
 const QUOTE_STATES = Object.values(QuoteState);
 const UNITS = Object.values(Unit);
 
+const DAY_MS = 86_400_000;
+
 // Number of subscription drafts with a pending mail to seed (see seedPendingSubscriptionInvoices)
 const PENDING_SUBSCRIPTION_COUNT = 3;
 
@@ -179,11 +181,15 @@ async function main() {
   for (const customer of customers) {
     const invoiceCount = faker.number.int({ min: 1, max: 5 });
     for (let i = 0; i < invoiceCount; i++) {
-      const date = faker.date.past({ years: 1 });
-      const dueDate = new Date(date.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const state = faker.helpers.arrayElement(INVOICE_STATES);
+      // Overdue needs a due date in the past: date at least 31 days ago, due 30 days later
+      const date =
+        state === InvoiceState.Overdue
+          ? faker.date.between({ from: new Date(Date.now() - 365 * DAY_MS), to: new Date(Date.now() - 31 * DAY_MS) })
+          : faker.date.past({ years: 1 });
+      const dueDate = new Date(date.getTime() + 30 * DAY_MS);
       const items = buildItems(categories);
       const totalAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
-      const state = faker.helpers.arrayElement(INVOICE_STATES);
       // Paid invoices feed the cash-basis accounting module, so they need a paidDate
       const paidDate =
         state === InvoiceState.Paid || state === InvoiceState.PartiallyPaid
@@ -204,7 +210,7 @@ async function main() {
       const invoiceNumber = invoiceSent
         ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`
         : null;
-      await prisma.invoice.create({
+      const invoice = await prisma.invoice.create({
         data: {
           customerId: customer.customerId,
           documentNumber: invoiceNumber,
@@ -221,6 +227,29 @@ async function main() {
             : undefined,
         },
       });
+
+      // Canceled only results from a sent credit note over the full amount
+      // (lib/credit-notes.ts, computeInvoiceState in lib/payments.ts).
+      if (state === InvoiceState.Canceled) {
+        const creditDate = faker.date.between({ from: date, to: new Date() });
+        const creditNumber = `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`;
+        await prisma.invoice.create({
+          data: {
+            customerId: customer.customerId,
+            documentNumber: creditNumber,
+            date: creditDate,
+            // A credit note has nothing to pay; the column is required, so reuse the date.
+            dueDate: creditDate,
+            totalAmount: -invoiceTotal,
+            state: InvoiceState.Sent,
+            creditNoteForId: invoice.id,
+            items: {
+              create: items.map((item) => ({ ...item, quantity: -item.quantity, totalAmount: -item.totalAmount })),
+            },
+            sentLogs: { create: buildSentLogs(creditNumber, "Gutschrift", customer.email, creditDate) },
+          },
+        });
+      }
     }
 
     const quoteCount = faker.number.int({ min: 1, max: 5 });
@@ -362,7 +391,6 @@ async function seedReminders(
     include: { companyInfo: true },
   });
   const admin = await prisma.user.findFirstOrThrow({ where: { role: UserRole.Admin } });
-  const DAY_MS = 86_400_000;
   const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS);
 
   for (const [i, plan] of REMINDER_PLANS.entries()) {

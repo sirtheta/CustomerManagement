@@ -9,6 +9,16 @@ import { randomUUID } from "crypto";
 // throwaway SQLite file. Everything after release 1.5.0 lives in one migration;
 // legacy data is seeded at the 1.5.0 state before that migration runs.
 const MIGRATION = "20261001120000_invoicing_and_banking";
+// Exactly the migrations shipped with v1.5.0
+// (`git show customer-management-v1.5.0:prisma/migrations`). Not a prefix of the
+// sorted folder list: "2_add_password_reset_token" sorts after the 2026… folders.
+const V1_5_0_MIGRATIONS = [
+  "0_init",
+  "1_invoice_document_number_unique",
+  "20260827190115_add_invoice_discounts",
+  "20260919140000_quote_unique_number_discount_and_indexes",
+  "2_add_password_reset_token",
+];
 const migrationsDir = path.join(process.cwd(), "prisma", "migrations");
 const folders = fs
   .readdirSync(migrationsDir, { withFileTypes: true })
@@ -16,6 +26,8 @@ const folders = fs
   .map((e) => e.name)
   .filter((n) => fs.existsSync(path.join(migrationsDir, n, "migration.sql")))
   .sort();
+const legacyFolders = folders.filter((n) => V1_5_0_MIGRATIONS.includes(n));
+const newFolders = folders.filter((n) => !V1_5_0_MIGRATIONS.includes(n));
 
 function applyMigration(db: Database.Database, name: string) {
   const sql = fs.readFileSync(path.join(migrationsDir, name, "migration.sql"), "utf8");
@@ -36,11 +48,21 @@ function legacyDb() {
   const db = new Database(dbPath);
   dbPaths.push(dbPath);
   dbs.push(db);
-  const idx = folders.indexOf(MIGRATION);
-  expect(idx).toBeGreaterThan(0);
-  for (const name of folders.slice(0, idx)) applyMigration(db, name);
+  expect(legacyFolders).toEqual([...V1_5_0_MIGRATIONS].sort());
+  for (const name of legacyFolders) applyMigration(db, name);
   return db;
 }
+
+/** Applies every migration added after 1.5.0, in startup.js order. */
+function upgrade(db: Database.Database) {
+  expect(newFolders).toContain(MIGRATION);
+  for (const name of newFolders) applyMigration(db, name);
+}
+
+const tableNames = (db: Database.Database) =>
+  (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]).map((r) => r.name);
+const columnNames = (db: Database.Database, table: string) =>
+  (db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map((c) => c.name);
 
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close();
@@ -66,7 +88,7 @@ describe(`migration ${MIGRATION}`, () => {
     db.prepare(`INSERT INTO "CompanyInformation" ("companyAddress") VALUES ('Beispielweg 1')`).run();
     db.prepare(`INSERT INTO "CompanyInformation" ("companyAddress") VALUES (NULL)`).run();
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const rows = db
       .prepare(
@@ -105,7 +127,7 @@ describe(`migration ${MIGRATION}`, () => {
     insert.run("Ohne Abo", "Weg 1", "Bern", "3000", "b@test.ch", 0, null);
     insert.run("Jahr ohne Datum", "Weg 1", "Bern", "3000", "c@test.ch", 1, null);
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const subs = db.prepare(`SELECT * FROM "Subscription"`).all() as Record<string, unknown>[];
     expect(subs).toHaveLength(1);
@@ -132,7 +154,7 @@ describe(`migration ${MIGRATION}`, () => {
     insert.run("R-3", 50, "Sent", null);
     insert.run("R-4", 0, "Paid", null);
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const rows = db
       .prepare(
@@ -162,7 +184,7 @@ describe(`migration ${MIGRATION}`, () => {
        VALUES ('Beratung', 'Hour', 100, 1, 100, 1)`
     ).run();
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const invoice = db
       .prepare(`SELECT "documentNumber", "state", "creditNoteForId" FROM "Invoice"`)
@@ -190,7 +212,7 @@ describe(`migration ${MIGRATION}`, () => {
        VALUES (1, 'Alt', 'CREATE', 'Customer', 'K-1', 1700000000000)`
     ).run();
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const rows = db.prepare(`SELECT "userName", "entityRef", "prevHash", "hash" FROM "AuditLog"`).all();
     expect(rows).toEqual([{ userName: "Alt", entityRef: "K-1", prevHash: null, hash: null }]);
@@ -216,7 +238,7 @@ describe(`migration ${MIGRATION}`, () => {
       ...required.map((n) => values[n] ?? (/amount|price|total/i.test(n) ? 20 : "x"))
     );
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     expect(db.prepare(`SELECT "paidDate", "date" FROM "Expense"`).get()).toEqual({
       paidDate: 1700000000000,
@@ -233,7 +255,7 @@ describe(`migration ${MIGRATION}`, () => {
     ).run();
     db.prepare(`INSERT INTO "PendingReminder" ("invoiceId", "reminderLevel") VALUES (1, 6)`).run();
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     expect(db.prepare(`SELECT "reminderLevel" FROM "PendingReminder"`).get()).toEqual({ reminderLevel: 4 });
 
@@ -255,6 +277,72 @@ describe(`migration ${MIGRATION}`, () => {
     }
   });
 
+  it("starts from the full 1.5.0 schema, including password reset tokens, and keeps them", () => {
+    const db = legacyDb();
+    expect(tableNames(db)).toContain("PasswordResetToken");
+    expect(columnNames(db, "User")).toContain("sessionEpoch");
+    db.prepare(
+      `INSERT INTO "User" ("email","name","passwordHash","updatedAt") VALUES ('a@test.ch','A','x',1700000000000)`
+    ).run();
+    db.prepare(
+      `INSERT INTO "PasswordResetToken" ("userId","tokenHash","expiresAt") VALUES (1,'hash-1',1700000000000)`
+    ).run();
+
+    upgrade(db);
+
+    expect(db.prepare(`SELECT "email", "sessionEpoch" FROM "User"`).all()).toEqual([
+      { email: "a@test.ch", sessionEpoch: 0 },
+    ]);
+    expect(db.prepare(`SELECT "userId", "tokenHash" FROM "PasswordResetToken"`).all()).toEqual([
+      { userId: 1, tokenHash: "hash-1" },
+    ]);
+  });
+
+  it("deletes orphaned items (no invoice and no quote) and keeps all others", () => {
+    const db = legacyDb();
+    db.pragma("foreign_keys = OFF");
+    db.prepare(
+      `INSERT INTO "Invoice" ("customerId", "documentNumber", "date", "totalAmount", "dueDate", "state")
+       VALUES (1, 'R-1', 1700000000000, 100, 1702592000000, 'Sent')`
+    ).run();
+    db.prepare(
+      `INSERT INTO "Quote" ("customerId", "documentNumber", "date", "totalAmount", "validUntil")
+       VALUES (1, 'Q-1', 1700000000000, 10, 1702592000000)`
+    ).run();
+    const item = db.prepare(
+      `INSERT INTO "Item" ("name", "unit", "unitPrice", "quantity", "totalAmount", "invoiceId", "quoteId")
+       VALUES (?, 'Piece', 1, 1, 1, ?, ?)`
+    );
+    item.run("Rechnung", 1, null);
+    item.run("Offerte", null, 1);
+    item.run("Waise 1", null, null);
+    item.run("Waise 2", null, null);
+
+    upgrade(db);
+
+    expect(db.prepare(`SELECT "name", "invoiceId", "quoteId" FROM "Item" ORDER BY "name"`).all()).toEqual([
+      { name: "Offerte", invoiceId: null, quoteId: 1 },
+      { name: "Rechnung", invoiceId: 1, quoteId: null },
+    ]);
+  });
+
+  it("drops ApplicationSettings.defaultYearlyInvoice and keeps the settings row", () => {
+    const db = legacyDb();
+    expect(columnNames(db, "ApplicationSettings")).toContain("defaultYearlyInvoice");
+    db.prepare(`INSERT INTO "CompanyInformation" ("companyAddress") VALUES ('Beispielweg 1')`).run();
+    db.prepare(
+      `INSERT INTO "ApplicationSettings" ("companyInformationId", "defaultYearlyInvoice", "invoiceNumberPrefix")
+       VALUES (1, 1, 'R-')`
+    ).run();
+
+    upgrade(db);
+
+    expect(columnNames(db, "ApplicationSettings")).not.toContain("defaultYearlyInvoice");
+    expect(db.prepare(`SELECT "invoiceNumberPrefix" FROM "ApplicationSettings"`).all()).toEqual([
+      { invoiceNumberPrefix: "R-" },
+    ]);
+  });
+
   it("numbers existing customers from 1001 and creates the contact table", () => {
     const db = legacyDb();
     const insert = db.prepare(
@@ -267,7 +355,7 @@ describe(`migration ${MIGRATION}`, () => {
     // A gap in the ids must not leave a gap in the numbers.
     db.prepare(`DELETE FROM "Customer" WHERE "contactPerson" = 'Zweiter'`).run();
 
-    applyMigration(db, MIGRATION);
+    upgrade(db);
 
     const rows = db
       .prepare(
