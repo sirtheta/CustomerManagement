@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,13 +71,17 @@ export default function SendInvoiceButton({
 
   useActionToast(state, `${noun} ${documentLabel(documentNumber)} versendet`, { toastErrors: false });
 
-  // Close the dialog once a send succeeds, derived from the action result
-  // timestamp during render rather than in an effect.
-  const [seenResultTs, setSeenResultTs] = useState(state?._ts);
-  if (state?._ts !== seenResultTs) {
-    setSeenResultTs(state?._ts);
-    if (state?.success) setOpen(false);
-  }
+  // Close the dialog once a send succeeds. This is an effect (not a state update during
+  // render) because the open state may live in the page-level provider, and updating
+  // another component while rendering is a React error. It runs per action result only;
+  // the ref keeps a changed setter identity from closing the dialog again on reopen.
+  const setOpenRef = useRef(setOpen);
+  useEffect(() => {
+    setOpenRef.current = setOpen;
+  });
+  useEffect(() => {
+    if (state?.success) setOpenRef.current(false);
+  }, [state]);
 
   // Reset the form fields each time the dialog opens.
   const [wasOpen, setWasOpen] = useState(open);
@@ -166,9 +170,14 @@ export default function SendInvoiceButton({
               />
               {shownNumber && (
                 <p className="text-xs text-muted-foreground">
-                  {expectedDocumentNumber
-                    ? `Die Nummer wird beim Senden vergeben (voraussichtlich ${expectedDocumentNumber}).`
-                    : "Die Nummer wird beim Senden vergeben."}
+                  {expectedDocumentNumber ? (
+                    <>
+                      Die Nummer wird beim Senden vergeben (voraussichtlich{" "}
+                      <span className="whitespace-nowrap">{expectedDocumentNumber}</span>).
+                    </>
+                  ) : (
+                    "Die Nummer wird beim Senden vergeben."
+                  )}
                 </p>
               )}
             </div>

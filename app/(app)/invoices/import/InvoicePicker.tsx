@@ -58,7 +58,7 @@ export function InvoicePicker({
         <ComboboxClear />
         <ComboboxTrigger />
       </ComboboxInputGroup>
-      <ComboboxContent empty="Keine offene Rechnung gefunden." className="min-w-80">
+      <ComboboxContent empty="Keine offene Rechnung gefunden." className="min-w-80 max-h-72">
         {(invoice: PickableInvoice) => (
           <ComboboxItem key={invoice.id} value={invoice}>
             <span className="min-w-0 flex-1 truncate">{invoiceLabel(invoice)}</span>
