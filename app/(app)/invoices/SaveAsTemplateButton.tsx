@@ -39,6 +39,7 @@ export default function SaveAsTemplateButton({ invoiceId }: { invoiceId: number 
     <div className="flex items-center gap-2">
       <input
         autoFocus
+        aria-label="Vorlagenname"
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}

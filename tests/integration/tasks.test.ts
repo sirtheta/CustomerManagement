@@ -158,6 +158,43 @@ describe("customer tasks", () => {
       expect(events[0].href).toBe(`/invoices/${invoice.id}?from=customers/${customer.customerId}`);
     });
 
+    it("words sends and creations of credit notes as Gutschrift", async () => {
+      const { customer } = await seedQuote();
+      const invoice = await db.prisma.invoice.create({
+        data: {
+          customerId: customer.customerId,
+          documentNumber: "I-1",
+          date: new Date(2026, 0, 10),
+          dueDate: new Date(2026, 1, 10),
+          totalAmount: 200,
+          state: "Sent",
+        },
+      });
+      const credit = await db.prisma.invoice.create({
+        data: {
+          customerId: customer.customerId,
+          documentNumber: "I-2",
+          date: new Date(2026, 0, 12),
+          dueDate: new Date(2026, 0, 12),
+          totalAmount: -50,
+          state: "Sent",
+          creditNoteForId: invoice.id,
+        },
+      });
+      await db.prisma.invoiceSentLog.createMany({
+        data: [
+          { invoiceId: invoice.id, sentAt: new Date(2026, 0, 11), sentTo: "a@b.ch", subject: "s" },
+          { invoiceId: credit.id, sentAt: new Date(2026, 0, 13), sentTo: "a@b.ch", subject: "s" },
+        ],
+      });
+
+      const texts = (await loadCustomerHistory(db.prisma, customer.customerId)).map((e) => e.text);
+
+      expect(texts).toContain("Rechnung I-1 an a@b.ch gesendet");
+      expect(texts).toContain("Gutschrift I-2 an a@b.ch gesendet");
+      expect(texts).toContain("Gutschrift I-2 erstellt");
+    });
+
     it("leaves out quotes, quote sends and tasks of switched-off modules", async () => {
       const { customer, quote } = await seedQuote();
       await db.prisma.quoteSentLog.create({

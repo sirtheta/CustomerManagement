@@ -51,7 +51,7 @@ export default async function AccountingPage({ searchParams }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold">Buchhaltung</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <YearSelector availableYears={statement.availableYears} selectedYear={statement.selectedYear} />
           <Button render={<Link href="/accounting/new" />}>Neue Ausgabe</Button>
           <Button variant="outline" render={<Link href="/accounting/receivables" />}>

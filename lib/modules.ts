@@ -52,7 +52,7 @@ export const MODULE_INFO: Record<ModuleKey, { label: string; description: string
     description: "Offerten erstellen und versenden, in Navigation, Kundenseite, Dashboard und Suche.",
   },
   reminders: {
-    label: "Mahnwesen",
+    label: "Mahnungen",
     description: "Zahlungserinnerungen und Mahnungen, inklusive Mahnliste und Mahngebühren in den Einstellungen.",
   },
   bankImport: {

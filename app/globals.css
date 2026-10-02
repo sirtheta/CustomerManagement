@@ -317,3 +317,8 @@ html.dark[data-color="rose"] {
     font-variant-numeric: tabular-nums;
   }
 }
+/* Settings page: lift toasts above the sticky save bar (set in SettingsForm). */
+body[data-save-bar] [data-sonner-toaster] {
+  --offset-bottom: 7.5rem !important;
+  --mobile-offset-bottom: 7.5rem !important;
+}

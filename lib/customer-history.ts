@@ -62,7 +62,7 @@ export async function loadCustomerHistory(
       : [],
     prisma.invoiceSentLog.findMany({
       where: { invoice: { customerId } },
-      select: { sentAt: true, sentTo: true, invoice: { select: { id: true, documentNumber: true } } },
+      select: { sentAt: true, sentTo: true, invoice: { select: { id: true, documentNumber: true, creditNoteForId: true } } },
       orderBy: { sentAt: "desc" },
       take,
     }),
@@ -118,7 +118,7 @@ export async function loadCustomerHistory(
     ...invoiceLogs.map((l) => ({
       date: l.sentAt,
       kind: "sent" as const,
-      text: `Rechnung ${documentLabel(l.invoice.documentNumber)} an ${l.sentTo} gesendet`,
+      text: `${l.invoice.creditNoteForId !== null ? "Gutschrift" : "Rechnung"} ${documentLabel(l.invoice.documentNumber)} an ${l.sentTo} gesendet`,
       href: `/invoices/${l.invoice.id}?from=customers/${customerId}`,
     })),
     ...quoteLogs.map((l) => ({

@@ -1,7 +1,6 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { hasRole, requireAdmin, requireEditor } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
@@ -11,13 +10,21 @@ import { readReceipts } from "@/lib/expense-receipts";
 import { requireModule } from "@/lib/module-guard";
 
 export type ExpenseFormState = {
+  success?: boolean;
+  /** Set with `success`: the form toasts first and then navigates, a server redirect would drop the toast. */
+  redirectTo?: string;
   error?: string;
   fieldErrors?: Record<string, string>;
   /** Submitted text values, echoed back because React resets the form after an action. */
   values?: Record<string, string>;
 };
 
-const ECHO_FIELDS = ["description", "date", "amount", "supplier", "dueDate", "paidDate", "notes"];
+/** The list shows one year at a time, so it opens on the year of the saved expense. */
+function listUrlFor(date: Date): string {
+  return `/accounting?year=${date.getUTCFullYear()}`;
+}
+
+const ECHO_FIELDS =["description", "date", "amount", "supplier", "dueDate", "paidDate", "notes"];
 
 function echoValues(formData: FormData): Record<string, string> {
   const values: Record<string, string> = {};
@@ -91,7 +98,7 @@ export async function createExpense(
   await logAudit(session, "CREATE", "Expense", expense.id, expense.description);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/accounting");
+  return { success: true, redirectTo: listUrlFor(parsed.data.date) };
 }
 
 export async function updateExpense(
@@ -136,7 +143,7 @@ export async function updateExpense(
   for (const r of toDelete) await logAudit(session, "DELETE", "ExpenseReceipt", r.id, r.name);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/accounting");
+  return { success: true, redirectTo: listUrlFor(parsed.data.date) };
 }
 
 export async function deleteExpense(id: number): Promise<void> {

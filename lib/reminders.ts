@@ -52,6 +52,12 @@ export function isOverdueInvoice(
   return invoice.state === "PartiallyPaid" && invoice.dueDate < today;
 }
 
+/** Whole days from the due date (a calendar day at UTC midnight) to `today` (Swiss day); 0 if not yet due. */
+export function daysOverdue(dueDate: Date, today: Date = swissToday()): number {
+  const utcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.max(0, Math.round((utcDay(today) - utcDay(dueDate)) / DAY_MS));
+}
+
 /**
  * When a reminder that was just sent or dismissed shows up again:
  * `cooldownDays` (`ApplicationSettings.reminderCooldownDays`, 14 without a

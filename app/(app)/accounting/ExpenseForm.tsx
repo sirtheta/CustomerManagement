@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useActionToast } from "@/hooks/use-action-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,12 +44,18 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 }
 
 export default function ExpenseForm({ expense, categories, receipts = [], canDeleteReceipts = false }: Props) {
+  const router = useRouter();
   const action = expense ? updateExpense.bind(null, expense.id) : createExpense;
 
   const [state, formAction, isPending] = useActionState<ExpenseFormState, FormData>(
     action,
     {}
   );
+
+  useActionToast(state, expense ? "Ausgabe gespeichert" : "Ausgabe erfasst", { toastErrors: false });
+  useEffect(() => {
+    if (state.success && state.redirectTo) router.replace(state.redirectTo);
+  }, [state, router]);
 
   const fe = state.fieldErrors ?? {};
   const v = state.values;
@@ -174,29 +182,6 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="dueDate">Fällig am</Label>
-                <Input
-                  id="dueDate"
-                  name="dueDate"
-                  type="date"
-                  defaultValue={v?.dueDate ?? expense?.dueDate?.slice(0, 10) ?? ""}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="paidDate">Bezahlt am</Label>
-                <Input
-                  id="paidDate"
-                  name="paidDate"
-                  type="date"
-                  disabled={!paid}
-                  defaultValue={v?.paidDate ?? expense?.paidDate?.slice(0, 10) ?? ""}
-                />
-                <p className="text-xs text-muted-foreground">Leer = Datum der Ausgabe.</p>
-              </div>
-            </div>
-
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -206,6 +191,27 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               />
               Bezahlt (nicht ankreuzen für offene Lieferantenrechnung)
             </label>
+
+            {/* Hidden, not unmounted: the unused date still travels with the form and is not lost on save. */}
+            <div className={paid ? "space-y-1.5 sm:max-w-[50%]" : "hidden"}>
+              <Label htmlFor="paidDate">Bezahlt am</Label>
+              <Input
+                id="paidDate"
+                name="paidDate"
+                type="date"
+                defaultValue={v?.paidDate ?? expense?.paidDate?.slice(0, 10) ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">Leer = Datum der Ausgabe.</p>
+            </div>
+            <div className={paid ? "hidden" : "space-y-1.5 sm:max-w-[50%]"}>
+              <Label htmlFor="dueDate">Fällig am</Label>
+              <Input
+                id="dueDate"
+                name="dueDate"
+                type="date"
+                defaultValue={v?.dueDate ?? expense?.dueDate?.slice(0, 10) ?? ""}
+              />
+            </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="receipts">Belege (PDF, JPG, PNG, je max. 5 MB)</Label>
@@ -275,7 +281,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
               <Button variant="outline" render={<Link href="/accounting" />}>
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || state.success}>
                 {isPending ? "Speichern…" : "Speichern"}
               </Button>
             </div>

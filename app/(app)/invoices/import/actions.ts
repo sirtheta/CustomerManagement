@@ -56,7 +56,7 @@ export async function uploadStatement(
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Bitte einen Kontoauszug als XML-Datei (camt.053 aus dem E-Banking) auswählen." };
+    return { error: "Bitte einen Kontoauszug als XML-Datei aus dem E-Banking auswählen (Format camt.053)." };
   }
   if (file.size > MAX_FILE_BYTES) {
     return { error: "Die Datei ist zu gross (maximal 10 MB)." };

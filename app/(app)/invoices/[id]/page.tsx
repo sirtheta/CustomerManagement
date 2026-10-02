@@ -220,9 +220,6 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 {formatCurrency(invoice.totalAmount.toNumber())}
               </span>
             </div>
-            <div>
-              <span className="text-gray-500">Version:</span> {invoice.version}
-            </div>
           </div>
           {invoice.customUserText && (
             <div>
@@ -318,7 +315,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                     <TableRow key={doc.id}>
                       <TableCell className="whitespace-nowrap">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell>
-                        {doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : "Rechnung"}
+                        {doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : isCreditNote ? "Gutschrift" : "Rechnung"}
                       </TableCell>
                       <TableCell>{doc.sentTo}</TableCell>
                       <TableCell className="font-mono text-xs" title={doc.sha256}>
@@ -452,7 +449,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </Button>
           )}
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
-            <CreateCreditNoteButton invoiceId={invoice.id} />
+            <CreateCreditNoteButton invoiceId={invoice.id} paid={summary.paid} remaining={summary.remaining} />
           )}
           {canEdit && !isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}
           <Button

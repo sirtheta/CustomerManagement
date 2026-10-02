@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { createNote, deleteNote, updateNote } from "./note-actions";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
+import { formatDate } from "@/lib/utils";
 
 type NoteRecord = {
   noteId: number;
@@ -102,7 +103,7 @@ function NoteItem({
 
   const titleRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
-  const date = new Date(note.updatedAt).toLocaleDateString("de-CH");
+  const date = formatDate(note.updatedAt);
 
   useEffect(() => {
     if (contentRef.current) autoGrow(contentRef.current);
@@ -161,7 +162,7 @@ function NoteItem({
 }
 
 function ReadOnlyNote({ note }: { note: NoteRecord }) {
-  const date = new Date(note.updatedAt).toLocaleDateString("de-CH");
+  const date = formatDate(note.updatedAt);
   return (
     <li className="py-3 space-y-1 text-sm">
       <div className="flex items-center gap-2 min-w-0">

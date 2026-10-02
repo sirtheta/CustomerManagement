@@ -6,9 +6,11 @@ import { toast } from "sonner";
 
 type Props = {
   quoteId: number;
+  /** Main action of the page (accepted quote). */
+  primary?: boolean;
 };
 
-export default function ConvertToInvoiceButton({ quoteId }: Props) {
+export default function ConvertToInvoiceButton({ quoteId, primary = false }: Props) {
   async function handleConvert() {
     const result = await convertQuoteToInvoice(quoteId);
     if (result?.error) {
@@ -22,7 +24,7 @@ export default function ConvertToInvoiceButton({ quoteId }: Props) {
       description="Soll diese Offerte in eine Rechnung umgewandelt werden?"
       confirmLabel="Konvertieren"
       confirmVariant="default"
-      triggerVariant="outline"
+      triggerVariant={primary ? "default" : "outline"}
       onConfirm={handleConvert}
     >
       Zu Rechnung konvertieren

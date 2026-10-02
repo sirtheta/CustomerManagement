@@ -233,6 +233,22 @@ describe("parseCamt053", () => {
     const err = formatErrorOf(`<?xml version="1.0"?><Document><BkToCstmrDbtCdtNtfctn/></Document>`);
     expect(err.kind).toBe("camt054");
     expect(err.message).toContain("camt.054");
+    expect(err.message).toContain("Format camt.053");
+  });
+
+  it("names the target format once, in brackets, in every format error", () => {
+    const files = [
+      "not xml",
+      `<?xml version="1.0"?><Document><BkToCstmrDbtCdtNtfctn/></Document>`,
+      `<Document><BkToCstmrAcctRpt/></Document>`,
+      `<?xml version="1.0"?><Invoice><Id>1</Id></Invoice>`,
+      `<Document><BkToCstmrStmt><GrpHdr/></BkToCstmrStmt></Document>`,
+    ];
+    for (const content of files) {
+      const { message } = formatErrorOf(content);
+      expect(message.match(/camt\.053/g)).toHaveLength(1);
+      expect(message).toContain("(Format camt.053)");
+    }
   });
 
   it("reports another XML format without guessing camt.054", () => {

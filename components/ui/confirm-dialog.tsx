@@ -22,8 +22,10 @@ type Props = {
   onConfirm: () => void | { error?: string } | Promise<void | { error?: string }>;
   children: React.ReactNode;
   triggerVariant?: "destructive" | "outline" | "ghost" | "default";
-  triggerSize?: "sm" | "default" | "lg";
+  triggerSize?: "sm" | "default" | "lg" | "icon-sm";
+  triggerClassName?: string;
   triggerDisabled?: boolean;
+  triggerAriaLabel?: string;
 };
 
 export function ConfirmDialog({
@@ -35,7 +37,9 @@ export function ConfirmDialog({
   children,
   triggerVariant = "destructive",
   triggerSize = "default",
+  triggerClassName,
   triggerDisabled,
+  triggerAriaLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -67,7 +71,15 @@ export function ConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button variant={triggerVariant} size={triggerSize} type="button" />}
+        render={
+          <Button
+            variant={triggerVariant}
+            size={triggerSize}
+            type="button"
+            className={triggerClassName}
+            aria-label={triggerAriaLabel}
+          />
+        }
         disabled={triggerDisabled}
       >
         {children}

@@ -13,7 +13,7 @@ import {
 } from "./document-actions";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 type DocumentRecord = {
   documentId: number;
@@ -116,6 +116,7 @@ function UploadForm({ customerId }: { customerId: number }) {
           ref={inputRef}
           name="file"
           type="file"
+          aria-label="Datei auswählen"
           accept={ACCEPTED}
           className="cursor-pointer flex-1"
           disabled={isLoading}
@@ -180,7 +181,7 @@ export default function DocumentsSection({ customerId, documents, canEdit, canDe
           <ul className="divide-y divide-border">
             {documents.map((doc) => {
               const { label, color } = fileLabel(doc.fileType);
-              const date = new Date(doc.uploadDate).toLocaleDateString("de-CH");
+              const date = formatDate(doc.uploadDate);
 
               return (
                 <li key={doc.documentId} className="py-3 space-y-2">

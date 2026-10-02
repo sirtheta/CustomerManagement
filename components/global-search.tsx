@@ -175,6 +175,7 @@ export function GlobalSearch({ autoFocus, size = "default", className, disableDr
           ref={inputRef}
           name="q"
           type="search"
+          aria-label="Suche"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

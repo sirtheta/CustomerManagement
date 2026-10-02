@@ -27,6 +27,7 @@ export function ReminderHighlight() {
       const el = document.getElementById(hash.slice(1));
       if (!el) return;
       clear();
+      el.querySelector("details")?.setAttribute("open", "");
       current = el;
       el.scrollIntoView({ block: "start" });
       el.classList.add(...HIGHLIGHT_CLASSES);

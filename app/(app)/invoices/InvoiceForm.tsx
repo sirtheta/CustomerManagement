@@ -15,7 +15,7 @@ import {
 import { CustomerCombobox } from "@/components/customer-combobox";
 import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
-import { addDays } from "@/lib/date";
+import { addDays, swissDateString } from "@/lib/date";
 import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import { customerDisplayName } from "@/lib/customer-display";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
@@ -99,7 +99,7 @@ export default function InvoiceForm({
     {}
   );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = swissDateString();
   const defaultDate = invoice
     ? new Date(invoice.date).toISOString().split("T")[0]
     : today;

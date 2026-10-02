@@ -33,7 +33,7 @@ export function CloseDrawerButton({ asBackdrop }: { asBackdrop?: boolean }) {
     <button
       onClick={close}
       className="p-1.5 rounded-md hover:bg-muted transition-colors"
-      aria-label="Schließen"
+      aria-label="Schliessen"
     >
       <X className="w-5 h-5" />
     </button>

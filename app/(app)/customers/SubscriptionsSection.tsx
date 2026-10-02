@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import Link from "next/link";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
+import { swissDateString } from "@/lib/date";
 import {
   createSubscription,
   updateSubscription,
@@ -57,6 +59,8 @@ function SubscriptionFields({
   disabled: boolean;
 }) {
   const noTemplate = values.templateId === "";
+  // The daily job bills every active subscription whose date is today or earlier.
+  const dueNow = values.nextInvoiceDate !== "" && values.nextInvoiceDate <= swissDateString();
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -93,6 +97,12 @@ function SubscriptionFields({
             onChange={(nextInvoiceDate) => onChange({ ...values, nextInvoiceDate })}
             disabled={disabled}
           />
+          {dueNow && (
+            <p className="text-xs text-muted-foreground">
+              Das Datum ist heute oder liegt in der Vergangenheit: Die erste Rechnung wird beim nächsten
+              täglichen Lauf erstellt.
+            </p>
+          )}
         </div>
       </div>
       <div className="space-y-1">
@@ -126,6 +136,14 @@ function SubscriptionFields({
             ))}
           </SelectContent>
         </Select>
+        {noTemplate && (
+          <p className="text-xs text-muted-foreground">
+            Ohne Vorlage entsteht ein leerer Entwurf über CHF 0.00.{" "}
+            <Link href="/invoices/templates" className="text-primary hover:underline">
+              Vorlage anlegen
+            </Link>
+          </p>
+        )}
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input

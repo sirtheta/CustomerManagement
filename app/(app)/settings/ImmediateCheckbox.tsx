@@ -17,7 +17,8 @@ type Props = {
 
 /**
  * A checkbox that is saved the moment it is clicked. It shows the new value at
- * once and falls back to the stored one when the server refuses or fails.
+ * once and falls back to the stored one when the server refuses or fails, and
+ * carries the same «Gilt sofort» hint everywhere.
  * It carries no `name`, so it never ends up in a surrounding form's FormData.
  */
 export default function ImmediateCheckbox({
@@ -58,6 +59,7 @@ export default function ImmediateCheckbox({
       <div>
         <Label htmlFor={id} className={labelClassName}>
           {label}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">Gilt sofort</span>
         </Label>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>

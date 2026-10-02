@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerCombobox } from "@/components/customer-combobox";
 import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
-import { addDays } from "@/lib/date";
+import { addDays, swissDateString } from "@/lib/date";
 import { createQuote, updateQuote, type QuoteFormState } from "./actions";
 import type { Category, Customer, Quote, Item, Service } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
@@ -66,7 +66,7 @@ export default function QuoteForm({
     {}
   );
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = swissDateString();
   const defaultDate = quote
     ? new Date(quote.date).toISOString().split("T")[0]
     : today;

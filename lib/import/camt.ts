@@ -213,9 +213,10 @@ function balanceOf(statement: Node, codes: string[]): number | null {
  * so the balance check compares against the most recent state.
  */
 export function parseCamt053(xml: string): ParsedStatement {
-  const NOT_XML =
-    "Diese Datei ist keine XML-Datei (z. B. PDF, CSV oder Excel). Bitte im E-Banking den Kontoauszug " +
-    "für den gewünschten Zeitraum als XML im Format camt.053 herunterladen und diese Datei hochladen.";
+  const HOW_TO_FIX =
+    "Bitte im E-Banking den Kontoauszug für den gewünschten Zeitraum als XML herunterladen " +
+    "(Format camt.053) und diese Datei hochladen.";
+  const NOT_XML = `Diese Datei ist keine XML-Datei (z. B. PDF, CSV oder Excel). ${HOW_TO_FIX}`;
 
   // Without a leading "<" (after BOM/whitespace) the parser would return an
   // empty object instead of failing, and the user would be told about camt.054.
@@ -226,12 +227,10 @@ export function parseCamt053(xml: string): ParsedStatement {
   let document: Node;
   try {
     document = parser.parse(xml);
-  } catch (err) {
+  } catch {
     throw new CamtFormatError(
       "not-xml",
-      "Die Datei konnte nicht gelesen werden, sie ist keine gültige XML-Datei " +
-        `(${err instanceof Error ? err.message : "unbekannter Fehler"}). ` +
-        "Bitte den Kontoauszug im E-Banking erneut als XML (camt.053) herunterladen."
+      `Die Datei ist beschädigt oder keine gültige XML-Datei. ${HOW_TO_FIX}`
     );
   }
 
@@ -244,32 +243,24 @@ export function parseCamt053(xml: string): ParsedStatement {
     if (message?.BkToCstmrDbtCdtNtfctn !== undefined) {
       throw new CamtFormatError(
         "camt054",
-        "Diese Datei ist eine Meldung über Einzelbuchungen (camt.054), kein Kontoauszug. Bitte im " +
-          "E-Banking den Kontoauszug für den gewünschten Zeitraum als XML im Format camt.053 herunterladen " +
-          "und diese Datei hochladen."
+        `Diese Datei enthält nur einzelne Zahlungsmeldungen der Bank, keinen Kontoauszug (Format camt.054). ${HOW_TO_FIX}`
       );
     }
     if (message?.BkToCstmrAcctRpt !== undefined) {
       throw new CamtFormatError(
         "wrong-format",
-        "Diese Datei ist ein untertägiger Kontobericht (camt.052), kein Kontoauszug. Bitte im E-Banking " +
-          "den Kontoauszug für den gewünschten Zeitraum als XML im Format camt.053 herunterladen und diese " +
-          "Datei hochladen."
+        `Diese Datei ist ein Zwischenbericht der Bank, kein Kontoauszug (Format camt.052). ${HOW_TO_FIX}`
       );
     }
-    throw new CamtFormatError(
-      "wrong-format",
-      "Diese XML-Datei ist kein Kontoauszug im Format camt.053. Bitte im E-Banking den Kontoauszug für " +
-        "den gewünschten Zeitraum als XML im Format camt.053 herunterladen und diese Datei hochladen."
-    );
+    throw new CamtFormatError("wrong-format", `Diese XML-Datei ist kein Kontoauszug. ${HOW_TO_FIX}`);
   }
 
   const statements = toArray(root.Stmt);
   if (statements.length === 0) {
     throw new CamtFormatError(
       "no-statement",
-      "Die Datei hat das Format camt.053, enthält aber keinen Kontoauszug. Bitte im E-Banking den " +
-        "Kontoauszug für den gewünschten Zeitraum erneut herunterladen."
+      `Die Datei enthält keinen Kontoauszug. Bitte im E-Banking den Kontoauszug für den gewünschten ` +
+        `Zeitraum erneut als XML herunterladen (Format camt.053).`
     );
   }
 

@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveSettings, setSetting, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
 import ImmediateCheckbox from "./ImmediateCheckbox";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
@@ -85,6 +87,9 @@ export default function SettingsForm(props: Props) {
   const savedValues = useRef("");
   const [dirty, setDirty] = useState(false);
   const [discardCount, setDiscardCount] = useState(0);
+  const router = useRouter();
+  // Target of an internal link the user clicked while the form is dirty.
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const serialize = (form: HTMLFormElement) =>
     JSON.stringify(Array.from(new FormData(form).entries()));
   const checkDirty = () => {
@@ -107,16 +112,23 @@ export default function SettingsForm(props: Props) {
       const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!link || link.target === "_blank" || link.origin !== window.location.origin) return;
       if (link.pathname === window.location.pathname && link.search === window.location.search) return;
-      if (!window.confirm("Ungespeicherte Änderungen gehen verloren. Seite trotzdem verlassen?")) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaveTo(link.pathname + link.search + link.hash);
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("click", onClick, true);
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
+  // While the sticky save bar is shown, globals.css lifts toasts above it.
+  useEffect(() => {
+    if (!dirty) return;
+    document.body.dataset.saveBar = "true";
+    return () => {
+      delete document.body.dataset.saveBar;
     };
   }, [dirty]);
   useActionToast(testState, "SMTP-Verbindung erfolgreich", { toastErrors: false });
@@ -261,7 +273,7 @@ export default function SettingsForm(props: Props) {
           <div className={props.showReminders ? "space-y-4" : "hidden"}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label htmlFor="reminderCooldownDays">Frist zwischen Mahnungen (Tage)</Label>
+              <Label htmlFor="reminderCooldownDays">Pause zwischen Mahnungen (Tage)</Label>
               <Input
                 id="reminderCooldownDays"
                 name="reminderCooldownDays"
@@ -316,7 +328,7 @@ export default function SettingsForm(props: Props) {
               description={
                 <>
                   Aktivieren um «{props.companyHolderName || "Inhabername"}» statt «
-                  {props.companyName || "Firmenname"}» als Gläubiger zu drucken. Gilt sofort.
+                  {props.companyName || "Firmenname"}» als Gläubiger zu drucken.
                 </>
               }
               checked={props.useHolderNameOnQR}
@@ -328,7 +340,7 @@ export default function SettingsForm(props: Props) {
             <ImmediateCheckbox
               id="roundTotalTo5Rappen"
               label="Rechnungsbetrag auf 5 Rappen runden"
-              description="Rundet das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen. Die Differenz steht als Zeile «Rundung» auf dem PDF. Positionen werden nicht gerundet, bereits versendete Rechnungen bleiben unverändert. Gilt sofort."
+              description="Rundet das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen. Die Differenz steht als Zeile «Rundung» auf dem PDF. Positionen werden nicht gerundet, bereits versendete Rechnungen bleiben unverändert."
               checked={props.roundTotalTo5Rappen}
               save={(next) => setSetting("roundTotalTo5Rappen", next)}
             />
@@ -556,6 +568,31 @@ export default function SettingsForm(props: Props) {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={leaveTo !== null} onOpenChange={(open) => !open && setLeaveTo(null)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Seite verlassen?</DialogTitle>
+            <DialogDescription>Ungespeicherte Änderungen gehen verloren.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLeaveTo(null)}>
+              Bleiben
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                const target = leaveTo;
+                setLeaveTo(null);
+                if (target) router.push(target);
+              }}
+            >
+              Verlassen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {dirty && (
         <div

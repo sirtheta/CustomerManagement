@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     applicationSettings: { findFirst: vi.fn(), update: vi.fn() },
-    subscription: { count: vi.fn() },
+    subscription: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     pendingEmail: { count: vi.fn() },
   },
 }));
@@ -15,7 +15,7 @@ vi.mock("nodemailer", () => ({ default: { createTransport: vi.fn() } }));
 vi.mock("@/lib/crypto", () => ({ encryptSecret: vi.fn(), decryptSecret: vi.fn() }));
 vi.mock("@/lib/daily-jobs", () => ({ runDailyJobs: vi.fn() }));
 
-import { setModule, setSetting } from "@/app/(app)/settings/actions";
+import { pauseAllSubscriptions, setModule, setSetting } from "@/app/(app)/settings/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -89,6 +89,7 @@ describe("setModule", () => {
 
     expect(result.error).toContain("3 aktive Abos");
     expect(result.error).toContain("bleibt eingeschaltet");
+    expect(result.error).toContain("Alle Abos pausieren");
     expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
     expect(logAudit).not.toHaveBeenCalled();
   });
@@ -99,6 +100,7 @@ describe("setModule", () => {
     const result = await setModule("subscriptions", false);
 
     expect(result.error).toContain("2 Abo-Rechnung");
+    expect(result.error).toContain("Ausstehende E-Mails");
     expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
   });
 
@@ -141,6 +143,68 @@ describe("setModule", () => {
 
     await expect(setModule("tasks", false)).rejects.toThrow();
     expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("pauseAllSubscriptions", () => {
+  it("pauses all active subscriptions and audits each one", async () => {
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([
+      { id: 4, customerId: 10 },
+      { id: 7, customerId: 11 },
+    ] as never);
+    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 2 } as never);
+
+    const result = await pauseAllSubscriptions();
+
+    expect(result).toEqual({ success: true, paused: 2 });
+    expect(prisma.subscription.findMany).toHaveBeenCalledWith({
+      where: { active: true },
+      select: { id: true, customerId: true },
+    });
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [4, 7] }, active: true },
+      data: { active: false },
+    });
+    expect(logAudit).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(logAudit).mock.calls[0].slice(1, 6)).toEqual([
+      "UPDATE", "Subscription", 4, undefined, { customerId: 10, active: false },
+    ]);
+    expect(vi.mocked(logAudit).mock.calls[1].slice(3, 4)).toEqual([7]);
+    expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
+  });
+
+  it("lets the module be switched off afterwards", async () => {
+    vi.mocked(prisma.subscription.count).mockResolvedValue(0);
+
+    expect((await setModule("subscriptions", false)).success).toBe(true);
+  });
+
+  it("does nothing when no subscription is active", async () => {
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([]);
+
+    const result = await pauseAllSubscriptions();
+
+    expect(result).toEqual({ success: true, paused: 0 });
+    expect(prisma.subscription.updateMany).not.toHaveBeenCalled();
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("does not touch pending drafts", async () => {
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([{ id: 1, customerId: 1 }] as never);
+    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.pendingEmail.count).mockResolvedValue(2);
+
+    await pauseAllSubscriptions();
+    const refused = await setModule("subscriptions", false);
+
+    expect(refused.error).toContain("2 Abo-Rechnung");
+  });
+
+  it("is admin only", async () => {
+    vi.mocked(auth).mockResolvedValue(editorSession);
+
+    await expect(pauseAllSubscriptions()).rejects.toThrow();
+    expect(prisma.subscription.updateMany).not.toHaveBeenCalled();
   });
 });
 

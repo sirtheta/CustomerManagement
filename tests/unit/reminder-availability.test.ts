@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reminderAvailability } from "@/lib/reminders";
+import { daysOverdue, reminderAvailability } from "@/lib/reminders";
 
 const now = new Date("2026-10-02T10:00:00Z");
 const pastDue = new Date("2026-09-01T00:00:00Z");
@@ -74,5 +74,16 @@ describe("reminderAvailability", () => {
     expect(reminderAvailability({ ...base, state: "Sent", dueDate: notDue, pendingReminder: null })).toEqual({
       kind: "none",
     });
+  });
+});
+
+describe("daysOverdue", () => {
+  it("counts calendar days from the due date to the Swiss day", () => {
+    expect(daysOverdue(new Date("2026-09-01T00:00:00Z"), new Date("2026-10-02T00:00:00Z"))).toBe(31);
+  });
+
+  it("is 0 on the due date and before it", () => {
+    expect(daysOverdue(new Date("2026-10-02T00:00:00Z"), new Date("2026-10-02T00:00:00Z"))).toBe(0);
+    expect(daysOverdue(new Date("2026-10-05T00:00:00Z"), new Date("2026-10-02T00:00:00Z"))).toBe(0);
   });
 });

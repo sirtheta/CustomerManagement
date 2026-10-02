@@ -26,6 +26,8 @@ type Props = {
   defaultBody: string;
   /** For drafts: the number the next numbering would assign (shown only, never sent). */
   expectedDocumentNumber?: string | null;
+  /** An accepted quote is converted next, so sending steps back to a secondary button. */
+  variant?: "default" | "outline";
 };
 
 const NUMBER_PLACEHOLDER = "{documentNumber}";
@@ -41,6 +43,7 @@ export default function SendQuoteButton({
   defaultSubject,
   defaultBody,
   expectedDocumentNumber = null,
+  variant = "default",
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
@@ -87,7 +90,7 @@ export default function SendQuoteButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="default" size="sm">
+          <Button variant={variant} size="sm">
             <SendIcon className="size-4 mr-1.5" />
             Offerte senden
           </Button>

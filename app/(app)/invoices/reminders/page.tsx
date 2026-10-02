@@ -9,7 +9,7 @@ import { Suspense } from "react";
 import { getPaymentSummary } from "@/lib/payments";
 import { documentLabel } from "@/lib/document-display";
 import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";
-import { DEFAULT_REMINDER_COOLDOWN_DAYS, lastLevelSentReminderIds, latestSentReminders } from "@/lib/reminders";
+import { DEFAULT_REMINDER_COOLDOWN_DAYS, daysOverdue, lastLevelSentReminderIds, latestSentReminders } from "@/lib/reminders";
 import { billingEmail } from "@/lib/customer-billing";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
@@ -79,7 +79,7 @@ export default async function RemindersPage({ searchParams }: Props) {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Ausstehende Mahnungen</h1>
+          <h1 className="text-2xl font-semibold">Mahnungen</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Überfällige Rechnungen prüfen und Mahnungen versenden
           </p>
@@ -152,6 +152,7 @@ export default async function RemindersPage({ searchParams }: Props) {
                 paidAmount={(summary?.paidRappen ?? 0) / 100}
                 creditedAmount={(summary?.creditedRappen ?? 0) / 100}
                 dueDate={formatDate(inv.dueDate)}
+                daysOverdue={daysOverdue(inv.dueDate)}
                 customerEmail={billingEmail(c)}
                 reminderLevel={r.reminderLevel}
                 defaultSubject={defaultSubject}

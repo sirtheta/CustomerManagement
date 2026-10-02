@@ -40,6 +40,8 @@ export function CustomerCombobox({ id, name, customers, defaultValue, required, 
       name={name}
       onValueChange={(value) => onValueChange?.((value as Customer | null) ?? null)}
       required={required}
+      // Typing highlights the first match, so Enter takes it over instead of submitting the form.
+      autoHighlight
     >
       <ComboboxInputGroup>
         <ComboboxInput id={id} placeholder="Kunde suchen…" />

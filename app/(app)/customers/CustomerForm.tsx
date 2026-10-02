@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,14 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
     action,
     {}
   );
+  // Every action result refills the inputs through new defaultValues; Base UI warns when the default of
+  // a mounted input changes, so the form is remounted per result (like the country Selects below).
+  const [seenState, setSeenState] = useState(state);
+  const [formKey, setFormKey] = useState(0);
+  if (seenState !== state) {
+    setSeenState(state);
+    setFormKey((k) => k + 1);
+  }
 
   const fe = state.fieldErrors ?? {};
   // After a failed submit the action returns what was typed; React resets the form
@@ -163,7 +171,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
           <CardTitle>Kundendaten</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form key={formKey} action={formAction} className="space-y-4">
             {state.error && !state.fieldErrors && (
               <p className="text-sm text-destructive">{state.error}</p>
             )}
@@ -346,16 +354,27 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="customerNumber">Kundennummer</Label>
-                    <Input
-                      id="customerNumber"
-                      name="customerNumber"
-                      inputMode="numeric"
-                      defaultValue={val("customerNumber", customer?.customerNumber)}
-                      placeholder="automatisch"
-                      disabled={customer != null}
-                      aria-invalid={!!fe.customerNumber}
-                      aria-describedby={fe.customerNumber ? "customerNumber-error" : undefined}
-                    />
+                    {customer ? (
+                      // Fixed after creation (archived PDFs carry it): shown, never submitted.
+                      <Input
+                        id="customerNumber"
+                        inputMode="numeric"
+                        value={customer.customerNumber ?? ""}
+                        placeholder="keine Nummer vergeben"
+                        disabled
+                        readOnly
+                      />
+                    ) : (
+                      <Input
+                        id="customerNumber"
+                        name="customerNumber"
+                        inputMode="numeric"
+                        defaultValue={val("customerNumber", null)}
+                        placeholder="wird automatisch vergeben"
+                        aria-invalid={!!fe.customerNumber}
+                        aria-describedby={fe.customerNumber ? "customerNumber-error" : undefined}
+                      />
+                    )}
                     {customer != null && (
                       <p className="text-xs text-muted-foreground">Nach dem Anlegen nicht änderbar.</p>
                     )}

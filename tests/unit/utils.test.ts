@@ -20,6 +20,16 @@ describe("formatCurrency", () => {
     expect(result).toContain("99.90");
   });
 
+  it("puts the minus sign in front of the currency", () => {
+    expect(formatCurrency(-1000)).toBe(`-${formatCurrency(1000)}`);
+    expect(formatCurrency("-12.5")).toMatch(/^-CHF\s12\.50$/);
+  });
+
+  it("does not print a minus for zero or negative zero", () => {
+    expect(formatCurrency(-0)).toBe(formatCurrency(0));
+    expect(formatCurrency(-0.001)).toBe(formatCurrency(0));
+  });
+
   it("uses the provided locale", () => {
     const result = formatCurrency(100, "de-CH");
     expect(result).toContain("100");

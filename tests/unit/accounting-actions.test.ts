@@ -104,16 +104,13 @@ describe("accounting actions", () => {
         id: 1,
         description: "Büromaterial",
       } as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/accounting");
-      });
 
-      await expect(
-        createExpense(
-          {},
-          form({ date: "2026-01-15", description: "Büromaterial", amount: "50", paid: "on" })
-        )
-      ).rejects.toThrow("REDIRECT:/accounting");
+      const result = await createExpense(
+        {},
+        form({ date: "2026-01-15", description: "Büromaterial", amount: "50", paid: "on" })
+      );
+
+      expect(result).toEqual({ success: true, redirectTo: "/accounting?year=2026" });
 
       expect(prisma.expense.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -128,22 +125,19 @@ describe("accounting actions", () => {
     it("stores an open supplier invoice without paidDate", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.expense.create).mockResolvedValue({ id: 2, description: "Hosting" } as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/accounting");
-      });
 
-      await expect(
-        createExpense(
-          {},
-          form({
-            date: "2026-01-15",
-            description: "Hosting",
-            amount: "99",
-            supplier: " Muster AG ",
-            dueDate: "2026-02-14",
-          })
-        )
-      ).rejects.toThrow("REDIRECT:/accounting");
+      const result = await createExpense(
+        {},
+        form({
+          date: "2026-01-15",
+          description: "Hosting",
+          amount: "99",
+          supplier: " Muster AG ",
+          dueDate: "2026-02-14",
+        })
+      );
+
+      expect(result.success).toBe(true);
 
       expect(prisma.expense.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -154,16 +148,29 @@ describe("accounting actions", () => {
       });
     });
 
+    it("uses the entered payment date, and drops it when the expense is not marked paid", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.expense.create).mockResolvedValue({ id: 4, description: "Hosting" } as never);
+      const base = { date: "2026-01-15", description: "Hosting", amount: "99", paidDate: "2026-02-01" };
+
+      await createExpense({}, form({ ...base, paid: "on" }));
+      expect(prisma.expense.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ paidDate: new Date("2026-02-01") }),
+      });
+
+      await createExpense({}, form(base));
+      expect(prisma.expense.create).toHaveBeenLastCalledWith({
+        data: expect.objectContaining({ paidDate: null }),
+      });
+    });
+
     it("stores valid receipts with the expense", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.expense.create).mockResolvedValue({ id: 3, description: "Papier" } as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/accounting");
-      });
       const fd = form({ date: "2026-01-15", description: "Papier", amount: "10" });
       fd.append("receipts", new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], "beleg.pdf"));
 
-      await expect(createExpense({}, fd)).rejects.toThrow("REDIRECT:/accounting");
+      expect((await createExpense({}, fd)).success).toBe(true);
 
       expect(prisma.expense.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -213,13 +220,14 @@ describe("accounting actions", () => {
     it("updates an expense and writes an audit log for Admin", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.expense.update).mockResolvedValue({} as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/accounting");
-      });
 
-      await expect(
-        updateExpense(1, {}, form({ date: "2026-01-15", description: "Miete", amount: "1200" }))
-      ).rejects.toThrow("REDIRECT:/accounting");
+      const result = await updateExpense(
+        1,
+        {},
+        form({ date: "2025-12-31", description: "Miete", amount: "1200" })
+      );
+
+      expect(result).toEqual({ success: true, redirectTo: "/accounting?year=2025" });
 
       expect(prisma.expense.update).toHaveBeenCalledWith({
         where: { id: 1 },
@@ -236,13 +244,10 @@ describe("accounting actions", () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.expenseReceipt.findMany).mockResolvedValue([{ id: 9, name: "beleg.pdf" }] as never);
       vi.mocked(prisma.expense.update).mockResolvedValue({} as never);
-      vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/accounting");
-      });
       const fd = form(base);
       fd.append("deleteReceiptIds", "9");
 
-      await expect(updateExpense(4, {}, fd)).rejects.toThrow("REDIRECT:/accounting");
+      expect((await updateExpense(4, {}, fd)).success).toBe(true);
 
       expect(prisma.expenseReceipt.findMany).toHaveBeenCalledWith({
         where: { id: { in: [9] }, expenseId: 4 },

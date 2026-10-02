@@ -55,24 +55,24 @@ Stand 2026-10-02: Commits `04f46a4`, `f5148b1`, `aec19c9`, `82b2cc5`, `06453fd`.
 
 ### UX (Medium/Low)
 - [x] Senden-Dialog zeigt `{documentNumber}`, kein Hinweis auf Sperre nach Versand, englischer «Close»-Button. (Nummer und «Schliessen» erledigt; Offerten-Dialog zeigt bei Entwürfen noch den Platzhalter)
-- [ ] Einstellungen: Klick-speichert und Speichern-Leiste vermischen sich, Toast verdeckt die Leiste; «Gilt sofort» nur bei zwei von vier.
-- [ ] Abo mit Datum in der Vergangenheit erzeugt sofort leeren Entwurf über CHF 0.00; kein Link «Vorlage anlegen».
-- [ ] Mobil (390px): `/invoices/import` 475px, `/accounting` 644px, Listen nur seitlich scrollbar.
-- [ ] Gutschrift auf teilbezahlte Rechnung: keine Warnung, Nummer nicht verlinkt, Präfix `I-`, Format «CHF-1'000.00», Verlauf sagt «Rechnung … gesendet».
-- [ ] Mahnliste mit 39 aufgeklappten Formularen, kein Sammelversand.
-- [ ] Kundenauswahl: Enter übernimmt einzigen Treffer nicht.
-- [ ] Ausgabe speichern: kein Toast, Weiterleitung an den Listenanfang; Formular mit doppelten Feldern (Bezahlt / Bezahlt am / Fällig am).
-- [ ] Zahlungen-Panel: «Zahlung erfassen» und «Als bezahlt markieren» tun dasselbe.
-- [ ] «Import rückgängig» deaktiviert, Grund nur im `title`.
-- [ ] Fachchinesisch in Bankimport-Fehlern (CAMT.054, «Budget-App»).
-- [ ] Begriffe: Mahnwesen/Ausstehende Mahnungen, «Mahnungs-Cooldown», «Version: 1».
-- [ ] Datumsformat Dashboard `5.10.2026` vs. `05.10.2026`.
-- [ ] Kundenformular: Kundennummer zeigt «automatisch» statt der Nummer.
-- [ ] Offerte «Angenommen»: Hauptaktion bleibt «Offerte senden».
-- [ ] Modul Abos abschalten: keine Sammelaktion «Alle pausieren».
-- [ ] `window.confirm` statt eigener Dialoge (Bankimport, Einstellungen).
-- [ ] Accessibility: Labels im Positionseditor, globale Suche, Datei-Input; Toasts verdecken Buttons.
-- [ ] Console: Hydration-Mismatch `/invoices/178/edit`, Base-UI-Warnung im Kundenformular.
+- [x] Einstellungen: Klick-speichert und Speichern-Leiste vermischen sich, Toast verdeckt die Leiste; «Gilt sofort» nur bei zwei von vier.  («Gilt sofort» an allen Klick-Checkboxen, Toasts rücken über die Speichern-Leiste)
+- [x] Abo mit Datum in der Vergangenheit erzeugt sofort leeren Entwurf über CHF 0.00; kein Link «Vorlage anlegen».  (Hinweise im Abo-Formular samt Link «Vorlage anlegen»)
+- [x] Mobil (390px): `/invoices/import` 475px, `/accounting` 644px, Listen nur seitlich scrollbar.  (`/accounting`: Kopfzeile bricht um; `/invoices/import` und Rechnungsliste waren nicht reproduzierbar)
+- [x] Gutschrift auf teilbezahlte Rechnung: keine Warnung, Nummer nicht verlinkt, Präfix `I-`, Format «CHF-1'000.00», Verlauf sagt «Rechnung … gesendet».  (Warnhinweis im Dialog, `-CHF 1'000.00`, Verlauf sagt «Gutschrift»; Präfix `I-` bleibt (gemeinsamer Nummernkreis))
+- [x] Mahnliste mit 39 aufgeklappten Formularen, kein Sammelversand.  (Karten eingeklappt mit Einzeiler; Sammelversand gibt es nicht und wurde nicht gebaut)
+- [x] Kundenauswahl: Enter übernimmt einzigen Treffer nicht.  (`autoHighlight`, im Browser noch zu prüfen)
+- [x] Ausgabe speichern: kein Toast, Weiterleitung an den Listenanfang; Formular mit doppelten Feldern (Bezahlt / Bezahlt am / Fällig am).  (Toast, Weiterleitung auf das Jahr der Ausgabe, «Bezahlt» steuert «Bezahlt am»/«Fällig am»)
+- [x] Zahlungen-Panel: «Zahlung erfassen» und «Als bezahlt markieren» tun dasselbe.  (doppelte Schaltfläche entfernt)
+- [x] «Import rückgängig» deaktiviert, Grund nur im `title`.  (Grund als sichtbarer Kurztext (früher erledigt))
+- [x] Fachchinesisch in Bankimport-Fehlern (CAMT.054, «Budget-App»).  (Fehlertexte in Klartext)
+- [x] Begriffe: Mahnwesen/Ausstehende Mahnungen, «Mahnungs-Cooldown», «Version: 1».  («Mahnungen», «Pause zwischen Mahnungen»; «Version: 1» war der Sperrzähler auf Rechnung/Offerte und ist entfernt)
+- [x] Datumsformat Dashboard `5.10.2026` vs. `05.10.2026`.  (`formatDate` im Dashboard; CSV-Exporte unverändert)
+- [x] Kundenformular: Kundennummer zeigt «automatisch» statt der Nummer.  (zeigt die Nummer, «wird automatisch vergeben» nur beim Anlegen)
+- [x] Offerte «Angenommen»: Hauptaktion bleibt «Offerte senden».  («Zu Rechnung konvertieren» ist Hauptaktion)
+- [x] Modul Abos abschalten: keine Sammelaktion «Alle pausieren».  («Alle Abos pausieren» im Modul-Bereich)
+- [x] `window.confirm` statt eigener Dialoge (Bankimport, Einstellungen).  (Einstellungen und Vorlagen-Löschen auf Dialoge umgestellt; Zahlung löschen im PaymentsPanel noch nativ)
+- [x] Accessibility: Labels im Positionseditor, globale Suche, Datei-Input; Toasts verdecken Buttons.  (Labels im Positionseditor, Suche, Datei-Inputs, Jahresauswahl)
+- [x] Console: Hydration-Mismatch `/invoices/178/edit`, Base-UI-Warnung im Kundenformular.  (dnd-kit-ID (`useId`) und Remount des Kundenformulars nach Fehler)
 
 ## 3. Weitere Code-Findings (Low)
 - [x] `undoImport` löscht Einträge, die ein späterer überlappender Import übersprungen hat (`lib/import/bank-import.ts:159-196`).

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useId, useState, type Dispatch, type SetStateAction } from "react";
 import { type ItemData } from "@/components/items-editor-schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,6 +118,8 @@ function SortableItemRow({
 }: SortableItemRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
+  const fieldId = useId();
+  const position = index + 1;
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -157,8 +159,10 @@ function SortableItemRow({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
-          <label className="text-xs font-medium">Bezeichnung</label>
+          <label htmlFor={`${fieldId}-name`} className="text-xs font-medium">Bezeichnung</label>
           <Input
+            id={`${fieldId}-name`}
+            aria-label={`Bezeichnung Position ${position}`}
             value={item.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
             placeholder="Bezeichnung"
@@ -166,8 +170,10 @@ function SortableItemRow({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium">Beschreibung</label>
+          <label htmlFor={`${fieldId}-description`} className="text-xs font-medium">Beschreibung</label>
           <Textarea
+            id={`${fieldId}-description`}
+            aria-label={`Beschreibung Position ${position}`}
             value={item.description}
             onChange={(e) => onUpdate({ description: e.target.value })}
             placeholder="Beschreibung"
@@ -183,7 +189,11 @@ function SortableItemRow({
             value={item.categoryId?.toString() ?? "none"}
             onValueChange={(value) => onUpdate({ categoryId: value === "none" ? null : Number(value) })}
           >
-            <SelectTrigger size="sm" className="h-8 text-sm w-full">
+            <SelectTrigger
+              size="sm"
+              className="h-8 text-sm w-full"
+              aria-label={`Kategorie Position ${position}`}
+            >
               <SelectValue>
                 {(value: string | null) => value === "none" || !value
                   ? "Keine Kategorie"
@@ -206,7 +216,11 @@ function SortableItemRow({
             value={item.unit}
             onValueChange={(val: string | null) => { if (val) onUpdate({ unit: val as Unit }); }}
           >
-            <SelectTrigger size="sm" className="h-8 text-sm w-full">
+            <SelectTrigger
+              size="sm"
+              className="h-8 text-sm w-full"
+              aria-label={`Einheit Position ${position}`}
+            >
               <SelectValue>
                 {(value: string | null) => value ? (unitLabels[value as Unit] ?? value) : "Einheit"}
               </SelectValue>
@@ -221,8 +235,10 @@ function SortableItemRow({
           </Select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium">Menge</label>
+          <label htmlFor={`${fieldId}-quantity`} className="text-xs font-medium">Menge</label>
           <Input
+            id={`${fieldId}-quantity`}
+            aria-label={`Menge Position ${position}`}
             type="text"
             inputMode="decimal"
             value={quantityDisplay ?? String(item.quantity)}
@@ -232,8 +248,10 @@ function SortableItemRow({
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium">Preis (CHF)</label>
+          <label htmlFor={`${fieldId}-price`} className="text-xs font-medium">Preis (CHF)</label>
           <Input
+            id={`${fieldId}-price`}
+            aria-label={`Einzelpreis in CHF Position ${position}`}
             type="text"
             inputMode="decimal"
             value={priceDisplay ?? String(item.unitPrice)}
@@ -244,8 +262,10 @@ function SortableItemRow({
         </div>
         {showDiscount && (
           <div className="space-y-1">
-            <label className="text-xs font-medium">Rabatt (%)</label>
+            <label htmlFor={`${fieldId}-discount`} className="text-xs font-medium">Rabatt (%)</label>
             <Input
+              id={`${fieldId}-discount`}
+              aria-label={`Rabatt in Prozent Position ${position}`}
               type="number"
               min="0"
               max="100"
@@ -301,6 +321,8 @@ export default function ItemsEditor({
   inputName = "itemsJson",
   showDiscount = false,
 }: Props) {
+  // dnd-kit numbers its screen-reader ids with a global counter, which differs between server and client.
+  const dndId = useId();
   const [items, setItems] = useState<ItemData[]>(initialItems);
   const [ids, setIds] = useState<string[]>(() => initialItems.map(() => crypto.randomUUID()));
   const [addMode, setAddMode] = useState<"service" | "custom" | null>(null);
@@ -370,6 +392,7 @@ export default function ItemsEditor({
           </p>
         )}
         <DndContext
+          id={dndId}
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
@@ -432,6 +455,7 @@ export default function ItemsEditor({
         <div className="border rounded-lg p-3 space-y-2">
           <Input
             autoFocus
+            aria-label="Leistung suchen"
             value={serviceSearch}
             onChange={(e) => setServiceSearch(e.target.value)}
             placeholder="Leistung suchen…"

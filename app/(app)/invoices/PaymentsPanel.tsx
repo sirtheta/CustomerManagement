@@ -15,11 +15,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { swissDateString } from "@/lib/date";
-import {
-  deletePaymentAction,
-  markInvoicePaidAction,
-  recordPaymentAction,
-} from "./payments/actions";
+import { deletePaymentAction, recordPaymentAction } from "./payments/actions";
 import type { InvoiceState } from "@prisma/client";
 
 type Props = {
@@ -45,7 +41,6 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
   const [overpaidBy, setOverpaidBy] = useState<number | null>(null);
 
   const canPay = canEdit && (state === "Sent" || state === "Overdue" || state === "PartiallyPaid" || state === "Paid");
-  const canMarkPaid = canEdit && (state === "Sent" || state === "Overdue" || state === "PartiallyPaid");
 
   function run(action: () => Promise<{ error?: string; needsConfirmation?: { overpaidBy: number } }>) {
     setError(null);
@@ -134,14 +129,9 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-          <Button variant="outline" disabled={isPending} onClick={() => submit(false)}>
+          <Button disabled={isPending} onClick={() => submit(false)}>
             Zahlung erfassen
           </Button>
-          {canMarkPaid && (
-            <Button disabled={isPending} onClick={() => run(() => markInvoicePaidAction(invoiceId))}>
-              Als bezahlt markieren
-            </Button>
-          )}
         </div>
       )}
 

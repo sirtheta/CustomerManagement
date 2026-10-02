@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import Link from "next/link";
 import { verifyAuditChain, type ChainVerification } from "@/lib/audit-chain";
+import { formatDate } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
@@ -167,7 +168,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
               logs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="whitespace-nowrap text-sm">
-                    {log.createdAt.toLocaleDateString("de-CH")}{" "}
+                    {formatDate(log.createdAt)}{" "}
                     <span className="text-muted-foreground text-xs">
                       {log.createdAt.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
                     </span>

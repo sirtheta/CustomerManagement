@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { QuoteState } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
                     <span
                       className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-gray-500"}`}
                     >
-                      {task.dueDate.toLocaleDateString("de-CH")}
+                      {formatDate(task.dueDate)}
                     </span>
                   </li>
                 ))}
@@ -223,7 +223,7 @@ export default async function DashboardPage() {
                       {customerDisplayName(sub.customer)}
                     </Link>
                     <span className="text-sm text-gray-500 whitespace-nowrap">
-                      {INTERVAL_LABELS[sub.interval]} · {sub.nextInvoiceDate.toLocaleDateString("de-CH")}
+                      {INTERVAL_LABELS[sub.interval]} · {formatDate(sub.nextInvoiceDate)}
                     </span>
                   </li>
                 ))}
@@ -251,6 +251,9 @@ export default async function DashboardPage() {
                     >
                       {documentLabel(inv.documentNumber)}
                     </Link>
+                    {inv.creditNoteForId !== null && (
+                      <span className="ml-2 text-xs text-gray-500">Gutschrift</span>
+                    )}
                     <p className="text-xs text-gray-500">
                       {customerDisplayName(inv.customer)}
                     </p>

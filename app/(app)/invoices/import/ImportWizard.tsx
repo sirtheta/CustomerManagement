@@ -16,6 +16,7 @@ export function ImportWizard() {
         <input
           type="file"
           name="file"
+          aria-label="Kontoauszug (CAMT.053, XML)"
           accept=".xml"
           required
           className="min-w-0 max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"

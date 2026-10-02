@@ -437,14 +437,42 @@ const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> 
       prisma.pendingEmail.count(),
     ]);
     if (activeSubscriptions > 0) {
-      return `Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos beenden.`;
+      return `Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos pausieren («Alle Abos pausieren» unter Module).`;
     }
     if (pendingEmails > 0) {
-      return `Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe.`;
+      return `Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe. Bitte unter «Ausstehende E-Mails» freigeben oder verwerfen.`;
     }
     return null;
   },
 };
+
+/**
+ * Pauses every active subscription so the Abos module can be switched off.
+ * Paused subscriptions keep their date and can be resumed later; the audit
+ * trail gets one `UPDATE Subscription` entry per subscription, as when
+ * pausing one by one.
+ */
+export async function pauseAllSubscriptions(): Promise<ActionState & { paused?: number }> {
+  const session = await requireAdmin();
+  const active = await prisma.subscription.findMany({
+    where: { active: true },
+    select: { id: true, customerId: true },
+  });
+  if (active.length === 0) return { success: true, paused: 0 };
+
+  const { count } = await prisma.subscription.updateMany({
+    where: { id: { in: active.map((s) => s.id) }, active: true },
+    data: { active: false },
+  });
+  for (const sub of active) {
+    await logAudit(session, "UPDATE", "Subscription", sub.id, undefined, { customerId: sub.customerId, active: false });
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/subscriptions");
+  return { success: true, paused: count };
+}
 
 /**
  * Switches one module on or off, saved the moment the checkbox is clicked. A

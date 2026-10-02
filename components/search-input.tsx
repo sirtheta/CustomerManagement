@@ -31,6 +31,7 @@ export function SearchInput({ defaultValue = "", placeholder = "Suchen…", clas
 
   return (
     <Input
+      aria-label={placeholder.replace(/…$/, "")}
       value={value}
       onChange={handleChange}
       placeholder={placeholder}

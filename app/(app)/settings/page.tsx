@@ -19,6 +19,10 @@ export default async function SettingsPage() {
   const c = settings?.companyInfo;
   const s = settings;
   const modules = modulesFromSettings(s);
+  // Only these two keep the Abos module from being switched off.
+  const [activeSubscriptions, pendingEmails] = modules.subscriptions
+    ? await Promise.all([prisma.subscription.count({ where: { active: true } }), prisma.pendingEmail.count()])
+    : [0, 0];
 
   return (
     <div className="space-y-6">
@@ -48,7 +52,7 @@ export default async function SettingsPage() {
           {/* Logo: eigene Client-Komponente mit eigener <form> — nie verschachtelt */}
           <LogoCard hasLogo={!!c?.companyLogo} />
 
-          <ModulesCard modules={modules} />
+          <ModulesCard modules={modules} activeSubscriptions={activeSubscriptions} pendingEmails={pendingEmails} />
 
           <VersionCard />
 

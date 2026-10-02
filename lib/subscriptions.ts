@@ -7,6 +7,7 @@ import { fillPlaceholders, invoiceMailTemplate, invoicePlaceholders } from "@/li
 import logger from "@/lib/logger";
 import { billingEmail, effectivePaymentTermDays } from "@/lib/customer-billing";
 import { customerDisplayName } from "@/lib/customer-display";
+import { formatDate } from "@/lib/utils";
 
 const log = logger.child({ module: "subscriptions" });
 
@@ -74,7 +75,7 @@ async function reportSkippedPeriods(
     await notifyAdmins(
       settings as Parameters<typeof notifyAdmins>[0],
       "Abo: Perioden übersprungen",
-      `Beim Abo von ${customerName} waren ${skipped + 1} Perioden fällig. Es wurde eine Rechnung erstellt, für ${skipped} weitere Periode(n) wurde keine erstellt. Die nächste Rechnung ist am ${nextInvoiceDate.toLocaleDateString("de-CH")} fällig. Bei Bedarf die fehlenden Rechnungen manuell erstellen.`,
+      `Beim Abo von ${customerName} waren ${skipped + 1} Perioden fällig. Es wurde eine Rechnung erstellt, für ${skipped} weitere Periode(n) wurde keine erstellt. Die nächste Rechnung ist am ${formatDate(nextInvoiceDate)} fällig. Bei Bedarf die fehlenden Rechnungen manuell erstellen.`,
       "/subscriptions"
     );
   } catch (err) {

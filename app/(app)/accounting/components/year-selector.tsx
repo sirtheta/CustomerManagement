@@ -22,7 +22,7 @@ export function YearSelector({ availableYears, selectedYear }: Props) {
       value={String(selectedYear)}
       onValueChange={(val) => router.push(`/accounting?year=${val}`)}
     >
-      <SelectTrigger className="w-28">
+      <SelectTrigger className="w-28" aria-label="Jahr">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

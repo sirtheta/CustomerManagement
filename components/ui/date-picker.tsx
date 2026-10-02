@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { parseDate, toDateString } from "@/lib/date";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface DatePickerInputProps {
   id?: string;
@@ -46,7 +46,7 @@ export function DatePickerInput({
   }
 
   const displayText = selectedDate
-    ? selectedDate.toLocaleDateString("de-CH")
+    ? formatDate(selectedDate)
     : "Datum wählen";
 
   return (

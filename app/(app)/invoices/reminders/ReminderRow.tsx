@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { sendReminder, dismissReminder, undoDismissReminder } from "./actions";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
-import { ClockIcon, SendIcon } from "lucide-react";
+import { ChevronRightIcon, ClockIcon, SendIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
 
@@ -27,6 +27,8 @@ type Props = {
   paidAmount: number;
   creditedAmount: number;
   dueDate: string;
+  /** Whole days past the due date, shown in the collapsed summary line. */
+  daysOverdue: number;
   customerEmail: string;
   reminderLevel: number;
   defaultSubject: string;
@@ -94,15 +96,28 @@ export default function ReminderRow(props: Props) {
     });
 
   return (
-    <Card id={`reminder-${props.reminderId}`} className="scroll-mt-28">
-      <CardHeader className="pb-3">
+    <Card id={`reminder-${props.reminderId}`} className="scroll-mt-28 py-0">
+      {/* Collapsed to one line so a long list stays scannable; ReminderHighlight opens the targeted card. */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+          <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="font-medium">{label}</span>
+            <span className="text-xs text-muted-foreground">{levelLabel}</span>
+            <span className="min-w-0 truncate text-muted-foreground">{props.customerName}</span>
+          </span>
+          <span className="shrink-0 text-right tabular-nums">
+            <span className="font-medium">{formatCurrency(props.totalAmount)}</span>
+            <span className="ml-2 text-xs text-destructive">
+              {props.daysOverdue} {props.daysOverdue === 1 ? "Tag" : "Tage"} überfällig
+            </span>
+          </span>
+        </summary>
+        <div className="space-y-4 border-t border-border py-4">
+      <CardHeader>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <CardTitle className="text-base">
-              {label}{" "}
-              <span className="text-xs font-normal text-muted-foreground">· {levelLabel}</span>
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-sm text-muted-foreground">
               {props.customerName} · Fällig:{" "}
               <span className="text-destructive font-medium">{props.dueDate}</span> ·{" "}
               {props.paidAmount > 0 || props.creditedAmount > 0 ? "offen " : ""}
@@ -206,6 +221,8 @@ export default function ReminderRow(props: Props) {
         </form>
         )}
       </CardContent>
+        </div>
+      </details>
     </Card>
   );
 }

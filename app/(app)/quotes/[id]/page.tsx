@@ -131,9 +131,6 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
                 {formatCurrency(quote.totalAmount.toNumber())}
               </span>
             </div>
-            <div>
-              <span className="text-gray-500">Version:</span> {quote.version}
-            </div>
           </div>
           {quote.customUserText && (
             <div>
@@ -226,8 +223,9 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}
             expectedDocumentNumber={nextDocumentNumber}
+            variant={quote.state === "Accepted" ? "outline" : "default"}
           />
-          <ConvertToInvoiceButton quoteId={quote.id} />
+          <ConvertToInvoiceButton quoteId={quote.id} primary={quote.state === "Accepted"} />
           <Button
             variant="outline"
             render={<Link href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
