@@ -24,6 +24,8 @@ import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
+import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
+import { AttentionBanners } from "@/components/attention-banners";
 import { customerDisplayName } from "@/lib/customer-display";
 
 const PAGE_SIZE = 25;
@@ -246,10 +248,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
 
   const modules = await loadModules();
   const canEdit = isEditorSession(await auth());
-  const [pendingCount, reminderCount] = await Promise.all([
-    modules.subscriptions ? prisma.pendingEmail.count() : 0,
-    modules.reminders ? prisma.pendingReminder.count() : 0,
-  ]);
+  const attention = await loadAttentionCounts(prisma, modules, canEdit);
 
   function sortHref(col: SortField) {
     const p = new URLSearchParams();
@@ -327,27 +326,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {pendingCount > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30 px-4 py-3">
-          <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
-            {pendingCount === 1
-              ? "1 Abo-Rechnung wartet auf Prüfung und Versand."
-              : `${pendingCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
-          </p>
-          {canEdit && <Button size="sm" render={<Link href="/invoices/pending" />}>Jetzt prüfen</Button>}
-        </div>
-      )}
-
-      {reminderCount > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30 px-4 py-3">
-          <p className="text-sm font-medium text-orange-900 dark:text-orange-200">
-            {reminderCount === 1
-              ? "1 überfällige Rechnung wartet auf Mahnung."
-              : `${reminderCount} überfällige Rechnungen warten auf Mahnung.`}
-          </p>
-          {canEdit && <Button size="sm" render={<Link href="/invoices/reminders" />}>Jetzt prüfen</Button>}
-        </div>
-      )}
+      <AttentionBanners banners={attentionBanners(attention, modules, canEdit)} />
 
       <div className="flex gap-1 flex-wrap">
         {filterOptions.map((opt) => (

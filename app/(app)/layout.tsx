@@ -9,7 +9,8 @@ import pkg from "../../package.json";
 import prisma from "@/lib/prisma";
 import { GlobalSearch } from "@/components/global-search";
 import { UpdateNotification } from "@/components/update-notification";
-import { hasRole } from "@/lib/permissions";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import { loadWorkCounts } from "@/lib/attention-counts";
 import { UserRole } from "@prisma/client";
 import { Suspense } from "react";
 import { loadModules } from "@/lib/module-guard";
@@ -22,18 +23,8 @@ export default async function AppLayout({
   const session = await auth();
   if (!session) redirect("/login");
 
-  const now = new Date();
   const modules = await loadModules();
-  const [pendingCount, reminderCount] = await Promise.all([
-    modules.subscriptions ? prisma.pendingEmail.count() : 0,
-    modules.reminders
-      ? prisma.pendingReminder.count({
-          where: {
-            OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
-          },
-        })
-      : 0,
-  ]);
+  const navCounts = await loadWorkCounts(prisma, modules, isEditorSession(session));
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -46,7 +37,7 @@ export default async function AppLayout({
             >
               CustomerManagement
             </Link>
-            <NavLinks role={session.user.role} modules={modules} pendingCount={pendingCount} reminderCount={reminderCount} />
+            <NavLinks role={session.user.role} modules={modules} counts={navCounts} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />

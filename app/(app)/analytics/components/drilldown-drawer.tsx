@@ -240,7 +240,7 @@ async function IncomeCategoryDrilldown({
                 </td>
                 <td className="px-2 sm:px-3 py-3">
                   <p className="truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                  <p className="text-xs text-muted-foreground">Bezahlt am {formatDate(item.date)}</p>
                 </td>
                 <td className="px-3 sm:px-5 py-3 text-left tabular-nums font-medium">
                   {formatCurrency(item.totalAmount)}
@@ -369,7 +369,7 @@ async function CombinedCategoryDrilldown({
                       </td>
                       <td className="w-[40%] px-2 sm:px-3 py-3">
                         <p className="truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(item.date)}</p>
+                        <p className="text-xs text-muted-foreground">Bezahlt am {formatDate(item.date)}</p>
                       </td>
                       <td className="w-[30%] px-3 sm:px-5 py-3 text-left tabular-nums font-medium">
                         {formatCurrency(item.totalAmount)}

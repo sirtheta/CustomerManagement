@@ -4,14 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
-import { InvoiceState, QuoteState } from "@prisma/client";
-import { AlertTriangle } from "lucide-react";
+import { QuoteState } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
 import { customerDisplayName } from "@/lib/customer-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { loadModules } from "@/lib/module-guard";
 import { isEditorSession } from "@/lib/permissions";
+import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
+import { AttentionBanners } from "@/components/attention-banners";
 
 export default async function DashboardPage() {
   const canEdit = isEditorSession(await auth());
@@ -25,8 +26,7 @@ export default async function DashboardPage() {
     openQuotes,
     recentInvoices,
     currentYearRevenue,
-    pendingEmailCount,
-    overdueCount,
+    attention,
     scheduledSubscriptionCount,
     scheduledSubscriptions,
     openTasks,
@@ -52,8 +52,7 @@ export default async function DashboardPage() {
       },
       _sum: { amount: true },
     }),
-    modules.subscriptions ? prisma.pendingEmail.count() : 0,
-    prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
+    loadAttentionCounts(prisma, modules, canEdit),
     modules.subscriptions
       ? prisma.subscription.count({
           where: { active: true, customer: { archivedAt: null } },
@@ -93,43 +92,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
 
-      {/* Warnings */}
-      {(pendingEmailCount > 0 || overdueCount > 0) && (
-        <div className="space-y-2">
-          {pendingEmailCount > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <AlertTriangle className="size-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
-                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200">
-                  {pendingEmailCount === 1
-                    ? "1 Abo-Rechnung wartet auf Prüfung und Versand."
-                    : `${pendingEmailCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
-                </p>
-              </div>
-              {canEdit && (
-                <Button size="sm" render={<Link href="/invoices/pending" />}>
-                  Jetzt prüfen
-                </Button>
-              )}
-            </div>
-          )}
-          {overdueCount > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <AlertTriangle className="size-4 text-red-600 dark:text-red-400 shrink-0" />
-                <p className="text-sm font-medium text-red-900 dark:text-red-200">
-                  {overdueCount === 1
-                    ? "1 Rechnung ist überfällig."
-                    : `${overdueCount} Rechnungen sind überfällig.`}
-                </p>
-              </div>
-              <Button size="sm" variant="outline" render={<Link href="/invoices?state=Overdue" />}>
-                Anzeigen
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+      <AttentionBanners banners={attentionBanners(attention, modules, canEdit)} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
         <Link href="/customers" className="h-full">
