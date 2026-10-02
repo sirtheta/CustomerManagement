@@ -193,4 +193,11 @@ describe("reminderMail", () => {
     expect(body).toContain(`Mahngebühr: ${formatCurrency(20)}`);
     expect(body).toContain(`Total: ${formatCurrency(120.5)}`);
   });
+
+  it("names the amount the open remainder after a partial payment", () => {
+    const charges = { feeRappen: 0, interestRappen: 0, totalRappen: 6000, paidRappen: 4000, creditedRappen: 0 };
+    const body = reminderMail({ ...base, openAmount: 60, charges }).body;
+    expect(body).toContain(`Offener Restbetrag: ${formatCurrency(60)} (bereits erhaltene Zahlungen und Gutschriften abgezogen)`);
+    expect(body).not.toContain("\nBetrag:");
+  });
 });

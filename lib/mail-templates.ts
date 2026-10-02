@@ -205,10 +205,21 @@ export function reminderMail(params: {
   companyName: string;
   dueDate: Date;
   openAmount: number;
-  charges?: { feeRappen: number; interestRappen: number; totalRappen: number } | null;
+  charges?: {
+    feeRappen: number;
+    interestRappen: number;
+    totalRappen: number;
+    paidRappen?: number;
+    creditedRappen?: number;
+  } | null;
 }): MailTemplate {
   const { level, numberLabel, contactPerson, companyName, dueDate, openAmount, charges } = params;
   const text = REMINDER_TEXTS[Math.min(Math.max(level, 1), MAX_REMINDER_LEVEL)];
+  // After a partial payment or credit note only the remainder is requested; say so.
+  const received = (charges?.paidRappen ?? 0) > 0 || (charges?.creditedRappen ?? 0) > 0;
+  const amountLine = received
+    ? "Offener Restbetrag: {totalAmount} (bereits erhaltene Zahlungen und Gutschriften abgezogen)"
+    : "Betrag: {totalAmount}";
   const extra =
     charges && (charges.feeRappen > 0 || charges.interestRappen > 0)
       ? `\nMahngebühr: ${formatCurrency(charges.feeRappen / 100)}\nVerzugszins: ${formatCurrency(charges.interestRappen / 100)}\nTotal: ${formatCurrency(charges.totalRappen / 100)}`
@@ -221,6 +232,6 @@ export function reminderMail(params: {
     dueDate: formatDate(dueDate),
   };
   const subject = `${reminderTitle(level)}${text.subjectSuffix}: Rechnung {documentNumber} – {companyName}`;
-  const body = `Guten Tag {contactPerson}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\nBetrag: {totalAmount}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
+  const body = `Guten Tag {contactPerson}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\n${amountLine}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
   return { subject: fillPlaceholders(subject, values), body: fillPlaceholders(body, values) };
 }

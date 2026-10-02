@@ -6,6 +6,7 @@ import { InvoiceState, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { documentLabel } from "@/lib/document-display";
 import { customerDisplayName } from "@/lib/customer-display";
+import { invoiceStateFilter } from "@/lib/reminders";
 
 const stateLabels: Record<string, string> = {
   Draft: "Entwurf",
@@ -42,7 +43,8 @@ export async function GET(request: Request) {
 
   const invoices = await prisma.invoice.findMany({
     where: {
-      ...(state ? { state } : {}),
+      // Same filter as the invoice list: "Überfällig" includes overdue PartiallyPaid invoices.
+      ...(state ? { AND: [invoiceStateFilter(state)] } : {}),
       ...(dateFrom || dateTo
         ? {
             date: {

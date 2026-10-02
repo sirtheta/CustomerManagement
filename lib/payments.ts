@@ -3,6 +3,7 @@ import type { InvoiceState, Prisma, PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { logAudit } from "@/lib/audit";
 import { toRappen } from "@/lib/calculations";
+import { isOverdueInvoice, keepsReminder } from "@/lib/reminders";
 
 export type PaymentSource = "manual" | "camt-import" | "budget-import" | "migration";
 
@@ -57,7 +58,7 @@ async function recalculateInvoiceState(
 ): Promise<{ from: InvoiceState; to: InvoiceState; documentNumber: string | null }> {
   const invoice = await db.invoice.findUniqueOrThrow({
     where: { id: invoiceId },
-    select: { state: true, totalAmount: true, dueDate: true, documentNumber: true },
+    select: { state: true, totalAmount: true, dueDate: true, documentNumber: true, creditNoteForId: true },
   });
   const paidRappen = await sumPaidRappen(db, invoiceId);
   const creditedRappen = await sumCreditedRappen(db, invoiceId);
@@ -80,8 +81,16 @@ async function recalculateInvoiceState(
   }
 
   await db.invoice.update({ where: { id: invoiceId }, data: { state: to, paidDate } });
-  // A reminder only makes sense while the invoice is Overdue.
-  if (to !== "Overdue") await db.pendingReminder.deleteMany({ where: { invoiceId } });
+  // A partial payment keeps the reminder (level, notices, snooze): the remainder
+  // is reminded further. Paid, Canceled, Sent or nothing left open drop it.
+  const remainingRappen = toRappen(invoice.totalAmount) - creditedRappen - paidRappen;
+  if (!keepsReminder(to, remainingRappen)) {
+    await db.pendingReminder.deleteMany({ where: { invoiceId } });
+  } else if (isOverdueInvoice({ state: to, dueDate: invoice.dueDate, creditNoteForId: invoice.creditNoteForId })) {
+    // E.g. a payment of a Paid invoice was deleted and it is overdue again: offer the
+    // reminder at once instead of waiting for the daily job. An existing one stays as it is.
+    await db.pendingReminder.upsert({ where: { invoiceId }, create: { invoiceId }, update: {} });
+  }
 
   return { from: invoice.state, to, documentNumber: invoice.documentNumber };
 }

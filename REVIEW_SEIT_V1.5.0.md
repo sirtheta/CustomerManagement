@@ -28,7 +28,7 @@ Legende: `[ ]` offen, `[x]` erledigt, `[-]` bewusst übersprungen.
 - [x] Gutschrift-Validierung prüft nur die Menge: negativer Stückpreis ergibt belastenden Beleg (`invoices/actions.ts:133`, `lib/credit-notes.ts:98`).
 - [ ] Rundungs-Schalter zwischen Original und Gutschrift kann 2 Rappen Rest lassen (`lib/credit-notes.ts:110`).
 - [ ] Stornierte Rechnung lässt sich erneut senden, QR über vollen Betrag (`document-actions.ts:187-257`).
-- [ ] Budget-API kann bei gleichzeitigen Requests doppelt buchen (`lib/payment-matching.ts:44-69`).
+- [x] Budget-API kann bei gleichzeitigen Requests doppelt buchen (`lib/payment-matching.ts:44-69`). Entschieden: bleibt optional (Spec F7, FEATURE_ANALYSE).
 
 ### Zugriff und Audit
 - [x] Viewer öffnet `/accounting/[id]` und `/accounting/new` per Direkt-URL: `requireEditor()` fehlt.
@@ -83,7 +83,12 @@ Stand 2026-10-02: Commits `04f46a4`, `f5148b1`, `aec19c9`, `82b2cc5`, `06453fd`.
 - [ ] CAMT-Sammelbuchung ohne `TxDtls/Amt` vervielfacht den Betrag (`lib/import/camt.ts`).
 - [ ] Nachfass-Aufgabe bleibt offen, wenn die Offerte gelöscht wird (`Task.quote onDelete: SetNull`).
 - [ ] «Jährliche Rechnung» ohne Datum geht bei der Migration verloren (optional pausiertes Abo anlegen).
-- [ ] «Verwerfen» bei Abo-Entwürfen löscht nur `PendingEmail`, Audit sagt «DELETE Invoice».
+- [x] «Verwerfen» bei Abo-Entwürfen löscht nur `PendingEmail`, Audit sagt «DELETE Invoice». (`discardPendingEmail` löscht jetzt Entwurf + Positionen + `PendingEmail` in einer Transaktion, mit Bestätigungsdialog; ist die Rechnung kein unnummerierter Entwurf mehr, nur die `PendingEmail`, Audit dann «DELETE PendingEmail».)
+
+- [ ] `deleteInvoice` löscht die Positionen nicht mit (`Item.invoice` ohne `onDelete`, Migration `SET NULL`): verwaiste `Item`-Zeilen (`app/(app)/invoices/actions.ts`).
+- [ ] `PendingEmailRow`: Erfolgs-Toast nach «Senden» läuft über `useActionToast` und erscheint vermutlich nie, weil die Zeile nach der Revalidierung weg ist (Muster wie in `ReminderRow`).
+- [ ] Überfällige Rechnung über CHF 0 bekommt vom Tagesjob eine Mahnung, deren Versand abgelehnt wird («bereits beglichen»).
+- [ ] Offerten-Senden-Dialog zeigt bei Entwürfen `{documentNumber}`; Sperrtext bei «Rückgängig» macht Zeilen im Importverlauf hoch.
 
 ## 4. Tests
 - [ ] Kein Test der 5-Rappen-Rundung für `createInvoice`/`updateInvoice`.
@@ -124,11 +129,11 @@ Doku:
 - [x] Übergangscode (`?subscription=true`-Redirect, `deleteMany` in `lib/reminders.ts`) bis zum nächsten Major behalten
 
 ## 6. Entscheidungen
-- [ ] Teilzahlung auf überfälliger Rechnung nimmt sie dauerhaft aus dem Mahnwesen (`lib/payments.ts:33,88`). Spec-Entscheid, nicht in CLAUDE.md. Weiter mahnen bei Restbetrag > 0?
-- [ ] Editoren dürfen Zahlungen löschen (auch CAMT/Budget). Admin-only machen oder in CLAUDE.md dokumentieren?
-- [ ] «Verwerfen» bei Abo-Entwürfen: Entwurf mitlöschen oder nur Audit-Aktion korrigieren?
+- [x] Teilzahlung auf überfälliger Rechnung nimmt sie dauerhaft aus dem Mahnwesen (`lib/payments.ts:33,88`). Spec-Entscheid, nicht in CLAUDE.md. Weiter mahnen bei Restbetrag > 0? Entschieden: weiter mahnen. Teilzahlung behält `PendingReminder` (Stufe, Belege, Zurückstellung), Status bleibt `PartiallyPaid`; Tagesjob legt für überfällige teilbezahlte Rechnungen eine an (`overdueInvoiceWhere`); Mahnbeleg/Karte zeigen Rest; Viewer-Banner und Filter «Überfällig» zählen sie mit. Tests: `tests/integration/reminders-partial-payment.test.ts`.
+- [x] Editoren dürfen Zahlungen löschen (auch CAMT/Budget). Admin-only machen oder in CLAUDE.md dokumentieren? Entschieden: Editoren dürfen, in CLAUDE.md dokumentiert.
+- [x] «Verwerfen» bei Abo-Entwürfen: Entwurf mitlöschen oder nur Audit-Aktion korrigieren? Entschieden: Entwurf mitlöschen (Abo-Periode wird übersprungen; bleibt Editor-Aufgabe).
 - [ ] Budget-API (`POST /api/external/payments`) weiter betreiben? Sonst entfällt ein Matching-Weg.
-- [ ] `InvoiceSentLog` und `SentDocument` sind inhaltlich doppelt. Agent rät: vorerst behalten (Datenmigration nötig).
+- [x] `InvoiceSentLog` und `SentDocument` sind inhaltlich doppelt. Agent rät: vorerst behalten (Datenmigration nötig). Entschieden: beide behalten, Unterschied in CLAUDE.md. Zusammenlegen frühestens als eigene Migration nach dem Major-Release.
 
 ## Übersprungen
 - [-] Migration setzt `PendingReminder.reminderLevel > 4` auf 4 (`migration.sql:300`). v1.5.0 hatte Stufen, aber die aktuelle Installation hat keine offenen Mahnungen, daher ohne Wirkung. Nur relevant, falls eine weitere Installation mit Altdaten Stufe ≥ 5 hat.

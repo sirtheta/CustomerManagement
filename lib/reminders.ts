@@ -1,8 +1,56 @@
-import type { InvoiceState, PrismaClient } from "@prisma/client";
+import type { InvoiceState, Prisma, PrismaClient } from "@prisma/client";
 import { MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
+import { swissToday } from "@/lib/date";
 
 export const DEFAULT_REMINDER_COOLDOWN_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * States in which an invoice keeps its `PendingReminder`. A partial payment
+ * leaves the invoice `PartiallyPaid` and the reminder (level, sent notices,
+ * snooze) in place, so the remainder is reminded further. Paid, Canceled, Sent
+ * and Draft drop it.
+ */
+export const REMINDER_STATES: readonly InvoiceState[] = ["Overdue", "PartiallyPaid"];
+
+/** True when an invoice in this state with this open remainder keeps its reminder. */
+export function keepsReminder(state: InvoiceState, remainingRappen: number): boolean {
+  return remainingRappen > 0 && REMINDER_STATES.includes(state);
+}
+
+/**
+ * Invoices that are overdue: `Overdue` (set by the daily job once the due date
+ * passed, or by hand) and `PartiallyPaid` once the due date (a calendar day,
+ * stored as UTC midnight) lies before today's Swiss day. PartiallyPaid stays
+ * PartiallyPaid; its remainder is always > 0 (otherwise it would be Paid).
+ * Credit notes never count. The daily job creates a reminder for exactly these,
+ * and the overdue counts and the "Überfällig" filter use the same definition.
+ */
+export function overdueInvoiceWhere(today: Date = swissToday()): Prisma.InvoiceWhereInput {
+  return {
+    creditNoteForId: null,
+    OR: [{ state: "Overdue" }, { state: "PartiallyPaid", dueDate: { lt: today } }],
+  };
+}
+
+/**
+ * Status filter of the invoice list and its CSV export: "Überfällig" means
+ * overdue as defined above (so it also lists overdue PartiallyPaid invoices,
+ * which keep their badge "Teilbezahlt"); every other value is the plain state.
+ */
+export function invoiceStateFilter(state: InvoiceState, today: Date = swissToday()): Prisma.InvoiceWhereInput {
+  return state === "Overdue" ? overdueInvoiceWhere(today) : { state };
+}
+
+/** In-memory form of `overdueInvoiceWhere`. */
+export function isOverdueInvoice(
+  invoice: { state: InvoiceState; dueDate: Date; creditNoteForId: number | null },
+  today: Date = swissToday()
+): boolean {
+  if (invoice.creditNoteForId != null) return false;
+  if (invoice.state === "Overdue") return true;
+  return invoice.state === "PartiallyPaid" && invoice.dueDate < today;
+}
 
 /**
  * When a reminder that was just sent or dismissed shows up again:
@@ -16,20 +64,18 @@ export function reminderSnoozedUntil(
   return new Date(now.getTime() + (cooldownDays ?? DEFAULT_REMINDER_COOLDOWN_DAYS) * DAY_MS);
 }
 
-export async function checkOverdueInvoices(prisma: PrismaClient): Promise<void> {
+export async function checkOverdueInvoices(prisma: PrismaClient, today: Date = swissToday()): Promise<void> {
   // Safety net for state changes that bypass the actions (direct DB edits,
-  // older code paths): reminders of invoices that are no longer Overdue are
-  // stale and must not linger in the Mahnungen list.
+  // older code paths): reminders of invoices that are neither Overdue nor
+  // PartiallyPaid are stale and must not linger in the Mahnungen list.
   await prisma.pendingReminder.deleteMany({
-    where: { invoice: { state: { not: "Overdue" } } },
+    where: { invoice: { state: { notIn: [...REMINDER_STATES] } } },
   });
 
+  // Also picks up PartiallyPaid invoices that became overdue after the partial
+  // payment, or whose reminder an older version deleted on the payment.
   const overdueInvoices = await prisma.invoice.findMany({
-    where: {
-      state: "Overdue",
-      pendingReminder: null,
-      creditNoteForId: null,
-    },
+    where: { AND: [overdueInvoiceWhere(today), { pendingReminder: null }] },
     select: { id: true },
   });
 
@@ -98,14 +144,13 @@ export type ReminderAvailability =
   /** Level 4 went out; the app sends nothing further. */
   | { kind: "lastLevelSent" }
   /** Due date passed, but the daily job has not created the reminder yet. */
-  | { kind: "awaitingJob" }
-  /** Overdue but partially paid: only `Overdue` invoices are reminded. */
-  | { kind: "partiallyPaid" };
+  | { kind: "awaitingJob" };
 
 /**
  * Whether the invoice page can offer a reminder, and why not. Mirrors what the
- * Mahnungen list shows: a `PendingReminder` exists only for `Overdue` invoices
- * (created by the daily `checkOverdueInvoices`) and is hidden while snoozed.
+ * Mahnungen list shows: a `PendingReminder` exists only for `Overdue` and
+ * overdue `PartiallyPaid` invoices (created by the daily `checkOverdueInvoices`)
+ * and is hidden while snoozed.
  */
 export function reminderAvailability(input: {
   state: InvoiceState;
@@ -117,12 +162,15 @@ export function reminderAvailability(input: {
 }): ReminderAvailability {
   const now = input.now ?? new Date();
   if (input.isCreditNote) return { kind: "none" };
-  const pastDue = input.dueDate < now;
-  if (input.state === "PartiallyPaid") return pastDue ? { kind: "partiallyPaid" } : { kind: "none" };
-  if (input.state === "Sent") return pastDue ? { kind: "awaitingJob" } : { kind: "none" };
-  if (input.state !== "Overdue") return { kind: "none" };
-
   const pending = input.pendingReminder;
+  if (input.state === "Sent") return input.dueDate < now ? { kind: "awaitingJob" } : { kind: "none" };
+  if (input.state === "PartiallyPaid") {
+    // Same cut-off as the daily job (`overdueInvoiceWhere`): the due day lies before today's Swiss day.
+    if (!pending) return input.dueDate < swissToday(now) ? { kind: "awaitingJob" } : { kind: "none" };
+  } else if (input.state !== "Overdue") {
+    return { kind: "none" };
+  }
+
   if (!pending) return { kind: "awaitingJob" };
   if (input.lastLevelSent) return { kind: "lastLevelSent" };
   if (pending.snoozedUntil && pending.snoozedUntil > now) {

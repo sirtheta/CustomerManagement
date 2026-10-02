@@ -70,10 +70,8 @@ export default async function RemindersPage({ searchParams }: Props) {
   const cooldownDays = settings?.reminderCooldownDays ?? DEFAULT_REMINDER_COOLDOWN_DAYS;
   const lastSent = await latestSentReminders(prisma, reminders);
   // Open amount after payments and sent credit notes (not the invoice total).
-  const remainingByInvoice = new Map(
-    await Promise.all(
-      reminders.map(async (r) => [r.invoiceId, (await getPaymentSummary(r.invoiceId)).remainingRappen / 100] as const)
-    )
+  const summaryByInvoice = new Map(
+    await Promise.all(reminders.map(async (r) => [r.invoiceId, await getPaymentSummary(r.invoiceId)] as const))
   );
   const lastLevelSentIds = await lastLevelSentReminderIds(prisma, reminders);
 
@@ -118,12 +116,15 @@ export default async function RemindersPage({ searchParams }: Props) {
             const customerName = customerDisplayName(c);
 
             const sent = lastSent.get(inv.id);
-            const remaining = remainingByInvoice.get(inv.id) ?? inv.totalAmount.toNumber();
-            const remainingRappen = Math.round(remaining * 100);
+            const summary = summaryByInvoice.get(inv.id);
+            const remainingRappen = summary?.remainingRappen ?? Math.round(inv.totalAmount.toNumber() * 100);
+            const remaining = remainingRappen / 100;
             const charges = settings
               ? computeReminderCharges({
                   level: r.reminderLevel,
                   openRappen: remainingRappen,
+                  paidRappen: summary?.paidRappen,
+                  creditedRappen: summary?.creditedRappen,
                   dueDate: inv.dueDate,
                   dunningDate: now,
                   settings,
@@ -147,6 +148,9 @@ export default async function RemindersPage({ searchParams }: Props) {
                 documentNumber={inv.documentNumber}
                 customerName={customerName}
                 totalAmount={remaining}
+                invoiceTotal={inv.totalAmount.toNumber()}
+                paidAmount={(summary?.paidRappen ?? 0) / 100}
+                creditedAmount={(summary?.creditedRappen ?? 0) / 100}
                 dueDate={formatDate(inv.dueDate)}
                 customerEmail={billingEmail(c)}
                 reminderLevel={r.reminderLevel}

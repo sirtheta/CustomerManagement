@@ -65,7 +65,18 @@ describe("loadAttentionCounts", () => {
     const db = fakeDb();
     expect((await loadAttentionCounts(db as never, allModulesEnabled(), true)).overdueInvoices).toBe(0);
     expect(db.invoice.count).not.toHaveBeenCalled();
-    expect((await loadAttentionCounts(db as never, allModulesEnabled(), false)).overdueInvoices).toBe(7);
+    const now = new Date("2026-10-01T22:30:00Z"); // 2 October in Swiss time
+    expect((await loadAttentionCounts(db as never, allModulesEnabled(), false, now)).overdueInvoices).toBe(7);
+    // Overdue, or PartiallyPaid past the due date (Swiss day), never a credit note.
+    expect(db.invoice.count).toHaveBeenCalledWith({
+      where: {
+        creditNoteForId: null,
+        OR: [
+          { state: "Overdue" },
+          { state: "PartiallyPaid", dueDate: { lt: new Date("2026-10-02T00:00:00Z") } },
+        ],
+      },
+    });
   });
 });
 

@@ -139,14 +139,16 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     : "";
   const reminderHint: string | null = (() => {
     switch (reminder.kind) {
+      case "available":
+        return invoice.state === "PartiallyPaid"
+          ? `Teilzahlung erhalten: Gemahnt wird der offene Restbetrag von ${formatCurrency(summary.remaining)}. ${lastSentText}`.trim()
+          : null;
       case "snoozed":
         return `${reminderTitle(reminder.level)} wieder möglich ab ${formatDate(reminder.until)} (zuletzt versendet oder zurückgestellt). ${lastSentText}`.trim();
       case "lastLevelSent":
         return `Letzte Mahnstufe versendet, die App sendet keine weitere Mahnung. ${lastSentText}`.trim();
       case "awaitingJob":
         return "Überfällig: Die Mahnung wird beim nächsten täglichen Abgleich vorbereitet und erscheint dann unter «Mahnungen».";
-      case "partiallyPaid":
-        return "Teilbezahlte Rechnungen können in der App nicht gemahnt werden.";
       default:
         return null;
     }

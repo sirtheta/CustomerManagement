@@ -27,6 +27,9 @@ export type ReminderCharges = {
   interestPercent: number;
   overdueDays: number;
   dunningDate: Date;
+  /** Payments and sent credit notes received so far; only printed (Mahnbeleg, mail), not stored. */
+  paidRappen?: number;
+  creditedRappen?: number;
 };
 
 const DAY_MS = 86_400_000;
@@ -48,6 +51,9 @@ export function computeReminderCharges(input: {
   dueDate: Date;
   dunningDate: Date;
   settings: ReminderChargeSettings;
+  /** From `getPaymentSummary`; interest is charged on `openRappen` only. */
+  paidRappen?: number;
+  creditedRappen?: number;
 }): ReminderCharges {
   const { level, openRappen, dueDate, dunningDate, settings } = input;
   const rate = settings.reminderInterestPercent;
@@ -69,5 +75,7 @@ export function computeReminderCharges(input: {
     interestPercent,
     overdueDays,
     dunningDate,
+    paidRappen: input.paidRappen ?? 0,
+    creditedRappen: input.creditedRappen ?? 0,
   };
 }

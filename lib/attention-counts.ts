@@ -1,8 +1,9 @@
-import { InvoiceState, type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { ModuleFlags } from "@/lib/modules";
 import type { NavBadgeCounts } from "@/lib/navigation";
 import { MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
-import { lastLevelSentReminderIds } from "@/lib/reminders";
+import { lastLevelSentReminderIds, overdueInvoiceWhere } from "@/lib/reminders";
+import { swissToday } from "@/lib/date";
 
 type Db = Pick<PrismaClient, "pendingEmail" | "pendingReminder" | "invoice" | "sentDocument">;
 
@@ -48,7 +49,10 @@ async function countSendableReminders(db: Db, now: Date): Promise<number> {
 }
 
 export type AttentionCounts = NavBadgeCounts & {
-  /** Invoices in state Overdue; only loaded when the reminder list is not available. */
+  /**
+   * Overdue invoices (`overdueInvoiceWhere`: Overdue, or PartiallyPaid past the due date);
+   * only loaded when the reminder list is not available.
+   */
   overdueInvoices: number;
 };
 
@@ -66,7 +70,7 @@ export async function loadAttentionCounts(
   const remindersAvailable = canEdit && modules.reminders;
   const [work, overdueInvoices] = await Promise.all([
     loadWorkCounts(db, modules, canEdit, now),
-    remindersAvailable ? 0 : db.invoice.count({ where: { state: InvoiceState.Overdue } }),
+    remindersAvailable ? 0 : db.invoice.count({ where: overdueInvoiceWhere(swissToday(now)) }),
   ]);
   return { ...work, overdueInvoices };
 }

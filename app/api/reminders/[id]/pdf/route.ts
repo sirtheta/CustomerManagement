@@ -41,10 +41,12 @@ export async function GET(
   if (!reminder) return Response.json({ error: "Not Found" }, { status: 404 });
   if (!settings) return Response.json({ error: "Company settings not configured" }, { status: 500 });
 
-  const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
+  const { remainingRappen, paidRappen, creditedRappen } = await getPaymentSummary(reminder.invoiceId);
   const charges = computeReminderCharges({
     level: reminder.reminderLevel,
     openRappen: remainingRappen,
+    paidRappen,
+    creditedRappen,
     dueDate: reminder.invoice.dueDate,
     dunningDate: new Date(),
     settings,

@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { InvoiceState } from "@prisma/client";
+import { InvoiceState, type Prisma } from "@prisma/client";
+import { invoiceStateFilter } from "@/lib/reminders";
 import { cn } from "@/lib/utils";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
@@ -82,9 +83,10 @@ async function InvoicesTable({
   const dateFromDate = dateFrom ? new Date(dateFrom) : undefined;
   const dateToDate = dateTo ? new Date(dateTo + "T23:59:59") : undefined;
 
-  const where = {
+  const where: Prisma.InvoiceWhereInput = {
     ...(customerId ? { customerId } : {}),
-    ...(activeFilter !== "all" ? { state: activeFilter as InvoiceState } : {}),
+    // AND: the overdue filter brings its own OR, which must not clash with the search.
+    ...(activeFilter !== "all" ? { AND: [invoiceStateFilter(activeFilter as InvoiceState)] } : {}),
     ...(dateFromDate || dateToDate
       ? { date: { ...(dateFromDate ? { gte: dateFromDate } : {}), ...(dateToDate ? { lte: dateToDate } : {}) } }
       : {}),

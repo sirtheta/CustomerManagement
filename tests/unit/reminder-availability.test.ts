@@ -42,12 +42,27 @@ describe("reminderAvailability", () => {
     expect(reminderAvailability({ ...base, state: "Sent", pendingReminder: null })).toEqual({ kind: "awaitingJob" });
   });
 
-  it("explains that partially paid invoices are not reminded once past due", () => {
-    expect(reminderAvailability({ ...base, state: "PartiallyPaid", pendingReminder: null })).toEqual({
-      kind: "partiallyPaid",
+  it("reminds a partially paid invoice past its due date like an overdue one", () => {
+    const partial = { ...base, state: "PartiallyPaid" as const };
+    expect(reminderAvailability(partial)).toEqual({ kind: "available", level: 2 });
+    const until = new Date("2026-10-10T00:00:00Z");
+    expect(reminderAvailability({ ...partial, pendingReminder: { reminderLevel: 3, snoozedUntil: until } })).toEqual({
+      kind: "snoozed",
+      level: 3,
+      until,
     });
-    expect(reminderAvailability({ ...base, state: "PartiallyPaid", dueDate: notDue, pendingReminder: null })).toEqual({
-      kind: "none",
+    expect(reminderAvailability({ ...partial, lastLevelSent: true })).toEqual({ kind: "lastLevelSent" });
+    expect(reminderAvailability({ ...partial, pendingReminder: null })).toEqual({ kind: "awaitingJob" });
+    expect(reminderAvailability({ ...partial, dueDate: notDue, pendingReminder: null })).toEqual({ kind: "none" });
+  });
+
+  it("waits for the Swiss day after the due date before a partially paid invoice counts as overdue", () => {
+    const partial = { ...base, state: "PartiallyPaid" as const, pendingReminder: null };
+    // Due 2026-10-01: on 1 October (Swiss time) not yet overdue, on 2 October it is.
+    const dueDate = new Date("2026-10-01T00:00:00Z");
+    expect(reminderAvailability({ ...partial, dueDate, now: new Date("2026-10-01T20:00:00Z") })).toEqual({ kind: "none" });
+    expect(reminderAvailability({ ...partial, dueDate, now: new Date("2026-10-01T22:30:00Z") })).toEqual({
+      kind: "awaitingJob",
     });
   });
 

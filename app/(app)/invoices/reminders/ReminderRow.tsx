@@ -21,7 +21,11 @@ type Props = {
   invoiceId: number;
   documentNumber: string | null;
   customerName: string;
+  /** Open remainder (after payments and sent credit notes): what the notice requests. */
   totalAmount: number;
+  invoiceTotal: number;
+  paidAmount: number;
+  creditedAmount: number;
   dueDate: string;
   customerEmail: string;
   reminderLevel: number;
@@ -101,8 +105,21 @@ export default function ReminderRow(props: Props) {
             <p className="text-sm text-muted-foreground mt-0.5">
               {props.customerName} · Fällig:{" "}
               <span className="text-destructive font-medium">{props.dueDate}</span> ·{" "}
+              {props.paidAmount > 0 || props.creditedAmount > 0 ? "offen " : ""}
               {formatCurrency(props.totalAmount)}
             </p>
+            {(props.paidAmount > 0 || props.creditedAmount > 0) && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {[
+                  `Rechnungsbetrag ${formatCurrency(props.invoiceTotal)}`,
+                  props.paidAmount > 0 ? `Teilzahlung erhalten ${formatCurrency(props.paidAmount)}` : null,
+                  props.creditedAmount > 0 ? `Gutschrift ${formatCurrency(props.creditedAmount)}` : null,
+                  `gemahnt wird der offene Rest von ${formatCurrency(props.totalAmount)}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
             {!props.lastLevelSent && (props.feeRappen > 0 || props.interestRappen > 0) && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 + Mahngebühr {formatCurrency(props.feeRappen / 100)} · Verzugszins{" "}

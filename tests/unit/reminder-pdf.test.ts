@@ -113,6 +113,29 @@ describe("generateReminderPdf", () => {
     expect(pageText[0]).not.toContain("überfällig");
   });
 
+  it("shows invoice total and payments before the remainder after a partial payment, QR = remainder + fee", async () => {
+    const off = { ...(settings as object), reminderInterestPercent: 0 } as never;
+    const c = computeReminderCharges({
+      level: 2, openRappen: 60000, paidRappen: 40000, creditedRappen: 0,
+      dueDate: new Date("2026-01-31"), dunningDate: new Date("2026-03-15"), settings: off,
+    });
+    const { pageText } = await extractText(await generateReminderPdf(invoice, off, c));
+    expect(pageText[0]).toContain("Rechnungsbetrag");
+    expect(pageText[0]).toMatch(/1['’]000\.00/);
+    expect(pageText[0]).toContain("Bereits bezahlt");
+    expect(pageText[0]).toMatch(/-400\.00/);
+    expect(pageText[0]).not.toContain("Gutschrift");
+    expect(pageText[0]).toContain("Offener Betrag");
+    expect(pageText[0]).toContain("610.00");
+    expect(pageText[1]).toContain("610.00");
+  });
+
+  it("lists no payment lines without payments or credit notes", async () => {
+    const { pageText } = await extractText(await generateReminderPdf(invoice, settings, charges(2)));
+    expect(pageText[0]).not.toContain("Rechnungsbetrag");
+    expect(pageText[0]).not.toContain("Bereits bezahlt");
+  });
+
   it("omits fee and interest lines when they are zero", async () => {
     const off = { ...(settings as object), reminderFeeLevel2Rappen: 0, reminderInterestPercent: 0 } as never;
     const c = computeReminderCharges({

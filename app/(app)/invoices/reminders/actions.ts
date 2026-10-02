@@ -81,11 +81,14 @@ async function sendReminderLocked(input: {
   let archive: ArchiveResult;
   let charges: ReturnType<typeof computeReminderCharges>;
   try {
-    const { remainingRappen } = await getPaymentSummary(reminder.invoiceId);
+    // Open remainder after partial payments and sent credit notes, not the invoice total.
+    const { remainingRappen, paidRappen, creditedRappen } = await getPaymentSummary(reminder.invoiceId);
     if (remainingRappen <= 0) return { error: "Die Rechnung ist bereits beglichen." };
     charges = computeReminderCharges({
       level: reminder.reminderLevel,
       openRappen: remainingRappen,
+      paidRappen,
+      creditedRappen,
       dueDate: reminder.invoice.dueDate,
       dunningDate: new Date(),
       settings,

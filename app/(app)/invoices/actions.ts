@@ -238,8 +238,9 @@ export async function updateInvoiceStatus(
     });
   }
 
-  // Reminders only make sense while the invoice is Overdue; any other
-  // state clears the pending one so it disappears from the Mahnungen list.
+  // Reminders only make sense while the invoice is Overdue (or PartiallyPaid, which is
+  // no manual target and cannot be left by hand); Sent and Paid clear the pending one
+  // so it disappears from the Mahnungen list. Paid already did so via the payment.
   if (state !== "Overdue") {
     await prisma.pendingReminder.deleteMany({ where: { invoiceId: id } });
   }
