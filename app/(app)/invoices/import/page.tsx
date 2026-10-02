@@ -20,7 +20,7 @@ export default async function InvoicesImportPage() {
         <div>
           <h1 className="text-2xl font-semibold">Bankimport</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            CAMT.053-Kontoauszug hochladen, Zahlungseingänge Rechnungen zuordnen und Geschäftsausgaben übernehmen
+            Kontoauszug aus dem E-Banking (camt.053) hochladen, Zahlungseingänge Rechnungen zuordnen und Geschäftsausgaben übernehmen
           </p>
         </div>
         <Button variant="outline" size="sm" render={<Link href="/invoices" />}>
@@ -32,7 +32,11 @@ export default async function InvoicesImportPage() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Zahlungseingänge</h2>
-        <IncomingTable rows={overview.incoming} />
+        <IncomingTable
+          rows={overview.incoming}
+          openInvoices={overview.openInvoices}
+          ignored={overview.ignoredIncoming}
+        />
       </section>
 
       {modules.accounting && (

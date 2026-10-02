@@ -164,7 +164,7 @@ describe("parseCamt053", () => {
 
   it("rejects a document that is not a CAMT.053 statement", () => {
     const camt054 = `<?xml version="1.0"?><Document><BkToCstmrDbtCdtNtfctn/></Document>`;
-    expect(() => parseCamt053(camt054)).toThrow(/CAMT\.054|BkToCstmrStmt/);
+    expect(() => parseCamt053(camt054)).toThrow(/camt\.054/i);
   });
 
   it("rejects unparseable XML with a readable message", () => {

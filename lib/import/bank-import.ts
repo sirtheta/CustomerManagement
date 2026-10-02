@@ -157,13 +157,42 @@ export async function importStatement(
 
 type ImportPeriod = { id: number; iban: string | null; periodFrom: string | null; periodTo: string | null };
 
+/** Shown when an import cannot be undone because entries of it are booked. */
+export const UNDO_BLOCKED_BOOKED =
+  "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen.";
+
+/** Shown when a later overlapping import relies on this import's entries. */
+export function undoBlockedByLaterImport(filename: string): string {
+  return (
+    `Ein späterer Import (${filename}) hat Bewegungen dieses Zeitraums als bereits bekannt übersprungen. ` +
+    "Sie gingen beim Rückgängigmachen verloren. Bitte zuerst den späteren Import rückgängig machen."
+  );
+}
+
 /**
  * A later import only stores entries it did not know, and which earlier
  * import the skipped ones belong to is not recorded. So any later import of
  * the same account with skipped entries and an overlapping (or unknown)
  * period may rely on this import's rows; deleting them would lose those
- * entries for good.
+ * entries for good. `candidates` are imports with `skippedCount > 0`.
  */
+export function pickShadowingImport<T extends ImportPeriod & { filename: string }>(
+  target: ImportPeriod,
+  candidates: T[]
+): T | null {
+  return (
+    candidates
+      .filter((other) => other.id > target.id)
+      .sort((a, b) => a.id - b.id)
+      .find((other) => {
+        if (target.iban && other.iban && target.iban !== other.iban) return false;
+        if (!target.periodFrom || !target.periodTo || !other.periodFrom || !other.periodTo) return true;
+        // YYYY-MM-DD compares as text; inclusive because both can hold the same day.
+        return other.periodFrom <= target.periodTo && target.periodFrom <= other.periodTo;
+      }) ?? null
+  );
+}
+
 async function findShadowingImport(
   target: ImportPeriod,
   prisma: PrismaClient
@@ -171,16 +200,8 @@ async function findShadowingImport(
   const later = await prisma.bankStatementImport.findMany({
     where: { id: { gt: target.id }, skippedCount: { gt: 0 } },
     select: { id: true, filename: true, iban: true, periodFrom: true, periodTo: true },
-    orderBy: { id: "asc" },
   });
-  return (
-    later.find((other) => {
-      if (target.iban && other.iban && target.iban !== other.iban) return false;
-      if (!target.periodFrom || !target.periodTo || !other.periodFrom || !other.periodTo) return true;
-      // YYYY-MM-DD compares as text; inclusive because both can hold the same day.
-      return other.periodFrom <= target.periodTo && target.periodFrom <= other.periodTo;
-    }) ?? null
-  );
+  return pickShadowingImport(target, later);
 }
 
 /**
@@ -197,16 +218,11 @@ export async function undoImport(
   });
   if (!existing) throw new BankImportError("Import nicht gefunden.");
   if (existing.transactions.some((t) => t.paymentId !== null || t.expenseId !== null)) {
-    throw new BankImportError(
-      "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen."
-    );
+    throw new BankImportError(UNDO_BLOCKED_BOOKED);
   }
   const shadowing = await findShadowingImport(existing, prisma);
   if (shadowing) {
-    throw new BankImportError(
-      `Ein späterer Import (${shadowing.filename}) hat Bewegungen dieses Zeitraums als bereits bekannt übersprungen. ` +
-        "Sie gingen beim Rückgängigmachen verloren. Bitte zuerst den späteren Import rückgängig machen."
-    );
+    throw new BankImportError(undoBlockedByLaterImport(shadowing.filename));
   }
 
   // The check above is only for the message; the delete re-checks inside the
@@ -216,9 +232,7 @@ export async function undoImport(
       where: { importId: existing.id, paymentId: null, expenseId: null },
     });
     if (removed.count !== existing.transactions.length) {
-      throw new BankImportError(
-        "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen."
-      );
+      throw new BankImportError(UNDO_BLOCKED_BOOKED);
     }
     await tx.bankStatementImport.delete({ where: { id: existing.id } });
   });
@@ -252,14 +266,47 @@ export async function listOpenTransactions(
     where: { ignored: false, paymentId: null, expenseId: null },
     orderBy: [{ date: "asc" }, { id: "asc" }],
   });
-  return rows.map((row) => ({
+  return rows.map(toOpenTransaction);
+}
+
+/** How many ignored incoming entries the overview lists at most (newest first). */
+export const IGNORED_INCOMING_LIMIT = 200;
+
+/**
+ * Incoming entries the user ignored, newest first, so they can be opened
+ * again. Booked rows never carry `ignored`, the filter only makes sure.
+ */
+export async function listIgnoredIncoming(
+  prisma: PrismaClient = defaultPrisma
+): Promise<{ rows: OpenTransaction[]; total: number }> {
+  const where = { ignored: true, paymentId: null, expenseId: null, amountRappen: { gt: 0 } };
+  const [rows, total] = await Promise.all([
+    prisma.bankTransaction.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { id: "desc" }],
+      take: IGNORED_INCOMING_LIMIT,
+    }),
+    prisma.bankTransaction.count({ where }),
+  ]);
+  return { rows: rows.map(toOpenTransaction), total };
+}
+
+function toOpenTransaction(row: {
+  id: number;
+  date: Date;
+  amountRappen: number;
+  description: string;
+  counterparty: string | null;
+  bankReference: string | null;
+}): OpenTransaction {
+  return {
     id: row.id,
     date: row.date.toISOString().slice(0, 10),
     amountCents: row.amountRappen,
     description: row.description,
     counterparty: row.counterparty,
     bankReference: row.bankReference,
-  }));
+  };
 }
 
 export interface ExpenseHint {

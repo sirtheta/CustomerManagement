@@ -203,21 +203,26 @@ export function parseCamt053(xml: string): ParsedStatement {
     document = parser.parse(xml);
   } catch (err) {
     throw new Error(
-      `Die Datei konnte nicht als XML gelesen werden: ${err instanceof Error ? err.message : "Unbekannter Fehler"}`
+      "Die Datei konnte nicht gelesen werden, sie ist keine gültige XML-Datei " +
+        `(${err instanceof Error ? err.message : "unbekannter Fehler"}). ` +
+        "Bitte den Kontoauszug im E-Banking erneut als XML (camt.053) herunterladen."
     );
   }
 
   const root = document?.Document?.BkToCstmrStmt;
   if (!root) {
     throw new Error(
-      "Kein CAMT.053-Kontoauszug erkannt (erwartet wird <Document><BkToCstmrStmt>). " +
-        "Bitte prüfen, ob versehentlich eine CAMT.054-Avisierung exportiert wurde."
+      "Diese Datei ist kein Kontoauszug. Vermutlich wurde eine Meldung über Einzelbuchungen (camt.054) " +
+        "oder ein anderes Format heruntergeladen. Bitte im E-Banking den Kontoauszug für den gewünschten " +
+        "Zeitraum als XML im Format camt.053 herunterladen und diese Datei hochladen."
     );
   }
 
   const statements = toArray(root.Stmt);
   if (statements.length === 0) {
-    throw new Error("Der Kontoauszug enthält keine <Stmt>-Elemente.");
+    throw new Error(
+      "Die Datei enthält keinen Kontoauszug. Bitte im E-Banking den Kontoauszug (camt.053) erneut herunterladen."
+    );
   }
 
   const transactions: ParsedTransaction[] = [];
@@ -249,7 +254,10 @@ export function parseCamt053(xml: string): ParsedStatement {
       // Pending entries can still change amount or date; importing them would
       // create a row that never reconciles against the next statement.
       if (status && status !== "BOOK") {
-        warnings.push(`Eine nicht verbuchte Bewegung (Status ${status}) wurde übersprungen.`);
+        warnings.push(
+          `Eine von der Bank noch nicht verbuchte Bewegung (Status ${status}) wurde übersprungen. ` +
+            "Sie kommt mit dem nächsten Kontoauszug, sobald sie verbucht ist."
+        );
         continue;
       }
 

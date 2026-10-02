@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -56,22 +57,17 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
     });
   }
 
-  function ignoreUnticked() {
-    if (
-      !window.confirm(
-        `${unticked.length} Bewegungen ignorieren? Das lässt sich nur durch Rückgängig des ganzen Imports zurücknehmen.`
-      )
-    )
-      return;
-    startTransition(async () => {
-      try {
-        const result = await ignoreTransactions(unticked.map((row) => row.transaction.id));
-        if (result.error) toast.error(result.error);
-        else toast.success(`${result.ignoredCount ?? 0} Bewegung(en) ignoriert.`);
-      } catch {
-        toast.error("Speichern fehlgeschlagen.");
-      }
-    });
+  /** Sent in chunks: one call accepts at most 1000 ids. */
+  async function ignoreUnticked(): Promise<{ error?: string }> {
+    const ids = unticked.map((row) => row.transaction.id);
+    let ignoredCount = 0;
+    for (let i = 0; i < ids.length; i += 1000) {
+      const result = await ignoreTransactions(ids.slice(i, i + 1000));
+      if (result.error) return { error: result.error };
+      ignoredCount += result.ignoredCount ?? 0;
+    }
+    toast.success(`${ignoredCount} Bewegung(en) ignoriert.`);
+    return {};
   }
 
   function ignoreOne(id: number) {
@@ -188,9 +184,17 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
       )}
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={ignoreUnticked} disabled={isPending || unticked.length === 0}>
+        <ConfirmDialog
+          title="Nicht angekreuzte Abbuchungen ignorieren"
+          description={`${unticked.length} ${unticked.length === 1 ? "Abbuchung wird" : "Abbuchungen werden"} als ignoriert markiert und nicht als Ausgabe übernommen. Das lässt sich nur zurücknehmen, indem der ganze Import rückgängig gemacht wird.`}
+          confirmLabel={`${unticked.length} ignorieren`}
+          confirmVariant="default"
+          triggerVariant="outline"
+          triggerDisabled={isPending || unticked.length === 0}
+          onConfirm={ignoreUnticked}
+        >
           Nicht angekreuzte ignorieren ({unticked.length})
-        </Button>
+        </ConfirmDialog>
         <Button onClick={take} disabled={isPending || chosen.length === 0}>
           {chosen.length} als Ausgabe{chosen.length === 1 ? "" : "n"} übernehmen
         </Button>

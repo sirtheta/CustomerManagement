@@ -21,6 +21,8 @@ export interface OpenInvoice {
   openAmount: number;
   /** Francs requested by the latest Mahnbeleg (open + fee + interest); only set when above `openAmount`. */
   reminderTotal?: number;
+  /** The customer's display name, for showing the invoice in the preview. */
+  customerName?: string;
   /** Names the customer may appear under on a statement (company, contact person). */
   customerNames?: string[];
 }

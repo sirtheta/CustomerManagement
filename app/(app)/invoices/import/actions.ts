@@ -56,7 +56,7 @@ export async function uploadStatement(
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return { error: "Bitte eine CAMT.053-Datei (.xml) auswählen." };
+    return { error: "Bitte einen Kontoauszug als XML-Datei (camt.053 aus dem E-Banking) auswählen." };
   }
   if (file.size > MAX_FILE_BYTES) {
     return { error: "Die Datei ist zu gross (maximal 10 MB)." };
@@ -247,6 +247,33 @@ export async function ignoreTransactions(
   }
   revalidatePath("/invoices/import");
   return { ignoredCount: result.count };
+}
+
+/**
+ * Opens ignored entries again, so they show up in the preview for booking.
+ * Only ignored entries change; a booked one never carries `ignored` and is
+ * filtered out anyway.
+ */
+export async function reopenTransactions(
+  ids: number[]
+): Promise<{ error?: string; reopenedCount?: number }> {
+  const session = await requireEditor();
+  await requireModule("bankImport");
+  if (!idList.safeParse(ids).success) return { error: INVALID_INPUT };
+  if (ids.length === 0) return { error: "Keine Bewegung ausgewählt." };
+
+  const result = await prisma.bankTransaction.updateMany({
+    where: { id: { in: ids }, ignored: true, paymentId: null, expenseId: null },
+    data: { ignored: false },
+  });
+  if (result.count > 0) {
+    await logAudit(session, "UPDATE", "BankStatementImport", undefined, undefined, {
+      reopenedBankTransactionIds: ids.slice(0, 100),
+      count: result.count,
+    });
+  }
+  revalidatePath("/invoices/import");
+  return { reopenedCount: result.count };
 }
 
 export async function undoStatementImport(importId: number): Promise<{ error?: string }> {

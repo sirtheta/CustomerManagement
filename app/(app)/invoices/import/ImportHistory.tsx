@@ -1,31 +1,21 @@
 "use client";
 
-import { useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import type { ImportOverview } from "@/lib/import/queries";
 import { undoStatementImport } from "./actions";
 
 export function ImportHistory({ imports }: { imports: ImportOverview["imports"] }) {
-  const [isPending, startTransition] = useTransition();
-
   if (imports.length === 0) {
     return <p className="text-sm text-muted-foreground py-4">Noch keine Importe.</p>;
   }
 
-  function undo(id: number) {
-    if (!window.confirm("Diesen Import mit allen seinen Bewegungen rückgängig machen?")) return;
-    startTransition(async () => {
-      try {
-        const result = await undoStatementImport(id);
-        if (result.error) toast.error(result.error);
-        else toast.success("Import rückgängig gemacht.");
-      } catch {
-        toast.error("Speichern fehlgeschlagen.");
-      }
-    });
+  async function undo(id: number): Promise<{ error?: string }> {
+    const result = await undoStatementImport(id);
+    if (!result.error) toast.success("Import rückgängig gemacht.");
+    return result;
   }
 
   return (
@@ -39,7 +29,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
             <TableHead>Bewegungen</TableHead>
             <TableHead>Verbucht</TableHead>
             <TableHead>Warnungen</TableHead>
-            <TableHead className="w-28"></TableHead>
+            <TableHead className="w-56"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -62,15 +52,22 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
                 )}
               </TableCell>
               <TableCell className="align-top">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isPending || entry.bookedCount > 0}
-                  title={entry.bookedCount > 0 ? "Es sind bereits Bewegungen verbucht." : undefined}
-                  onClick={() => undo(entry.id)}
+                <ConfirmDialog
+                  title="Import rückgängig machen"
+                  description={`Der Import «${entry.filename}» wird mit allen ${entry.importedCount} Bewegungen gelöscht, auch den ignorierten. Die Datei kann danach erneut hochgeladen werden.`}
+                  confirmLabel="Rückgängig machen"
+                  triggerVariant="ghost"
+                  triggerSize="sm"
+                  triggerDisabled={entry.undoBlockedReason !== null}
+                  onConfirm={() => undo(entry.id)}
                 >
                   Rückgängig
-                </Button>
+                </ConfirmDialog>
+                {entry.undoBlockedReason && (
+                  <p className="mt-1 max-w-56 whitespace-normal text-xs text-muted-foreground">
+                    {entry.undoBlockedReason}
+                  </p>
+                )}
               </TableCell>
             </TableRow>
           ))}

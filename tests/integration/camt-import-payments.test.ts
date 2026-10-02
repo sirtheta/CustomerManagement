@@ -27,8 +27,11 @@ import {
   bookExpenses,
   bookPayments,
   ignoreTransactions,
+  reopenTransactions,
   undoStatementImport,
 } from "@/app/(app)/invoices/import/actions";
+import { requireEditor } from "@/lib/permissions";
+import { loadImportOverview } from "@/lib/import/queries";
 import { importStatement } from "@/lib/import/bank-import";
 import type { ParsedTransaction } from "@/lib/import/types";
 import type { Session } from "next-auth";
@@ -242,6 +245,93 @@ describe("CAMT import actions against a real database", () => {
     expect(await ignoreTransactions(ids)).toEqual({ ignoredCount: 1 });
     const first = await db.prisma.bankTransaction.findUniqueOrThrow({ where: { id: ids[0] } });
     expect(first.ignored).toBe(false);
+  });
+
+  describe("reopening ignored entries", () => {
+    it("reopens only ignored entries, never booked or open ones, and audits it", async () => {
+      const inv = await seedInvoice();
+      const { ids } = await seedTransactions([{ amountCents: 5000 }, { amountCents: 6000 }, { amountCents: 7000 }]);
+      await ignoreTransactions([ids[0]]);
+      await bookPayments([{ transactionId: ids[1], invoiceId: inv.id }]);
+
+      expect(await reopenTransactions(ids)).toEqual({ reopenedCount: 1 });
+      const [reopened, booked, open] = await Promise.all(
+        ids.map((id) => db.prisma.bankTransaction.findUniqueOrThrow({ where: { id } }))
+      );
+      expect(reopened.ignored).toBe(false);
+      expect(booked.paymentId).not.toBeNull();
+      expect(booked.ignored).toBe(false);
+      expect(open.ignored).toBe(false);
+
+      const audit = await db.prisma.auditLog.findMany({
+        where: { entityType: "BankStatementImport", action: "UPDATE" },
+        orderBy: { id: "asc" },
+      });
+      expect(audit.at(-1)?.details).toContain("reopenedBankTransactionIds");
+      // Nothing changed: no second audit entry.
+      expect(await reopenTransactions([ids[0]])).toEqual({ reopenedCount: 0 });
+      expect(
+        await db.prisma.auditLog.count({ where: { entityType: "BankStatementImport", action: "UPDATE" } })
+      ).toBe(audit.length);
+    });
+
+    it("lists ignored incoming entries in the overview until they are reopened", async () => {
+      const { ids } = await seedTransactions([{ amountCents: 5000 }, { amountCents: -800 }]);
+      await ignoreTransactions(ids);
+
+      let overview = await loadImportOverview(db.prisma);
+      expect(overview.ignoredIncoming.total).toBe(1);
+      expect(overview.ignoredIncoming.rows.map((r) => r.id)).toEqual([ids[0]]);
+      expect(overview.incoming).toHaveLength(0);
+
+      await reopenTransactions([ids[0]]);
+      overview = await loadImportOverview(db.prisma);
+      expect(overview.ignoredIncoming.total).toBe(0);
+      expect(overview.incoming.map((r) => r.transaction.id)).toEqual([ids[0]]);
+    });
+
+    it("rejects an invalid payload and a Viewer", async () => {
+      const { ids } = await seedTransactions([{ amountCents: 5000 }]);
+      await ignoreTransactions(ids);
+      expect(await reopenTransactions(["x" as unknown as number])).toEqual({ error: "Ungültige Eingabe." });
+      expect(await reopenTransactions([])).toEqual({ error: "Keine Bewegung ausgewählt." });
+
+      // requireEditor redirects a Viewer, which surfaces as a thrown NEXT_REDIRECT.
+      vi.mocked(requireEditor).mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+      await expect(reopenTransactions(ids)).rejects.toThrow("NEXT_REDIRECT");
+      const row = await db.prisma.bankTransaction.findUniqueOrThrow({ where: { id: ids[0] } });
+      expect(row.ignored).toBe(true);
+    });
+  });
+
+  it("shows why an import cannot be undone in the overview", async () => {
+    const inv = await seedInvoice();
+    const booked = await seedTransactions([{ amountCents: 10000 }]);
+    await bookPayments([{ transactionId: booked.ids[0], invoiceId: inv.id }]);
+    const free = await seedTransactions([{ amountCents: -100 }]);
+
+    const overview = await loadImportOverview(db.prisma);
+    const byId = new Map(overview.imports.map((row) => [row.id, row.undoBlockedReason]));
+    expect(byId.get(booked.importId)).toContain("verbucht");
+    expect(byId.get(free.importId)).toBeNull();
+  });
+
+  it("lists open invoices with customer name and open amount for the manual pick", async () => {
+    const inv = await seedInvoice("Sent", 250);
+    await seedInvoice("Paid");
+    const { ids } = await seedTransactions([{ amountCents: 4000 }]);
+    await bookPayments([{ transactionId: ids[0], invoiceId: inv.id }]);
+
+    const overview = await loadImportOverview(db.prisma);
+    const customer = await db.prisma.customer.findFirstOrThrow({ where: { customerId: inv.customerId } });
+    expect(overview.openInvoices).toEqual([
+      {
+        id: inv.id,
+        documentNumber: inv.documentNumber,
+        customerName: customer.company ?? customer.contactPerson ?? "",
+        openAmount: 210,
+      },
+    ]);
   });
 
   it("undoes an untouched import and refuses one with a booked entry", async () => {
