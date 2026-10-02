@@ -140,7 +140,7 @@ async function defaultNotify(...args: Parameters<NotifyAdmins>): Promise<boolean
  * Tells the admins that a backup failed, over the same channels as the daily
  * notifications (notify e-mail address, Telegram). Runs at most once per
  * nightly job, so no extra throttling. Never throws: a broken notification
- * setup must not affect the job. Returns whether at least one admin channel is configured (delivery
+ * setup must not affect the job. Returns whether at least one admin channel delivered (delivery
  * errors are swallowed per channel).
  */
 export async function notifyBackupFailure(

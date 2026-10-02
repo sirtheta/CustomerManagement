@@ -49,4 +49,27 @@ describe("zipStream", () => {
     expect(Object.keys(files)).toHaveLength(300);
     expect(files["f/299.bin"]).toEqual(payload);
   });
+
+  it("does not let the last add succeed after the consumer cancelled while it waited", async () => {
+    let outcome: "pending" | "returned" | "threw" = "pending";
+    let aborted = () => false;
+    // Without a reader the queue fills up after a few files, so the last add of a
+    // run this long is the one waiting for backpressure when the consumer cancels.
+    const stream = zipStream(async (add, isAborted) => {
+      aborted = isAborted;
+      try {
+        for (let i = 0; i < 8; i++) await add(`f${i}.bin`, new Uint8Array(10), { store: true });
+        outcome = "returned";
+      } catch (err) {
+        outcome = "threw";
+        throw err;
+      }
+    });
+    const reader = stream.getReader();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await reader.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(aborted()).toBe(true);
+    expect(outcome).toBe("threw");
+  });
 });

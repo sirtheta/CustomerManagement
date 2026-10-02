@@ -33,3 +33,14 @@ export function advancePast(date: Date, interval: SubscriptionIntervalName, toda
   while (next.getTime() <= today.getTime()) next = addInterval(next, interval);
   return next;
 }
+
+/** Number of due periods `advancePast` drops: all but the first one that is already in the past. */
+export function skippedPeriods(date: Date, interval: SubscriptionIntervalName, today: Date): number {
+  let skipped = 0;
+  let next = addInterval(date, interval);
+  while (next.getTime() <= today.getTime()) {
+    skipped++;
+    next = addInterval(next, interval);
+  }
+  return skipped;
+}

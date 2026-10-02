@@ -64,7 +64,9 @@ export async function closeAnsweredFollowUps(prisma: PrismaClient): Promise<numb
 
 /**
  * Tells the admin channels about open tasks that are due and were not
- * announced yet (one message for all of them), then stamps them.
+ * announced yet (one message for all of them). They are stamped only when at
+ * least one channel delivered: with no channel configured, or when every
+ * delivery failed, they stay unannounced and are tried again on the next run.
  */
 export async function notifyDueTasks(
   prisma: PrismaClient,
@@ -78,12 +80,13 @@ export async function notifyDueTasks(
   });
   if (due.length === 0) return;
   const { notifyAdmins } = await import("@/lib/notifications");
-  await notifyAdmins(
+  const delivered = await notifyAdmins(
     settings,
     `Fällige Aufgaben – ${due.length} Aufgabe(n)`,
     `${due.length} Aufgabe(n) sind fällig.`,
     "/dashboard"
   );
+  if (!delivered) return;
   await prisma.task.updateMany({
     where: { id: { in: due.map((t) => t.id) } },
     data: { notifiedAt: now },

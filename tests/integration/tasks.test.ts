@@ -104,6 +104,24 @@ describe("customer tasks", () => {
       expect(stamped.map((t) => t.title)).toEqual(["fällig"]);
     });
 
+    it("keeps due tasks unannounced when no channel delivered, and retries on the next run", async () => {
+      notifyAdmins.mockClear();
+      const { customer } = await seedQuote();
+      const now = new Date(2026, 9, 10);
+      await db.prisma.task.create({
+        data: { customerId: customer.customerId, title: "fällig", dueDate: new Date(2026, 9, 9) },
+      });
+
+      notifyAdmins.mockResolvedValueOnce(false);
+      await notifyDueTasks(db.prisma, settings, now);
+      expect(await db.prisma.task.count({ where: { notifiedAt: { not: null } } })).toBe(0);
+
+      notifyAdmins.mockResolvedValueOnce(true);
+      await notifyDueTasks(db.prisma, settings, now);
+      expect(notifyAdmins).toHaveBeenCalledTimes(2);
+      expect(await db.prisma.task.count({ where: { notifiedAt: { not: null } } })).toBe(1);
+    });
+
     it("does nothing without settings", async () => {
       notifyAdmins.mockClear();
       await notifyDueTasks(db.prisma, null);

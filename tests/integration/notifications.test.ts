@@ -415,6 +415,19 @@ describe("notifyAdmins", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("returns false when every configured channel fails to deliver", async () => {
+    mockSendMail.mockRejectedValueOnce(new Error("SMTP down"));
+    mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => "boom" });
+    expect(await notifyAdmins(baseSettings(), "S", "M", "/")).toBe(false);
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns true when only one of two channels delivers", async () => {
+    mockSendMail.mockRejectedValueOnce(new Error("SMTP down"));
+    expect(await notifyAdmins(baseSettings(), "S", "M", "/")).toBe(true);
+  });
+
   it("returns false when no channel is configured", async () => {
     const settings = {
       ...baseSettings(),

@@ -5,6 +5,7 @@ vi.mock("@/lib/prisma", () => ({
     $transaction: vi.fn(),
     quote: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), findUnique: vi.fn() },
     item: { createMany: vi.fn(), deleteMany: vi.fn() },
+    task: { updateMany: vi.fn() },
     quoteSentLog: { create: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
     invoice: { create: vi.fn() },
@@ -338,6 +339,10 @@ describe("quote actions", () => {
 
       await expect(deleteQuote(1)).rejects.toThrow("REDIRECT:/quotes");
       expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { quoteId: 1 } });
+      expect(prisma.task.updateMany).toHaveBeenCalledWith({
+        where: { quoteId: 1, doneAt: null },
+        data: { doneAt: expect.any(Date) },
+      });
       expect(prisma.quote.delete).toHaveBeenCalledWith({ where: { id: 1 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Quote", 1, "Q-2026-001");
     });

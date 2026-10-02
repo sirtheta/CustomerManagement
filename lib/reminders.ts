@@ -67,15 +67,23 @@ export function reminderSnoozedUntil(
 export async function checkOverdueInvoices(prisma: PrismaClient, today: Date = swissToday()): Promise<void> {
   // Safety net for state changes that bypass the actions (direct DB edits,
   // older code paths): reminders of invoices that are neither Overdue nor
-  // PartiallyPaid are stale and must not linger in the Mahnungen list.
+  // PartiallyPaid are stale and must not linger in the Mahnungen list. Same for
+  // invoices with a total of 0: nothing is open, `sendReminder` refuses them.
+  // (Invoices settled by payments or credit notes leave Overdue/PartiallyPaid
+  // in `recalculateInvoiceState`, which drops their reminder.)
   await prisma.pendingReminder.deleteMany({
-    where: { invoice: { state: { notIn: [...REMINDER_STATES] } } },
+    where: {
+      OR: [
+        { invoice: { state: { notIn: [...REMINDER_STATES] } } },
+        { invoice: { totalAmount: { lte: 0 } } },
+      ],
+    },
   });
 
   // Also picks up PartiallyPaid invoices that became overdue after the partial
   // payment, or whose reminder an older version deleted on the payment.
   const overdueInvoices = await prisma.invoice.findMany({
-    where: { AND: [overdueInvoiceWhere(today), { pendingReminder: null }] },
+    where: { AND: [overdueInvoiceWhere(today), { totalAmount: { gt: 0 } }, { pendingReminder: null }] },
     select: { id: true },
   });
 

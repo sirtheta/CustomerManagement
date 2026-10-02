@@ -321,23 +321,45 @@ export function parseCamt053(xml: string): ParsedStatement {
 
       // A collective booking (Sammelbuchung) carries several TxDtls under one
       // Ntry; each is a real transaction and has to be imported separately.
+      // That only works when every TxDtls states its own amount: falling back to
+      // the entry amount per leg would book it several times, so such an entry
+      // is imported as one row with the entry amount instead.
       if (details.length > 1) {
-        for (const txDetails of details) {
-          const indicator = firstText(txDetails, [["CdtDbtInd"]]) ?? entryIndicator;
-          const amountCents = signedAmount(txDetails.Amt ?? entry.Amt, indicator);
-          if (amountCents === null) {
-            warnings.push("Eine Teilbuchung ohne lesbaren Betrag wurde übersprungen.");
-            continue;
+        if (details.every((txDetails) => text(txDetails?.Amt) !== null)) {
+          for (const txDetails of details) {
+            const indicator = firstText(txDetails, [["CdtDbtInd"]]) ?? entryIndicator;
+            const amountCents = signedAmount(txDetails.Amt, indicator);
+            if (amountCents === null) {
+              warnings.push("Eine Teilbuchung ohne lesbaren Betrag wurde übersprungen.");
+              continue;
+            }
+            const counterparty = counterpartyOf(txDetails, entry, indicator === "DBIT");
+            transactions.push({
+              date: entryDate,
+              amountCents,
+              description: descriptionOf(txDetails, entry, counterparty),
+              counterparty,
+              bankReference: referenceOf(txDetails, entry, false),
+            });
           }
-          const counterparty = counterpartyOf(txDetails, entry, indicator === "DBIT");
-          transactions.push({
-            date: entryDate,
-            amountCents,
-            description: descriptionOf(txDetails, entry, counterparty),
-            counterparty,
-            bankReference: referenceOf(txDetails, entry, false),
-          });
+          continue;
         }
+
+        const amountCents = signedAmount(entry.Amt, entryIndicator);
+        if (amountCents === null) {
+          warnings.push("Eine Bewegung ohne lesbaren Betrag wurde übersprungen.");
+          continue;
+        }
+        warnings.push(
+          "Eine Sammelbuchung ohne Einzelbeträge wurde als eine einzige Bewegung mit dem Gesamtbetrag importiert."
+        );
+        transactions.push({
+          date: entryDate,
+          amountCents,
+          description: descriptionOf(null, entry, null),
+          counterparty: null,
+          bankReference: referenceOf(null, entry),
+        });
         continue;
       }
 

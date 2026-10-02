@@ -13,6 +13,7 @@ import {
   type ExpenseHint,
   type OpenTransaction,
 } from "@/lib/import/bank-import";
+import { UNDO_HINT_BOOKED, undoHintLaterImport } from "@/lib/import/undo-hints";
 import {
   matchStatementToInvoices,
   type MatchedTransaction,
@@ -92,6 +93,8 @@ export interface ImportOverview {
     createdAt: string;
     /** Why "Rückgängig" is not possible, `null` when it is. Same texts as `undoImport`. */
     undoBlockedReason: string | null;
+    /** One-line form of `undoBlockedReason` for the history table. */
+    undoBlockedHint: string | null;
   }>;
 }
 
@@ -128,10 +131,12 @@ export async function loadImportOverview(
           select: { id: true, filename: true, iban: true, periodFrom: true, periodTo: true },
         })
       : [];
-  const undoBlockedReason = (row: (typeof imports)[number]): string | null => {
-    if ((bookedByImport.get(row.id) ?? 0) > 0) return UNDO_BLOCKED_BOOKED;
+  const undoBlocked = (row: (typeof imports)[number]): { reason: string; hint: string } | null => {
+    if ((bookedByImport.get(row.id) ?? 0) > 0) return { reason: UNDO_BLOCKED_BOOKED, hint: UNDO_HINT_BOOKED };
     const shadowing = pickShadowingImport(row, shadowCandidates);
-    return shadowing ? undoBlockedByLaterImport(shadowing.filename) : null;
+    return shadowing
+      ? { reason: undoBlockedByLaterImport(shadowing.filename), hint: undoHintLaterImport(shadowing.filename) }
+      : null;
   };
 
   return {
@@ -147,18 +152,22 @@ export async function loadImportOverview(
     ignoredIncoming,
     expenses: outgoing.map((transaction) => ({ transaction, hint: hints[transaction.id] })),
     categories,
-    imports: imports.map((row) => ({
-      id: row.id,
-      filename: row.filename,
-      iban: row.iban,
-      periodFrom: row.periodFrom,
-      periodTo: row.periodTo,
-      importedCount: row.importedCount,
-      skippedCount: row.skippedCount,
-      bookedCount: bookedByImport.get(row.id) ?? 0,
-      balanceWarning: row.balanceWarning,
-      createdAt: row.createdAt.toISOString(),
-      undoBlockedReason: undoBlockedReason(row),
-    })),
+    imports: imports.map((row) => {
+      const blocked = undoBlocked(row);
+      return {
+        id: row.id,
+        filename: row.filename,
+        iban: row.iban,
+        periodFrom: row.periodFrom,
+        periodTo: row.periodTo,
+        importedCount: row.importedCount,
+        skippedCount: row.skippedCount,
+        bookedCount: bookedByImport.get(row.id) ?? 0,
+        balanceWarning: row.balanceWarning,
+        createdAt: row.createdAt.toISOString(),
+        undoBlockedReason: blocked?.reason ?? null,
+        undoBlockedHint: blocked?.hint ?? null,
+      };
+    }),
   };
 }

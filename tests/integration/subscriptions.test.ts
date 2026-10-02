@@ -3,6 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { checkSubscriptions } from "@/lib/subscriptions";
 
+const notifyAdmins = vi.fn().mockResolvedValue(true);
+vi.mock("@/lib/notifications", () => ({ notifyAdmins: (...a: unknown[]) => notifyAdmins(...a) }));
+
 describe("checkSubscriptions", () => {
   const db = createTestDatabase();
 
@@ -136,6 +139,50 @@ describe("checkSubscriptions", () => {
     await seedSubscription({ interval: "Monthly", nextInvoiceDate: new Date(2026, 0, 15) });
     await checkSubscriptions(db.prisma);
     expect(await db.prisma.invoice.count()).toBe(1);
+  });
+
+  describe("periods that were already due", () => {
+    function atFixedDay() {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 9, 2, 12) });
+    }
+
+    it("bills one period and records and announces the skipped ones", async () => {
+      atFixedDay();
+      try {
+        notifyAdmins.mockClear();
+        await db.prisma.applicationSettings.create({ data: { companyInfo: { create: {} } } });
+        const sub = await seedSubscription({ interval: "Monthly", nextInvoiceDate: new Date(2026, 6, 15) });
+        await checkSubscriptions(db.prisma);
+
+        // 15 Jul, 15 Aug and 15 Sep are due: one invoice, two dropped, next on 15 Oct.
+        expect(await db.prisma.invoice.count()).toBe(1);
+        const updated = await db.prisma.subscription.findUniqueOrThrow({ where: { id: sub.id } });
+        expect(updated.nextInvoiceDate).toEqual(new Date(2026, 9, 15));
+        const [entry] = await db.prisma.auditLog.findMany({ where: { entityType: "Invoice", action: "CREATE" } });
+        expect(JSON.parse(entry.details!)).toMatchObject({ subscriptionId: sub.id, skippedPeriods: 2 });
+        expect(notifyAdmins).toHaveBeenCalledTimes(1);
+        expect(notifyAdmins.mock.calls[0][1]).toBe("Abo: Perioden übersprungen");
+        expect(notifyAdmins.mock.calls[0][2]).toContain("2 weitere Periode(n)");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("stays silent when only the current period was due", async () => {
+      atFixedDay();
+      try {
+        notifyAdmins.mockClear();
+        await db.prisma.applicationSettings.create({ data: { companyInfo: { create: {} } } });
+        await seedSubscription({ interval: "Monthly", nextInvoiceDate: new Date(2026, 8, 15) });
+        await checkSubscriptions(db.prisma);
+
+        expect(notifyAdmins).not.toHaveBeenCalled();
+        const [entry] = await db.prisma.auditLog.findMany({ where: { entityType: "Invoice", action: "CREATE" } });
+        expect(entry.details).not.toContain("skippedPeriods");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it("skips paused subscriptions", async () => {

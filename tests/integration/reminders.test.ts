@@ -120,6 +120,31 @@ describe("checkOverdueInvoices", () => {
     expect(count).toBe(0);
   });
 
+  it("creates no PendingReminder for an overdue invoice with a total of 0 and removes an existing one", async () => {
+    const { prisma } = db;
+    const customer = await seedCustomer();
+    const zero = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId, documentNumber: "R-240020", date: pastDate(40),
+        dueDate: pastDate(5), totalAmount: 0, state: "Overdue",
+      },
+    });
+    const zeroWithReminder = await prisma.invoice.create({
+      data: {
+        customerId: customer.customerId, documentNumber: "R-240021", date: pastDate(40),
+        dueDate: pastDate(5), totalAmount: 0, state: "Overdue",
+      },
+    });
+    await prisma.pendingReminder.create({ data: { invoiceId: zeroWithReminder.id } });
+    const normal = await seedOverdueInvoice(customer.customerId, "R-240022");
+
+    await checkOverdueInvoices(prisma);
+
+    expect(await prisma.pendingReminder.findUnique({ where: { invoiceId: zero.id } })).toBeNull();
+    expect(await prisma.pendingReminder.findUnique({ where: { invoiceId: zeroWithReminder.id } })).toBeNull();
+    expect(await prisma.pendingReminder.findUnique({ where: { invoiceId: normal.id } })).not.toBeNull();
+  });
+
   it("creates no PendingReminder for a credit note", async () => {
     const { prisma } = db;
     const customer = await seedCustomer();

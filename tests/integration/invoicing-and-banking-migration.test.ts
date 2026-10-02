@@ -129,10 +129,17 @@ describe(`migration ${MIGRATION}`, () => {
 
     upgrade(db);
 
-    const subs = db.prepare(`SELECT * FROM "Subscription"`).all() as Record<string, unknown>[];
-    expect(subs).toHaveLength(1);
-    expect(subs[0]).toMatchObject({ interval: "Yearly", autoSend: 0, active: 1, templateId: null });
+    const subs = db
+      .prepare(
+        `SELECT s.*, c."contactPerson" FROM "Subscription" s JOIN "Customer" c ON c."customerId" = s."customerId" ORDER BY s."id"`
+      )
+      .all() as Record<string, unknown>[];
+    expect(subs).toHaveLength(2);
+    expect(subs[0]).toMatchObject({ contactPerson: "Yearly Kunde", interval: "Yearly", autoSend: 0, active: 1, templateId: null });
     expect(subs[0].nextInvoiceDate).toBe(date);
+    // No date: kept as a paused subscription on 1 January of next year (local midnight)
+    expect(subs[1]).toMatchObject({ contactPerson: "Jahr ohne Datum", interval: "Yearly", autoSend: 0, active: 0, templateId: null });
+    expect(subs[1].nextInvoiceDate).toBe(new Date(new Date().getFullYear() + 1, 0, 1).getTime());
 
     const cols = (db.prepare(`PRAGMA table_info("Customer")`).all() as { name: string }[]).map((c) => c.name);
     expect(cols).not.toContain("yearlyInvoice");

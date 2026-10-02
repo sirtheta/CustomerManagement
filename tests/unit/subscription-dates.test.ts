@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addInterval, advancePast, INTERVAL_LABELS } from "@/lib/subscription-dates";
+import { addInterval, advancePast, skippedPeriods, INTERVAL_LABELS } from "@/lib/subscription-dates";
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
 
@@ -38,6 +38,23 @@ describe("advancePast", () => {
   it("never returns a date <= today", () => {
     const today = d(2026, 10, 15);
     expect(advancePast(d(2026, 9, 15), "Monthly", today).getTime()).toBeGreaterThan(today.getTime());
+  });
+});
+
+describe("skippedPeriods", () => {
+  it("is 0 when only the current period is due", () => {
+    expect(skippedPeriods(d(2026, 9, 29), "Monthly", d(2026, 9, 30))).toBe(0);
+    expect(skippedPeriods(d(2026, 9, 30), "Monthly", d(2026, 9, 30))).toBe(0);
+  });
+  it("counts every due period after the first", () => {
+    expect(skippedPeriods(d(2026, 1, 15), "Monthly", d(2026, 9, 30))).toBe(8);
+    expect(skippedPeriods(d(2025, 10, 1), "Quarterly", d(2026, 10, 2))).toBe(4);
+  });
+  it("matches the number of steps advancePast takes beyond the first", () => {
+    const today = d(2026, 10, 2);
+    const next = advancePast(d(2026, 1, 31), "Monthly", today);
+    expect(skippedPeriods(d(2026, 1, 31), "Monthly", today)).toBe(8);
+    expect(next).toEqual(d(2026, 10, 28));
   });
 });
 

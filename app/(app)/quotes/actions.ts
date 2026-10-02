@@ -148,7 +148,9 @@ export async function deleteQuote(id: number): Promise<{ error?: string }> {
   const q = await prisma.quote.findUnique({ where: { id }, select: { documentNumber: true } });
   try {
     // Item.quote has no onDelete (SET NULL), so the items would stay behind as orphans.
+    // Task.quote is SET NULL too: the open follow-up would stay open without its quote.
     await prisma.$transaction([
+      prisma.task.updateMany({ where: { quoteId: id, doneAt: null }, data: { doneAt: new Date() } }),
       prisma.item.deleteMany({ where: { quoteId: id } }),
       prisma.quote.delete({ where: { id } }),
     ]);

@@ -23,11 +23,13 @@ export async function GET(request: Request) {
   const year = parseYearParam(new URL(request.url).searchParams.get("year"), now);
   if (year === null) return Response.json({ error: "Bad Request" }, { status: 400 });
 
-  const stream = zipStream(async (add) => {
+  const stream = zipStream(async (add, aborted) => {
     try {
       const summary = await buildYearPackage(prisma, year, now, (entry) =>
         add(entry.name, entry.data, { store: entry.name.endsWith(".pdf") })
       );
+      // Only a download that ran to the end is audited, not one the client aborted.
+      if (aborted()) throw new Error("Download abgebrochen");
       await logAudit(session, "EXPORT", "YearPackage", undefined, String(year), { ...summary });
     } catch (err) {
       log.error({ err, year }, "Year package failed");

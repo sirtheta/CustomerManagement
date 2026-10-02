@@ -89,11 +89,20 @@ CREATE TABLE "Subscription" (
 );
 
 -- Existing yearly customers become one Yearly subscription each (no template,
--- manual approval), keeping their planned date.
+-- manual approval), keeping their planned date. A customer flagged yearly
+-- without a date was never invoiced by the old job; they become a PAUSED
+-- subscription dated 1 January of next year (local midnight, like dates saved
+-- through the app), so nothing is lost and nothing is billed unasked.
 INSERT INTO "Subscription" ("customerId", "interval", "nextInvoiceDate", "autoSend", "active")
-SELECT "customerId", 'Yearly', "nextInvoiceDate", false, true
+SELECT "customerId", 'Yearly',
+  COALESCE(
+    "nextInvoiceDate",
+    CAST(strftime('%s', date('now', 'localtime', 'start of year', '+1 year'), 'utc') AS INTEGER) * 1000
+  ),
+  false,
+  "nextInvoiceDate" IS NOT NULL
 FROM "Customer"
-WHERE "yearlyInvoice" = true AND "nextInvoiceDate" IS NOT NULL;
+WHERE "yearlyInvoice" = true;
 
 CREATE INDEX "Subscription_nextInvoiceDate_idx" ON "Subscription"("nextInvoiceDate");
 CREATE INDEX "Subscription_customerId_idx" ON "Subscription"("customerId");

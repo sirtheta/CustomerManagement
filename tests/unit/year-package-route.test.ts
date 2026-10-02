@@ -89,4 +89,18 @@ describe("GET /api/export/year-package", () => {
     await expect(res.arrayBuffer()).rejects.toThrow("db down");
     expect(logAudit).not.toHaveBeenCalled();
   });
+
+  it("writes no audit entry when the client aborts the download before the package is finished", async () => {
+    vi.mocked(buildYearPackage).mockImplementationOnce(async (_prisma, _year, _now, emit) => {
+      await emit({ name: "jahrespaket-2026/journal-2026.csv", data: new TextEncoder().encode("Datum") });
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return { fileCount: 1, pdfOk: 0, pdfMissing: 0, pdfMismatch: 0, withoutPdf: 0 };
+    });
+    const res = await GET(req("year=2026"));
+    const reader = res.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(logAudit).not.toHaveBeenCalled();
+  });
 });

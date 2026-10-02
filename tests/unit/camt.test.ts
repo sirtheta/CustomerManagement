@@ -136,6 +136,45 @@ describe("parseCamt053", () => {
     expect(result.transactions.map((t) => t.description)).toEqual(["Teil A", "Teil B"]);
   });
 
+  it("imports a collective booking without individual amounts once, with the entry amount", () => {
+    const collective = `
+      <Ntry>
+        <NtryRef>SAMMEL-1</NtryRef>
+        <Amt Ccy="CHF">150.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-01-10</Dt></BookgDt>
+        <AddtlNtryInf>Sammelauftrag</AddtlNtryInf>
+        <NtryDtls>
+          <TxDtls><RmtInf><Ustrd>Teil A</Ustrd></RmtInf></TxDtls>
+          <TxDtls><RmtInf><Ustrd>Teil B</Ustrd></RmtInf></TxDtls>
+          <TxDtls><RmtInf><Ustrd>Teil C</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+      </Ntry>`;
+    const result = parseCamt053(camt(collective));
+    expect(result.transactions).toHaveLength(1);
+    expect(result.transactions[0].amountCents).toBe(-15000);
+    expect(result.transactions[0].description).toBe("Sammelauftrag");
+    expect(result.transactions[0].bankReference).toBe("SAMMEL-1");
+    expect(result.warnings.join(" ")).toContain("Sammelbuchung ohne Einzelbeträge");
+  });
+
+  it("never books more than the entry when only some legs carry an amount", () => {
+    const collective = `
+      <Ntry>
+        <Amt Ccy="CHF">150.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-01-10</Dt></BookgDt>
+        <NtryDtls>
+          <TxDtls><Amt Ccy="CHF">100.00</Amt><RmtInf><Ustrd>Teil A</Ustrd></RmtInf></TxDtls>
+          <TxDtls><RmtInf><Ustrd>Teil B</Ustrd></RmtInf></TxDtls>
+        </NtryDtls>
+      </Ntry>`;
+    const result = parseCamt053(camt(collective));
+    expect(result.transactions.map((t) => t.amountCents)).toEqual([15000]);
+  });
+
   it("treats a literal NOTPROVIDED InstrId as no reference at all", () => {
     const atmWithdrawal = `
       <Ntry>

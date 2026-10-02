@@ -24,7 +24,15 @@ type Props = {
   documentNumber: string | null;
   defaultSubject: string;
   defaultBody: string;
+  /** For drafts: the number the next numbering would assign (shown only, never sent). */
+  expectedDocumentNumber?: string | null;
 };
+
+const NUMBER_PLACEHOLDER = "{documentNumber}";
+const NUMBER_PENDING_TEXT = "(wird beim Senden vergeben)";
+
+const replaceAllText = (text: string, search: string, replacement: string) =>
+  text.split(search).join(replacement);
 
 export default function SendQuoteButton({
   quoteId,
@@ -32,12 +40,21 @@ export default function SendQuoteButton({
   documentNumber,
   defaultSubject,
   defaultBody,
+  expectedDocumentNumber = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [to, setTo] = useState(customerEmail);
-  const [subject, setSubject] = useState(defaultSubject);
-  const [body, setBody] = useState(defaultBody);
+  // A draft has no number yet: the dialog shows the expected number (or a note) in place
+  // of the placeholder, and the submitted text carries the placeholder again, so the server
+  // fills in the number it really assigns when sending.
+  const shownNumber = documentNumber ? null : (expectedDocumentNumber ?? NUMBER_PENDING_TEXT);
+  const toDisplay = (text: string) =>
+    shownNumber ? replaceAllText(text, NUMBER_PLACEHOLDER, shownNumber) : text;
+  const toSubmit = (text: string) =>
+    shownNumber ? replaceAllText(text, shownNumber, NUMBER_PLACEHOLDER) : text;
+  const [subject, setSubject] = useState(() => toDisplay(defaultSubject));
+  const [body, setBody] = useState(() => toDisplay(defaultBody));
 
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     sendQuote,
@@ -61,8 +78,8 @@ export default function SendQuoteButton({
     if (open) {
       setTab("edit");
       setTo(customerEmail);
-      setSubject(defaultSubject);
-      setBody(defaultBody);
+      setSubject(toDisplay(defaultSubject));
+      setBody(toDisplay(defaultBody));
     }
   }
 
@@ -113,13 +130,10 @@ export default function SendQuoteButton({
           <input type="hidden" name="quoteId" value={quoteId} />
 
           {/* Hidden inputs carry values when in preview mode */}
-          {tab === "preview" && (
-            <>
-              <input type="hidden" name="to" value={to} />
-              <input type="hidden" name="subject" value={subject} />
-              <input type="hidden" name="body" value={body} />
-            </>
-          )}
+          {tab === "preview" && <input type="hidden" name="to" value={to} />}
+          {/* Subject and body are always submitted from here, with the number placeholder restored. */}
+          <input type="hidden" name="subject" value={toSubmit(subject)} />
+          <input type="hidden" name="body" value={toSubmit(body)} />
 
           {/* Edit tab */}
           <div className={tab === "edit" ? "space-y-4" : "hidden"}>
@@ -138,17 +152,27 @@ export default function SendQuoteButton({
               <Label htmlFor="send-subject">Betreff</Label>
               <Input
                 id="send-subject"
-                name="subject"
                 required
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
               />
+              {shownNumber && (
+                <p className="text-xs text-muted-foreground">
+                  {expectedDocumentNumber ? (
+                    <>
+                      Die Nummer wird beim Senden vergeben (voraussichtlich{" "}
+                      <span className="whitespace-nowrap">{expectedDocumentNumber}</span>).
+                    </>
+                  ) : (
+                    "Die Nummer wird beim Senden vergeben."
+                  )}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="send-body">Nachricht</Label>
               <textarea
                 id="send-body"
-                name="body"
                 rows={7}
                 required
                 value={body}

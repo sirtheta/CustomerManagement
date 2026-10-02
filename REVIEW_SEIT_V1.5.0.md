@@ -76,19 +76,19 @@ Stand 2026-10-02: Commits `04f46a4`, `f5148b1`, `aec19c9`, `82b2cc5`, `06453fd`.
 
 ## 3. Weitere Code-Findings (Low)
 - [x] `undoImport` löscht Einträge, die ein späterer überlappender Import übersprungen hat (`lib/import/bank-import.ts:159-196`).
-- [ ] Jahrespaket kann `EXPORT`-Audit für abgebrochenen Download schreiben (`lib/zip.ts:31-33`).
-- [ ] «Alle nicht angehakten ignorieren» scheitert bei > 1000 Zeilen (`import/actions.ts:22,233`).
-- [ ] Abo-Nachholen überspringt verpasste Perioden ohne Hinweis (`lib/subscription-dates.ts:31-35`).
-- [ ] Fällige Aufgaben werden als gemeldet markiert, auch wenn kein Kanal zustellte (`lib/tasks.ts:80-90`).
-- [ ] CAMT-Sammelbuchung ohne `TxDtls/Amt` vervielfacht den Betrag (`lib/import/camt.ts`).
-- [ ] Nachfass-Aufgabe bleibt offen, wenn die Offerte gelöscht wird (`Task.quote onDelete: SetNull`).
-- [ ] «Jährliche Rechnung» ohne Datum geht bei der Migration verloren (optional pausiertes Abo anlegen).
+- [x] Jahrespaket kann `EXPORT`-Audit für abgebrochenen Download schreiben (`lib/zip.ts:31-33`).  (behoben: Abbruch während des letzten Wartens bzw. vor dem Audit schreibt keinen Eintrag mehr)
+- [x] «Alle nicht angehakten ignorieren» scheitert bei > 1000 Zeilen (`import/actions.ts:22,233`).  (kein Fehler: die Oberfläche sendet bereits Blöcke zu 1000; Test ergänzt)
+- [x] Abo-Nachholen überspringt verpasste Perioden ohne Hinweis (`lib/subscription-dates.ts:31-35`).  (Verzicht bleibt, ist jetzt sichtbar: Audit `skippedPeriods` + Admin-Meldung)
+- [x] Fällige Aufgaben werden als gemeldet markiert, auch wenn kein Kanal zustellte (`lib/tasks.ts:80-90`).  (`notifyAdmins` meldet Zustellung, gestempelt wird nur bei Erfolg)
+- [x] CAMT-Sammelbuchung ohne `TxDtls/Amt` vervielfacht den Betrag (`lib/import/camt.ts`).  (Aufteilung nur, wenn jede Einzelposition einen Betrag hat, sonst eine Zeile mit Gesamtbetrag + Warnung)
+- [x] Nachfass-Aufgabe bleibt offen, wenn die Offerte gelöscht wird (`Task.quote onDelete: SetNull`).  (`deleteQuote` schliesst offene Nachfass-Aufgaben; Altfälle mit `quoteId = null` bleiben)
+- [x] «Jährliche Rechnung» ohne Datum geht bei der Migration verloren (optional pausiertes Abo anlegen).  (pausiertes Jahres-Abo, Datum 1.1. des Folgejahres)
 - [x] «Verwerfen» bei Abo-Entwürfen löscht nur `PendingEmail`, Audit sagt «DELETE Invoice». (`discardPendingEmail` löscht jetzt Entwurf + Positionen + `PendingEmail` in einer Transaktion, mit Bestätigungsdialog; ist die Rechnung kein unnummerierter Entwurf mehr, nur die `PendingEmail`, Audit dann «DELETE PendingEmail».)
 
-- [ ] `deleteInvoice` löscht die Positionen nicht mit (`Item.invoice` ohne `onDelete`, Migration `SET NULL`): verwaiste `Item`-Zeilen (`app/(app)/invoices/actions.ts`).
-- [ ] `PendingEmailRow`: Erfolgs-Toast nach «Senden» läuft über `useActionToast` und erscheint vermutlich nie, weil die Zeile nach der Revalidierung weg ist (Muster wie in `ReminderRow`).
-- [ ] Überfällige Rechnung über CHF 0 bekommt vom Tagesjob eine Mahnung, deren Versand abgelehnt wird («bereits beglichen»).
-- [ ] Offerten-Senden-Dialog zeigt bei Entwürfen `{documentNumber}`; Sperrtext bei «Rückgängig» macht Zeilen im Importverlauf hoch.
+- [x] `deleteInvoice` löscht die Positionen nicht mit (`Item.invoice` ohne `onDelete`, Migration `SET NULL`): verwaiste `Item`-Zeilen (`app/(app)/invoices/actions.ts`).
+- [x] `PendingEmailRow`: Erfolgs-Toast nach «Senden» läuft über `useActionToast` und erscheint vermutlich nie, weil die Zeile nach der Revalidierung weg ist (Muster wie in `ReminderRow`).
+- [x] Überfällige Rechnung über CHF 0 bekommt vom Tagesjob eine Mahnung, deren Versand abgelehnt wird («bereits beglichen»).  (Tagesjob legt keine Mahnung für Betrag 0 an und räumt Altfälle auf)
+- [x] Offerten-Senden-Dialog zeigt bei Entwürfen `{documentNumber}`; Sperrtext bei «Rückgängig» macht Zeilen im Importverlauf hoch.  (Nummer-Hinweis wie bei Rechnungen; Sperrgrund als aufklappbarer Kurztext)
 
 ## 4. Tests
 - [x] Kein Test der 5-Rappen-Rundung für `createInvoice`/`updateInvoice`. `tests/integration/invoice-actions-db.test.ts` (echte Test-DB): aus = exakt, ein = Total nach Rabatt gerundet (Positionen nicht), Draft-Update rechnet neu, Gutschrift rundet gespiegelt, Umschalten via `setSetting` lässt bestehende Dokumente stehen.

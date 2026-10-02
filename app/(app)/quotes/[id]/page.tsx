@@ -24,6 +24,7 @@ import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
 import { quoteMail } from "@/lib/mail-templates";
+import { generateQuoteNumber } from "@/lib/document-number";
 
 const stateLabels: Record<QuoteState, string> = {
   Draft: "Entwurf",
@@ -68,6 +69,9 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const companyName = settings?.companyInfo.companyName ?? "";
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
   const { subject: defaultSubject, body: defaultBody } = quoteMail(quote, companyName);
+
+  // Read-only preview for the send dialog; the real number is assigned when sending.
+  const nextDocumentNumber = quote.documentNumber ? null : await generateQuoteNumber();
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/quotes";
@@ -221,6 +225,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
             documentNumber={quote.documentNumber}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}
+            expectedDocumentNumber={nextDocumentNumber}
           />
           <ConvertToInvoiceButton quoteId={quote.id} />
           <Button

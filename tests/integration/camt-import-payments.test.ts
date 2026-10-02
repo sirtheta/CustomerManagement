@@ -161,6 +161,19 @@ describe("CAMT import actions against a real database", () => {
     expect(entries[0].details).toContain("ignoredBankTransactionIds");
   });
 
+  it("ignores more than 1000 open entries in chunks of 1000, as the expenses table sends them", async () => {
+    const { importId, ids } = await seedTransactions(Array.from({ length: 1500 }, () => ({ amountCents: -100 })));
+    expect(await ignoreTransactions(ids)).toEqual({ error: "Ungültige Eingabe." });
+
+    let ignoredCount = 0;
+    for (let i = 0; i < ids.length; i += 1000) {
+      const result = await ignoreTransactions(ids.slice(i, i + 1000));
+      ignoredCount += result.ignoredCount ?? 0;
+    }
+    expect(ignoredCount).toBe(1500);
+    expect(await db.prisma.bankTransaction.count({ where: { importId, ignored: true } })).toBe(1500);
+  });
+
   it.each(["Paid", "Draft"] as const)("skips a %s invoice", async (state) => {
     const inv = await seedInvoice(state);
     const { ids } = await seedTransactions([{ amountCents: 10000, bankReference: "REF-X" }]);

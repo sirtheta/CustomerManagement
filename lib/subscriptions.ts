@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SYSTEM_ACTOR } from "@/lib/system-actor";
 import { calculateInvoiceTotal, calculateItemTotal } from "@/lib/calculations";
-import { advancePast, type SubscriptionIntervalName } from "@/lib/subscription-dates";
+import { advancePast, skippedPeriods, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { logAuditEntry } from "@/lib/audit";
 import { fillPlaceholders, invoiceMailTemplate, invoicePlaceholders } from "@/lib/mail-templates";
 import logger from "@/lib/logger";
@@ -56,6 +56,32 @@ async function reportAutoSendFailure(
   }
 }
 
+/**
+ * One invoice per run, then the date jumps past today, so further periods that
+ * were already due (long downtime, a date set far in the past) get no invoice.
+ * Tells the admins so they can bill them by hand if needed.
+ */
+async function reportSkippedPeriods(
+  prisma: PrismaClient,
+  settings: (JobSettings & { companyInfo: unknown }) | null,
+  info: { subscriptionId: number; customerName: string; skipped: number; nextInvoiceDate: Date }
+): Promise<void> {
+  const { subscriptionId, customerName, skipped, nextInvoiceDate } = info;
+  log.warn({ subscriptionId, skipped }, "Subscription periods skipped");
+  if (!settings) return;
+  try {
+    const { notifyAdmins } = await import("@/lib/notifications");
+    await notifyAdmins(
+      settings as Parameters<typeof notifyAdmins>[0],
+      "Abo: Perioden übersprungen",
+      `Beim Abo von ${customerName} waren ${skipped + 1} Perioden fällig. Es wurde eine Rechnung erstellt, für ${skipped} weitere Periode(n) wurde keine erstellt. Die nächste Rechnung ist am ${nextInvoiceDate.toLocaleDateString("de-CH")} fällig. Bei Bedarf die fehlenden Rechnungen manuell erstellen.`,
+      "/subscriptions"
+    );
+  } catch (err) {
+    log.error({ err, subscriptionId }, "Notifying the admins about skipped subscription periods failed");
+  }
+}
+
 export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -99,6 +125,9 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
       };
     });
     const totalAmount = calculateInvoiceTotal(items, 0, { roundTo5Rappen: settings?.roundTotalTo5Rappen ?? false });
+    const interval = sub.interval as SubscriptionIntervalName;
+    const nextInvoiceDate = advancePast(sub.nextInvoiceDate, interval, today);
+    const skipped = skippedPeriods(sub.nextInvoiceDate, interval, today);
 
     try {
       // Invoice, PendingEmail and the date advance succeed or fail together: a
@@ -136,9 +165,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         // list was read: no match rolls the whole transaction back.
         const advanced = await tx.subscription.updateMany({
           where: { id: sub.id, active: true, nextInvoiceDate: sub.nextInvoiceDate },
-          data: {
-            nextInvoiceDate: advancePast(sub.nextInvoiceDate, sub.interval as SubscriptionIntervalName, today),
-          },
+          data: { nextInvoiceDate },
         });
         if (advanced.count === 0) throw new SubscriptionChangedError();
 
@@ -153,10 +180,23 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
           entityType: "Invoice",
           entityId: invoiceId,
           entityRef: null,
-          details: JSON.stringify({ subscriptionId: sub.id, source: "subscription" }),
+          details: JSON.stringify({
+            subscriptionId: sub.id,
+            source: "subscription",
+            ...(skipped > 0 ? { skippedPeriods: skipped } : {}),
+          }),
         },
         prisma
       );
+
+      if (skipped > 0) {
+        await reportSkippedPeriods(prisma, settings, {
+          subscriptionId: sub.id,
+          customerName: customerDisplayName(sub.customer),
+          skipped,
+          nextInvoiceDate,
+        });
+      }
 
       // Only a template with items is sent unattended, never a CHF 0 invoice.
       if (sub.autoSend && items.length > 0) {

@@ -2,14 +2,19 @@ import { Zip, ZipDeflate, ZipPassThrough } from "fflate";
 
 export type ZipAdd = (name: string, data: Uint8Array, options?: { store?: boolean }) => Promise<void>;
 
+/** True once the consumer cancelled the stream (e.g. the client closed the download). */
+export type ZipAborted = () => boolean;
+
 /**
  * Streams a ZIP archive. `produce` adds files one by one via `add`; `add`
  * waits while the consumer is slower than the producer, so a large archive
  * never piles up in memory. If `produce` throws, the stream errors and the
  * download ends without a valid central directory (an incomplete ZIP cannot
- * pass as complete).
+ * pass as complete). `add` throws once the consumer cancelled, and `aborted`
+ * lets `produce` check before side effects that must only follow a complete
+ * archive.
  */
-export function zipStream(produce: (add: ZipAdd) => Promise<void>): ReadableStream<Uint8Array> {
+export function zipStream(produce: (add: ZipAdd, aborted: ZipAborted) => Promise<void>): ReadableStream<Uint8Array> {
   let cancelled = false;
   return new ReadableStream<Uint8Array>(
     {
@@ -31,10 +36,11 @@ export function zipStream(produce: (add: ZipAdd) => Promise<void>): ReadableStre
           while (!cancelled && (controller.desiredSize ?? 1) <= 0) {
             await new Promise((resolve) => setTimeout(resolve, 5));
           }
+          if (cancelled) throw new Error("Download abgebrochen");
         };
 
         try {
-          await produce(add);
+          await produce(add, () => cancelled);
           zip.end();
         } catch (err) {
           controller.error(err);

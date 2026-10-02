@@ -71,7 +71,7 @@ export async function sendAdminNotifications(
       : Promise.resolve([]),
   ]);
 
-  const tasks: Promise<void>[] = [];
+  const tasks: Promise<boolean>[] = [];
 
   if (unnotifiedReminders.length > 0) {
     const n = unnotifiedReminders.length;
@@ -142,7 +142,9 @@ function buildTelegramText(subject: string, message: string, path: string): stri
  * Sends one message to every configured admin channel (notify e-mail address,
  * Telegram) — the same channels as the daily overdue/pending notifications.
  * Each channel logs and swallows its own delivery errors. Returns whether at
- * least one channel is configured.
+ * least one channel delivered (a channel switched off by DISABLE_EMAIL /
+ * DISABLE_TELEGRAM counts as handled), so callers can retry a failed message
+ * later; false also when no channel is configured.
  */
 export async function notifyAdmins(
   settings: FullSettings,
@@ -150,9 +152,8 @@ export async function notifyAdmins(
   message: string,
   path: string
 ): Promise<boolean> {
-  const tasks = buildChannelTasks(settings, subject, message, path);
-  await Promise.allSettled(tasks);
-  return tasks.length > 0;
+  const results = await Promise.all(buildChannelTasks(settings, subject, message, path));
+  return results.some(Boolean);
 }
 
 function buildChannelTasks(
@@ -160,8 +161,8 @@ function buildChannelTasks(
   subject: string,
   message: string,
   path: string
-): Promise<void>[] {
-  const tasks: Promise<void>[] = [];
+): Promise<boolean>[] {
+  const tasks: Promise<boolean>[] = [];
   if (settings.notifyEmailAddress && hasSmtpSettings(settings)) {
     tasks.push(sendNotificationEmail(settings, subject, buildEmailBody(message, path)));
   }
@@ -181,10 +182,10 @@ async function sendNotificationEmail(
   settings: FullSettings,
   subject: string,
   text: string
-): Promise<void> {
+): Promise<boolean> {
   if (isEmailDisabled()) {
     log.info("Notification email suppressed (DISABLE_EMAIL=true)");
-    return;
+    return true;
   }
   try {
     await createSettingsTransport(settings).sendMail({
@@ -193,8 +194,10 @@ async function sendNotificationEmail(
       subject,
       text,
     });
+    return true;
   } catch (err) {
     log.error({ err }, "Failed to send notification email");
+    return false;
   }
 }
 
@@ -202,10 +205,10 @@ async function sendTelegramMessage(
   botToken: string,
   chatId: string,
   text: string
-): Promise<void> {
+): Promise<boolean> {
   if (process.env.DISABLE_TELEGRAM === "true") {
     log.info("Telegram notification suppressed (DISABLE_TELEGRAM=true)");
-    return;
+    return true;
   }
   try {
     const res = await fetch(
@@ -220,7 +223,9 @@ async function sendTelegramMessage(
       const detail = await res.text();
       throw new Error(`Telegram API ${res.status}: ${detail}`);
     }
+    return true;
   } catch (err) {
     log.error({ err }, "Failed to send Telegram notification");
+    return false;
   }
 }

@@ -272,8 +272,17 @@ describe("invoice actions against a real database", () => {
         },
       });
       const invoiceId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 5, quantity: 1 }])));
+      const followUp = await db.prisma.task.create({
+        data: { customerId, quoteId: quote.id, title: "Offerte nachfassen", dueDate: new Date("2026-06-08") },
+      });
+      const otherFollowUp = await db.prisma.task.create({
+        data: { customerId, quoteId: otherQuote.id, title: "Offerte nachfassen", dueDate: new Date("2026-06-08") },
+      });
 
       await expectRedirect(() => deleteQuote(quote.id), "/quotes");
+
+      expect((await db.prisma.task.findUniqueOrThrow({ where: { id: followUp.id } })).doneAt).not.toBeNull();
+      expect((await db.prisma.task.findUniqueOrThrow({ where: { id: otherFollowUp.id } })).doneAt).toBeNull();
 
       expect(await db.prisma.quote.findUnique({ where: { id: quote.id } })).toBeNull();
       expect(await db.prisma.item.count({ where: { quoteId: quote.id } })).toBe(0);
