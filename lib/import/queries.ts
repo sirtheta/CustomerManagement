@@ -1,7 +1,8 @@
 import defaultPrisma from "@/lib/prisma";
 import type { PrismaClient } from "@prisma/client";
 import { customerDisplayName } from "@/lib/customer-display";
-import { toRappen } from "@/lib/payments";
+import { DEFAULT_PREFIXES } from "@/lib/document-number";
+import { toRappen } from "@/lib/calculations";
 import {
   expenseHints,
   listOpenTransactions,
@@ -107,7 +108,7 @@ export async function loadImportOverview(
   const bookedByImport = new Map(booked.map((row) => [row.importId, row._count._all]));
 
   return {
-    incoming: matchStatementToInvoices(open, openInvoices, settings?.invoiceNumberPrefix ?? "R-"),
+    incoming: matchStatementToInvoices(open, openInvoices, settings?.invoiceNumberPrefix ?? DEFAULT_PREFIXES.invoice),
     expenses: outgoing.map((transaction) => ({ transaction, hint: hints[transaction.id] })),
     categories,
     imports: imports.map((row) => ({

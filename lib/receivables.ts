@@ -1,7 +1,7 @@
 import type { InvoiceState, PrismaClient } from "@prisma/client";
 import { hasBillingAddress, type BillingFields } from "@/lib/customer-billing";
 import { customerDisplayName } from "@/lib/customer-display";
-import { toRappen } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 
 export type AgeBucket = "notDue" | "d0_30" | "d31_60" | "d61_90" | "d90plus";
 

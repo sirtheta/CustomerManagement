@@ -97,3 +97,13 @@ describe("DocumentNumberGenerator – quotes", () => {
     expect(number).toBe(`${quotePrefix}0006`);
   });
 });
+
+describe("DocumentNumberGenerator – missing settings row", () => {
+  it("should fall back to the schema default prefixes", async () => {
+    vi.mocked(prisma.invoice.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.quote.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    expect(await generateInvoiceNumber()).toBe(`${invoicePrefix}0001`);
+    expect(await generateQuoteNumber()).toBe(`${quotePrefix}0001`);
+  });
+});

@@ -22,6 +22,7 @@ import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
+import { customerDisplayName } from "@/lib/customer-display";
 
 const PAGE_SIZE = 25;
 
@@ -239,9 +240,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                       href={`/customers/${q.customer.customerId}`}
                       className="hover:underline"
                     >
-                      {q.customer.contactInsteadOfCompany
-                        ? q.customer.contactPerson
-                        : (q.customer.company || q.customer.contactPerson)}
+                      {customerDisplayName(q.customer)}
                     </Link>
                   </TableCell>
                   <TableCell>{formatDate(q.date)}</TableCell>

@@ -1,13 +1,9 @@
-import nodemailer from "nodemailer";
 import cron from "node-cron";
 import type { PrismaClient, ApplicationSettings, CompanyInformation } from "@prisma/client";
 import logger from "@/lib/logger";
 import { config } from "@/lib/config";
 import { decryptSecret } from "@/lib/crypto";
-import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
-import { checkOverdueInvoices } from "@/lib/reminders";
-import { checkSubscriptions } from "@/lib/subscriptions";
-import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
+import { createSettingsTransport, hasSmtpSettings, isEmailDisabled, settingsSender } from "@/lib/smtp";
 import { getEnabledModules } from "@/lib/modules";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
@@ -29,48 +25,10 @@ export function startNotificationScheduler(): void {
     log.info("Running daily notification check");
     // The shared client uses the better-sqlite3 driver adapter; a plain
     // `new PrismaClient()` has no datasource URL in this setup and throws.
+    // lib/daily-jobs is loaded lazily too, because it imports this module.
     const { default: prisma } = await import("@/lib/prisma");
-    // Switched-off modules (Einstellungen → Module) are skipped entirely.
-    const modules = await getEnabledModules(prisma);
-    const steps: [string, () => Promise<unknown>][] = [
-      ["checkAndUpdateAllDocumentStates", () => checkAndUpdateAllDocumentStates(prisma)],
-      ...(modules.reminders
-        ? [["checkOverdueInvoices", () => checkOverdueInvoices(prisma)] as [string, () => Promise<unknown>]]
-        : []),
-      ...(modules.subscriptions
-        ? [["checkSubscriptions", () => checkSubscriptions(prisma)] as [string, () => Promise<unknown>]]
-        : []),
-      ...(modules.tasks
-        ? ([
-            ["closeAnsweredFollowUps", () => closeAnsweredFollowUps(prisma)],
-            [
-              "notifyDueTasks",
-              async () => {
-                const settings = await prisma.applicationSettings.findFirst({
-                  include: { companyInfo: true },
-                });
-                await notifyDueTasks(prisma, settings);
-              },
-            ],
-          ] as [string, () => Promise<unknown>][])
-        : []),
-      [
-        "sendAdminNotifications",
-        async () => {
-          const settings = await prisma.applicationSettings.findFirst({
-            include: { companyInfo: true },
-          });
-          await sendAdminNotifications(prisma, settings);
-        },
-      ],
-    ];
-    for (const [name, step] of steps) {
-      try {
-        await step();
-      } catch (err) {
-        log.error({ err, step: name }, "Daily notification cron step failed");
-      }
-    }
+    const { runDailyJobs } = await import("@/lib/daily-jobs");
+    await runDailyJobs(prisma);
   });
   globalForScheduler.notificationSchedulerStarted = true;
   log.info({ schedule }, "Notification scheduler started");
@@ -204,9 +162,7 @@ function buildChannelTasks(
   path: string
 ): Promise<void>[] {
   const tasks: Promise<void>[] = [];
-  const hasSmtp =
-    settings.notifyEmailAddress && settings.smtpHost && settings.smtpUser && settings.smtpPassword;
-  if (hasSmtp) {
+  if (settings.notifyEmailAddress && hasSmtpSettings(settings)) {
     tasks.push(sendNotificationEmail(settings, subject, buildEmailBody(message, path)));
   }
   if (settings.notifyTelegramBotToken && settings.notifyTelegramChatId) {
@@ -226,24 +182,13 @@ async function sendNotificationEmail(
   subject: string,
   text: string
 ): Promise<void> {
-  if (process.env.DISABLE_EMAIL === "true") {
+  if (isEmailDisabled()) {
     log.info("Notification email suppressed (DISABLE_EMAIL=true)");
     return;
   }
   try {
-    const fromName =
-      settings.smtpFromName ||
-      settings.companyInfo.companyName ||
-      settings.smtpUser!;
-    const fromAddress = settings.smtpFromAddress || settings.smtpUser;
-    const transporter = nodemailer.createTransport({
-      host: settings.smtpHost!,
-      port: settings.smtpPort ?? 587,
-      secure: (settings.smtpPort ?? 587) === 465,
-      auth: { user: settings.smtpUser!, pass: decryptSecret(settings.smtpPassword!) },
-    });
-    await transporter.sendMail({
-      from: `"${fromName}" <${fromAddress}>`,
+    await createSettingsTransport(settings).sendMail({
+      from: settingsSender(settings),
       to: settings.notifyEmailAddress!,
       subject,
       text,

@@ -22,6 +22,8 @@ import type { QuoteState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
+import { customerDisplayName } from "@/lib/customer-display";
+import { quoteMail } from "@/lib/mail-templates";
 
 const stateLabels: Record<QuoteState, string> = {
   Draft: "Entwurf",
@@ -64,16 +66,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   if (!quote) notFound();
 
   const companyName = settings?.companyInfo.companyName ?? "";
-  // Drafts have no number yet: keep the placeholder so it is filled in when sent.
-  const numberOrPlaceholder = quote.documentNumber ?? "{documentNumber}";
-  const defaultSubject = `Offerte Nr. ${numberOrPlaceholder} – ${companyName}`;
-  const defaultBody = `Guten Tag ${quote.customer.contactPerson}\n\nanbei erhalten Sie die Offerte Nr. ${numberOrPlaceholder} vom ${formatDate(quote.date)} über ${formatCurrency(quote.totalAmount.toNumber())}.\n${quote.customUserText ? `\n${quote.customUserText}\n` : ""}\nGültig bis: ${formatDate(quote.validUntil)}\n\nMit freundlichen Grüssen\n${companyName}`;
+  // Drafts have no number yet: the placeholder stays so it is filled in when sent.
+  const { subject: defaultSubject, body: defaultBody } = quoteMail(quote, companyName);
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/quotes";
-  const customerName = quote.customer.contactInsteadOfCompany
-    ? quote.customer.contactPerson
-    : (quote.customer.company || quote.customer.contactPerson);
+  const customerName = customerDisplayName(quote.customer);
   const breadcrumbItems = fromCustomer
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(quote.documentNumber) }]
     : [{ label: "Offerten", href: "/quotes" }, { label: documentLabel(quote.documentNumber) }];
@@ -89,9 +87,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
               href={`/customers/${quote.customer.customerId}`}
               className="hover:underline"
             >
-              {quote.customer.contactInsteadOfCompany
-                ? quote.customer.contactPerson
-                : (quote.customer.company || quote.customer.contactPerson)}
+              {customerDisplayName(quote.customer)}
             </Link>
           </p>
         </div>

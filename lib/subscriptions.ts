@@ -1,23 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
-import type { Session } from "next-auth";
+import { SYSTEM_ACTOR } from "@/lib/system-actor";
 import { calculateInvoiceTotal, calculateItemTotal } from "@/lib/calculations";
 import { advancePast, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { logAuditEntry } from "@/lib/audit";
-import { formatDate } from "@/lib/utils";
+import { fillPlaceholders, invoiceMailTemplate, invoicePlaceholders } from "@/lib/mail-templates";
 import logger from "@/lib/logger";
 import { billingEmail, effectivePaymentTermDays } from "@/lib/customer-billing";
+import { customerDisplayName } from "@/lib/customer-display";
 
 const log = logger.child({ module: "subscriptions" });
-
-const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
-const DEFAULT_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
-
-/** Actor for documents the job sends on its own (autoSend); audit and archive rows need a user id. */
-export const SYSTEM_ACTOR: Session = {
-  user: { id: "0", name: "System (Abo)", email: "", role: "Admin" },
-  expires: "9999-12-31T23:59:59.999Z",
-} as Session;
 
 class SubscriptionChangedError extends Error {
   constructor() {
@@ -65,10 +56,6 @@ async function reportAutoSendFailure(
   }
 }
 
-function resolve(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
-}
-
 export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -88,8 +75,8 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
   if (due.length === 0) return;
 
   const companyName = settings?.companyInfo.companyName ?? "";
-  const subjectTpl = settings?.emailSubjectTemplate || DEFAULT_SUBJECT;
-  const bodyTpl = settings?.emailBodyTemplate || DEFAULT_BODY;
+  // Subscription drafts carry no custom text.
+  const mailTpl = invoiceMailTemplate(settings, { isCreditNote: false, hasCustomText: false });
   const defaultPaymentDays = settings?.defaultPaymentTermDays ?? 30;
 
   for (const sub of due) {
@@ -130,23 +117,18 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         });
 
         const vars = {
-          // Kept as placeholder: the number is only assigned when the mail is approved.
-          documentNumber: "{documentNumber}",
-          contactPerson: sub.customer.contactPerson,
-          companyName,
-          // Placeholder too: positions can be edited on the pending page; resolved at send time.
-          totalAmount: "{totalAmount}",
-          date: formatDate(today),
-          dueDate: formatDate(dueDate),
-          customUserText: "",
+          // The draft has no number yet, so {documentNumber} stays until the mail is approved.
+          ...invoicePlaceholders({ ...invoice, customer: sub.customer }, companyName),
+          // Kept as placeholder too: positions can be edited on the pending page; resolved at send time.
+          totalAmount: undefined,
         };
 
         const pendingEmail = await tx.pendingEmail.create({
           data: {
             invoiceId: invoice.id,
             to: billingEmail(sub.customer),
-            subject: resolve(subjectTpl, vars),
-            body: resolve(bodyTpl, vars),
+            subject: fillPlaceholders(mailTpl.subject, vars),
+            body: fillPlaceholders(mailTpl.body, vars),
           },
         });
 
@@ -181,9 +163,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         const failureBase = {
           subscriptionId: sub.id,
           invoiceId,
-          customerName: sub.customer.contactInsteadOfCompany
-            ? sub.customer.contactPerson
-            : sub.customer.company || sub.customer.contactPerson,
+          customerName: customerDisplayName(sub.customer),
         };
         try {
           // Loaded lazily: the PDF/mail stack is only needed when something is actually sent.

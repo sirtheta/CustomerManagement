@@ -21,7 +21,7 @@ import SaveAsTemplateButton from "../SaveAsTemplateButton";
 import CreateCreditNoteButton from "../CreateCreditNoteButton";
 import { UserRole, type InvoiceState } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
-import { toRappen } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -29,6 +29,8 @@ import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
 import { billingEmail } from "@/lib/customer-billing";
 import { loadModules } from "@/lib/module-guard";
+import { customerDisplayName } from "@/lib/customer-display";
+import { invoiceMail } from "@/lib/mail-templates";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -101,36 +103,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/invoices";
-  const customerName = invoice.customer.contactInsteadOfCompany
-    ? invoice.customer.contactPerson
-    : (invoice.customer.company || invoice.customer.contactPerson);
+  const customerName = customerDisplayName(invoice.customer);
   const breadcrumbItems = fromCustomer
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(invoice.documentNumber) }]
     : [{ label: "Rechnungen", href: "/invoices" }, { label: documentLabel(invoice.documentNumber) }];
 
   const companyName = settings?.companyInfo.companyName ?? "";
-  // Drafts have no number yet: keep the placeholder so it is filled in when sent.
-  const numberOrPlaceholder = invoice.documentNumber ?? "{documentNumber}";
-  const invoiceSubject =
-    settings?.emailSubjectTemplate?.replace(/\{documentNumber\}/g, numberOrPlaceholder).replace(/\{companyName\}/g, companyName)
-    ?? `Rechnung Nr. ${numberOrPlaceholder} – ${companyName}`;
-  const defaultSubject = isCreditNote
-    ? `Gutschrift Nr. ${numberOrPlaceholder} – ${companyName}`
-    : invoiceSubject;
-  const DEFAULT_BODY = `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. ${numberOrPlaceholder} vom ${formatDate(invoice.date)} über ${formatCurrency(invoice.totalAmount.toNumber())}.\n${invoice.customUserText ? `\n${invoice.customUserText}\n` : ""}\nZahlbar bis: ${formatDate(invoice.dueDate)}\n\nMit freundlichen Grüssen\n${companyName}`;
-  const invoiceBody = settings?.emailBodyTemplate
-    ? settings.emailBodyTemplate
-        .replace(/\{documentNumber\}/g, numberOrPlaceholder)
-        .replace(/\{contactPerson\}/g, invoice.customer.contactPerson)
-        .replace(/\{companyName\}/g, companyName)
-        .replace(/\{totalAmount\}/g, formatCurrency(invoice.totalAmount.toNumber()))
-        .replace(/\{date\}/g, formatDate(invoice.date))
-        .replace(/\{dueDate\}/g, formatDate(invoice.dueDate))
-        .replace(/\{customUserText\}/g, invoice.customUserText ?? "")
-    : DEFAULT_BODY;
-  const defaultBody = isCreditNote
-    ? `Guten Tag ${invoice.customer.contactPerson}\n\nanbei erhalten Sie die Gutschrift Nr. ${numberOrPlaceholder} vom ${formatDate(invoice.date)} über ${formatCurrency(Math.abs(invoice.totalAmount.toNumber()))}.\n\nMit freundlichen Grüssen\n${companyName}`
-    : invoiceBody;
+  // Drafts have no number yet: the placeholder stays so it is filled in when sent.
+  const { subject: defaultSubject, body: defaultBody } = invoiceMail(invoice, settings, companyName);
 
   return (
     <div className="space-y-4">
@@ -153,9 +133,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               href={`/customers/${invoice.customer.customerId}`}
               className="hover:underline"
             >
-              {invoice.customer.contactInsteadOfCompany
-                ? invoice.customer.contactPerson
-                : (invoice.customer.company || invoice.customer.contactPerson)}
+              {customerDisplayName(invoice.customer)}
             </Link>
           </p>
         </div>

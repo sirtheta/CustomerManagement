@@ -30,6 +30,7 @@ import { auth } from "@/lib/auth";
 import { decryptSecret } from "@/lib/crypto";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
+import { customerDisplayName } from "@/lib/customer-display";
 
 const invoiceStateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -151,9 +152,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
   const decryptedNotes = notes.map((n) => ({ ...n, content: decryptSecret(n.content) }));
 
-  const customerName = customer.contactInsteadOfCompany
-    ? customer.contactPerson
-    : (customer.company || customer.contactPerson);
+  const customerName = customerDisplayName(customer);
 
   return (
     <div className="space-y-6">

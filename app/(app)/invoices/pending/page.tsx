@@ -6,6 +6,7 @@ import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { customerDisplayName } from "@/lib/customer-display";
 
 export default async function PendingEmailsPage() {
   await requireModule("subscriptions");
@@ -39,9 +40,7 @@ export default async function PendingEmailsPage() {
         <div className="space-y-4">
           {pending.map((p) => {
             const c = p.invoice.customer;
-            const customerName = c.contactInsteadOfCompany
-              ? c.contactPerson
-              : (c.company || c.contactPerson);
+            const customerName = customerDisplayName(c);
             return (
               <PendingEmailRow
                 key={p.id}

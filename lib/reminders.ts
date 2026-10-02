@@ -1,6 +1,21 @@
 import type { PrismaClient } from "@prisma/client";
 import { MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
 
+const DEFAULT_REMINDER_COOLDOWN_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * When a reminder that was just sent or dismissed shows up again:
+ * `cooldownDays` (`ApplicationSettings.reminderCooldownDays`, 14 without a
+ * settings row) from now.
+ */
+export function reminderSnoozedUntil(
+  cooldownDays: number | null | undefined,
+  now: Date = new Date()
+): Date {
+  return new Date(now.getTime() + (cooldownDays ?? DEFAULT_REMINDER_COOLDOWN_DAYS) * DAY_MS);
+}
+
 export async function checkOverdueInvoices(prisma: PrismaClient): Promise<void> {
   // Safety net for state changes that bypass the actions (direct DB edits,
   // older code paths): reminders of invoices that are no longer Overdue are

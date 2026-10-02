@@ -2,6 +2,7 @@ import defaultPrisma from "@/lib/prisma";
 import type { InvoiceState, Prisma, PrismaClient } from "@prisma/client";
 import type { Session } from "next-auth";
 import { logAudit } from "@/lib/audit";
+import { toRappen } from "@/lib/calculations";
 
 export type PaymentSource = "manual" | "camt-import" | "budget-import" | "migration";
 
@@ -9,11 +10,6 @@ export type PaymentSource = "manual" | "camt-import" | "budget-import" | "migrat
 export class PaymentError extends Error {}
 
 type Db = PrismaClient | Prisma.TransactionClient;
-
-export function toRappen(value: number | { toNumber(): number }): number {
-  const n = typeof value === "number" ? value : value.toNumber();
-  return Math.round(n * 100);
-}
 
 export function computeInvoiceState(input: {
   state: InvoiceState;

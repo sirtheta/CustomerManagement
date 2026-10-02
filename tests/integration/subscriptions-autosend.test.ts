@@ -6,7 +6,8 @@ vi.mock("@/lib/pending-email-send", () => ({ sendPendingInvoice: (...a: unknown[
 const notifyAdmins = vi.fn();
 vi.mock("@/lib/notifications", () => ({ notifyAdmins: (...a: unknown[]) => notifyAdmins(...a) }));
 
-import { checkSubscriptions, SYSTEM_ACTOR } from "@/lib/subscriptions";
+import { checkSubscriptions } from "@/lib/subscriptions";
+import { SYSTEM_ACTOR } from "@/lib/system-actor";
 
 describe("checkSubscriptions with autoSend", () => {
   const db = createTestDatabase();

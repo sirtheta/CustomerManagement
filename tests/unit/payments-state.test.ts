@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { computeInvoiceState, toRappen } from "@/lib/payments";
+import { computeInvoiceState } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 
 const future = new Date("2099-01-01");
 const past = new Date("2000-01-01");
@@ -10,6 +11,10 @@ describe("toRappen", () => {
     expect(toRappen(0.1 + 0.2)).toBe(30);
     expect(toRappen(123.45)).toBe(12345);
     expect(toRappen({ toNumber: () => 19.99 })).toBe(1999);
+  });
+
+  it("keeps the sign of negative amounts (credit notes)", () => {
+    expect(toRappen(-180.05)).toBe(-18005);
   });
 });
 

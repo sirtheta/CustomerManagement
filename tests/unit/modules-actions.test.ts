@@ -13,11 +13,7 @@ vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("sharp", () => ({ default: vi.fn() }));
 vi.mock("nodemailer", () => ({ default: { createTransport: vi.fn() } }));
 vi.mock("@/lib/crypto", () => ({ encryptSecret: vi.fn(), decryptSecret: vi.fn() }));
-vi.mock("@/lib/state-manager", () => ({ checkAndUpdateAllDocumentStates: vi.fn() }));
-vi.mock("@/lib/reminders", () => ({ checkOverdueInvoices: vi.fn() }));
-vi.mock("@/lib/subscriptions", () => ({ checkSubscriptions: vi.fn() }));
-vi.mock("@/lib/tasks", () => ({ closeAnsweredFollowUps: vi.fn(), notifyDueTasks: vi.fn() }));
-vi.mock("@/lib/notifications", () => ({ sendAdminNotifications: vi.fn() }));
+vi.mock("@/lib/daily-jobs", () => ({ runDailyJobs: vi.fn() }));
 
 import { setModule, setSetting } from "@/app/(app)/settings/actions";
 import prisma from "@/lib/prisma";

@@ -24,6 +24,7 @@ import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
+import { customerDisplayName } from "@/lib/customer-display";
 
 const PAGE_SIZE = 25;
 
@@ -174,9 +175,7 @@ async function InvoicesTable({
                   </TableCell>
                   <TableCell>
                     <Link href={`/customers/${inv.customer.customerId}`} className="hover:underline">
-                      {inv.customer.contactInsteadOfCompany
-                        ? inv.customer.contactPerson
-                        : (inv.customer.company || inv.customer.contactPerson)}
+                      {customerDisplayName(inv.customer)}
                     </Link>
                   </TableCell>
                   <TableCell>{formatDate(inv.date)}</TableCell>

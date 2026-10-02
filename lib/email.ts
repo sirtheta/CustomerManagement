@@ -1,57 +1,29 @@
-import nodemailer from "nodemailer";
+import type { SendMailOptions } from "nodemailer";
 import type { ApplicationSettings, CompanyInformation, Customer, Invoice, Quote } from "@prisma/client";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { decryptSecret } from "@/lib/crypto";
-import { customerDisplayName } from "@/lib/customer-display";
 import { billingEmail } from "@/lib/customer-billing";
+import { createSettingsTransport, isEmailDisabled, settingsSender } from "@/lib/smtp";
+import {
+  DEFAULT_QUOTE_SUBJECT,
+  defaultQuoteBody,
+  fillPlaceholders,
+  invoiceMailTemplate,
+  invoicePlaceholders,
+  quotePlaceholders,
+} from "@/lib/mail-templates";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 type FullInvoice = Invoice & { customer: Customer };
 type FullQuote = Quote & { customer: Customer };
 
-function buildTransport(settings: FullSettings) {
-  if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPassword) {
-    throw new Error("SMTP nicht konfiguriert. Bitte SMTP-Einstellungen hinterlegen.");
+/** Sends through the stored SMTP settings; does nothing while `DISABLE_EMAIL=true`. */
+async function sendWithSettings(settings: FullSettings, mail: Omit<SendMailOptions, "from">): Promise<void> {
+  if (isEmailDisabled()) {
+    console.log("[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)");
+    return;
   }
-  return nodemailer.createTransport({
-    host: settings.smtpHost,
-    port: settings.smtpPort ?? 587,
-    secure: (settings.smtpPort ?? 587) === 465,
-    auth: {
-      user: settings.smtpUser,
-      pass: decryptSecret(settings.smtpPassword),
-    },
-  });
+  const transporter = createSettingsTransport(settings);
+  await transporter.sendMail({ from: settingsSender(settings), ...mail });
 }
-
-function resolvePlaceholders(
-  template: string,
-  invoice: FullInvoice,
-  documentNumber: string,
-  settings: FullSettings
-): string {
-  const c = invoice.customer;
-  const displayName = customerDisplayName(c);
-
-  return template
-    .replace(/\{documentNumber\}/g, documentNumber)
-    .replace(/\{contactPerson\}/g, c.contactPerson)
-    .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
-    .replace(/\{totalAmount\}/g, formatCurrency(Math.abs(invoice.totalAmount.toNumber())))
-    .replace(/\{date\}/g, formatDate(invoice.date))
-    .replace(/\{dueDate\}/g, formatDate(invoice.dueDate))
-    .replace(/\{customUserText\}/g, invoice.customUserText || "")
-    .replace(/\{customerName\}/g, displayName);
-}
-
-const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
-const DEFAULT_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\n{customUserText}\n\nZahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}";
-
-// Credit notes have no due date and are stored negative; they ignore the custom invoice templates.
-const CREDIT_NOTE_SUBJECT = "Gutschrift Nr. {documentNumber} – {companyName}";
-const CREDIT_NOTE_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}";
 
 export async function sendInvoiceEmail(
   invoice: FullInvoice,
@@ -61,52 +33,26 @@ export async function sendInvoiceEmail(
 ): Promise<void> {
   const documentNumber = invoice.documentNumber;
   if (!documentNumber) throw new Error("Rechnung hat noch keine Nummer.");
-  if (process.env.DISABLE_EMAIL === 'true') {
-    console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
-    return;
-  }
 
-  const transporter = buildTransport(settings);
-
-  const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
-  const fromAddress = settings.smtpFromAddress || settings.smtpUser;
   const isCreditNote = invoice.creditNoteForId != null;
-  const subjectTemplate = isCreditNote ? CREDIT_NOTE_SUBJECT : settings.emailSubjectTemplate || DEFAULT_SUBJECT;
-  const bodyTemplate = isCreditNote ? CREDIT_NOTE_BODY : settings.emailBodyTemplate || DEFAULT_BODY;
-
-  const subject = resolvePlaceholders(overrides?.subject ?? subjectTemplate, invoice, documentNumber, settings);
-  const text = resolvePlaceholders(overrides?.body ?? bodyTemplate, invoice, documentNumber, settings);
-  const to = overrides?.to ?? billingEmail(invoice.customer);
-  const filename =
-    overrides?.attachmentName ?? `${isCreditNote ? "gutschrift" : "rechnung"}-${invoice.documentNumber}.pdf`;
-
-  await transporter.sendMail({
-    from: `"${fromName}" <${fromAddress}>`,
-    to,
-    subject,
-    text,
-    attachments: [{ filename, content: pdf, contentType: "application/pdf" }],
+  const template = invoiceMailTemplate(settings, {
+    isCreditNote,
+    hasCustomText: Boolean(invoice.customUserText),
   });
-}
+  const values = { ...invoicePlaceholders(invoice, settings.companyInfo.companyName || ""), documentNumber };
 
-function resolveQuotePlaceholders(
-  template: string,
-  quote: FullQuote,
-  documentNumber: string,
-  settings: FullSettings
-): string {
-  const c = quote.customer;
-  const displayName = customerDisplayName(c);
-
-  return template
-    .replace(/\{documentNumber\}/g, documentNumber)
-    .replace(/\{contactPerson\}/g, c.contactPerson)
-    .replace(/\{companyName\}/g, settings.companyInfo.companyName || "")
-    .replace(/\{totalAmount\}/g, formatCurrency(quote.totalAmount.toNumber()))
-    .replace(/\{date\}/g, formatDate(quote.date))
-    .replace(/\{validUntil\}/g, formatDate(quote.validUntil))
-    .replace(/\{customUserText\}/g, quote.customUserText || "")
-    .replace(/\{customerName\}/g, displayName);
+  await sendWithSettings(settings, {
+    to: overrides?.to ?? billingEmail(invoice.customer),
+    subject: fillPlaceholders(overrides?.subject ?? template.subject, values),
+    text: fillPlaceholders(overrides?.body ?? template.body, values),
+    attachments: [
+      {
+        filename: overrides?.attachmentName ?? `${isCreditNote ? "gutschrift" : "rechnung"}-${documentNumber}.pdf`,
+        content: pdf,
+        contentType: "application/pdf",
+      },
+    ],
+  });
 }
 
 export function toHtml(text: string): string {
@@ -124,25 +70,8 @@ export async function sendAccountMail(
   subject: string,
   text: string
 ): Promise<void> {
-  if (process.env.DISABLE_EMAIL === "true") {
-    console.log("[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)");
-    return;
-  }
-  const transporter = buildTransport(settings);
-  const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
-  const fromAddress = settings.smtpFromAddress || settings.smtpUser;
-  await transporter.sendMail({
-    from: `"${fromName}" <${fromAddress}>`,
-    to,
-    subject,
-    text,
-    html: toHtml(text),
-  });
+  await sendWithSettings(settings, { to, subject, text, html: toHtml(text) });
 }
-
-const DEFAULT_QUOTE_SUBJECT = "Offerte Nr. {documentNumber} – {companyName}";
-export const DEFAULT_QUOTE_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber} vom {date} über {totalAmount}.\n\n{customUserText}\n\nGültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}";
 
 export async function sendQuoteEmail(
   quote: FullQuote,
@@ -152,26 +81,13 @@ export async function sendQuoteEmail(
 ): Promise<void> {
   const documentNumber = quote.documentNumber;
   if (!documentNumber) throw new Error("Offerte hat noch keine Nummer.");
-  if (process.env.DISABLE_EMAIL === 'true') {
-    console.log('[email] E-Mail-Versand deaktiviert (DISABLE_EMAIL=true)');
-    return;
-  }
 
-  const transporter = buildTransport(settings);
+  const values = { ...quotePlaceholders(quote, settings.companyInfo.companyName || ""), documentNumber };
 
-  const fromName = settings.smtpFromName || settings.companyInfo.companyName || settings.smtpUser;
-  const fromAddress = settings.smtpFromAddress || settings.smtpUser;
-
-  const subject = resolveQuotePlaceholders(overrides?.subject ?? DEFAULT_QUOTE_SUBJECT, quote, documentNumber, settings);
-  const text = resolveQuotePlaceholders(overrides?.body ?? DEFAULT_QUOTE_BODY, quote, documentNumber, settings);
-  const to = overrides?.to ?? quote.customer.email;
-  const filename = `offerte-${quote.documentNumber}.pdf`;
-
-  await transporter.sendMail({
-    from: `"${fromName}" <${fromAddress}>`,
-    to,
-    subject,
-    text,
-    attachments: [{ filename, content: pdf, contentType: "application/pdf" }],
+  await sendWithSettings(settings, {
+    to: overrides?.to ?? quote.customer.email,
+    subject: fillPlaceholders(overrides?.subject ?? DEFAULT_QUOTE_SUBJECT, values),
+    text: fillPlaceholders(overrides?.body ?? defaultQuoteBody(Boolean(quote.customUserText)), values),
+    attachments: [{ filename: `offerte-${documentNumber}.pdf`, content: pdf, contentType: "application/pdf" }],
   });
 }

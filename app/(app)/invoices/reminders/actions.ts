@@ -9,7 +9,7 @@ import type { ArchiveResult } from "@/lib/document-archive";
 import { getPaymentSummary } from "@/lib/payments";
 import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
 import { computeReminderCharges, MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
-import { isLastReminderLevelSent } from "@/lib/reminders";
+import { isLastReminderLevelSent, reminderSnoozedUntil } from "@/lib/reminders";
 import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
@@ -103,8 +103,7 @@ async function sendReminderLocked(input: {
     return { error: err instanceof Error ? err.message : "Fehler beim Senden." };
   }
 
-  const cooldownDays = settings.reminderCooldownDays ?? 14;
-  const snoozedUntil = new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000);
+  const snoozedUntil = reminderSnoozedUntil(settings.reminderCooldownDays);
 
   const recorded = await recordSend(
     () =>
@@ -164,8 +163,7 @@ export async function dismissReminder(id: number): Promise<void> {
   const settings = await prisma.applicationSettings.findFirst({
     select: { reminderCooldownDays: true },
   });
-  const cooldownDays = settings?.reminderCooldownDays ?? 14;
-  const snoozedUntil = new Date(Date.now() + cooldownDays * 24 * 60 * 60 * 1000);
+  const snoozedUntil = reminderSnoozedUntil(settings?.reminderCooldownDays);
   const reminder = await prisma.pendingReminder.findUnique({
     where: { id },
     include: { invoice: { select: { id: true, documentNumber: true } } },

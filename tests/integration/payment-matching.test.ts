@@ -22,7 +22,7 @@ describe("matchAndMarkPaid against a real database", () => {
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
-        documentNumber: "R-26010001",
+        documentNumber: "I-26010001",
         date: new Date(),
         dueDate: new Date(),
         totalAmount: 123.45,
@@ -34,11 +34,11 @@ describe("matchAndMarkPaid against a real database", () => {
     });
 
     const result = await matchAndMarkPaid(
-      { description: "Zahlung Rechnung R-26010001", amountRappen: 12345 },
+      { description: "Zahlung Rechnung I-26010001", amountRappen: 12345 },
       prisma
     );
 
-    expect(result).toEqual({ matched: true, invoiceId: invoice.id, documentNumber: "R-26010001" });
+    expect(result).toEqual({ matched: true, invoiceId: invoice.id, documentNumber: "I-26010001" });
 
     const updated = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
     expect(updated.state).toBe("Paid");
@@ -65,7 +65,7 @@ describe("matchAndMarkPaid against a real database", () => {
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
-        documentNumber: "R-26010004",
+        documentNumber: "I-26010004",
         date: new Date(),
         dueDate: new Date(),
         totalAmount: 100,
@@ -77,7 +77,7 @@ describe("matchAndMarkPaid against a real database", () => {
     });
 
     const result = await matchAndMarkPaid(
-      { description: "Restzahlung R-26010004", amountRappen: 6000, bookingDate: "2026-01-20" },
+      { description: "Restzahlung I-26010004", amountRappen: 6000, bookingDate: "2026-01-20" },
       prisma
     );
 
@@ -95,7 +95,7 @@ describe("matchAndMarkPaid against a real database", () => {
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
-        documentNumber: "R-26010002",
+        documentNumber: "I-26010002",
         date: new Date(),
         dueDate: new Date(),
         totalAmount: 100.0,
@@ -104,7 +104,7 @@ describe("matchAndMarkPaid against a real database", () => {
     });
 
     const result = await matchAndMarkPaid(
-      { description: "Zahlung R-26010002", amountRappen: 10001 },
+      { description: "Zahlung I-26010002", amountRappen: 10001 },
       prisma
     );
 
@@ -120,7 +120,7 @@ describe("matchAndMarkPaid against a real database", () => {
     await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
-        documentNumber: "R-26010003",
+        documentNumber: "I-26010003",
         date: new Date(),
         dueDate: new Date(),
         totalAmount: 50,
@@ -130,7 +130,7 @@ describe("matchAndMarkPaid against a real database", () => {
     });
 
     const result = await matchAndMarkPaid(
-      { description: "Zahlung R-26010003", amountRappen: 5000 },
+      { description: "Zahlung I-26010003", amountRappen: 5000 },
       prisma
     );
 
@@ -143,7 +143,7 @@ describe("matchAndMarkPaid against a real database", () => {
     const invoice = await prisma.invoice.create({
       data: {
         customerId: customer.customerId,
-        documentNumber: "R-26030001",
+        documentNumber: "I-26030001",
         date: new Date("2026-03-01"),
         dueDate: new Date("2099-01-01"),
         totalAmount: 100,
@@ -159,7 +159,7 @@ describe("matchAndMarkPaid against a real database", () => {
 
     // The remainder with the same reference is the same bank entry: not booked again.
     const duplicate = await matchAndMarkPaid(
-      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API" },
+      { description: "Zahlung I-26030001", amountRappen: 6000, bankReference: "REF-API" },
       prisma
     );
     expect(duplicate.matched).toBe(false);
@@ -167,7 +167,7 @@ describe("matchAndMarkPaid against a real database", () => {
 
     // A different reference books the remainder and stores the reference.
     const booked = await matchAndMarkPaid(
-      { description: "Zahlung R-26030001", amountRappen: 6000, bankReference: "REF-API-2" },
+      { description: "Zahlung I-26030001", amountRappen: 6000, bankReference: "REF-API-2" },
       prisma
     );
     expect(booked.matched).toBe(true);

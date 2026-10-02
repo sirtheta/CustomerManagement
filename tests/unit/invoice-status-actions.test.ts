@@ -38,8 +38,6 @@ vi.mock("@/lib/payments", () => ({
   recordRemainingPayment: vi.fn(),
   recordPayment: vi.fn(),
   syncInvoiceState: vi.fn(),
-  toRappen: (v: number | { toNumber(): number }) =>
-    Math.round((typeof v === "number" ? v : v.toNumber()) * 100),
   PaymentError: class extends Error {},
 }));
 

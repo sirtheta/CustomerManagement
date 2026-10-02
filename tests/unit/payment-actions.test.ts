@@ -18,7 +18,6 @@ vi.mock("@/lib/payments", () => ({
   recordPayment: vi.fn(),
   recordRemainingPayment: vi.fn(),
   deletePayment: vi.fn(),
-  toRappen: (v: number) => Math.round(v * 100),
   PaymentError: class extends Error {},
 }));
 

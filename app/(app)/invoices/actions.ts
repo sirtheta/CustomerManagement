@@ -13,7 +13,8 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
 import { assignDocumentNumber } from "@/lib/document-number";
-import { PaymentError, recordRemainingPayment, syncInvoiceState, toRappen } from "@/lib/payments";
+import { PaymentError, recordRemainingPayment, syncInvoiceState } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 import { canTransitionInvoice } from "@/lib/state-manager";
 import { swissToday } from "@/lib/date";
 import {

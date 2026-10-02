@@ -49,4 +49,14 @@ describe("customerDisplayName", () => {
       })
     ).toBe("");
   });
+
+  it("should return an empty string when neither company nor contact person is set", () => {
+    expect(
+      customerDisplayName({
+        company: null,
+        contactPerson: null,
+        contactInsteadOfCompany: false,
+      })
+    ).toBe("");
+  });
 });

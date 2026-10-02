@@ -17,6 +17,7 @@ import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/date";
 import { effectivePaymentTermDays } from "@/lib/customer-billing";
+import { customerDisplayName } from "@/lib/customer-display";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
@@ -189,7 +190,7 @@ export default function InvoiceForm({
               {creditNoteFor ? (
                 <>
                   <input type="hidden" name="customerId" value={invoice!.customerId} />
-                  <p className="text-sm">{defaultCustomer?.company || defaultCustomer?.contactPerson}</p>
+                  <p className="text-sm">{defaultCustomer && customerDisplayName(defaultCustomer)}</p>
                 </>
               ) : (
                 <CustomerCombobox

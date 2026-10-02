@@ -3,20 +3,17 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
-import nodemailer from "nodemailer";
+import { createSmtpTransport, DEFAULT_SMTP_PORT, formatSender, isEmailDisabled } from "@/lib/smtp";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { requireAdmin } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import logger from "@/lib/logger";
-import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
-import { checkOverdueInvoices } from "@/lib/reminders";
-import { checkSubscriptions } from "@/lib/subscriptions";
-import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
-import { sendAdminNotifications } from "@/lib/notifications";
-import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleKey } from "@/lib/modules";
+import { runDailyJobs } from "@/lib/daily-jobs";
+import { MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleKey } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
+import { DEFAULT_PREFIXES } from "@/lib/document-number";
 
 const log = logger.child({ module: "settings" });
 
@@ -129,8 +126,8 @@ export async function saveSettings(
     numberFormat: (formData.get("numberFormat") as string) || "de-CH",
     defaultPaymentTermDays: isNaN(paymentTermDays) ? 30 : paymentTermDays,
     defaultQuoteValidityDays: isNaN(quoteValidityDays) ? 30 : quoteValidityDays,
-    invoiceNumberPrefix: (formData.get("invoiceNumberPrefix") as string) || "R-",
-    quoteNumberPrefix: (formData.get("quoteNumberPrefix") as string) || "A-",
+    invoiceNumberPrefix: (formData.get("invoiceNumberPrefix") as string) || DEFAULT_PREFIXES.invoice,
+    quoteNumberPrefix: (formData.get("quoteNumberPrefix") as string) || DEFAULT_PREFIXES.quote,
     smtpHost: (formData.get("smtpHost") as string) || null,
     smtpPort: (smtpPort !== null && !isNaN(smtpPort)) ? smtpPort : null,
     smtpUser: (formData.get("smtpUser") as string) || null,
@@ -287,14 +284,8 @@ export async function testSmtpConnection(
     return { error: "Bitte SMTP-Server, Benutzername und Passwort ausfüllen." };
   }
 
-  const port = portRaw ? parseInt(portRaw) : 587;
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
+  const port = portRaw ? parseInt(portRaw) : DEFAULT_SMTP_PORT;
+  const transporter = createSmtpTransport({ host, port, user, pass });
 
   try {
     await transporter.verify();
@@ -323,7 +314,7 @@ export async function testEmailNotification(
 ): Promise<ActionState> {
   await requireAdmin();
 
-  if (process.env.DISABLE_EMAIL === "true") {
+  if (isEmailDisabled()) {
     return { error: "E-Mail-Versand ist in dieser Umgebung deaktiviert (DISABLE_EMAIL=true)." };
   }
 
@@ -343,17 +334,12 @@ export async function testEmailNotification(
     return { error: "Bitte zuerst SMTP-Server, Benutzername und Passwort konfigurieren." };
   }
 
-  const port = portRaw ? parseInt(portRaw) : 587;
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
+  const port = portRaw ? parseInt(portRaw) : DEFAULT_SMTP_PORT;
+  const transporter = createSmtpTransport({ host, port, user, pass });
 
   try {
     await transporter.sendMail({
-      from: `"${fromName}" <${fromAddress}>`,
+      from: formatSender(fromName, fromAddress || user),
       to,
       subject: "Test-Benachrichtigung – CustomerManagement",
       text: "Dies ist eine Test-Benachrichtigung von CustomerManagement. Die E-Mail-Benachrichtigungen sind korrekt konfiguriert.",
@@ -372,23 +358,17 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
   }
   await requireAdmin();
   try {
-    await checkAndUpdateAllDocumentStates(prisma);
-    const modules = await getEnabledModules(prisma);
-    if (modules.reminders) await checkOverdueInvoices(prisma);
-    if (modules.subscriptions) await checkSubscriptions(prisma);
-    if (modules.tasks) await closeAnsweredFollowUps(prisma);
     // Reset notification stamps so the check always sends in dev
     await Promise.all([
       prisma.pendingReminder.updateMany({ data: { adminNotifiedAt: null } }),
       prisma.pendingEmail.updateMany({ data: { adminNotifiedAt: null } }),
       prisma.task.updateMany({ data: { notifiedAt: null } }),
     ]);
-    const settings = await prisma.applicationSettings.findFirst({
-      include: { companyInfo: true },
-    });
-    await sendAdminNotifications(prisma, settings);
-    if (modules.tasks) await notifyDueTasks(prisma, settings);
+    const failures = await runDailyJobs(prisma);
     revalidatePath("/");
+    if (failures.length > 0) {
+      return { error: `Fehler: ${failures.map((f) => `${f.step}: ${f.error}`).join("; ")}` };
+    }
     return { success: true, _ts: Date.now() };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";

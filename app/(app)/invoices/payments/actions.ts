@@ -11,8 +11,8 @@ import {
   getPaymentSummary,
   recordPayment,
   recordRemainingPayment,
-  toRappen,
 } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 import { isValidDateString, swissToday } from "@/lib/date";
 
 const log = logger.child({ module: "payment-actions" });

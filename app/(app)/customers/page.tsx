@@ -21,6 +21,7 @@ import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
+import { customerDisplayName } from "@/lib/customer-display";
 
 const PAGE_SIZE = 25;
 
@@ -115,9 +116,7 @@ async function CustomersTable({
                   <TableCell>
                     <Link href={`/customers/${c.customerId}`} className="hover:underline">
                       <div className="font-medium">
-                        {c.contactInsteadOfCompany
-                          ? c.contactPerson
-                          : (c.company || c.contactPerson)}
+                        {customerDisplayName(c)}
                       </div>
                       {!c.contactInsteadOfCompany && c.company && (
                         <div className="text-xs text-gray-500">{c.contactPerson}</div>

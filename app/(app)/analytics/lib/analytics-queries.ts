@@ -3,6 +3,7 @@ import { InvoiceState } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { sumOpenAmount } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 import { customerDisplayName } from "@/lib/customer-display";
 import { documentLabel } from "@/lib/document-display";
 export { categoryParamValue } from "./analytics-utils";
@@ -134,8 +135,6 @@ type CategoryRef = { categoryId: number; name: string; colorHex: string | null }
 type AllocItem = { id: number; name: string; totalAmount: { toNumber(): number }; category: CategoryRef | null };
 
 export type ItemShare<T> = { item: T | null; rappen: number };
-
-const toRappen = (value: { toNumber(): number }) => Math.round(value.toNumber() * 100);
 
 /**
  * Splits one payment over the invoice items by their share of the item sum,
@@ -339,10 +338,11 @@ function yearRangeDescending(min: Date | null, max: Date | null): number[] {
   return years;
 }
 
-// Every Server Action / Route Handler that touches invoices, expenses,
-// categories or customer names busts ANALYTICS_CACHE_TAG. The nightly cron
-// (Sent → Overdue, yearly Draft invoices) runs outside request scope where
-// revalidateTag is unavailable; its changes surface via the 5-minute TTL.
+// Every Server Action / Route Handler that touches invoices, payments,
+// expenses, categories or customer names busts ANALYTICS_CACHE_TAG. The daily
+// job (Sent → Overdue, subscription drafts and their autoSend) runs outside
+// request scope where revalidateTag is unavailable; its changes surface via
+// the 5-minute TTL.
 export const fetchAnalyticsData = unstable_cache(
   fetchAnalyticsDataUncached,
   ["analytics-data"],

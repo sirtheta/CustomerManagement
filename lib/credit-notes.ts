@@ -1,7 +1,8 @@
 import defaultPrisma from "@/lib/prisma";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { ItemData } from "@/components/items-editor-schema";
-import { sumCreditedRappen, toRappen } from "@/lib/payments";
+import { sumCreditedRappen } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 
 // Deliberately no "use server": plain helpers, used from actions only.
 

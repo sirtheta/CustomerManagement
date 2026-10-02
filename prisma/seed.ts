@@ -26,8 +26,8 @@ const INVOICE_STATES = Object.values(InvoiceState);
 const QUOTE_STATES = Object.values(QuoteState);
 const UNITS = Object.values(Unit);
 
-// Number of pending yearly-invoice mails to seed (see seedPendingYearlyInvoices)
-const PENDING_YEARLY_COUNT = 3;
+// Number of subscription drafts with a pending mail to seed (see seedPendingSubscriptionInvoices)
+const PENDING_SUBSCRIPTION_COUNT = 3;
 
 // Like the defaults in lib/subscriptions.ts, but without the {totalAmount} placeholder (seeded mails are not sent)
 const DEFAULT_SUBJECT = "Rechnung Nr. {documentNumber} – {companyName}";
@@ -131,7 +131,7 @@ async function main() {
   for (let i = 0; i < 50; i++) {
     // The first few customers are guaranteed to get a yearly subscription so
     // the pending subscription mails below always have someone to belong to
-    const forcedYearly = i < PENDING_YEARLY_COUNT;
+    const forcedYearly = i < PENDING_SUBSCRIPTION_COUNT;
     const customer = await prisma.customer.create({
       data: {
         company: faker.company.name(),
@@ -311,15 +311,15 @@ async function main() {
     },
   });
 
-  // Pending yearly invoices, exactly as checkSubscriptions leaves them
-  const pendingYearly = await seedPendingYearlyInvoices(
-    customers.slice(0, PENDING_YEARLY_COUNT),
+  // Subscription drafts with a pending mail, exactly as checkSubscriptions leaves them
+  const pendingSubscription = await seedPendingSubscriptionInvoices(
+    customers.slice(0, PENDING_SUBSCRIPTION_COUNT),
     company.companyName,
     categories,
     prefix,
     invoiceCounter,
   );
-  invoiceCounter = pendingYearly.invoiceCounter;
+  invoiceCounter = pendingSubscription.invoiceCounter;
 
   const reminderCount = await seedReminders(customers.slice(3, 3 + REMINDER_PLANS.length), categories, prefix, invoiceCounter);
   invoiceCounter += REMINDER_PLANS.length;
@@ -329,7 +329,7 @@ async function main() {
   const bankCount = await seedBankStatement(company.companyIBAN);
 
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingYearly.count} pending subscription invoice mails, ${reminderCount} dunning invoices, ${bankCount} open bank transactions.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingSubscription.count} pending subscription invoice mails, ${reminderCount} dunning invoices, ${bankCount} open bank transactions.`,
   );
 }
 
@@ -515,8 +515,8 @@ async function seedBankStatement(iban: string | null): Promise<number> {
 // subscription's nextInvoiceDate advanced by one year (seeded as Yearly).
 // Each customer also gets a prior numbered, Paid invoice from a year ago so
 // the history looks realistic.
-async function seedPendingYearlyInvoices(
-  yearlyCustomers: { customerId: number; contactPerson: string; email: string }[],
+async function seedPendingSubscriptionInvoices(
+  subscriptionCustomers: { customerId: number; contactPerson: string; email: string }[],
   companyName: string,
   categories: { categoryId: number }[],
   prefix: string,
@@ -529,7 +529,7 @@ async function seedPendingYearlyInvoices(
   const dueDate = new Date(today);
   dueDate.setDate(dueDate.getDate() + paymentDays);
 
-  for (const [i, customer] of yearlyCustomers.entries()) {
+  for (const [i, customer] of subscriptionCustomers.entries()) {
     const priorDate = new Date(today);
     priorDate.setFullYear(priorDate.getFullYear() - 1);
     priorDate.setDate(priorDate.getDate() - i);
@@ -592,7 +592,7 @@ async function seedPendingYearlyInvoices(
     });
   }
 
-  return { count: yearlyCustomers.length, invoiceCounter };
+  return { count: subscriptionCustomers.length, invoiceCounter };
 }
 
 // Generate 1–2 send-history entries (used for non-draft invoices/quotes).

@@ -4,6 +4,12 @@ export type DiscountedItem = {
   discountPercent?: number;
 };
 
+/** Francs (number or Prisma Decimal) to whole Rappen, `Math.round`, sign kept. */
+export function toRappen(value: number | { toNumber(): number }): number {
+  const n = typeof value === "number" ? value : value.toNumber();
+  return Math.round(n * 100);
+}
+
 function roundCents(amount: number): number {
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 }

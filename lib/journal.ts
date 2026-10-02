@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { buildCsv } from "@/lib/csv-export";
 import { customerDisplayName, type CustomerNameFields } from "@/lib/customer-display";
 import { documentLabel } from "@/lib/document-display";
-import { toRappen } from "@/lib/payments";
+import { toRappen } from "@/lib/calculations";
 
 type Money = { toNumber(): number };
 

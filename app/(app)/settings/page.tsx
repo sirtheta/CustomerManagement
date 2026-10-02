@@ -6,6 +6,7 @@ import DatabaseExportCard from "./DatabaseExportCard";
 import DevToolsCard from "./DevToolsCard";
 import ModulesCard from "./ModulesCard";
 import { modulesFromSettings } from "@/lib/modules";
+import { DEFAULT_PREFIXES } from "@/lib/document-number";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/permissions";
@@ -74,8 +75,8 @@ export default async function SettingsPage() {
           numberFormat={s?.numberFormat ?? "de-CH"}
           defaultPaymentTermDays={s?.defaultPaymentTermDays ?? 30}
           defaultQuoteValidityDays={s?.defaultQuoteValidityDays ?? 30}
-          invoiceNumberPrefix={s?.invoiceNumberPrefix ?? "R-"}
-          quoteNumberPrefix={s?.quoteNumberPrefix ?? "A-"}
+          invoiceNumberPrefix={s?.invoiceNumberPrefix ?? DEFAULT_PREFIXES.invoice}
+          quoteNumberPrefix={s?.quoteNumberPrefix ?? DEFAULT_PREFIXES.quote}
           useHolderNameOnQR={s?.useHolderNameOnQR ?? false}
           roundTotalTo5Rappen={s?.roundTotalTo5Rappen ?? false}
           smtpHost={s?.smtpHost ?? ""}

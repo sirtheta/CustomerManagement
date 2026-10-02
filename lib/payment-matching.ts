@@ -1,14 +1,9 @@
 import defaultPrisma from "@/lib/prisma";
 import type { PrismaClient } from "@prisma/client";
-import type { Session } from "next-auth";
 import { getPaymentSummary, recordPayment } from "@/lib/payments";
 import { extractDocumentNumberCandidates } from "@/lib/import/document-reference";
-
-// Actor used for audit log entries triggered by the Budget app's import,
-// where no logged-in user exists. `logAudit` only reads `user.{id,name,email}`.
-const SYSTEM_ACTOR = {
-  user: { id: "0", name: "Budget-Import", email: "system@budget" },
-} as Session;
+import { DEFAULT_PREFIXES } from "@/lib/document-number";
+import { BUDGET_IMPORT_ACTOR } from "@/lib/system-actor";
 
 export type PaymentMatchResult =
   | { matched: true; invoiceId: number; documentNumber: string }
@@ -32,7 +27,7 @@ export async function matchAndMarkPaid(
   prisma: PrismaClient = defaultPrisma
 ): Promise<PaymentMatchResult> {
   const settings = await prisma.applicationSettings.findFirst();
-  const prefix = settings?.invoiceNumberPrefix ?? "R-";
+  const prefix = settings?.invoiceNumberPrefix ?? DEFAULT_PREFIXES.invoice;
   const candidates = extractDocumentNumberCandidates(params.description, prefix);
 
   for (const documentNumber of candidates) {
@@ -64,7 +59,7 @@ export async function matchAndMarkPaid(
         date: paidDate,
         source: "budget-import",
         bankReference: params.bankReference,
-        actor: SYSTEM_ACTOR,
+        actor: BUDGET_IMPORT_ACTOR,
       },
       prisma
     );

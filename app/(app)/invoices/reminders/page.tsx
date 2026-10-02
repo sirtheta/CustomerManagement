@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import ReminderRow from "./ReminderRow";
 import { SearchInput } from "@/components/search-input";
 import { Suspense } from "react";
@@ -14,6 +14,8 @@ import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { customerDisplayName } from "@/lib/customer-display";
+import { reminderMail } from "@/lib/mail-templates";
 
 type Props = {
   searchParams: Promise<{ search?: string }>;
@@ -98,9 +100,7 @@ export default async function RemindersPage({ searchParams }: Props) {
           {reminders.map((r) => {
             const inv = r.invoice;
             const c = inv.customer;
-            const customerName = c.contactInsteadOfCompany
-              ? c.contactPerson
-              : (c.company || c.contactPerson);
+            const customerName = customerDisplayName(c);
 
             const levelLabel = reminderTitle(r.reminderLevel);
             const remaining = remainingByInvoice.get(inv.id) ?? inv.totalAmount.toNumber();
@@ -114,11 +114,15 @@ export default async function RemindersPage({ searchParams }: Props) {
                   settings,
                 })
               : null;
-            const extra = charges && (charges.feeRappen > 0 || charges.interestRappen > 0)
-              ? `\nMahngebühr: ${formatCurrency(charges.feeRappen / 100)}\nVerzugszins: ${formatCurrency(charges.interestRappen / 100)}\nTotal: ${formatCurrency(charges.totalRappen / 100)}`
-              : "";
-            const defaultSubject = `${levelLabel}: Rechnung ${documentLabel(inv.documentNumber)} – ${companyName}`;
-            const defaultBody = `Guten Tag ${c.contactPerson}\n\nwir möchten Sie höflich daran erinnern, dass folgende Rechnung noch offen ist:\n\nRechnung Nr.: ${documentLabel(inv.documentNumber)}\nBetrag: ${formatCurrency(remaining)}${extra}\nFälligkeitsdatum: ${formatDate(inv.dueDate)}\n\nBitte überweisen Sie den Betrag umgehend auf unser Konto.\n\nMit freundlichen Grüssen\n${companyName}`;
+            const { subject: defaultSubject, body: defaultBody } = reminderMail({
+              levelLabel,
+              numberLabel: documentLabel(inv.documentNumber),
+              contactPerson: c.contactPerson,
+              companyName,
+              dueDate: inv.dueDate,
+              openAmount: remaining,
+              charges,
+            });
 
             return (
               <ReminderRow

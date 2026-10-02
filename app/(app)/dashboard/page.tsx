@@ -7,6 +7,7 @@ import Link from "next/link";
 import { InvoiceState, QuoteState } from "@prisma/client";
 import { AlertTriangle } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
+import { customerDisplayName } from "@/lib/customer-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { loadModules } from "@/lib/module-guard";
@@ -224,9 +225,7 @@ export default async function DashboardPage() {
                       <span className="font-medium">{task.title}</span>
                       <span className="text-gray-500">
                         {" · "}
-                        {task.customer.contactInsteadOfCompany
-                          ? task.customer.contactPerson
-                          : (task.customer.company || task.customer.contactPerson)}
+                        {customerDisplayName(task.customer)}
                       </span>
                     </Link>
                     <span
@@ -258,9 +257,7 @@ export default async function DashboardPage() {
                 {scheduledSubscriptions.map((sub) => (
                   <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
                     <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
-                      {sub.customer.contactInsteadOfCompany
-                        ? sub.customer.contactPerson
-                        : (sub.customer.company || sub.customer.contactPerson)}
+                      {customerDisplayName(sub.customer)}
                     </Link>
                     <span className="text-sm text-gray-500 whitespace-nowrap">
                       {INTERVAL_LABELS[sub.interval]} · {sub.nextInvoiceDate.toLocaleDateString("de-CH")}
@@ -292,9 +289,7 @@ export default async function DashboardPage() {
                       {documentLabel(inv.documentNumber)}
                     </Link>
                     <p className="text-xs text-gray-500">
-                      {inv.customer.contactInsteadOfCompany
-                        ? inv.customer.contactPerson
-                        : (inv.customer.company || inv.customer.contactPerson)}
+                      {customerDisplayName(inv.customer)}
                     </p>
                   </div>
                   <span className="text-sm font-medium">

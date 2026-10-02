@@ -1,5 +1,6 @@
 import type { ParsedTransaction } from "@/lib/import/types";
 import { extractDocumentNumberCandidates } from "@/lib/import/document-reference";
+import { toRappen } from "@/lib/calculations";
 
 /**
  * Matches CAMT.053 statement entries to open invoices, so a bank export can
@@ -41,15 +42,11 @@ export interface MatchedTransaction<T extends ParsedTransaction = ParsedTransact
 
 const MIN_NAME_LENGTH = 4;
 
-function centsOf(francs: number): number {
-  return Math.round(francs * 100);
-}
-
 /** The open amount, or the total printed on the latest Mahnbeleg, is a payment of this invoice. */
 function acceptsAmount(invoice: OpenInvoice, cents: number): boolean {
   return (
-    centsOf(invoice.openAmount) === cents ||
-    (invoice.reminderTotal != null && centsOf(invoice.reminderTotal) === cents)
+    toRappen(invoice.openAmount) === cents ||
+    (invoice.reminderTotal != null && toRappen(invoice.reminderTotal) === cents)
   );
 }
 

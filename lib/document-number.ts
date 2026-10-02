@@ -5,6 +5,13 @@ import { logAudit } from "@/lib/audit";
 
 type DbClient = typeof prisma | Prisma.TransactionClient;
 
+/**
+ * Number prefixes used when the settings row is missing or a prefix field is
+ * empty. Must match the `@default` of `invoiceNumberPrefix`/`quoteNumberPrefix`
+ * in prisma/schema.prisma.
+ */
+export const DEFAULT_PREFIXES = { invoice: "I-", quote: "Q-" } as const;
+
 // Deliberately no "use server": that directive would expose every export
 // here as a public Server Action endpoint, callable without a session.
 // These are plain helpers used from within actions/transactions only.
@@ -17,13 +24,13 @@ type DbClient = typeof prisma | Prisma.TransactionClient;
  */
 export async function generateInvoiceNumber(db: DbClient = prisma): Promise<string> {
   const settings = await db.applicationSettings.findFirst();
-  const prefix = settings?.invoiceNumberPrefix ?? "R-";
+  const prefix = settings?.invoiceNumberPrefix ?? DEFAULT_PREFIXES.invoice;
   return generateNumber(db, prefix, "invoice");
 }
 
 export async function generateQuoteNumber(db: DbClient = prisma): Promise<string> {
   const settings = await db.applicationSettings.findFirst();
-  const prefix = settings?.quoteNumberPrefix ?? "O-";
+  const prefix = settings?.quoteNumberPrefix ?? DEFAULT_PREFIXES.quote;
   return generateNumber(db, prefix, "quote");
 }
 

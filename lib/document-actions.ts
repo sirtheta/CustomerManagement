@@ -53,7 +53,8 @@ async function createItems(
   });
 }
 
-export type CreateDocumentInput = {
+/** Fields of an invoice/quote as entered in the form; used for create and update. */
+export type DocumentInput = {
   kind: DocumentKind;
   customerId: number;
   customUserText: string | null;
@@ -66,7 +67,7 @@ export type CreateDocumentInput = {
 };
 
 export async function createDocumentWithItems(
-  input: CreateDocumentInput
+  input: DocumentInput
 ): Promise<{ id: number; documentNumber: null }> {
   // Drafts are created without a number; assignDocumentNumber hands it out
   // when the document first leaves Draft.
@@ -108,24 +109,12 @@ export async function createDocumentWithItems(
   return { id, documentNumber: null };
 }
 
-export type UpdateDocumentInput = {
-  kind: DocumentKind;
-  customerId: number;
-  customUserText: string | null;
-  date: Date;
-  dueDate?: Date;
-  validUntil?: Date;
-  totalAmount: number;
-  discountPercent: number;
-  items: ItemData[];
-};
-
 /** Thrown when someone tries to edit an invoice that already left Draft. */
 export class DocumentLockedError extends Error {}
 
 export async function updateDocumentWithItems(
   id: number,
-  input: UpdateDocumentInput,
+  input: DocumentInput,
   prisma: PrismaClient = defaultPrisma
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {

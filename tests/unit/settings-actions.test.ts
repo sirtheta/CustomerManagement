@@ -23,13 +23,7 @@ vi.mock("@/lib/crypto", () => ({
   encryptSecret: vi.fn((v: string) => `enc:${v}`),
   decryptSecret: vi.fn((v: string) => v.replace("enc:", "")),
 }));
-vi.mock("@/lib/state-manager", () => ({
-  checkAndUpdateAllDocumentStates: vi.fn(),
-}));
-vi.mock("@/lib/reminders", () => ({ checkOverdueInvoices: vi.fn() }));
-vi.mock("@/lib/subscriptions", () => ({ checkSubscriptions: vi.fn() }));
-vi.mock("@/lib/tasks", () => ({ closeAnsweredFollowUps: vi.fn(), notifyDueTasks: vi.fn() }));
-vi.mock("@/lib/notifications", () => ({ sendAdminNotifications: vi.fn() }));
+vi.mock("@/lib/daily-jobs", () => ({ runDailyJobs: vi.fn(async () => []) }));
 vi.mock("@/lib/pdf/theme", () => ({
   resolveTheme: vi.fn((v: unknown) => v),
 }));
@@ -56,6 +50,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
+import { runDailyJobs } from "@/lib/daily-jobs";
 
 const adminSession = {
   user: { id: "1", name: "Admin", email: "admin@test.ch", role: "Admin" },
@@ -222,8 +217,8 @@ describe("settings actions", () => {
         reminderFeeLevel3Rappen: 0,
         reminderFeeLevel4Rappen: 0,
         reminderInterestPercent: 5,
-        invoiceNumberPrefix: "R-",
-        quoteNumberPrefix: "A-",
+        invoiceNumberPrefix: "I-",
+        quoteNumberPrefix: "Q-",
       } as never);
       vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
       vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
@@ -239,8 +234,8 @@ describe("settings actions", () => {
         applicationSettingsId: 1,
         companyInformationId: 2,
         companyInfo: { companyIBAN: "CH9300762011623852957" },
-        invoiceNumberPrefix: "R-",
-        quoteNumberPrefix: "A-",
+        invoiceNumberPrefix: "I-",
+        quoteNumberPrefix: "Q-",
         smtpHost: "old.mail.ch",
         smtpUser: "old",
         smtpPassword: "enc:oldpass",
@@ -257,7 +252,7 @@ describe("settings actions", () => {
         form({
           companyIBAN: "CH56 0483 5012 3456 7800 9",
           invoiceNumberPrefix: "RE-",
-          quoteNumberPrefix: "A-",
+          quoteNumberPrefix: "Q-",
           smtpHost: "new.mail.ch",
           smtpUser: "old",
           smtpPassword: "newpass",
@@ -283,7 +278,7 @@ describe("settings actions", () => {
           "notifyTelegramChatId",
         ],
         companyIBAN: { from: "CH9300762011623852957", to: "CH5604835012345678009" },
-        invoiceNumberPrefix: { from: "R-", to: "RE-" },
+        invoiceNumberPrefix: { from: "I-", to: "RE-" },
         smtpHost: { from: "old.mail.ch", to: "new.mail.ch" },
         smtpPassword: "geändert",
         smtpFromAddress: { from: null, to: "info@test.ch" },
@@ -302,8 +297,8 @@ describe("settings actions", () => {
         applicationSettingsId: 1,
         companyInformationId: 2,
         companyInfo: { companyIBAN: "CH9300762011623852957" },
-        invoiceNumberPrefix: "R-",
-        quoteNumberPrefix: "A-",
+        invoiceNumberPrefix: "I-",
+        quoteNumberPrefix: "Q-",
         smtpPassword: null,
         notifyTelegramBotToken: null,
       } as never);
@@ -326,8 +321,8 @@ describe("settings actions", () => {
         smtpPassword: null,
         notifyTelegramBotToken: null,
         roundTotalTo5Rappen: true,
-        invoiceNumberPrefix: "R-",
-        quoteNumberPrefix: "A-",
+        invoiceNumberPrefix: "I-",
+        quoteNumberPrefix: "Q-",
       } as never);
       vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
       vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
@@ -659,6 +654,16 @@ describe("settings actions", () => {
 
       const result = await triggerNotificationCheck();
       expect(result.success).toBe(true);
+      expect(runDailyJobs).toHaveBeenCalledWith(prisma);
+      expect(prisma.task.updateMany).toHaveBeenCalledWith({ data: { notifiedAt: null } });
+    });
+
+    it("reports failed daily job steps", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(runDailyJobs).mockResolvedValueOnce([{ step: "checkSubscriptions", error: "boom" }]);
+
+      const result = await triggerNotificationCheck();
+      expect(result.error).toBe("Fehler: checkSubscriptions: boom");
     });
   });
 

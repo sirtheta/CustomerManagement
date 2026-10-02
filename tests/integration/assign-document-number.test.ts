@@ -34,7 +34,7 @@ describe("assignDocumentNumber", () => {
 
     const number = await assignDocumentNumber("invoice", invoice.id, { client: db.prisma });
 
-    expect(number).toBe(`R-${yy}${mm}0001`);
+    expect(number).toBe(`I-${yy}${mm}0001`);
     const stored = await db.prisma.invoice.findUnique({ where: { id: invoice.id } });
     expect(stored?.documentNumber).toBe(number);
   });
@@ -56,7 +56,7 @@ describe("assignDocumentNumber", () => {
     const kept = await draftInvoice();
     await db.prisma.invoice.delete({ where: { id: deleted.id } });
 
-    expect(await assignDocumentNumber("invoice", kept.id, { client: db.prisma })).toBe(`R-${yy}${mm}0001`);
+    expect(await assignDocumentNumber("invoice", kept.id, { client: db.prisma })).toBe(`I-${yy}${mm}0001`);
   });
 
   it("numbers sequentially across concurrent calls", async () => {
@@ -80,7 +80,7 @@ describe("assignDocumentNumber", () => {
         state: "Draft",
       },
     });
-    expect(await assignDocumentNumber("quote", quote.id, { client: db.prisma })).toBe(`O-${yy}${mm}0001`);
+    expect(await assignDocumentNumber("quote", quote.id, { client: db.prisma })).toBe(`Q-${yy}${mm}0001`);
   });
 
   it("writes an UPDATE audit entry only when a number is newly assigned", async () => {

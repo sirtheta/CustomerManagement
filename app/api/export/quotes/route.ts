@@ -5,6 +5,7 @@ import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { QuoteState, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { documentLabel } from "@/lib/document-display";
+import { customerDisplayName } from "@/lib/customer-display";
 import { moduleDisabledResponse } from "@/lib/module-guard";
 
 const stateLabels: Record<string, string> = {
@@ -63,9 +64,7 @@ export async function GET(request: Request) {
     documentLabel(q.documentNumber),
     q.date.toLocaleDateString("de-CH"),
     q.validUntil.toLocaleDateString("de-CH"),
-    q.customer.contactInsteadOfCompany
-      ? q.customer.contactPerson
-      : (q.customer.company || q.customer.contactPerson),
+    customerDisplayName(q.customer),
     q.totalAmount.toNumber().toFixed(2),
     stateLabels[q.state] ?? q.state,
   ]);
