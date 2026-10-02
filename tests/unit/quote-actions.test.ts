@@ -331,7 +331,7 @@ describe("quote actions", () => {
         documentNumber: "Q-2026-001",
       } as never);
       vi.mocked(prisma.quote.delete).mockResolvedValue({} as never);
-      vi.mocked(prisma.$transaction).mockImplementation((ops) => Promise.all(ops as never[]) as never);
+      vi.mocked(prisma.$transaction).mockImplementation(((ops: Promise<unknown>[]) => Promise.all(ops)) as never);
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT:/quotes");
       });
