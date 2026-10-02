@@ -16,6 +16,7 @@ import { CustomerCombobox } from "@/components/customer-combobox";
 import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays } from "@/lib/date";
+import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
@@ -101,22 +102,32 @@ export default function InvoiceForm({
   const defaultDate = invoice
     ? new Date(invoice.date).toISOString().split("T")[0]
     : today;
+
+  const initialCustomer =
+    customers.find((c) => c.customerId === (invoice?.customerId ?? defaultCustomerId)) ?? null;
+  // Term of the selected customer, else the global default. Existing invoices keep their due date.
+  const [termDays, setTermDays] = useState(
+    effectivePaymentTermDays(initialCustomer, defaultPaymentTermDays)
+  );
+  const [invoiceDate, setInvoiceDate] = useState(defaultDate);
   const defaultDueDate = invoice
     ? new Date(invoice.dueDate).toISOString().split("T")[0]
-    : (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + defaultPaymentTermDays);
-        return d.toISOString().split("T")[0];
-      })();
+    : addDays(defaultDate, termDays);
 
   const [dueDate, setDueDate] = useState(defaultDueDate);
 
   function handleDateChange(value: string) {
-    setDueDate(addDays(value, defaultPaymentTermDays));
+    setInvoiceDate(value);
+    setDueDate(addDays(value, termDays));
   }
 
-  const defaultCustomer =
-    customers.find((c) => c.customerId === (invoice?.customerId ?? defaultCustomerId)) ?? null;
+  function handleCustomerChange(customer: Customer | null) {
+    const days = effectivePaymentTermDays(customer, defaultPaymentTermDays);
+    setTermDays(days);
+    if (!invoice) setDueDate(addDays(invoiceDate, days));
+  }
+
+  const defaultCustomer = initialCustomer;
 
   const initialItems = invoice ? invoice.items.map(toItemData) : [];
   const [templateKey, setTemplateKey] = useState(0);
@@ -186,6 +197,7 @@ export default function InvoiceForm({
                   name="customerId"
                   customers={customers}
                   defaultValue={defaultCustomer}
+                  onValueChange={handleCustomerChange}
                   required
                 />
               )}

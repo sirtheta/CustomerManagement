@@ -18,6 +18,8 @@ const ALT_MATCH: Record<string, string> = {
   profile: "Profilseite mit Passwort ändern",
   dashboard: "Dashboard mit Kennzahlen zu Rechnungen und Umsatz",
   customers: "Kundenliste mit Suche und Filter für Kunden mit Abo",
+  "customer-detail": "Kundendetail mit Stammdaten, Kontakten, Abos und Notizen",
+  "customer-form": "Kundenformular mit aufgeklapptem Bereich Weitere Angaben",
   invoices: "Rechnungsliste mit Status-Filtern",
   "invoice-new": "Neue Rechnung mit Positionen und Kunde",
   quotes: "Offertenliste mit Status Entwurf, Versendet, Angenommen",

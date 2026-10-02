@@ -57,4 +57,44 @@ describe("GET /api/export/customers", () => {
     expect(lines[1]).toContain("B Ohne Abo");
     expect(lines[1].endsWith(",")).toBe(true);
   });
+
+  it("exports customer number, UID, billing data, payment term and contacts", async () => {
+    currentSession = sessionFor("Editor");
+    await db.prisma.customer.create({
+      data: {
+        ...createValidTestCustomer(),
+        contactPerson: "Extended",
+        email: "ext@example.ch",
+        customerNumber: 1042,
+        uid: "CHE-116.281.710",
+        paymentTermDays: 10,
+        billingName: "Muster AG, Buchhaltung",
+        billingStreet: "Postfach",
+        billingHouseNumber: "7",
+        billingZipCode: "3000",
+        billingCity: "Bern",
+        billingCountry: "CH",
+        billingEmail: "buchhaltung@example.ch",
+        contacts: {
+          create: [
+            { name: "Buchhaltung", role: "Buchhaltung", email: "b@x.ch" },
+            { name: "Einkauf", email: "e@x.ch" },
+          ],
+        },
+      },
+    });
+
+    const res = await GET();
+    const [header, line] = (await res.text()).split("\n");
+    expect(header).toBe(
+      "ID,Kunden-Nr.,Firma,Kontaktperson,Strasse,Hausnummer,PLZ,Ort,Land,E-Mail,Telefon,UID," +
+        "Zahlungsfrist (Tage),Rechnungsname,Rechnungsstrasse,Rechnungs-PLZ,Rechnungsort,Rechnungsland," +
+        "Rechnungs-E-Mail,Weitere Kontakte,Abos"
+    );
+    expect(line).toContain(",1042,");
+    expect(line).toContain("CHE-116.281.710");
+    expect(line).toContain("Postfach 7");
+    expect(line).toContain("buchhaltung@example.ch");
+    expect(line).toContain("Buchhaltung (Buchhaltung) <b@x.ch>; Einkauf <e@x.ch>");
+  });
 });

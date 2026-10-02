@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import DeleteCustomerButton from "./DeleteCustomerButton";
+import { customerSearchConditions } from "@/lib/customer-search";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
@@ -39,12 +40,7 @@ async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPag
     ...(subscriptionOnly ? { subscriptions: { some: { active: true } } } : {}),
     ...(term
       ? {
-          OR: [
-            { company: { contains: term } },
-            { contactPerson: { contains: term } },
-            { email: { contains: term } },
-            { city: { contains: term } },
-          ],
+          OR: customerSearchConditions(term),
         }
       : {}),
   };
@@ -68,6 +64,7 @@ async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPag
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Kunden-Nr.</TableHead>
               <TableHead>
                 <SortableColumn href={sortHrefs.contactPerson} active={sortField === "contactPerson"} direction={sortOrder}>
                   Firma / Kontakt
@@ -90,7 +87,7 @@ async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPag
           <TableBody>
             {customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={6} className="text-center py-12">
                   {term ? (
                     <p className="text-muted-foreground">Keine Kunden für diesen Suchbegriff.</p>
                   ) : (
@@ -106,6 +103,7 @@ async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPag
             ) : (
               customers.map((c) => (
                 <TableRow key={c.customerId}>
+                  <TableCell>{c.customerNumber ?? "—"}</TableCell>
                   <TableCell>
                     <Link href={`/customers/${c.customerId}`} className="hover:underline">
                       <div className="font-medium">
@@ -157,6 +155,7 @@ function CustomersTableSkeleton() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Kunden-Nr.</TableHead>
             <TableHead>Firma / Kontakt</TableHead>
             <TableHead>Ort</TableHead>
             <TableHead>E-Mail</TableHead>
@@ -164,7 +163,7 @@ function CustomersTableSkeleton() {
             <TableHead className="w-40" />
           </TableRow>
         </TableHeader>
-        <TableSkeleton columns={5} />
+        <TableSkeleton columns={6} />
       </Table>
     </div>
   );
@@ -225,7 +224,7 @@ export default async function CustomersPage({ searchParams }: Props) {
       </div>
 
       <Suspense fallback={<div className="h-9 rounded-lg border border-input bg-muted animate-pulse" />}>
-        <SearchInput defaultValue={search ?? ""} placeholder="Firma, Kontakt oder Ort suchen…" />
+        <SearchInput defaultValue={search ?? ""} placeholder="Firma, Kontakt, Ort, Kunden-Nr. oder UID suchen…" />
       </Suspense>
 
       <Suspense fallback={<CustomersTableSkeleton />}>

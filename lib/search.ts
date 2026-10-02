@@ -1,4 +1,5 @@
 import type { InvoiceState, PrismaClient, QuoteState } from "@prisma/client";
+import { customerSearchConditions } from "@/lib/customer-search";
 import { customerDisplayName } from "@/lib/customer-display";
 
 export { customerDisplayName };
@@ -68,12 +69,7 @@ export async function searchGlobal(
   const [customers, invoices, quotes] = await Promise.all([
     db.customer.findMany({
       where: {
-        OR: [
-          { company: { contains: q } },
-          { contactPerson: { contains: q } },
-          { email: { contains: q } },
-          { city: { contains: q } },
-        ],
+        OR: customerSearchConditions(q),
       },
       select: {
         customerId: true,

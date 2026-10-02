@@ -9,6 +9,7 @@ import { DEFAULT_THEME, resolveTheme, type PdfTheme } from "@/lib/pdf/theme";
 import { applyFonts } from "@/lib/pdf/fonts";
 import { Prisma } from "@prisma/client";
 import type { Customer, Unit } from "@prisma/client";
+import { billingRecipient, customerRecipient, type BillingFields } from "@/lib/customer-billing";
 
 const log = logger.child({ module: "pdf" });
 
@@ -50,7 +51,8 @@ export type RenderDoc = {
     | "zipCode"
     | "city"
     | "country"
-  >;
+  > &
+    BillingFields;
   items: RenderItem[];
   /** Prebuilt Swiss QR bill data; null skips the QR page (always null for quotes). */
   qr: QrBillData | null;
@@ -224,16 +226,15 @@ export async function generateDocumentPdf(
     y += Math.max(theme.logoMaxSize + 15, companyLines.length * LINE_HEIGHT + 15);
 
     // ── Customer address ─────────────────────────────────────────────────
-    const displayName =
-      customer.contactInsteadOfCompany || !customer.company
-        ? customer.contactPerson
-        : customer.company;
+    // Invoices, credit notes and reminders go to the billing address; quotes always to the customer.
+    const recipient = doc.kind === "quote" ? customerRecipient(customer) : billingRecipient(customer);
     const addrLines = [
-      displayName,
-      !customer.contactInsteadOfCompany && customer.company ? customer.contactPerson : null,
-      formatStreetLine(customer.street, customer.houseNumber),
-      formatCityLine(customer.zipCode, customer.city),
-      foreignCountryLine(customer.country),
+      recipient.name,
+      recipient.contactLine,
+      formatStreetLine(recipient.street, recipient.houseNumber),
+      formatCityLine(recipient.zipCode, recipient.city),
+      foreignCountryLine(recipient.country),
+      recipient.uid ? `UID: ${recipient.uid}` : null,
     ].filter(Boolean) as string[];
 
     pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
@@ -252,6 +253,7 @@ export async function generateDocumentPdf(
       [doc.numberLabel, doc.documentNumber],
       ["Datum:", fmtDate(doc.date, locale)],
     ];
+    if (customer.customerNumber != null) detailRows.push(["Kunden-Nr.:", String(customer.customerNumber)]);
     if (doc.dueDate !== null) detailRows.push([doc.dueLabel, fmtDate(doc.dueDate, locale)]);
     if (doc.referenceLine) detailRows.push(["Bezug:", doc.referenceLine]);
     detailRows.forEach(([label, value]) => {

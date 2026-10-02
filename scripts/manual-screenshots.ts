@@ -43,11 +43,53 @@ type Shot = {
   run?: (page: Page) => Promise<void>;
 };
 
+// Opens the demo customer with the extended data (customer number 1001).
+async function openDemoCustomer(page: Page) {
+  await page.goto(`${BASE_URL}/customers`);
+  await page.getByRole("link", { name: /Bergland Bäckerei AG/ }).click();
+  await page.waitForURL(/\/customers\/\d+$/);
+}
+
 const SHOTS: Shot[] = [
   { name: "login", path: "/login", fullPage: false },
   { name: "profile", path: "/profile" },
   { name: "dashboard", path: "/dashboard", fullPage: true },
   { name: "customers", path: "/customers", fullPage: true },
+  {
+    name: "customer-detail",
+    path: "/customers",
+    // Customer ids depend on seed order, so open the demo customer from the list.
+    run: async (page) => {
+      await openDemoCustomer(page);
+      await page.waitForSelector("text=Kontakte");
+      await hideDevIndicator(page);
+      await page.screenshot({ path: path.join(OUT_DIR, "customer-detail.png"), fullPage: true });
+    },
+  },
+  {
+    name: "customer-form",
+    path: "/customers",
+    run: async (page) => {
+      await openDemoCustomer(page);
+      await page.getByText("Bearbeiten", { exact: true }).click();
+      const form = page.locator("form", { has: page.locator('input[name="customerNumber"]') });
+      await form.waitFor();
+      // The section is collapsed unless the customer already has data in it.
+      const details = form.locator("details");
+      if ((await details.getAttribute("open")) === null) await details.locator("summary").click();
+      await hideDevIndicator(page);
+      await page.waitForTimeout(200);
+      // Clip the card out of a full-page capture: an element screenshot scrolls the
+      // card under the sticky header, which then covers its top edge.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const box = await form.evaluate((el) => {
+        const target = el.closest('[data-slot="card"]') ?? el;
+        const r = target.getBoundingClientRect();
+        return { x: r.x + window.scrollX, y: r.y + window.scrollY, width: r.width, height: r.height };
+      });
+      await page.screenshot({ path: path.join(OUT_DIR, "customer-form.png"), fullPage: true, clip: box });
+    },
+  },
   { name: "invoices", path: "/invoices", fullPage: true },
   { name: "invoice-new", path: "/invoices/new", fullPage: true },
   { name: "quotes", path: "/quotes", fullPage: true },

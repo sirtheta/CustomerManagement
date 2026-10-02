@@ -113,6 +113,58 @@ describe("generateDocumentPdf byte assembly", () => {
     expect(numPages).toBe(1);
   });
 
+  const extended = {
+    contactInsteadOfCompany: false,
+    company: "Muster AG",
+    contactPerson: "Anna Beispiel",
+    street: "Hauptstrasse",
+    houseNumber: "5",
+    zipCode: "8001",
+    city: "Zürich",
+    country: "CH",
+    customerNumber: 1042,
+    uid: "CHE-116.281.710",
+    billingName: "Muster AG, Buchhaltung",
+    billingStreet: "Postfach",
+    billingZipCode: "3000",
+    billingCity: "Bern",
+    billingCountry: "CH",
+  };
+
+  it("addresses an invoice to the billing address with UID and customer number", async () => {
+    const buf = await generateDocumentPdf(baseDoc({ customer: extended }), company, "de-CH", undefined);
+    const text = (await extractText(buf)).pageText.join(" ");
+    expect(text).toContain("Muster AG, Buchhaltung");
+    expect(text).toContain("Postfach");
+    expect(text).toContain("3000 Bern");
+    expect(text).toContain("UID: CHE-116.281.710");
+    expect(text).toContain("Kunden-Nr.:");
+    expect(text).toContain("1042");
+    expect(text).not.toContain("Hauptstrasse");
+  });
+
+  it("addresses a quote to the customer address without UID but with customer number", async () => {
+    const buf = await generateDocumentPdf(
+      baseDoc({ kind: "quote", title: "Offerte", customer: extended }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const text = (await extractText(buf)).pageText.join(" ");
+    expect(text).toContain("Hauptstrasse 5");
+    expect(text).toContain("8001 Zürich");
+    expect(text).not.toContain("Postfach");
+    expect(text).not.toContain("UID:");
+    expect(text).toContain("1042");
+  });
+
+  it("omits Kunden-Nr. and UID for customers without them", async () => {
+    const buf = await generateDocumentPdf(baseDoc(), company, "de-CH", undefined);
+    const text = (await extractText(buf)).pageText.join(" ");
+    expect(text).not.toContain("Kunden-Nr.");
+    expect(text).not.toContain("UID:");
+  });
+
   it("appends a separate Swiss QR bill page when qr data is present", async () => {
     const qr = buildQrBillData({
       invoice: { documentNumber: "I-26010001", totalAmount: 100 },
@@ -318,6 +370,16 @@ describe("generateQuotePdf", () => {
           phone: null,
           contactInsteadOfCompany: false,
           archivedAt: null,
+          customerNumber: null,
+          uid: null,
+          billingName: null,
+          billingStreet: null,
+          billingHouseNumber: null,
+          billingZipCode: null,
+          billingCity: null,
+          billingCountry: null,
+          billingEmail: null,
+          paymentTermDays: null,
         },
         items: [
           {

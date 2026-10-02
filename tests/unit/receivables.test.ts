@@ -150,6 +150,36 @@ describe("buildReceivables customer address", () => {
     });
   });
 
+  it("uses the billing address when set", () => {
+    const report = buildReceivables(
+      [
+        inv({
+          id: 1,
+          customer: {
+            ...customer,
+            street: "Seestrasse",
+            houseNumber: "100",
+            zipCode: "3011",
+            city: "Bern",
+            country: "CH",
+            billingStreet: "Postfach",
+            billingHouseNumber: "7",
+            billingZipCode: "8001",
+            billingCity: "Zürich",
+            billingCountry: "CH",
+          },
+        }),
+      ],
+      new Date("2026-12-31")
+    );
+    expect(report.rows[0].customerAddress).toEqual({
+      street: "Postfach 7",
+      zip: "8001",
+      city: "Zürich",
+      country: "CH",
+    });
+  });
+
   it("falls back to empty strings when the input has no address", () => {
     const report = buildReceivables([inv({ id: 1 })], new Date("2026-12-31"));
     expect(report.rows[0].customerAddress).toEqual({ street: "", zip: "", city: "", country: "" });

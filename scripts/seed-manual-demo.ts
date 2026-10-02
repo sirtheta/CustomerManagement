@@ -69,14 +69,32 @@ async function main() {
   });
 
   const customerData = [
-    { company: "Bergland Bäckerei AG", contactPerson: "Fritz Amrein", street: "Dorfstrasse", houseNumber: "12", city: "Interlaken", zipCode: "3800", email: "info@bergland-baeckerei.ch", phone: "+41 33 822 14 50" },
-    { company: "Zimmerei Wüthrich GmbH", contactPerson: "Karin Wüthrich", street: "Industriestrasse", houseNumber: "8", city: "Thun", zipCode: "3600", email: "kontakt@zimmerei-wuethrich.ch", phone: "+41 33 437 60 10" },
-    { company: "Café Lumière", contactPerson: "Aline Perret", street: "Rue du Marché", houseNumber: "5", city: "Lausanne", zipCode: "1003", email: "aline@cafe-lumiere.ch", phone: "+41 21 311 22 44" },
-    { company: "Optik Sonnenschein", contactPerson: "David Meyer", street: "Bahnhofstrasse", houseNumber: "44", city: "Zürich", zipCode: "8001", email: "david.meyer@optik-sonnenschein.ch", phone: "+41 44 211 90 30" },
-    { company: "Physiopraxis Bergmatt", contactPerson: "Nadja Steiner", street: "Bergmattweg", houseNumber: "3", city: "Luzern", zipCode: "6003", email: "info@physio-bergmatt.ch", phone: "+41 41 240 55 12" },
-    { company: null, contactPerson: "Beat Hofmann", street: "Rosenweg", houseNumber: "9", city: "Basel", zipCode: "4056", email: "beat.hofmann@bluewin.ch", phone: "+41 61 333 77 89", contactInsteadOfCompany: true },
-    { company: "Garage Oberland AG", contactPerson: "Res Baumann", street: "Seestrasse", houseNumber: "120", city: "Spiez", zipCode: "3700", email: "info@garage-oberland.ch", phone: "+41 33 654 22 11" },
-    { company: "Confiserie Mathez", contactPerson: "Chantal Mathez", street: "Marktgasse", houseNumber: "21", city: "Bern", zipCode: "3011", email: "chantal@confiserie-mathez.ch", phone: "+41 31 311 45 67" },
+    {
+      company: "Bergland Bäckerei AG", contactPerson: "Fritz Amrein", street: "Dorfstrasse", houseNumber: "12", city: "Interlaken", zipCode: "3800", email: "info@bergland-baeckerei.ch", phone: "+41 33 822 14 50",
+      customerNumber: 1001,
+      uid: "CHE-116.281.710",
+      paymentTermDays: 10,
+      billingName: "Bergland Bäckerei AG, Buchhaltung",
+      billingStreet: "Bahnhofstrasse",
+      billingHouseNumber: "2",
+      billingZipCode: "3800",
+      billingCity: "Interlaken",
+      billingCountry: "CH",
+      billingEmail: "rechnungen@treuhand-alpina.ch",
+      contacts: {
+        create: [
+          { name: "Sandra Gerber", role: "Buchhaltung", email: "s.gerber@treuhand-alpina.ch", phone: "+41 33 822 90 11" },
+          { name: "Peter Amrein", role: "Produktion", email: "p.amrein@bergland-baeckerei.ch" },
+        ],
+      },
+    },
+    { company: "Zimmerei Wüthrich GmbH", contactPerson: "Karin Wüthrich", street: "Industriestrasse", houseNumber: "8", city: "Thun", zipCode: "3600", email: "kontakt@zimmerei-wuethrich.ch", phone: "+41 33 437 60 10", customerNumber: 1002, uid: "CHE-104.567.890", paymentTermDays: 14 },
+    { company: "Café Lumière", contactPerson: "Aline Perret", street: "Rue du Marché", houseNumber: "5", city: "Lausanne", zipCode: "1003", email: "aline@cafe-lumiere.ch", phone: "+41 21 311 22 44", customerNumber: 1003 },
+    { company: "Optik Sonnenschein", contactPerson: "David Meyer", street: "Bahnhofstrasse", houseNumber: "44", city: "Zürich", zipCode: "8001", email: "david.meyer@optik-sonnenschein.ch", phone: "+41 44 211 90 30", customerNumber: 1004, uid: "CHE-107.890.123" },
+    { company: "Physiopraxis Bergmatt", contactPerson: "Nadja Steiner", street: "Bergmattweg", houseNumber: "3", city: "Luzern", zipCode: "6003", email: "info@physio-bergmatt.ch", phone: "+41 41 240 55 12", customerNumber: 1005 },
+    { company: null, contactPerson: "Beat Hofmann", street: "Rosenweg", houseNumber: "9", city: "Basel", zipCode: "4056", email: "beat.hofmann@bluewin.ch", phone: "+41 61 333 77 89", contactInsteadOfCompany: true, customerNumber: 1006 },
+    { company: "Garage Oberland AG", contactPerson: "Res Baumann", street: "Seestrasse", houseNumber: "120", city: "Spiez", zipCode: "3700", email: "info@garage-oberland.ch", phone: "+41 33 654 22 11", customerNumber: 1007, uid: "CHE-105.678.902", paymentTermDays: 60 },
+    { company: "Confiserie Mathez", contactPerson: "Chantal Mathez", street: "Marktgasse", houseNumber: "21", city: "Bern", zipCode: "3011", email: "chantal@confiserie-mathez.ch", phone: "+41 31 311 45 67", customerNumber: 1008, uid: "CHE-106.789.013" },
   ];
   const customers = await Promise.all(customerData.map((data) => prisma.customer.create({ data })));
 

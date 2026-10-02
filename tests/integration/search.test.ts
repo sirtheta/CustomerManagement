@@ -49,6 +49,18 @@ describe("searchGlobal", () => {
     }
   });
 
+  it("should find a customer by its exact customer number", async () => {
+    const { prisma } = db;
+    await seedCustomer({ company: "Nummer AG", customerNumber: 1042 } as never);
+    await seedCustomer({ company: "Andere AG", customerNumber: 1043 } as never);
+
+    const hit = await searchGlobal(prisma, "1042");
+    expect(hit.customers.map((c) => c.company)).toEqual(["Nummer AG"]);
+
+    const none = await searchGlobal(prisma, "1044");
+    expect(none.customers).toHaveLength(0);
+  });
+
   it("should find invoices and quotes by document number and customer fields", async () => {
     const { prisma } = db;
     const customer = await seedCustomer({ company: "Seeblick GmbH", contactPerson: "Beat Keller" });

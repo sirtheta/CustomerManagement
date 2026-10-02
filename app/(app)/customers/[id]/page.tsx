@@ -7,6 +7,7 @@ import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import SubscriptionsSection from "../SubscriptionsSection";
+import ContactsSection from "../ContactsSection";
 import TasksSection from "../TasksSection";
 import HistorySection from "../HistorySection";
 import { loadCustomerHistory } from "@/lib/customer-history";
@@ -88,7 +89,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates, tasks, users, history] = await Promise.all([
+  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates, contacts, tasks, users, history] = await Promise.all([
     prisma.customer.findUnique({ where: { customerId } }),
     prisma.document.findMany({
       where: { customerId },
@@ -123,6 +124,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       orderBy: { nextInvoiceDate: "asc" },
     }),
     prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),
     prisma.task.findMany({
       where: { customerId },
       include: { assignee: { select: { name: true } } },
@@ -153,14 +155,25 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <CustomerForm
-          key={`${customer.customerId}-${isEditing}`}
-          customer={customer}
-          readOnly={!isEditing}
-          cancelHref={`/customers/${customerId}`}
-          editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
-        />
         <div className="space-y-6">
+          <CustomerForm
+            key={`${customer.customerId}-${isEditing}`}
+            customer={customer}
+            readOnly={!isEditing}
+            cancelHref={`/customers/${customerId}`}
+            editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
+          />
+          <ContactsSection
+            customerId={customerId}
+            canEdit={canEdit}
+            contacts={contacts.map((c) => ({
+              contactId: c.contactId,
+              name: c.name,
+              role: c.role,
+              email: c.email,
+              phone: c.phone,
+            }))}
+          />
           <SubscriptionsSection
             customerId={customerId}
             canEdit={canEdit}
@@ -175,6 +188,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
               templateName: s.template?.name ?? null,
             }))}
           />
+        </div>
+        <div className="space-y-6">
           <TasksSection
             customerId={customerId}
             canEdit={canEdit}

@@ -299,6 +299,37 @@ ALTER TABLE "SentDocument" ADD COLUMN "openRappen" INTEGER;
 -- The old code raised the level without a cap; level 4 is now the last one.
 UPDATE "PendingReminder" SET "reminderLevel" = 4 WHERE "reminderLevel" > 4;
 
+-- ── Extended customer model (F10) ───────────────────────────────────────
+ALTER TABLE "Customer" ADD COLUMN "customerNumber" INTEGER;
+ALTER TABLE "Customer" ADD COLUMN "uid" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingName" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingStreet" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingHouseNumber" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingZipCode" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingCity" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingCountry" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "billingEmail" TEXT;
+ALTER TABLE "Customer" ADD COLUMN "paymentTermDays" INTEGER;
+
+-- Existing customers are numbered from 1001 in the order of their id; the
+-- unique index is only created afterwards.
+UPDATE "Customer" SET "customerNumber" = 1000 + (
+  SELECT COUNT(*) FROM "Customer" AS c2 WHERE c2."customerId" <= "Customer"."customerId"
+);
+CREATE UNIQUE INDEX "Customer_customerNumber_key" ON "Customer"("customerNumber");
+
+CREATE TABLE "CustomerContact" (
+    "contactId" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "customerId" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "role" TEXT,
+    "email" TEXT,
+    "phone" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CustomerContact_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer" ("customerId") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE INDEX "CustomerContact_customerId_idx" ON "CustomerContact"("customerId");
+
 -- ── Customer follow-up tasks (F12) ──────────────────────────────────────
 CREATE TABLE "Task" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
