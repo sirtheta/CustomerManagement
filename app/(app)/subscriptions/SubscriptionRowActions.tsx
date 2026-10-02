@@ -19,7 +19,7 @@ export default function SubscriptionRowActions({ customerId, subscriptionId, act
     <div className="flex items-center justify-end gap-1.5">
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size="sm"
         disabled={isToggling}
         onClick={() =>
@@ -38,7 +38,6 @@ export default function SubscriptionRowActions({ customerId, subscriptionId, act
         title="Abo löschen"
         description="Soll dieses Abo wirklich gelöscht werden? Bereits erstellte Rechnungen bleiben erhalten."
         confirmLabel="Löschen"
-        triggerVariant="ghost"
         triggerSize="sm"
         onConfirm={() => deleteSubscription(customerId, subscriptionId)}
       >
