@@ -20,6 +20,7 @@ import {
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 
 const editorSession = {
@@ -208,6 +209,12 @@ describe("subscription actions", () => {
       });
     });
 
+    it("refreshes the subscription overview", async () => {
+      vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
+      await setSubscriptionActive(1, 7, false);
+      expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
+    });
+
     it("does not audit when the customer does not match", async () => {
       vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 0 } as never);
       await setSubscriptionActive(2, 7, false);
@@ -223,6 +230,12 @@ describe("subscription actions", () => {
       expect(logAudit).toHaveBeenCalledWith(editorSession, "DELETE", "Subscription", 7, undefined, {
         customerId: 1,
       });
+    });
+
+    it("refreshes the subscription overview", async () => {
+      vi.mocked(prisma.subscription.deleteMany).mockResolvedValue({ count: 1 } as never);
+      await deleteSubscription(1, 7);
+      expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
     });
 
     it("does not audit when nothing was deleted", async () => {
