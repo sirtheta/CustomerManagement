@@ -59,7 +59,7 @@ npx vitest run tests/unit/calculations.test.ts
 - NextAuth v5 Credentials provider with bcrypt password validation
 - Optional TOTP 2FA (`otplib`); backup codes stored as a JSON array in `User.totpBackupCodes`
 - In-memory rate limiting on login attempts
-- JWT sessions, 8-hour max age
+- JWT sessions, 7-day max age, renewed every 24 h while active (`lib/config.ts`, `SESSION_MAX_AGE_SEC` / `SESSION_UPDATE_AGE_SEC`)
 - `user.role` (`Admin | Editor | Viewer`) is embedded in the JWT and carried into `session.user.role`
 
 **Authorization** (`lib/permissions.ts`):
@@ -90,7 +90,7 @@ npx vitest run tests/unit/calculations.test.ts
 
 **PDF generation** (`lib/pdf/`): Server-side only, using `pdfkit` + `swissqrbill` for Swiss QR payment slips. Triggered via `GET /api/invoices/[id]/pdf`.
 
-**Email** (`lib/email.ts`): Nodemailer SMTP. Outgoing emails are queued via the `PendingEmail` model before sending, and logged in `InvoiceSentLog`.
+**Email** (`lib/email.ts`): Nodemailer SMTP. Invoices, quotes and reminders are sent directly from the send dialog; only subscription invoices are queued as `PendingEmail` (approval under `invoices/pending`, or `autoSend`). Sent invoices and reminders are logged in `InvoiceSentLog`, quotes in `QuoteSentLog`.
 
 **Audit logging** (`lib/audit.ts`, `lib/audit-chain.ts`): All significant mutations call `logAudit(...)` (or `logAuditEntry(...)` when there is no session), both never-throw. Every row is hash-chained: `hash = SHA-256([prevHash, userId, userName, action, entityType, entityId, entityRef, details, createdAt])`, `prevHash` is `@unique` so the chain stays linear (writers collide on P2002 and retry), the first chained row uses the `"GENESIS"` sentinel, rows written before the chain existed keep `hash = null`. Never write to `AuditLog` directly (`prisma.auditLog.create`) — always go through `appendAuditEntry`, otherwise the chain breaks. `verifyAuditChain` runs on Einstellungen → Aktivitätsprotokoll and reports the first broken row. Never call `logAudit`/`logAuditEntry` inside a `$transaction` callback (the adapter serialises interactive transactions with a mutex, so the nested write waits on the outer one and times out). The hash is unkeyed: edits/deletions of single rows are detected, a full recompute of the chain by someone with file access is not, and deleting the *last* rows is only detectable if the head hash shown there was stored externally (`?head=<hash>` checks it).
 

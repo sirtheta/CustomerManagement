@@ -34,7 +34,9 @@ curl -O https://raw.githubusercontent.com/sirtheta/CustomerManagement/main/.env.
 
 # 2. Umgebungsvariablen konfigurieren
 cp .env.example .env
-nano .env  # Werte setzen (AUTH_SECRET, ADMIN_PASSWORD_HASH, TOTP_SECRET, AUTH_URL)
+nano .env  # Werte setzen (AUTH_SECRET, AUTH_URL, ADMIN_EMAIL, ADMIN_PASSWORD_HASH)
+           # 2FA wird nach dem Login unter Einstellungen → Benutzer eingerichtet; TOTP_SECRET
+           # liest nur der Dev-Seed (prisma/seed.ts) und hat im Betrieb keine Wirkung
 
 # 3. Datenbankdatei ablegen
 mkdir -p data

@@ -17,17 +17,24 @@ versende sie per E-Mail und behalte offene Zahlungen, Mahnungen und deinen Umsat
 
 - 👥 **Kundenverwaltung** mit Firmen-/Kontaktdaten und Datei-Uploads pro Kunde
 - 📄 **Offerten & Rechnungen** mit klarem Status-Workflow (Entwurf → Versendet → Bezahlt …)
-- 🇨🇭 **Schweizer QR-Rechnung** als fertiges PDF inkl. IBAN und Firmenlogo
-- 🔁 **Abos (wiederkehrende Rechnungen, monatlich, quartalsweise, jährlich)** werden automatisch erstellt
-- ⏰ **Zahlungserinnerungen / Mahnwesen** mit eigenem Mahnbeleg je Stufe (optional mit Mahngebühr und Verzugszins)
-- ✉️ **E-Mail-Versand** von Rechnungen direkt aus der App (eigener SMTP-Server)
+- 🇨🇭 **Schweizer QR-Rechnung** als fertiges PDF inkl. IBAN und Firmenlogo, optional mit Rundung auf 5 Rappen
+- ↩️ **Gutschriften** zu versendeten Rechnungen, die den offenen Betrag reduzieren
+- 💳 **Zahlungen & Teilzahlungen** pro Rechnung, mit Liste der offenen Posten (inkl. Altersstruktur und CSV)
+- 🏦 **Bankimport (CAMT.053)**: Kontoauszug hochladen, Zahlungen den Rechnungen zuordnen und Belastungen als Ausgaben übernehmen
+- 🔁 **Abos (wiederkehrende Rechnungen, monatlich, quartalsweise, jährlich)** werden automatisch erstellt und auf Wunsch direkt versendet
+- ⏰ **Zahlungserinnerungen / Mahnwesen** in vier Stufen mit eigenem Mahnbeleg (optional mit Mahngebühr und Verzugszins)
+- ✉️ **E-Mail-Versand** von Rechnungen, Offerten und Mahnungen direkt aus der App (eigener SMTP-Server)
+- 🗄️ **PDF-Archiv**: jede versendete Rechnung und Mahnung wird unverändert mit Prüfsumme abgelegt
+- ✅ **Aufgaben & Kundenverlauf**: Wiedervorlagen pro Kunde (z. B. automatisch «Offerte nachfassen») und eine Chronik aller Dokumente, Zahlungen und Notizen
 - 🔔 **Benachrichtigungen** über überfällige Posten per E-Mail oder Telegram
 - 💰 **Buchhaltung & GuV** mit Ausgaben-Erfassung und visualisierter Gewinn-/Verlust-Rechnung (Einnahmen − Ausgaben pro Monat)
 - 📊 **Auswertungen** zu Umsatz, Rechnungsstatus, Kategorien und Top-Kunden
 - 🗂️ **Vorlagen & Dienstleistungen** für schnelles Erstellen wiederkehrender Positionen
 - 🔍 **Volltextsuche** über Kunden, Rechnungen und Offerten
 - 👤 **Benutzer & Rollen** (Admin, Editor, Viewer) mit optionaler **2-Faktor-Authentifizierung**
-- 📝 **Audit-Log** protokolliert alle wichtigen Änderungen
+- 📝 **Audit-Log** protokolliert alle wichtigen Änderungen (fälschungserkennend verkettet)
+- 🧩 **Module**: Offerten, Abos, Mahnwesen, Bankimport, Buchhaltung, Auswertungen und Aufgaben lassen sich einzeln ausblenden
+- 💾 **Nächtliche Datenbank-Backups** und Log-Dateien, als Admin direkt in der App herunterladbar
 - 📤 **CSV-Export** von Kunden, Rechnungen und Offerten sowie ein **Jahrespaket (ZIP)** für die Steuererklärung (Journal, Jahresübersicht, offene Posten, archivierte Rechnungs-PDFs)
 
 ---
@@ -78,7 +85,9 @@ in der App unter **Einstellungen** verwaltet — nicht über Umgebungsvariablen.
 ## Technologie
 
 Next.js 16 · React 19 · TypeScript · Tailwind CSS 4 · Prisma + SQLite · NextAuth.
-Das Image läuft auf `amd64` und `arm64` (z. B. Raspberry Pi 5).
+Das fertige Image wird nur für `arm64` gebaut (z. B. Raspberry Pi 5); für `amd64` das
+Image aus dem Repository selbst bauen (`docker build -t customer-management .`) und in der
+`docker-compose.yml` als `image:` eintragen.
 
 Entwickler:innen finden die Anleitung zum lokalen Aufsetzen, zur Architektur und zum
 Datenmodell in [CLAUDE.md](CLAUDE.md).
