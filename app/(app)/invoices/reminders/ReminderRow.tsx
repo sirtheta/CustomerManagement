@@ -2,12 +2,14 @@
 
 import { useActionState, useTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { sendReminder, dismissReminder } from "./actions";
-import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
+import { sendReminder, dismissReminder, undoDismissReminder } from "./actions";
+import type { ActionState } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { ClockIcon, SendIcon } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
@@ -52,24 +54,48 @@ function SnoozeButton({ cooldownDays, pending, onClick }: { cooldownDays: number
 }
 
 export default function ReminderRow(props: Props) {
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    sendReminder,
-    {}
-  );
+  const label = documentLabel(props.documentNumber);
+
+  // The toasts are raised right where the action result arrives, not from an effect of this card:
+  // on success the revalidated list no longer contains the card, so an effect would never run.
+  const [state, formAction, isPending] = useActionState<ActionState, FormData>(async (prev, formData) => {
+    const result = await sendReminder(prev, formData);
+    if (result.success) toast.success(`Mahnung für ${label} versendet`);
+    else if (result.error) toast.error(result.error);
+    return result;
+  }, {});
   const [dismissing, startDismiss] = useTransition();
 
-  useActionToast(state, `Mahnung für ${documentLabel(props.documentNumber)} versendet`, { toastErrors: false });
-
   const levelLabel = reminderTitle(props.reminderLevel);
-  const snooze = () => startDismiss(() => dismissReminder(props.reminderId));
+  const { reminderId, cooldownDays } = props;
+
+  const undoSnooze = async (snoozedUntil: string) => {
+    const result = await undoDismissReminder(reminderId, snoozedUntil);
+    if (result.success) toast.success(`Mahnung für ${label} wird wieder angezeigt`);
+    else if (result.error) toast.error(result.error);
+  };
+
+  const snooze = () =>
+    startDismiss(async () => {
+      const result = await dismissReminder(reminderId);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      const until = result.snoozedUntil;
+      toast.success(
+        `Mahnung für ${label} für ${cooldownDays} ${cooldownDays === 1 ? "Tag" : "Tage"} zurückgestellt`,
+        until ? { action: { label: "Rückgängig", onClick: () => void undoSnooze(until) } } : undefined
+      );
+    });
 
   return (
-    <Card id={`reminder-${props.reminderId}`} className="scroll-mt-20 target:ring-2 target:ring-primary">
+    <Card id={`reminder-${props.reminderId}`} className="scroll-mt-28">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <CardTitle className="text-base">
-              {documentLabel(props.documentNumber)}{" "}
+              {label}{" "}
               <span className="text-xs font-normal text-muted-foreground">· {levelLabel}</span>
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -77,7 +103,7 @@ export default function ReminderRow(props: Props) {
               <span className="text-destructive font-medium">{props.dueDate}</span> ·{" "}
               {formatCurrency(props.totalAmount)}
             </p>
-            {(props.feeRappen > 0 || props.interestRappen > 0) && (
+            {!props.lastLevelSent && (props.feeRappen > 0 || props.interestRappen > 0) && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 + Mahngebühr {formatCurrency(props.feeRappen / 100)} · Verzugszins{" "}
                 {formatCurrency(props.interestRappen / 100)} (auf dem Beleg)
@@ -90,13 +116,15 @@ export default function ReminderRow(props: Props) {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              render={<a href={`/api/reminders/${props.reminderId}/pdf`} target="_blank" rel="noopener noreferrer" />}
-            >
-              Mahnbeleg-Vorschau
-            </Button>
+            {!props.lastLevelSent && (
+              <Button
+                variant="outline"
+                size="sm"
+                render={<a href={`/api/reminders/${props.reminderId}/pdf`} target="_blank" rel="noopener noreferrer" />}
+              >
+                Mahnbeleg-Vorschau
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -109,14 +137,12 @@ export default function ReminderRow(props: Props) {
       </CardHeader>
       <CardContent>
         {props.lastLevelSent ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              Letzte Stufe erreicht. Weitere Schritte (z. B. Betreibung) erfolgen ausserhalb der App.
-            </p>
-            <SnoozeButton cooldownDays={props.cooldownDays} pending={dismissing} onClick={snooze} />
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Letzte Stufe erreicht. Die App sendet keine weitere Mahnung, weitere Schritte (z. B. Betreibung)
+            erfolgen ausserhalb der App. Die Rechnung bleibt hier sichtbar, bis sie bezahlt ist.
+          </p>
         ) : (
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-3">
           <input type="hidden" name="reminderId" value={props.reminderId} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -154,7 +180,7 @@ export default function ReminderRow(props: Props) {
             <p className="text-sm text-destructive">{state.error}</p>
           )}
           <div className="flex justify-between items-center gap-2 pt-1">
-            <SnoozeButton cooldownDays={props.cooldownDays} pending={dismissing} onClick={snooze} />
+            <SnoozeButton cooldownDays={cooldownDays} pending={dismissing} onClick={snooze} />
             <Button type="submit" size="sm" disabled={isPending}>
               <SendIcon className="size-4 mr-1.5" />
               {isPending ? "Wird gesendet…" : "Mahnung senden"}

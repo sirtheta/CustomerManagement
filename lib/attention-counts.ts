@@ -1,8 +1,10 @@
 import { InvoiceState, type PrismaClient } from "@prisma/client";
 import type { ModuleFlags } from "@/lib/modules";
 import type { NavBadgeCounts } from "@/lib/navigation";
+import { MAX_REMINDER_LEVEL } from "@/lib/reminder-charges";
+import { lastLevelSentReminderIds } from "@/lib/reminders";
 
-type Db = Pick<PrismaClient, "pendingEmail" | "pendingReminder" | "invoice">;
+type Db = Pick<PrismaClient, "pendingEmail" | "pendingReminder" | "invoice" | "sentDocument">;
 
 /** Reminders that show up in the reminder list right now (not snoozed into the future). */
 export function dueReminderWhere(now: Date) {
@@ -22,9 +24,27 @@ export async function loadWorkCounts(
 ): Promise<NavBadgeCounts> {
   const [pendingEmails, dueReminders] = await Promise.all([
     canEdit && modules.subscriptions ? db.pendingEmail.count() : 0,
-    canEdit && modules.reminders ? db.pendingReminder.count({ where: dueReminderWhere(now) }) : 0,
+    canEdit && modules.reminders ? countSendableReminders(db, now) : 0,
   ]);
   return { pendingEmails, dueReminders };
+}
+
+/**
+ * Reminders in the list that can still be sent: not snoozed and not past the
+ * last level. Cards with "Letzte Stufe erreicht" stay in the list but do not
+ * wait for anything the app could send, so they are not counted.
+ */
+async function countSendableReminders(db: Db, now: Date): Promise<number> {
+  const where = dueReminderWhere(now);
+  const [total, atLastLevel] = await Promise.all([
+    db.pendingReminder.count({ where }),
+    db.pendingReminder.findMany({
+      where: { AND: [where, { reminderLevel: { gte: MAX_REMINDER_LEVEL } }] },
+      select: { id: true, invoiceId: true, reminderLevel: true, createdAt: true },
+    }),
+  ]);
+  if (atLastLevel.length === 0) return total;
+  return total - (await lastLevelSentReminderIds(db, atLastLevel)).size;
 }
 
 export type AttentionCounts = NavBadgeCounts & {

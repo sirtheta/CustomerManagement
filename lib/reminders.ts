@@ -62,6 +62,32 @@ export async function isLastReminderLevelSent(
   return sent > 0;
 }
 
+/**
+ * Batch form of `isLastReminderLevelSent`: the ids of the given reminders whose
+ * last level went out (one query for all of them). Such a reminder stays in the
+ * Mahnungen list, but nothing can be sent for it any more.
+ */
+export async function lastLevelSentReminderIds(
+  prisma: Pick<PrismaClient, "sentDocument">,
+  reminders: { id: number; invoiceId: number; reminderLevel: number; createdAt: Date }[]
+): Promise<Set<number>> {
+  const result = new Set<number>();
+  const atLast: typeof reminders = [];
+  for (const r of reminders) {
+    if (r.reminderLevel > MAX_REMINDER_LEVEL) result.add(r.id);
+    else if (r.reminderLevel === MAX_REMINDER_LEVEL) atLast.push(r);
+  }
+  if (atLast.length === 0) return result;
+  const docs = await prisma.sentDocument.findMany({
+    where: { kind: "Reminder", reminderLevel: MAX_REMINDER_LEVEL, invoiceId: { in: atLast.map((r) => r.invoiceId) } },
+    select: { invoiceId: true, createdAt: true },
+  });
+  for (const r of atLast) {
+    if (docs.some((d) => d.invoiceId === r.invoiceId && d.createdAt >= r.createdAt)) result.add(r.id);
+  }
+  return result;
+}
+
 export type ReminderAvailability =
   /** Nothing to remind (draft, paid, canceled, credit note, not yet due). */
   | { kind: "none" }

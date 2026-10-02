@@ -35,7 +35,7 @@ vi.mock("@/components/items-editor-schema", () => ({
   },
 }));
 
-import { sendReminder, dismissReminder } from "@/app/(app)/invoices/reminders/actions";
+import { sendReminder, dismissReminder, undoDismissReminder } from "@/app/(app)/invoices/reminders/actions";
 import { saveAsTemplate, updateTemplate, deleteTemplate } from "@/app/(app)/invoices/templates/actions";
 import { approvePendingEmail, discardPendingEmail } from "@/app/(app)/invoices/pending/actions";
 import prisma from "@/lib/prisma";
@@ -265,15 +265,83 @@ describe("invoices/reminders actions", () => {
         invoiceId: 10,
         invoice: { id: 10, documentNumber: "R-2026-010" },
       } as never);
-      vi.mocked(prisma.pendingReminder.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.pendingReminder.updateMany).mockResolvedValue({ count: 1 } as never);
 
-      await dismissReminder(2);
-      expect(prisma.pendingReminder.update).toHaveBeenCalledWith({
+      const result = await dismissReminder(2);
+      expect(prisma.pendingReminder.updateMany).toHaveBeenCalledWith({
         where: { id: 2 },
         data: expect.objectContaining({ snoozedUntil: expect.any(Date) }),
       });
+      expect(result.success).toBe(true);
+      expect(result.snoozedUntil).toEqual(expect.any(String));
       expect(logAudit).toHaveBeenCalled();
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/reminders");
+    });
+
+    it("returns an error instead of throwing when the reminder is gone", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue(null);
+      const result = await dismissReminder(2);
+      expect(result.error).toMatch(/nicht gefunden/);
+      expect(prisma.pendingReminder.updateMany).not.toHaveBeenCalled();
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
+    it("refuses to snooze a reminder whose last level was sent", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 2, invoiceId: 10, reminderLevel: 5, invoice: { id: 10, documentNumber: "R-2026-010" },
+      } as never);
+      const result = await dismissReminder(2);
+      expect(result.error).toMatch(/letzte Mahnstufe/);
+      expect(prisma.pendingReminder.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects Viewer role", async () => {
+      vi.mocked(auth).mockResolvedValue(viewerSession);
+      await expect(dismissReminder(2)).rejects.toThrow();
+    });
+  });
+
+  describe("undoDismissReminder", () => {
+    const until = "2026-10-16T10:00:00.000Z";
+
+    it("resets exactly the snooze set by dismissReminder and logs audit", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 2, invoiceId: 10, invoice: { id: 10, documentNumber: "R-2026-010" },
+      } as never);
+      vi.mocked(prisma.pendingReminder.updateMany).mockResolvedValue({ count: 1 } as never);
+
+      const result = await undoDismissReminder(2, until);
+      expect(result.success).toBe(true);
+      expect(prisma.pendingReminder.updateMany).toHaveBeenCalledWith({
+        where: { id: 2, snoozedUntil: new Date(until) },
+        data: { snoozedUntil: null },
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "Reminder", 10, "R-2026-010", {
+        action: "dismissUndone",
+      });
+      expect(revalidatePath).toHaveBeenCalledWith("/invoices/reminders");
+    });
+
+    it("changes nothing when the reminder was sent or snoozed again meanwhile", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingReminder.findUnique).mockResolvedValue({
+        id: 2, invoiceId: 10, invoice: { id: 10, documentNumber: "R-2026-010" },
+      } as never);
+      vi.mocked(prisma.pendingReminder.updateMany).mockResolvedValue({ count: 0 } as never);
+
+      const result = await undoDismissReminder(2, until);
+      expect(result.error).toMatch(/inzwischen geändert/);
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
+    it("rejects Viewer role", async () => {
+      vi.mocked(auth).mockResolvedValue(viewerSession);
+      await expect(undoDismissReminder(2, until)).rejects.toThrow();
     });
   });
 });

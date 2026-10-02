@@ -3,12 +3,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import ReminderRow from "./ReminderRow";
+import { ReminderHighlight } from "./ReminderHighlight";
 import { SearchInput } from "@/components/search-input";
 import { Suspense } from "react";
 import { getPaymentSummary } from "@/lib/payments";
 import { documentLabel } from "@/lib/document-display";
 import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";
-import { DEFAULT_REMINDER_COOLDOWN_DAYS, isLastReminderLevelSent, latestSentReminders } from "@/lib/reminders";
+import { DEFAULT_REMINDER_COOLDOWN_DAYS, lastLevelSentReminderIds, latestSentReminders } from "@/lib/reminders";
 import { billingEmail } from "@/lib/customer-billing";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
@@ -74,13 +75,7 @@ export default async function RemindersPage({ searchParams }: Props) {
       reminders.map(async (r) => [r.invoiceId, (await getPaymentSummary(r.invoiceId)).remainingRappen / 100] as const)
     )
   );
-  const lastLevelSentIds = new Set(
-    (
-      await Promise.all(
-        reminders.map(async (r) => ((await isLastReminderLevelSent(prisma, r)) ? r.id : null))
-      )
-    ).filter((id): id is number => id !== null)
-  );
+  const lastLevelSentIds = await lastLevelSentReminderIds(prisma, reminders);
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -165,6 +160,7 @@ export default async function RemindersPage({ searchParams }: Props) {
               />
             );
           })}
+          <ReminderHighlight />
         </div>
       )}
     </div>

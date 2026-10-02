@@ -157,7 +157,14 @@ async function sendReminderLocked(input: {
   return { success: true, _ts: Date.now() };
 }
 
-export async function dismissReminder(id: number): Promise<void> {
+export type DismissReminderResult = ActionState & {
+  /** ISO time the reminder is hidden until; `undoDismissReminder` only resets exactly this snooze. */
+  snoozedUntil?: string;
+};
+
+const REMINDER_GONE_ERROR = "Mahnung nicht gefunden. Sie wurde vermutlich durch eine Zahlung erledigt.";
+
+export async function dismissReminder(id: number): Promise<DismissReminderResult> {
   const session = await requireEditor();
   await requireModule("reminders");
   const settings = await prisma.applicationSettings.findFirst({
@@ -168,14 +175,47 @@ export async function dismissReminder(id: number): Promise<void> {
     where: { id },
     include: { invoice: { select: { id: true, documentNumber: true } } },
   });
-  await prisma.pendingReminder.update({
+  if (!reminder) return { error: REMINDER_GONE_ERROR };
+  if (await isLastReminderLevelSent(prisma, reminder)) {
+    return { error: "Die letzte Mahnstufe wurde bereits versendet. Zurückstellen ist nicht mehr nötig." };
+  }
+  // updateMany: a payment may have removed the reminder in the meantime.
+  const { count } = await prisma.pendingReminder.updateMany({
     where: { id },
     data: { snoozedUntil },
   });
-  if (reminder) {
-    await logAudit(session, "UPDATE", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
-      action: "dismissed",
-    });
-  }
+  if (count === 0) return { error: REMINDER_GONE_ERROR };
+  await logAudit(session, "UPDATE", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
+    action: "dismissed",
+    snoozedUntil: snoozedUntil.toISOString(),
+  });
   revalidatePath("/invoices/reminders");
+  return { success: true, snoozedUntil: snoozedUntil.toISOString() };
+}
+
+/**
+ * Undo of "Zurückstellen": shows the reminder again at once. Only resets the
+ * snooze `dismissReminder` set (same `snoozedUntil`), so it never cancels the
+ * cooldown of a reminder that was sent in the meantime.
+ */
+export async function undoDismissReminder(id: number, snoozedUntil: string): Promise<ActionState> {
+  const session = await requireEditor();
+  await requireModule("reminders");
+  const until = new Date(snoozedUntil);
+  if (isNaN(until.getTime())) return { error: "Ungültige Anfrage." };
+  const reminder = await prisma.pendingReminder.findUnique({
+    where: { id },
+    include: { invoice: { select: { id: true, documentNumber: true } } },
+  });
+  if (!reminder) return { error: REMINDER_GONE_ERROR };
+  const { count } = await prisma.pendingReminder.updateMany({
+    where: { id, snoozedUntil: until },
+    data: { snoozedUntil: null },
+  });
+  if (count === 0) return { error: "Die Mahnung wurde inzwischen geändert und kann nicht mehr zurückgeholt werden." };
+  await logAudit(session, "UPDATE", "Reminder", reminder.invoiceId, reminder.invoice.documentNumber ?? undefined, {
+    action: "dismissUndone",
+  });
+  revalidatePath("/invoices/reminders");
+  return { success: true };
 }

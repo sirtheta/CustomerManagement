@@ -4,11 +4,15 @@ import { attentionBanners, loadAttentionCounts, loadWorkCounts } from "@/lib/att
 
 const modulesWith = (off: Partial<ModuleFlags>): ModuleFlags => ({ ...allModulesEnabled(), ...off });
 
-function fakeDb() {
+function fakeDb(
+  atLastLevel: { id: number; invoiceId: number; reminderLevel: number; createdAt: Date }[] = [],
+  levelFourDocs: { invoiceId: number; createdAt: Date }[] = []
+) {
   return {
     pendingEmail: { count: vi.fn().mockResolvedValue(2) },
-    pendingReminder: { count: vi.fn().mockResolvedValue(3) },
+    pendingReminder: { count: vi.fn().mockResolvedValue(3), findMany: vi.fn().mockResolvedValue(atLastLevel) },
     invoice: { count: vi.fn().mockResolvedValue(7) },
+    sentDocument: { findMany: vi.fn().mockResolvedValue(levelFourDocs) },
   };
 }
 
@@ -16,13 +20,32 @@ describe("loadWorkCounts", () => {
   it("counts pending mails and not-snoozed reminders for editors", async () => {
     const db = fakeDb();
     const now = new Date("2026-10-02T10:00:00Z");
+    const notSnoozed = { OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }] };
     expect(await loadWorkCounts(db as never, allModulesEnabled(), true, now)).toEqual({
       pendingEmails: 2,
       dueReminders: 3,
     });
-    expect(db.pendingReminder.count).toHaveBeenCalledWith({
-      where: { OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }] },
-    });
+    expect(db.pendingReminder.count).toHaveBeenCalledWith({ where: notSnoozed });
+    expect(db.pendingReminder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { AND: [notSnoozed, { reminderLevel: { gte: 4 } }] } })
+    );
+    expect(db.sentDocument.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not count reminders whose last level was already sent", async () => {
+    const created = new Date("2026-09-01T00:00:00Z");
+    const db = fakeDb(
+      [
+        { id: 1, invoiceId: 10, reminderLevel: 4, createdAt: created }, // level 4 sent → not counted
+        { id: 2, invoiceId: 11, reminderLevel: 4, createdAt: created }, // level 4 not sent yet → counted
+        { id: 3, invoiceId: 12, reminderLevel: 4, createdAt: created }, // level 4 sent before a restart → counted
+      ],
+      [
+        { invoiceId: 10, createdAt: new Date("2026-09-20T00:00:00Z") },
+        { invoiceId: 12, createdAt: new Date("2026-08-01T00:00:00Z") },
+      ]
+    );
+    expect((await loadWorkCounts(db as never, allModulesEnabled(), true)).dueReminders).toBe(2);
   });
 
   it("returns 0 without querying for Viewers and switched-off modules", async () => {

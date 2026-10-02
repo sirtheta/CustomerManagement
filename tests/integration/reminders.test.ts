@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { checkOverdueInvoices, isLastReminderLevelSent, latestSentReminders } from "@/lib/reminders";
+import { checkOverdueInvoices, isLastReminderLevelSent, lastLevelSentReminderIds, latestSentReminders } from "@/lib/reminders";
 
 describe("checkOverdueInvoices", () => {
   const db = createTestDatabase();
@@ -267,6 +267,18 @@ describe("isLastReminderLevelSent", () => {
     await sentLevel4(inv.id, new Date(Date.now() - 60_000));
     const fresh = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
     expect(await isLastReminderLevelSent(db.prisma, fresh)).toBe(false);
+  });
+
+  it("lastLevelSentReminderIds agrees with isLastReminderLevelSent for a batch", async () => {
+    const inv = await seed();
+    await sentLevel4(inv.id, new Date(Date.now() - 60_000)); // before the reminder: ignored
+    const r = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
+    const below = { id: 900, invoiceId: inv.id, reminderLevel: 3, createdAt: r.createdAt };
+    const above = { id: 901, invoiceId: inv.id, reminderLevel: 5, createdAt: r.createdAt };
+    expect([...(await lastLevelSentReminderIds(db.prisma, [r, below, above]))]).toEqual([901]);
+    await sentLevel4(inv.id, new Date(r.createdAt.getTime() + 1000));
+    expect([...(await lastLevelSentReminderIds(db.prisma, [r, below, above]))].sort()).toEqual([r.id, 901].sort());
+    expect((await lastLevelSentReminderIds(db.prisma, [])).size).toBe(0);
   });
 });
 
