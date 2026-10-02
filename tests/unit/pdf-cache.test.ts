@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { existsSync, rmSync } from "fs";
+import { existsSync, rmSync, utimesSync } from "fs";
 import { join } from "path";
 
 vi.mock("@/lib/config", () => ({
   config: {
-    pdf: { cacheDir: join("tests", ".tmp-pdf-cache-test"), cacheTtlMs: 50, cacheMaxFiles: 3 },
+    pdf: { cacheDir: join("tests", ".tmp-pdf-cache-test"), cacheTtlMs: 60_000, cacheMaxFiles: 3 },
   },
 }));
 
@@ -13,8 +13,10 @@ const ABS_CACHE_DIR = join(process.cwd(), RELATIVE_CACHE_DIR);
 
 import { readCache, writeCache } from "@/lib/pdf/pdf-cache";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Sets the file's mtime to `secondsAgo` seconds in the past, so no test depends on real waiting. */
+function age(key: string, secondsAgo: number) {
+  const t = new Date(Date.now() - secondsAgo * 1000);
+  utimesSync(join(ABS_CACHE_DIR, `${key}.pdf`), t, t);
 }
 
 describe("pdf-cache", () => {
@@ -44,17 +46,18 @@ describe("pdf-cache", () => {
   it("expires an entry once its TTL has elapsed", async () => {
     await writeCache("ttl-key", Buffer.from("stale-soon"));
     expect(await readCache("ttl-key")).not.toBeNull();
-    await sleep(60);
+    age("ttl-key", 120);
     expect(await readCache("ttl-key")).toBeNull();
   });
 
   it("evicts the oldest file once cacheMaxFiles is exceeded", async () => {
+    rmSync(ABS_CACHE_DIR, { recursive: true, force: true });
     await writeCache("evict-a", Buffer.from("a"));
-    await sleep(5);
+    age("evict-a", 30);
     await writeCache("evict-b", Buffer.from("b"));
-    await sleep(5);
+    age("evict-b", 20);
     await writeCache("evict-c", Buffer.from("c"));
-    await sleep(5);
+    age("evict-c", 10);
     // cacheMaxFiles is 3; writing a 4th evicts the oldest (evict-a) to stay at the limit.
     await writeCache("evict-d", Buffer.from("d"));
 
