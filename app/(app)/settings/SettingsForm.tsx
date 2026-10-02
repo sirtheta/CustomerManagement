@@ -12,6 +12,10 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES, countryName } from "@/lib/address";
 
 type Props = {
+  // Switched-off modules stay in the form as hidden fields: saveSettings reads
+  // every field and would reset a missing one to its default.
+  showQuotes: boolean;
+  showReminders: boolean;
   companyName: string;
   companyHolderName: string;
   companyStreet: string;
@@ -174,7 +178,7 @@ export default function SettingsForm(props: Props) {
               <Label htmlFor="invoiceNumberPrefix">Rechnungspräfix</Label>
               <Input id="invoiceNumberPrefix" name="invoiceNumberPrefix" defaultValue={props.invoiceNumberPrefix} />
             </div>
-            <div className="space-y-1">
+            <div className={props.showQuotes ? "space-y-1" : "hidden"}>
               <Label htmlFor="quoteNumberPrefix">Offertenpräfix</Label>
               <Input id="quoteNumberPrefix" name="quoteNumberPrefix" defaultValue={props.quoteNumberPrefix} />
             </div>
@@ -190,7 +194,7 @@ export default function SettingsForm(props: Props) {
                 defaultValue={props.defaultPaymentTermDays}
               />
             </div>
-            <div className="space-y-1">
+            <div className={props.showQuotes ? "space-y-1" : "hidden"}>
               <Label htmlFor="defaultQuoteValidityDays">Offerten-Gültigkeit (Tage)</Label>
               <Input
                 id="defaultQuoteValidityDays"
@@ -201,6 +205,7 @@ export default function SettingsForm(props: Props) {
               />
             </div>
           </div>
+          <div className={props.showReminders ? "space-y-4" : "hidden"}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="reminderCooldownDays">Mahnungs-Cooldown (Tage)</Label>
@@ -248,6 +253,7 @@ export default function SettingsForm(props: Props) {
                 />
               </div>
             </div>
+          </div>
           </div>
 
           <div className="flex items-start gap-3 pt-2 border-t">

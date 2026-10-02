@@ -7,6 +7,7 @@ import logger from "@/lib/logger";
 import { UserRole } from "@prisma/client";
 import { buildYearPackage, parseYearParam } from "@/lib/year-package";
 import { zipStream } from "@/lib/zip";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 const log = logger.child({ module: "api.year-package" });
 
@@ -14,6 +15,9 @@ export async function GET(request: Request) {
   const session = await auth();
   if (!session) redirect("/login");
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) redirect("/dashboard");
+
+  const disabled = await moduleDisabledResponse("accounting");
+  if (disabled) return disabled;
 
   const now = new Date();
   const year = parseYearParam(new URL(request.url).searchParams.get("year"), now);

@@ -17,6 +17,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { loadModules } from "@/lib/module-guard";
 
 const PAGE_SIZE = 25;
 
@@ -181,7 +182,8 @@ export default async function CustomersPage({ searchParams }: Props) {
     sortBy === "city" || sortBy === "email" ? sortBy : "contactPerson";
   const sortOrder: SortOrder = order === "desc" ? "desc" : "asc";
   const term = search?.trim() ?? "";
-  const subscriptionOnly = subscription === "true";
+  const modules = await loadModules();
+  const subscriptionOnly = subscription === "true" && modules.subscriptions;
   const archivedOnly = archived === "true";
 
   function sortHref(col: SortField) {

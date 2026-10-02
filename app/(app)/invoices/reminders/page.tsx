@@ -10,12 +10,14 @@ import { documentLabel } from "@/lib/document-display";
 import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";
 import { isLastReminderLevelSent } from "@/lib/reminders";
 import { billingEmail } from "@/lib/customer-billing";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = {
   searchParams: Promise<{ search?: string }>;
 };
 
 export default async function RemindersPage({ searchParams }: Props) {
+  await requireModule("reminders");
   const { search } = await searchParams;
   const term = search?.trim() ?? "";
   const now = new Date();

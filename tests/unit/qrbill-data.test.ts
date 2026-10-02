@@ -241,6 +241,13 @@ describe("QRBill data preparation", () => {
         notifyTelegramBotToken: null,
         notifyTelegramChatId: null,
         notifyRepeatIntervalDays: null,
+        moduleTasks: true,
+        moduleSubscriptions: true,
+        moduleQuotes: true,
+        moduleReminders: true,
+        moduleBankImport: true,
+        moduleAccounting: true,
+        moduleAnalytics: true,
         pdfTheme: null,
         companyInformationId: 1,
         companyInfo: {

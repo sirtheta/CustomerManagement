@@ -8,6 +8,7 @@ import { UserRole } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { readReceipts } from "@/lib/expense-receipts";
+import { requireModule } from "@/lib/module-guard";
 
 export type ExpenseFormState = {
   error?: string;
@@ -74,6 +75,7 @@ export async function createExpense(
   formData: FormData
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
+  await requireModule("accounting");
   const parsed = parseExpenseForm(formData);
   if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
@@ -98,6 +100,7 @@ export async function updateExpense(
   formData: FormData
 ): Promise<ExpenseFormState> {
   const session = await requireEditor();
+  await requireModule("accounting");
   const parsed = parseExpenseForm(formData);
   if ("error" in parsed) return { ...parsed, values: echoValues(formData) };
 
@@ -138,6 +141,7 @@ export async function updateExpense(
 
 export async function deleteExpense(id: number): Promise<void> {
   const session = await requireAdmin();
+  await requireModule("accounting");
   const expense = await prisma.expense.findUnique({ where: { id }, select: { description: true } });
   await prisma.expense.delete({ where: { id } });
   await logAudit(session, "DELETE", "Expense", id, expense?.description);

@@ -5,11 +5,15 @@ import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { fetchJournal, journalCsv } from "@/lib/journal";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session) redirect("/login");
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) redirect("/dashboard");
+
+  const disabled = await moduleDisabledResponse("accounting");
+  if (disabled) return disabled;
 
   const url = new URL(request.url);
   const yearParam = url.searchParams.get("year");

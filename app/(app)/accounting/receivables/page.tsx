@@ -11,6 +11,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
 import { AGE_BUCKETS, fetchReceivables } from "@/lib/receivables";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = { searchParams: Promise<{ asOf?: string }> };
 
@@ -23,6 +24,7 @@ function parseAsOf(raw: string | undefined): Date {
 
 export default async function ReceivablesPage({ searchParams }: Props) {
   await requireEditor();
+  await requireModule("accounting");
   const { asOf: asOfParam } = await searchParams;
   const asOf = parseAsOf(asOfParam);
   const asOfValue = asOf.toISOString().slice(0, 10);

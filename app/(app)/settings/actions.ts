@@ -14,6 +14,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
+import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
@@ -334,9 +335,10 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
   await requireAdmin();
   try {
     await checkAndUpdateAllDocumentStates(prisma);
-    await checkOverdueInvoices(prisma);
-    await checkSubscriptions(prisma);
-    await closeAnsweredFollowUps(prisma);
+    const modules = await getEnabledModules(prisma);
+    if (modules.reminders) await checkOverdueInvoices(prisma);
+    if (modules.subscriptions) await checkSubscriptions(prisma);
+    if (modules.tasks) await closeAnsweredFollowUps(prisma);
     // Reset notification stamps so the check always sends in dev
     await Promise.all([
       prisma.pendingReminder.updateMany({ data: { adminNotifiedAt: null } }),
@@ -347,7 +349,7 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
       include: { companyInfo: true },
     });
     await sendAdminNotifications(prisma, settings);
-    await notifyDueTasks(prisma, settings);
+    if (modules.tasks) await notifyDueTasks(prisma, settings);
     revalidatePath("/");
     return { success: true, _ts: Date.now() };
   } catch (err) {
@@ -402,4 +404,55 @@ export async function testTelegramNotification(
     const message = err instanceof Error ? err.message : "Anfrage fehlgeschlagen.";
     return { error: `Telegram-Fehler: ${message}` };
   }
+}
+
+export async function saveModules(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const session = await requireAdmin();
+  const settings = await prisma.applicationSettings.findFirst();
+  if (!settings) return { error: "Keine Einstellungen gefunden", _ts: Date.now() };
+
+  const wanted = Object.fromEntries(
+    MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
+  ) as Record<(typeof MODULE_KEYS)[number], boolean>;
+
+  // Active subscriptions would keep creating invoices in the background, and
+  // drafts waiting for approval would be unreachable once the page is hidden.
+  if (!wanted.subscriptions && settings.moduleSubscriptions) {
+    const [activeSubscriptions, pendingEmails] = await Promise.all([
+      prisma.subscription.count({ where: { active: true } }),
+      prisma.pendingEmail.count(),
+    ]);
+    if (activeSubscriptions > 0) {
+      return {
+        _ts: Date.now(),
+        error: `Abos können nicht ausgeblendet werden, solange noch ${activeSubscriptions} aktive Abos bestehen. Bitte zuerst alle Abos beenden.`,
+      };
+    }
+    if (pendingEmails > 0) {
+      return {
+        _ts: Date.now(),
+        error: `Abos können nicht ausgeblendet werden, solange noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe warten.`,
+      };
+    }
+  }
+
+  const data = Object.fromEntries(MODULE_KEYS.map((key) => [MODULE_FIELDS[key], wanted[key]]));
+  await prisma.applicationSettings.update({
+    where: { applicationSettingsId: settings.applicationSettingsId },
+    data,
+  });
+
+  const changed = MODULE_KEYS.filter((key) => settings[MODULE_FIELDS[key]] !== wanted[key]);
+  if (changed.length > 0) {
+    await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Module", {
+      ...Object.fromEntries(changed.map((key) => [MODULE_INFO[key].label, wanted[key] ? "ein" : "aus"])),
+    });
+  }
+
+  // The navigation lives in the layout, so everything has to be re-rendered.
+  revalidatePath("/", "layout");
+  return { success: true, _ts: Date.now() };
 }

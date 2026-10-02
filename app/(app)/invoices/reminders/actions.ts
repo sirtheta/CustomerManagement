@@ -12,6 +12,7 @@ import { isLastReminderLevelSent } from "@/lib/reminders";
 import { logAudit } from "@/lib/audit";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
+import { requireModule } from "@/lib/module-guard";
 
 const log = logger.child({ module: "invoices.reminders" });
 
@@ -20,6 +21,7 @@ export async function sendReminder(
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("reminders");
 
   const reminderId = parseInt(formData.get("reminderId") as string, 10);
   const to = (formData.get("to") as string).trim();
@@ -113,6 +115,7 @@ export async function sendReminder(
 
 export async function dismissReminder(id: number): Promise<void> {
   const session = await requireEditor();
+  await requireModule("reminders");
   const settings = await prisma.applicationSettings.findFirst({
     select: { reminderCooldownDays: true },
   });

@@ -5,12 +5,14 @@ import DeleteExpenseButton from "../DeleteExpenseButton";
 import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
 export default async function EditExpensePage({ params }: Props) {
+  await requireModule("accounting");
   const { id } = await params;
   const expenseId = parseInt(id, 10);
 

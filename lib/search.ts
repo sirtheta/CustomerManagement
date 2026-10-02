@@ -1,6 +1,7 @@
 import type { InvoiceState, PrismaClient, QuoteState } from "@prisma/client";
 import { customerSearchConditions } from "@/lib/customer-search";
 import { customerDisplayName } from "@/lib/customer-display";
+import { getEnabledModules } from "@/lib/modules";
 
 export { customerDisplayName };
 
@@ -66,6 +67,8 @@ export async function searchGlobal(
     ],
   };
 
+  const modules = await getEnabledModules(db);
+
   const [customers, invoices, quotes] = await Promise.all([
     db.customer.findMany({
       where: {
@@ -88,12 +91,14 @@ export async function searchGlobal(
       take: limit,
       orderBy: { date: "desc" },
     }),
-    db.quote.findMany({
-      where: documentWhere,
-      select: documentSelect,
-      take: limit,
-      orderBy: { date: "desc" },
-    }),
+    modules.quotes
+      ? db.quote.findMany({
+          where: documentWhere,
+          select: documentSelect,
+          take: limit,
+          orderBy: { date: "desc" },
+        })
+      : [],
   ]);
 
   const toHit = <TState extends string>(doc: {
@@ -115,6 +120,6 @@ export async function searchGlobal(
   return {
     customers,
     invoices: invoices.map(toHit),
-    quotes: quotes.map(toHit),
+    quotes: quotes.map((q) => toHit<QuoteState>(q)),
   };
 }

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import logger from "@/lib/logger";
 import { documentLabel } from "@/lib/document-display";
+import { isModuleEnabled } from "@/lib/modules";
 
 const log = logger.child({ module: "tasks" });
 
@@ -21,6 +22,7 @@ export async function createQuoteFollowUp(
   input: { quoteId: number; assigneeId?: number | null; sentAt?: Date }
 ): Promise<void> {
   try {
+    if (!(await isModuleEnabled(prisma, "tasks"))) return;
     const quote = await prisma.quote.findUnique({
       where: { id: input.quoteId },
       select: { id: true, customerId: true, documentNumber: true },

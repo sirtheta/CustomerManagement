@@ -349,3 +349,12 @@ CREATE TABLE "Task" (
 CREATE INDEX "Task_customerId_idx" ON "Task"("customerId");
 CREATE INDEX "Task_doneAt_dueDate_idx" ON "Task"("doneAt", "dueDate");
 CREATE INDEX "Task_quoteId_idx" ON "Task"("quoteId");
+
+-- Module switches (Einstellungen -> Module)
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleTasks" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleSubscriptions" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleQuotes" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleReminders" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleBankImport" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleAccounting" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleAnalytics" BOOLEAN NOT NULL DEFAULT true;
