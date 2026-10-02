@@ -111,7 +111,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         categoryId: item.categoryId,
       };
     });
-    const totalAmount = calculateInvoiceTotal(items, 0);
+    const totalAmount = calculateInvoiceTotal(items, 0, { roundTo5Rappen: settings?.roundTotalTo5Rappen ?? false });
 
     try {
       // Invoice, PendingEmail and the date advance succeed or fail together: a

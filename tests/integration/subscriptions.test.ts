@@ -96,6 +96,33 @@ describe("checkSubscriptions", () => {
     expect(days).toBe(14);
   });
 
+  it("rounds the draft total to 5 Rappen when the setting is on", async () => {
+    await db.prisma.applicationSettings.create({
+      data: { roundTotalTo5Rappen: true, companyInfo: { create: {} } },
+    });
+    const template = await db.prisma.invoiceTemplate.create({
+      data: { name: "Krumm", items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 10.03, quantity: 1 }] } },
+    });
+    await seedSubscription({ templateId: template.id });
+    await checkSubscriptions(db.prisma);
+
+    const [invoice] = await db.prisma.invoice.findMany({ include: { items: true } });
+    expect(invoice.totalAmount.toNumber()).toBe(10.05);
+    expect(invoice.items[0].totalAmount.toNumber()).toBe(10.03);
+  });
+
+  it("keeps the exact draft total when the setting is off", async () => {
+    await db.prisma.applicationSettings.create({ data: { companyInfo: { create: {} } } });
+    const template = await db.prisma.invoiceTemplate.create({
+      data: { name: "Krumm", items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 10.03, quantity: 1 }] } },
+    });
+    await seedSubscription({ templateId: template.id });
+    await checkSubscriptions(db.prisma);
+
+    const [invoice] = await db.prisma.invoice.findMany();
+    expect(invoice.totalAmount.toNumber()).toBe(10.03);
+  });
+
   it("advances nextInvoiceDate by the interval", async () => {
     const sub = await seedSubscription({ interval: "Quarterly", nextInvoiceDate: new Date(2026, 0, 15) });
     await checkSubscriptions(db.prisma);

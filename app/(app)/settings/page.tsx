@@ -77,6 +77,7 @@ export default async function SettingsPage() {
           invoiceNumberPrefix={s?.invoiceNumberPrefix ?? "R-"}
           quoteNumberPrefix={s?.quoteNumberPrefix ?? "A-"}
           useHolderNameOnQR={s?.useHolderNameOnQR ?? false}
+          roundTotalTo5Rappen={s?.roundTotalTo5Rappen ?? false}
           smtpHost={s?.smtpHost ?? ""}
           smtpPort={s?.smtpPort ?? 587}
           smtpUser={s?.smtpUser ?? ""}

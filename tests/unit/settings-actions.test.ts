@@ -231,6 +231,48 @@ describe("settings actions", () => {
       expect(logAudit).not.toHaveBeenCalled();
     });
 
+    it("stores the 5-Rappen rounding switch and audits a change", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+        roundTotalTo5Rappen: false,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({ roundTotalTo5Rappen: "on" }));
+
+      expect(prisma.applicationSettings.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ roundTotalTo5Rappen: true }) })
+      );
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "Settings", 1, "Rundung", {
+        roundTotalTo5Rappen: true,
+      });
+    });
+
+    it("switches the rounding off when the checkbox is missing and does not audit an unchanged value", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+        roundTotalTo5Rappen: false,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({}));
+
+      expect(prisma.applicationSettings.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ roundTotalTo5Rappen: false }) })
+      );
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
     it("rejects negative reminder fees and an interest rate outside 0-100", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);

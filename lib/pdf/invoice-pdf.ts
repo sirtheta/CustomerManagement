@@ -1,6 +1,5 @@
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateDocumentPdf, type RenderDoc } from "@/lib/pdf/document-pdf";
-import { calculateInvoiceTotal } from "@/lib/calculations";
 import { documentLabel } from "@/lib/document-display";
 import type {
   Invoice,
@@ -32,14 +31,10 @@ export async function generateInvoicePdf(
 ): Promise<Buffer> {
   const company = settings.companyInfo;
   const discountPercent = Number(invoice.discountPercent ?? 0);
-  const total = calculateInvoiceTotal(
-    invoice.items.map((item) => ({
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
-      discountPercent: Number(item.discountPercent ?? 0),
-    })),
-    discountPercent
-  );
+  // The stored total is the single source of truth (payments, QR amount and open
+  // items use it); recomputing here would ignore the 5-Rappen rounding setting
+  // for drafts saved before it was switched.
+  const total = Number(invoice.totalAmount);
 
   const draft = !invoice.documentNumber;
   const isCreditNote = invoice.creditNoteForId != null;

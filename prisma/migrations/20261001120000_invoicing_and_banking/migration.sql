@@ -358,3 +358,6 @@ ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleReminders" BOOLEAN NOT NULL 
 ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleBankImport" BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleAccounting" BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE "ApplicationSettings" ADD COLUMN "moduleAnalytics" BOOLEAN NOT NULL DEFAULT true;
+
+-- Round document totals to 5 Rappen (opt-in, Einstellungen)
+ALTER TABLE "ApplicationSettings" ADD COLUMN "roundTotalTo5Rappen" BOOLEAN NOT NULL DEFAULT false;

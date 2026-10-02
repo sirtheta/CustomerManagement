@@ -133,6 +133,7 @@ export async function saveSettings(
     quoteNumberPrefix: (formData.get("quoteNumberPrefix") as string) || "A-",
     defaultYearlyInvoice: formData.get("defaultYearlyInvoice") === "on",
     useHolderNameOnQR: formData.get("useHolderNameOnQR") === "on",
+    roundTotalTo5Rappen: formData.get("roundTotalTo5Rappen") === "on",
     smtpHost: (formData.get("smtpHost") as string) || null,
     smtpPort: (smtpPort !== null && !isNaN(smtpPort)) ? smtpPort : null,
     smtpUser: (formData.get("smtpUser") as string) || null,
@@ -187,6 +188,12 @@ export async function saveSettings(
       reminderFeeLevel3Rappen: feeLevel3,
       reminderFeeLevel4Rappen: feeLevel4,
       reminderInterestPercent: interestPercent,
+    });
+  }
+
+  if ((settings?.roundTotalTo5Rappen ?? false) !== appData.roundTotalTo5Rappen) {
+    await logAudit(session, "UPDATE", "Settings", settings?.applicationSettingsId, "Rundung", {
+      roundTotalTo5Rappen: appData.roundTotalTo5Rappen,
     });
   }
 
