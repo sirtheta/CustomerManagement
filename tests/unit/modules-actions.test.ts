@@ -84,24 +84,44 @@ describe("saveModules", () => {
     expect(logAudit).not.toHaveBeenCalled();
   });
 
-  it("refuses to hide subscriptions while active subscriptions exist", async () => {
+  it("keeps subscriptions on while active subscriptions exist, but saves the other switches", async () => {
+    vi.mocked(prisma.subscription.count).mockResolvedValue(3);
+
+    const result = await saveModules({}, form(MODULE_KEYS.filter((k) => k !== "subscriptions" && k !== "tasks")));
+
+    expect(result.error).toContain("3 aktive Abos");
+    expect(result.error).toContain("Übrige Änderungen gespeichert");
+    expect(result.success).toBeUndefined();
+    expect(prisma.applicationSettings.update).toHaveBeenCalledWith({
+      where: { applicationSettingsId: 1 },
+      data: expect.objectContaining({ moduleSubscriptions: true, moduleTasks: false }),
+    });
+    // the form shows what is in effect: subscriptions still on, tasks off
+    expect(result.values).toMatchObject({ subscriptions: true, tasks: false, quotes: true });
+    expect(vi.mocked(logAudit).mock.calls[0][5]).toEqual({ Aufgaben: "aus" });
+  });
+
+  it("only reports the refusal when nothing else changed", async () => {
     vi.mocked(prisma.subscription.count).mockResolvedValue(3);
 
     const result = await saveModules({}, form(MODULE_KEYS.filter((k) => k !== "subscriptions")));
 
     expect(result.error).toContain("3 aktive Abos");
-    // the other switches the user changed come back, so the form keeps them
-    expect(result.values).toMatchObject({ subscriptions: false, tasks: true, quotes: true });
-    expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+    expect(result.error).not.toContain("Übrige Änderungen");
+    expect(logAudit).not.toHaveBeenCalled();
   });
 
-  it("refuses to hide subscriptions while drafts wait for approval", async () => {
+  it("keeps subscriptions on while drafts wait for approval", async () => {
     vi.mocked(prisma.pendingEmail.count).mockResolvedValue(2);
 
     const result = await saveModules({}, form(MODULE_KEYS.filter((k) => k !== "subscriptions")));
 
     expect(result.error).toContain("2 Abo-Rechnung");
-    expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+    expect(result.values?.subscriptions).toBe(true);
+    expect(prisma.applicationSettings.update).toHaveBeenCalledWith({
+      where: { applicationSettingsId: 1 },
+      data: expect.objectContaining({ moduleSubscriptions: true }),
+    });
   });
 
   it("does not check subscriptions when the module is already off", async () => {

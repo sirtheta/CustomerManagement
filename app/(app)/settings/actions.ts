@@ -406,10 +406,27 @@ export async function testTelegramNotification(
   }
 }
 
-// `values` carries the submitted switches back to the form: React resets an
-// uncontrolled form after every action, which would otherwise also undo the
-// other checkboxes when one change is refused.
+// `values` carries the switches that are in effect back to the form: React
+// resets an uncontrolled form after every action, so the form must be told
+// what to show (a refused switch stays on, the others keep their new state).
 export type ModulesActionState = ActionState & { values?: ModuleFlags };
+
+/** Why subscriptions cannot be hidden right now, or null when they can. */
+async function subscriptionsHiddenBlocker(): Promise<string | null> {
+  // Active subscriptions would keep creating invoices in the background, and
+  // drafts waiting for approval would be unreachable once the page is hidden.
+  const [activeSubscriptions, pendingEmails] = await Promise.all([
+    prisma.subscription.count({ where: { active: true } }),
+    prisma.pendingEmail.count(),
+  ]);
+  if (activeSubscriptions > 0) {
+    return `Abos bleiben eingeschaltet: Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos beenden.`;
+  }
+  if (pendingEmails > 0) {
+    return `Abos bleiben eingeschaltet: Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe.`;
+  }
+  return null;
+}
 
 export async function saveModules(
   _prev: ModulesActionState,
@@ -423,27 +440,12 @@ export async function saveModules(
     MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
   ) as ModuleFlags;
 
-  // Active subscriptions would keep creating invoices in the background, and
-  // drafts waiting for approval would be unreachable once the page is hidden.
+  // A refused switch does not block the others: they are saved, only
+  // subscriptions stay on.
+  let refused: string | null = null;
   if (!wanted.subscriptions && settings.moduleSubscriptions) {
-    const [activeSubscriptions, pendingEmails] = await Promise.all([
-      prisma.subscription.count({ where: { active: true } }),
-      prisma.pendingEmail.count(),
-    ]);
-    if (activeSubscriptions > 0) {
-      return {
-        _ts: Date.now(),
-        values: wanted,
-        error: `Abos können nicht ausgeblendet werden, solange noch ${activeSubscriptions} aktive Abos bestehen. Bitte zuerst alle Abos beenden.`,
-      };
-    }
-    if (pendingEmails > 0) {
-      return {
-        _ts: Date.now(),
-        values: wanted,
-        error: `Abos können nicht ausgeblendet werden, solange noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe warten.`,
-      };
-    }
+    refused = await subscriptionsHiddenBlocker();
+    if (refused) wanted.subscriptions = true;
   }
 
   const data = Object.fromEntries(MODULE_KEYS.map((key) => [MODULE_FIELDS[key], wanted[key]]));
@@ -461,5 +463,12 @@ export async function saveModules(
 
   // The navigation lives in the layout, so everything has to be re-rendered.
   revalidatePath("/", "layout");
+  if (refused) {
+    return {
+      _ts: Date.now(),
+      values: wanted,
+      error: changed.length > 0 ? `Übrige Änderungen gespeichert. ${refused}` : refused,
+    };
+  }
   return { success: true, _ts: Date.now(), values: wanted };
 }
