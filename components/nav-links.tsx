@@ -7,23 +7,41 @@ import { cn } from "@/lib/utils";
 import { MenuIcon, XIcon } from "lucide-react";
 import { UserRole } from "@prisma/client";
 import { GlobalSearch } from "@/components/global-search";
+import type { ModuleFlags, ModuleKey } from "@/lib/modules";
 
-const navItems = [
+const navItems: {
+  href: string;
+  label: string;
+  adminOnly: boolean;
+  editorOnly: boolean;
+  module?: ModuleKey;
+}[] = [
   { href: "/dashboard",   label: "Dashboard",     adminOnly: false, editorOnly: false },
   { href: "/customers",   label: "Kunden",        adminOnly: false, editorOnly: false },
   { href: "/invoices",    label: "Rechnungen",    adminOnly: false, editorOnly: false },
-  { href: "/quotes",      label: "Offerten",      adminOnly: false, editorOnly: false },
-  { href: "/analytics",   label: "Auswertung",    adminOnly: false, editorOnly: false },
-  { href: "/accounting",  label: "Buchhaltung",   adminOnly: false, editorOnly: true  },
+  { href: "/quotes",      label: "Offerten",      adminOnly: false, editorOnly: false, module: "quotes" },
+  { href: "/analytics",   label: "Auswertung",    adminOnly: false, editorOnly: false, module: "analytics" },
+  { href: "/accounting",  label: "Buchhaltung",   adminOnly: false, editorOnly: true,  module: "accounting" },
   { href: "/services",    label: "Leistungen",    adminOnly: false, editorOnly: false },
   { href: "/settings",    label: "Einstellungen", adminOnly: true,  editorOnly: false },
 ];
 
-export function NavLinks({ role, pendingCount = 0, reminderCount = 0 }: { role: UserRole; pendingCount?: number; reminderCount?: number }) {
+export function NavLinks({
+  role,
+  modules,
+  pendingCount = 0,
+  reminderCount = 0,
+}: {
+  role: UserRole;
+  modules: ModuleFlags;
+  pendingCount?: number;
+  reminderCount?: number;
+}) {
   const visibleItems = navItems.filter(
     (item) =>
       (!item.adminOnly || role === UserRole.Admin) &&
-      (!item.editorOnly || role !== UserRole.Viewer)
+      (!item.editorOnly || role !== UserRole.Viewer) &&
+      (!item.module || modules[item.module])
   );
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);

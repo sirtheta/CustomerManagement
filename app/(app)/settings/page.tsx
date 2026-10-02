@@ -4,6 +4,8 @@ import LogoCard from "./LogoCard";
 import VersionCard from "./VersionCard";
 import DatabaseExportCard from "./DatabaseExportCard";
 import DevToolsCard from "./DevToolsCard";
+import ModulesCard from "./ModulesCard";
+import { modulesFromSettings } from "@/lib/modules";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/permissions";
@@ -15,6 +17,7 @@ export default async function SettingsPage() {
   });
   const c = settings?.companyInfo;
   const s = settings;
+  const modules = modulesFromSettings(s);
 
   return (
     <div className="space-y-6">
@@ -44,6 +47,8 @@ export default async function SettingsPage() {
           {/* Logo: eigene Client-Komponente mit eigener <form> — nie verschachtelt */}
           <LogoCard hasLogo={!!c?.companyLogo} />
 
+          <ModulesCard modules={modules} />
+
           <VersionCard />
 
           <DatabaseExportCard />
@@ -53,6 +58,8 @@ export default async function SettingsPage() {
 
         {/* Settings: eigene Client-Komponente mit eigener <form> */}
         <SettingsForm
+          showQuotes={modules.quotes}
+          showReminders={modules.reminders}
           companyName={c?.companyName ?? ""}
           companyHolderName={c?.companyHolderName ?? ""}
           companyStreet={c?.companyStreet ?? ""}

@@ -4,6 +4,7 @@ import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { readCache, writeCache } from "@/lib/pdf/pdf-cache";
 import { themeRevision } from "@/lib/pdf/theme";
 import { NextRequest } from "next/server";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 export async function GET(
   _req: NextRequest,
@@ -11,6 +12,9 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  const disabled = await moduleDisabledResponse("quotes");
+  if (disabled) return disabled;
 
   const { id } = await params;
   const quoteId = parseInt(id, 10);

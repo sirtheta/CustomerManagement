@@ -21,6 +21,7 @@ import SendQuoteButton from "../SendQuoteButton";
 import type { QuoteState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
+import { requireModule } from "@/lib/module-guard";
 
 const stateLabels: Record<QuoteState, string> = {
   Draft: "Entwurf",
@@ -47,6 +48,7 @@ type Props = {
 };
 
 export default async function QuoteDetailPage({ params, searchParams }: Props) {
+  await requireModule("quotes");
   const { id } = await params;
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);

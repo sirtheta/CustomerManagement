@@ -11,6 +11,7 @@ import { checkStatementAccount } from "@/lib/import/statement-checks";
 import { PaymentError, recordPayment } from "@/lib/payments";
 import logger from "@/lib/logger";
 import { z } from "zod";
+import { requireModule } from "@/lib/module-guard";
 
 const log = logger.child({ module: "invoices.import" });
 
@@ -51,6 +52,7 @@ export async function uploadStatement(
   formData: FormData
 ): Promise<UploadStatementState> {
   const session = await requireEditor();
+  await requireModule("bankImport");
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -103,6 +105,7 @@ export async function bookPayments(
   items: { transactionId: number; invoiceId: number }[]
 ): Promise<{ error?: string; paidCount?: number }> {
   const session = await requireEditor();
+  await requireModule("bankImport");
   if (!paymentItems.safeParse(items).success) return { error: INVALID_INPUT };
   if (items.length === 0) return { error: "Keine Zuordnung ausgewählt." };
 
@@ -166,6 +169,8 @@ export async function bookExpenses(
   items: { transactionId: number; categoryId: number | null }[]
 ): Promise<{ error?: string; expenseCount?: number }> {
   const session = await requireEditor();
+  await requireModule("bankImport");
+  await requireModule("accounting");
   if (!expenseItems.safeParse(items).success) return { error: INVALID_INPUT };
   if (items.length === 0) return { error: "Keine Ausgabe ausgewählt." };
 
@@ -224,6 +229,7 @@ export async function ignoreTransactions(
   ids: number[]
 ): Promise<{ error?: string; ignoredCount?: number }> {
   const session = await requireEditor();
+  await requireModule("bankImport");
   if (!idList.safeParse(ids).success) return { error: INVALID_INPUT };
   if (ids.length === 0) return { error: "Keine Bewegung ausgewählt." };
 
@@ -243,6 +249,7 @@ export async function ignoreTransactions(
 
 export async function undoStatementImport(importId: number): Promise<{ error?: string }> {
   const session = await requireEditor();
+  await requireModule("bankImport");
   try {
     await undoImport({ importId, actor: session });
   } catch (err) {

@@ -389,6 +389,13 @@ model ApplicationSettings {
   notifyTelegramBotToken   String?
   notifyTelegramChatId     String?
   notifyRepeatIntervalDays Int?
+  moduleTasks              Boolean            @default(true)
+  moduleSubscriptions      Boolean            @default(true)
+  moduleQuotes             Boolean            @default(true)
+  moduleReminders          Boolean            @default(true)
+  moduleBankImport         Boolean            @default(true)
+  moduleAccounting         Boolean            @default(true)
+  moduleAnalytics          Boolean            @default(true)
   pdfTheme                 Json?
   companyInformationId     Int                @unique
   companyInfo              CompanyInformation @relation(fields: [companyInformationId], references: [companyInformationId], onDelete: Cascade)

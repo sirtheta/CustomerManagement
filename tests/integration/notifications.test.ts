@@ -43,6 +43,13 @@ function baseSettings() {
     notifyTelegramBotToken: "bot123:token",
     notifyTelegramChatId: "12345",
     notifyRepeatIntervalDays: null,
+    moduleTasks: true,
+    moduleSubscriptions: true,
+    moduleQuotes: true,
+    moduleReminders: true,
+    moduleBankImport: true,
+    moduleAccounting: true,
+    moduleAnalytics: true,
     pdfTheme: null,
     companyInformationId: 1,
     companyInfo: {

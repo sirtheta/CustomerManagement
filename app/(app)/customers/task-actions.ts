@@ -6,6 +6,7 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import { requireEditor } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { isValidDateString, parseDate } from "@/lib/date";
+import { requireModule } from "@/lib/module-guard";
 
 const MAX_TITLE_LENGTH = 200;
 
@@ -20,6 +21,7 @@ export async function createTask(
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("tasks");
   const title = ((formData.get("title") as string) ?? "").trim();
   if (!title) return { error: "Titel ist erforderlich" };
   if (title.length > MAX_TITLE_LENGTH) return { error: `Titel zu lang (max. ${MAX_TITLE_LENGTH} Zeichen)` };
@@ -49,6 +51,7 @@ export async function createTask(
 
 export async function setTaskDone(customerId: number, taskId: number, done: boolean): Promise<void> {
   const session = await requireEditor();
+  await requireModule("tasks");
   const { count } = await prisma.task.updateMany({
     where: { id: taskId, customerId },
     data: { doneAt: done ? new Date() : null, notifiedAt: null },
@@ -60,6 +63,7 @@ export async function setTaskDone(customerId: number, taskId: number, done: bool
 
 export async function deleteTask(customerId: number, taskId: number): Promise<void> {
   const session = await requireEditor();
+  await requireModule("tasks");
   const task = await prisma.task.findFirst({ where: { id: taskId, customerId }, select: { title: true } });
   if (!task) return;
   await prisma.task.delete({ where: { id: taskId } });

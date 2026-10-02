@@ -6,6 +6,7 @@ import { generateReminderPdf } from "@/lib/pdf/reminder-pdf";
 import { computeReminderCharges } from "@/lib/reminder-charges";
 import { UserRole } from "@prisma/client";
 import { NextRequest } from "next/server";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 // Preview of the notice as it would be sent now (amounts recomputed like sendReminder).
 // Nothing is archived or booked.
@@ -18,6 +19,9 @@ export async function GET(
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const disabled = await moduleDisabledResponse("reminders");
+  if (disabled) return disabled;
 
   const { id } = await params;
   const reminderId = parseInt(id, 10);

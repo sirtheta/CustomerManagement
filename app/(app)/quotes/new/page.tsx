@@ -1,12 +1,14 @@
 import prisma from "@/lib/prisma";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import QuoteForm from "../QuoteForm";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = {
   searchParams: Promise<{ customerId?: string }>;
 };
 
 export default async function NewQuotePage({ searchParams }: Props) {
+  await requireModule("quotes");
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 

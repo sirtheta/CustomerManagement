@@ -23,6 +23,7 @@ import { ProfitLossChart } from "./components/profit-loss-chart";
 import DeleteExpenseButton from "./DeleteExpenseButton";
 import { documentLabel } from "@/lib/document-display";
 import { Badge } from "@/components/ui/badge";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = {
   searchParams: Promise<{ year?: string }>;
@@ -30,6 +31,7 @@ type Props = {
 
 export default async function AccountingPage({ searchParams }: Props) {
   await requireEditor();
+  await requireModule("accounting");
 
   const { year } = await searchParams;
   const parsedYear = year ? parseInt(year, 10) : NaN;

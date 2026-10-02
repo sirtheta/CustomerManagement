@@ -14,6 +14,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
+import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleFlags, type ModuleKey } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
@@ -334,9 +335,10 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
   await requireAdmin();
   try {
     await checkAndUpdateAllDocumentStates(prisma);
-    await checkOverdueInvoices(prisma);
-    await checkSubscriptions(prisma);
-    await closeAnsweredFollowUps(prisma);
+    const modules = await getEnabledModules(prisma);
+    if (modules.reminders) await checkOverdueInvoices(prisma);
+    if (modules.subscriptions) await checkSubscriptions(prisma);
+    if (modules.tasks) await closeAnsweredFollowUps(prisma);
     // Reset notification stamps so the check always sends in dev
     await Promise.all([
       prisma.pendingReminder.updateMany({ data: { adminNotifiedAt: null } }),
@@ -347,7 +349,7 @@ export async function triggerNotificationCheck(): Promise<ActionState> {
       include: { companyInfo: true },
     });
     await sendAdminNotifications(prisma, settings);
-    await notifyDueTasks(prisma, settings);
+    if (modules.tasks) await notifyDueTasks(prisma, settings);
     revalidatePath("/");
     return { success: true, _ts: Date.now() };
   } catch (err) {
@@ -402,4 +404,81 @@ export async function testTelegramNotification(
     const message = err instanceof Error ? err.message : "Anfrage fehlgeschlagen.";
     return { error: `Telegram-Fehler: ${message}` };
   }
+}
+
+// `values` carries the switches that are in effect back to the form: React
+// resets an uncontrolled form after every action, so the form must be told
+// what to show (a refused switch stays on, the others keep their new state).
+export type ModulesActionState = ActionState & { values?: ModuleFlags };
+
+/**
+ * A module can only be switched off while this returns null; otherwise it
+ * returns the reason. Modules without an entry can always be hidden.
+ */
+const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> = {
+  // Active subscriptions would keep creating invoices in the background, and
+  // drafts waiting for approval would be unreachable once the page is hidden.
+  subscriptions: async () => {
+    const [activeSubscriptions, pendingEmails] = await Promise.all([
+      prisma.subscription.count({ where: { active: true } }),
+      prisma.pendingEmail.count(),
+    ]);
+    if (activeSubscriptions > 0) {
+      return `Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos beenden.`;
+    }
+    if (pendingEmails > 0) {
+      return `Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe.`;
+    }
+    return null;
+  },
+};
+
+export async function saveModules(
+  _prev: ModulesActionState,
+  formData: FormData
+): Promise<ModulesActionState> {
+  const session = await requireAdmin();
+  const settings = await prisma.applicationSettings.findFirst();
+  if (!settings) return { error: "Keine Einstellungen gefunden", _ts: Date.now() };
+
+  const wanted = Object.fromEntries(
+    MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
+  ) as ModuleFlags;
+
+  // A refused switch does not block the others: they are saved, only the
+  // refused module stays on.
+  const refusals: string[] = [];
+  for (const key of MODULE_KEYS) {
+    if (wanted[key] || !settings[MODULE_FIELDS[key]]) continue;
+    const reason = await MODULE_BLOCKERS[key]?.();
+    if (reason) {
+      wanted[key] = true;
+      refusals.push(`${MODULE_INFO[key].label} bleibt eingeschaltet: ${reason}`);
+    }
+  }
+
+  const data = Object.fromEntries(MODULE_KEYS.map((key) => [MODULE_FIELDS[key], wanted[key]]));
+  await prisma.applicationSettings.update({
+    where: { applicationSettingsId: settings.applicationSettingsId },
+    data,
+  });
+
+  const changed = MODULE_KEYS.filter((key) => settings[MODULE_FIELDS[key]] !== wanted[key]);
+  if (changed.length > 0) {
+    await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Module", {
+      ...Object.fromEntries(changed.map((key) => [MODULE_INFO[key].label, wanted[key] ? "ein" : "aus"])),
+    });
+  }
+
+  // The navigation lives in the layout, so everything has to be re-rendered.
+  revalidatePath("/", "layout");
+  if (refusals.length > 0) {
+    const message = refusals.join(" ");
+    return {
+      _ts: Date.now(),
+      values: wanted,
+      error: changed.length > 0 ? `Übrige Änderungen gespeichert. ${message}` : message,
+    };
+  }
+  return { success: true, _ts: Date.now(), values: wanted };
 }

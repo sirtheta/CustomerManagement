@@ -10,6 +10,7 @@ import { CategoryBreakdownChart } from "./components/category-breakdown-chart";
 import { CategoryCombinedChart } from "./components/category-combined-chart";
 import { TopCustomersChart } from "./components/top-customers-chart";
 import { DrilldownDrawer } from "./components/drilldown-drawer";
+import { requireModule } from "@/lib/module-guard";
 
 type Props = {
   searchParams: Promise<{
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export default async function AnalyticsPage({ searchParams }: Props) {
+  await requireModule("analytics");
   await auth();
 
   const { year, drillMonth, drillStatus, drillCustomer, drillIncomeCategory, drillExpenseCategory, drillCombinedCategory } =
