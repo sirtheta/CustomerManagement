@@ -40,6 +40,15 @@ describe("parseDocumentItems", () => {
     expect(totalAmount).toBe(0);
   });
 
+  it("keeps the exact total by default and rounds it to 5 Rappen on request", () => {
+    const fd = makeFormData(JSON.stringify([{ ...validItem, unitPrice: 10.03, quantity: 1, totalAmount: 10.03 }]));
+    expect(parseDocumentItems(fd).totalAmount).toBe(10.03);
+    const rounded = parseDocumentItems(fd, { roundTo5Rappen: true });
+    expect(rounded.totalAmount).toBe(10.05);
+    // the item keeps its exact amount
+    expect(rounded.items[0].totalAmount).toBe(10.03);
+  });
+
   it("sums multiple items correctly", () => {
     const items = [
       { ...validItem, unitPrice: 75, totalAmount: 150 },

@@ -14,7 +14,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
-import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleFlags, type ModuleKey } from "@/lib/modules";
+import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleKey } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
@@ -132,7 +132,6 @@ export async function saveSettings(
     invoiceNumberPrefix: (formData.get("invoiceNumberPrefix") as string) || "R-",
     quoteNumberPrefix: (formData.get("quoteNumberPrefix") as string) || "A-",
     defaultYearlyInvoice: formData.get("defaultYearlyInvoice") === "on",
-    useHolderNameOnQR: formData.get("useHolderNameOnQR") === "on",
     smtpHost: (formData.get("smtpHost") as string) || null,
     smtpPort: (smtpPort !== null && !isNaN(smtpPort)) ? smtpPort : null,
     smtpUser: (formData.get("smtpUser") as string) || null,
@@ -150,8 +149,6 @@ export async function saveSettings(
     reminderFeeLevel3Rappen: feeLevel3,
     reminderFeeLevel4Rappen: feeLevel4,
     reminderInterestPercent: interestPercent,
-    notifyOverdueEnabled: formData.get("notifyOverdueEnabled") === "on",
-    notifyPendingEnabled: formData.get("notifyPendingEnabled") === "on",
     notifyEmailAddress: (formData.get("notifyEmailAddress") as string)?.trim() || null,
     notifyTelegramBotToken: (formData.get("notifyTelegramBotToken") as string)?.trim()
       ? encryptSecret((formData.get("notifyTelegramBotToken") as string).trim())
@@ -406,11 +403,6 @@ export async function testTelegramNotification(
   }
 }
 
-// `values` carries the switches that are in effect back to the form: React
-// resets an uncontrolled form after every action, so the form must be told
-// what to show (a refused switch stays on, the others keep their new state).
-export type ModulesActionState = ActionState & { values?: ModuleFlags };
-
 /**
  * A module can only be switched off while this returns null; otherwise it
  * returns the reason. Modules without an entry can always be hidden.
@@ -433,52 +425,69 @@ const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> 
   },
 };
 
-export async function saveModules(
-  _prev: ModulesActionState,
-  formData: FormData
-): Promise<ModulesActionState> {
+/**
+ * Switches one module on or off, saved the moment the checkbox is clicked. A
+ * refused switch-off returns the reason and changes nothing, the checkbox
+ * snaps back.
+ */
+export async function setModule(key: string, enabled: boolean): Promise<ActionState> {
   const session = await requireAdmin();
+  if (!(MODULE_KEYS as readonly string[]).includes(key)) return { error: "Unbekanntes Modul." };
+  const moduleKey = key as ModuleKey;
+
   const settings = await prisma.applicationSettings.findFirst();
-  if (!settings) return { error: "Keine Einstellungen gefunden", _ts: Date.now() };
+  if (!settings) return { error: "Keine Einstellungen gefunden" };
+  if (settings[MODULE_FIELDS[moduleKey]] === enabled) return { success: true };
 
-  const wanted = Object.fromEntries(
-    MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
-  ) as ModuleFlags;
-
-  // A refused switch does not block the others: they are saved, only the
-  // refused module stays on.
-  const refusals: string[] = [];
-  for (const key of MODULE_KEYS) {
-    if (wanted[key] || !settings[MODULE_FIELDS[key]]) continue;
-    const reason = await MODULE_BLOCKERS[key]?.();
-    if (reason) {
-      wanted[key] = true;
-      refusals.push(`${MODULE_INFO[key].label} bleibt eingeschaltet: ${reason}`);
-    }
+  if (!enabled) {
+    const reason = await MODULE_BLOCKERS[moduleKey]?.();
+    if (reason) return { error: `${MODULE_INFO[moduleKey].label} bleibt eingeschaltet: ${reason}` };
   }
 
-  const data = Object.fromEntries(MODULE_KEYS.map((key) => [MODULE_FIELDS[key], wanted[key]]));
   await prisma.applicationSettings.update({
     where: { applicationSettingsId: settings.applicationSettingsId },
-    data,
+    data: { [MODULE_FIELDS[moduleKey]]: enabled },
   });
-
-  const changed = MODULE_KEYS.filter((key) => settings[MODULE_FIELDS[key]] !== wanted[key]);
-  if (changed.length > 0) {
-    await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Module", {
-      ...Object.fromEntries(changed.map((key) => [MODULE_INFO[key].label, wanted[key] ? "ein" : "aus"])),
-    });
-  }
+  await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Module", {
+    [MODULE_INFO[moduleKey].label]: enabled ? "ein" : "aus",
+  });
 
   // The navigation lives in the layout, so everything has to be re-rendered.
   revalidatePath("/", "layout");
-  if (refusals.length > 0) {
-    const message = refusals.join(" ");
-    return {
-      _ts: Date.now(),
-      values: wanted,
-      error: changed.length > 0 ? `Übrige Änderungen gespeichert. ${message}` : message,
-    };
+  return { success: true };
+}
+
+// Checkboxes in the settings form that save on click instead of with the form
+// (the value is the audit label, null = not audited). saveSettings leaves them alone.
+const IMMEDIATE_SETTINGS = {
+  useHolderNameOnQR: null,
+  roundTotalTo5Rappen: "Rundung",
+  notifyOverdueEnabled: null,
+  notifyPendingEnabled: null,
+} as const;
+
+export type ImmediateSettingKey = keyof typeof IMMEDIATE_SETTINGS;
+
+export async function setSetting(key: string, value: boolean): Promise<ActionState> {
+  const session = await requireAdmin();
+  if (!Object.hasOwn(IMMEDIATE_SETTINGS, key)) return { error: "Unbekannte Einstellung." };
+  const settingKey = key as ImmediateSettingKey;
+
+  const settings = await prisma.applicationSettings.findFirst();
+  if (!settings) return { error: "Bitte zuerst die Einstellungen speichern." };
+  if (settings[settingKey] === value) return { success: true };
+
+  await prisma.applicationSettings.update({
+    where: { applicationSettingsId: settings.applicationSettingsId },
+    data: { [settingKey]: value },
+  });
+  const auditLabel = IMMEDIATE_SETTINGS[settingKey];
+  if (auditLabel) {
+    await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, auditLabel, {
+      [settingKey]: value,
+    });
   }
-  return { success: true, _ts: Date.now(), values: wanted };
+
+  revalidatePath("/settings");
+  return { success: true };
 }

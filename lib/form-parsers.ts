@@ -1,5 +1,5 @@
 import { itemDataSchema, type ItemData } from "@/components/items-editor-schema";
-import { calculateInvoiceTotal, calculateItemTotal } from "@/lib/calculations";
+import { calculateInvoiceTotal, calculateItemTotal, type TotalOptions } from "@/lib/calculations";
 
 export type ParsedItems = {
   items: ItemData[];
@@ -7,7 +7,7 @@ export type ParsedItems = {
   discountPercent: number;
 };
 
-export function parseDocumentItems(formData: FormData): ParsedItems {
+export function parseDocumentItems(formData: FormData, totalOptions: TotalOptions = {}): ParsedItems {
   const itemsJson = (formData.get("itemsJson") as string) || "[]";
   const items = itemDataSchema.array().parse(JSON.parse(itemsJson)).map((item) => ({
     ...item,
@@ -17,6 +17,6 @@ export function parseDocumentItems(formData: FormData): ParsedItems {
   const discountPercent = rawDiscount === null || rawDiscount === ""
     ? 0
     : Number(String(rawDiscount).replace(",", "."));
-  const totalAmount = calculateInvoiceTotal(items, discountPercent);
+  const totalAmount = calculateInvoiceTotal(items, discountPercent, totalOptions);
   return { items, totalAmount, discountPercent };
 }

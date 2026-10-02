@@ -370,7 +370,8 @@ model ApplicationSettings {
   quoteNumberPrefix        String             @default("Q-")
   defaultYearlyInvoice     Boolean            @default(false)
   useHolderNameOnQR        Boolean            @default(false)
-  smtpHost                 String?
+  roundTotalTo5Rappen      Boolean            @default(false)
+  smtpHost                String?
   smtpPort                 Int?
   smtpUser                 String?
   smtpPassword             String?

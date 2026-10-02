@@ -231,6 +231,28 @@ describe("settings actions", () => {
       expect(logAudit).not.toHaveBeenCalled();
     });
 
+    it("leaves the switches that save on click untouched", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+        roundTotalTo5Rappen: true,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({}));
+
+      // the form no longer carries these fields, so a save must not reset them
+      const data = vi.mocked(prisma.applicationSettings.update).mock.calls[0][0].data;
+      for (const key of ["useHolderNameOnQR", "roundTotalTo5Rappen", "notifyOverdueEnabled", "notifyPendingEnabled"]) {
+        expect(data).not.toHaveProperty(key);
+      }
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
     it("rejects negative reminder fees and an interest rate outside 0-100", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);

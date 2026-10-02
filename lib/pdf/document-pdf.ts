@@ -9,6 +9,7 @@ import { DEFAULT_THEME, resolveTheme, type PdfTheme } from "@/lib/pdf/theme";
 import { applyFonts } from "@/lib/pdf/fonts";
 import { Prisma } from "@prisma/client";
 import type { Customer, Unit } from "@prisma/client";
+import { splitTotals } from "@/lib/calculations";
 import { billingRecipient, customerRecipient, type BillingFields } from "@/lib/customer-billing";
 
 const log = logger.child({ module: "pdf" });
@@ -385,17 +386,29 @@ export async function generateDocumentPdf(
 
       const subtotal = doc.items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
       const invoiceDiscount = Number(doc.discountPercent ?? 0);
-      if (invoiceDiscount > 0) {
+      const { discountAmount, rounding } = splitTotals(subtotal, invoiceDiscount, doc.totalAmount);
+      if (invoiceDiscount > 0 || rounding !== 0) {
         pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
         pdf.text("Zwischensumme", MARGIN, y);
         pdf.text(`CHF ${fmt(subtotal, locale)}`, MARGIN, y, { width: CONTENT_W, align: "right" });
         y += LINE_HEIGHT + 4;
-        pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
-        pdf.text(`- CHF ${fmt(subtotal - doc.totalAmount, locale)}`, MARGIN, y, {
-          width: CONTENT_W,
-          align: "right",
-        });
-        y += LINE_HEIGHT + 6;
+        if (invoiceDiscount > 0) {
+          pdf.text(`Rabatt (${fmt(invoiceDiscount, locale)} %)`, MARGIN, y);
+          pdf.text(`- CHF ${fmt(discountAmount, locale)}`, MARGIN, y, {
+            width: CONTENT_W,
+            align: "right",
+          });
+          y += LINE_HEIGHT + 4;
+        }
+        if (rounding !== 0) {
+          pdf.text("Rundung", MARGIN, y);
+          pdf.text(`${rounding < 0 ? "- " : ""}CHF ${fmt(Math.abs(rounding), locale)}`, MARGIN, y, {
+            width: CONTENT_W,
+            align: "right",
+          });
+          y += LINE_HEIGHT + 4;
+        }
+        y += 2;
       }
 
       pdf.font(BOLD).fontSize(TOTAL).fillColor(TEXT_COLOR);

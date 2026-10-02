@@ -189,7 +189,7 @@ export default async function DashboardPage() {
         </Link>
 
         {modules.subscriptions && (
-          <Link href="/customers?subscription=true" className="h-full">
+          <Link href="/subscriptions" className="h-full">
             <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500">
@@ -243,7 +243,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Kommende Abo-Rechnungen</CardTitle>
-            <Button variant="outline" size="sm" render={<Link href="/customers?subscription=true" />}>
+            <Button variant="outline" size="sm" render={<Link href="/subscriptions" />}>
               Alle anzeigen
             </Button>
           </CardHeader>

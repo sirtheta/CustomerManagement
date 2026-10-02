@@ -228,6 +228,44 @@ describe("generateDocumentPdf byte assembly", () => {
     const { pageText } = await extractText(buf);
     expect(pageText[0]).toContain("Rabatt");
     expect(pageText[0]).toContain("Zwischensumme");
+    expect(pageText[0]).not.toContain("Rundung");
+  });
+
+  it("shows the discount and the rounding on separate lines", async () => {
+    // 99.99 - 12.5 % = 87.49 (discount 12.50), rounded to 87.50 (rounding 0.01)
+    const buf = await generateDocumentPdf(
+      baseDoc({
+        discountPercent: 12.5,
+        totalAmount: 87.5,
+        items: [{ name: "Pos 1", description: null, unit: "Hour", quantity: 1, unitPrice: 99.99, totalAmount: 99.99 }],
+      }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Rabatt (12.5");
+    expect(pageText[0]).toContain("- CHF 12.50");
+    expect(pageText[0]).toContain("Rundung");
+    expect(pageText[0]).toContain("CHF 0.01");
+    expect(pageText[0]).toContain("CHF 87.50");
+  });
+
+  it("shows a rounding line without discount and marks a downward rounding", async () => {
+    const buf = await generateDocumentPdf(
+      baseDoc({
+        totalAmount: 100,
+        items: [{ name: "Pos 1", description: null, unit: "Hour", quantity: 1, unitPrice: 100.02, totalAmount: 100.02 }],
+      }),
+      company,
+      "de-CH",
+      undefined
+    );
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Zwischensumme");
+    expect(pageText[0]).not.toContain("Rabatt");
+    expect(pageText[0]).toContain("Rundung");
+    expect(pageText[0]).toContain("- CHF 0.02");
   });
 });
 
@@ -273,7 +311,7 @@ describe("draft watermark", () => {
 
 describe("generateInvoicePdf drafts", () => {
   const decimal = (n: number) => n as unknown as import("@prisma/client").Prisma.Decimal;
-  const invoiceFor = (documentNumber: string | null) =>
+  const invoiceFor = (documentNumber: string | null, overrides: Record<string, unknown> = {}) =>
     ({
       id: 5,
       customerId: 1,
@@ -282,6 +320,7 @@ describe("generateInvoicePdf drafts", () => {
       dueDate: new Date("2026-01-31"),
       version: 1,
       state: "Draft",
+      totalAmount: decimal(100),
       discountPercent: decimal(0),
       customUserText: null,
       customer: {
@@ -307,6 +346,7 @@ describe("generateInvoicePdf drafts", () => {
           totalAmount: decimal(100),
         },
       ],
+      ...overrides,
     }) as never;
   const settings = {
     companyInfo: {
@@ -338,6 +378,21 @@ describe("generateInvoicePdf drafts", () => {
     expect(numPages).toBe(2);
     expect(pageText[0]).not.toContain("ENTWURF");
     expect(pageText[1]).toContain("Zahlteil");
+  });
+
+  it("prints the stored total and a Rundung line when it differs from the items", async () => {
+    // items add up to 100.00, the stored (5-Rappen rounded) total is 100.05
+    const buf = await generateInvoicePdf(invoiceFor(null, { totalAmount: decimal(100.05) }), settings);
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Rundung");
+    expect(pageText[0]).toContain("100.05");
+  });
+
+  it("prints no Rundung line when the total matches the items", async () => {
+    const buf = await generateInvoicePdf(invoiceFor(null), settings);
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).not.toContain("Rundung");
+    expect(pageText[0]).not.toContain("Zwischensumme");
   });
 });
 

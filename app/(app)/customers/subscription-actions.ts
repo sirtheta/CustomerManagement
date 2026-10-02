@@ -72,6 +72,7 @@ export async function createSubscription(
   });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/subscriptions");
   return { success: true, _ts: Date.now() };
 }
 
@@ -106,6 +107,7 @@ export async function updateSubscription(
   });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/subscriptions");
   return { success: true, _ts: Date.now() };
 }
 
@@ -121,6 +123,7 @@ export async function setSubscriptionActive(
   await logAudit(session, "UPDATE", "Subscription", subscriptionId, undefined, { customerId, active });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/subscriptions");
 }
 
 export async function deleteSubscription(customerId: number, subscriptionId: number): Promise<void> {
@@ -131,4 +134,5 @@ export async function deleteSubscription(customerId: number, subscriptionId: num
   await logAudit(session, "DELETE", "Subscription", subscriptionId, undefined, { customerId });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
+  revalidatePath("/subscriptions");
 }
