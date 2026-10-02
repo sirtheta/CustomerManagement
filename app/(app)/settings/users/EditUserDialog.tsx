@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { updateUser } from "./actions";
+import { useActionToast } from "@/hooks/use-action-toast";
 
 type User = {
   id: number;
@@ -29,6 +30,15 @@ export function EditUserDialog({ user }: { user: User }) {
   const [isActive, setIsActive] = useState(user.isActive);
   const updateUserById = updateUser.bind(null, user.id);
   const [state, formAction, pending] = useActionState(updateUserById, {});
+
+  useActionToast(state, "Benutzer gespeichert");
+  // Close the dialog once the save succeeds, derived from the action
+  // result timestamp during render rather than in an effect.
+  const [seenResultTs, setSeenResultTs] = useState(state._ts);
+  if (state._ts !== seenResultTs) {
+    setSeenResultTs(state._ts);
+    if (state.success) setOpen(false);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

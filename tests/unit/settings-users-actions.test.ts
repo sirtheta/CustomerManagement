@@ -135,7 +135,7 @@ describe("settings/users actions", () => {
       } as never);
 
       const result = await createUser({}, form(VALID_USER_FORM));
-      expect(result).toEqual({});
+      expect(result).toEqual({ success: true, _ts: expect.any(Number) });
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           email: "new@user.ch",
@@ -174,7 +174,7 @@ describe("settings/users actions", () => {
         form({ email: "invite@user.ch", name: "Eingeladen", password: "", role: "Editor" })
       );
 
-      expect(result).toEqual({});
+      expect(result).toEqual({ success: true, _ts: expect.any(Number) });
       expect(validatePasswordPolicy).not.toHaveBeenCalled();
       expect(prisma.user.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -204,7 +204,7 @@ describe("settings/users actions", () => {
         form({ email: "invite2@user.ch", name: "Eingeladen", password: "", role: "Viewer" })
       );
 
-      expect(result).toEqual({});
+      expect(result).toEqual({ success: true, _ts: expect.any(Number) });
       expect(prisma.user.create).toHaveBeenCalled();
     });
   });
@@ -247,7 +247,7 @@ describe("settings/users actions", () => {
         {},
         form({ name: "Geändert", role: "Editor", isActive: "true" })
       );
-      expect(result).toEqual({});
+      expect(result).toEqual({ success: true, _ts: expect.any(Number) });
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 2 },
         data: { name: "Geändert", role: "Editor", isActive: true },
