@@ -50,6 +50,7 @@ function baseSettings() {
     moduleBankImport: true,
     moduleAccounting: true,
     moduleAnalytics: true,
+    roundTotalTo5Rappen: false,
     pdfTheme: null,
     companyInformationId: 1,
     companyInfo: {

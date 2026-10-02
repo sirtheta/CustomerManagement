@@ -94,6 +94,15 @@ describe("quote actions", () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
+    it("hands the 5-Rappen rounding setting to the item parser", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ roundTotalTo5Rappen: true } as never);
+      vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
+      vi.mocked(prisma.$transaction).mockRejectedValue(new Error("DB error"));
+      await createQuote({}, form(BASE_FORM));
+      expect(parseDocumentItems).toHaveBeenCalledWith(expect.any(FormData), { roundTo5Rappen: true });
+    });
+
     it("returns error when transaction fails", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });

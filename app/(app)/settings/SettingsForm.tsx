@@ -38,6 +38,7 @@ type Props = {
   invoiceNumberPrefix: string;
   quoteNumberPrefix: string;
   useHolderNameOnQR: boolean;
+  roundTotalTo5Rappen: boolean;
   smtpHost: string;
   smtpPort: number;
   smtpUser: string;
@@ -271,6 +272,26 @@ export default function SettingsForm(props: Props) {
               <p className="text-xs text-muted-foreground mt-0.5">
                 Aktivieren um «{props.companyHolderName || "Inhabername"}» statt
                 «{props.companyName || "Firmenname"}» als Gläubiger zu drucken.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 pt-2 border-t">
+            <input
+              type="checkbox"
+              id="roundTotalTo5Rappen"
+              name="roundTotalTo5Rappen"
+              defaultChecked={props.roundTotalTo5Rappen}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <div>
+              <Label htmlFor="roundTotalTo5Rappen" className="cursor-pointer font-medium">
+                Rechnungsbetrag auf 5 Rappen runden
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Rundet das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen.
+                Die Differenz steht als Zeile «Rundung» auf dem PDF. Positionen werden nicht gerundet,
+                bereits versendete Rechnungen bleiben unverändert.
               </p>
             </div>
           </div>
