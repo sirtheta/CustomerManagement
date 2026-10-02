@@ -7,6 +7,13 @@ export function hasRole(session: Session, roles: UserRole[]): boolean {
   return roles.includes(session.user.role);
 }
 
+const EDITOR_ROLES: UserRole[] = [UserRole.Admin, UserRole.Editor];
+
+/** True for the roles requireEditor() lets through; for hiding editor-only UI. */
+export function isEditorSession(session: Session | null): boolean {
+  return session !== null && hasRole(session, EDITOR_ROLES);
+}
+
 export async function requireRole(roles: UserRole[]): Promise<Session> {
   const session = await auth();
   if (!session) redirect("/login");
@@ -19,5 +26,5 @@ export async function requireAdmin(): Promise<Session> {
 }
 
 export async function requireEditor(): Promise<Session> {
-  return requireRole([UserRole.Admin, UserRole.Editor]);
+  return requireRole(EDITOR_ROLES);
 }

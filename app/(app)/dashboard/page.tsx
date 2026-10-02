@@ -10,9 +10,10 @@ import { documentLabel } from "@/lib/document-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { loadModules } from "@/lib/module-guard";
+import { isEditorSession } from "@/lib/permissions";
 
 export default async function DashboardPage() {
-  await auth();
+  const canEdit = isEditorSession(await auth());
   const modules = await loadModules();
 
   const currentYear = new Date().getFullYear();
@@ -104,9 +105,11 @@ export default async function DashboardPage() {
                     : `${pendingEmailCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
                 </p>
               </div>
-              <Button size="sm" render={<Link href="/invoices/pending" />}>
-                Jetzt prüfen
-              </Button>
+              {canEdit && (
+                <Button size="sm" render={<Link href="/invoices/pending" />}>
+                  Jetzt prüfen
+                </Button>
+              )}
             </div>
           )}
           {overdueCount > 0 && (

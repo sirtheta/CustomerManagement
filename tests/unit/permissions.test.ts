@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(),
 }));
 
-import { hasRole } from "@/lib/permissions";
+import { hasRole, isEditorSession } from "@/lib/permissions";
 
 function session(role: UserRole): Session {
   return {
@@ -46,5 +46,18 @@ describe("hasRole", () => {
 
   it("returns false for empty roles list", () => {
     expect(hasRole(session(UserRole.Admin), [])).toBe(false);
+  });
+});
+
+describe("isEditorSession", () => {
+  // Same roles as requireEditor(): pages render the "nur für Bearbeiter" notice instead of redirecting.
+  it("accepts Admin and Editor", () => {
+    expect(isEditorSession(session(UserRole.Admin))).toBe(true);
+    expect(isEditorSession(session(UserRole.Editor))).toBe(true);
+  });
+
+  it("rejects Viewer and a missing session", () => {
+    expect(isEditorSession(session(UserRole.Viewer))).toBe(false);
+    expect(isEditorSession(null)).toBe(false);
   });
 });

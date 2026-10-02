@@ -11,7 +11,7 @@ export default function DevToolsCard() {
     () => triggerNotificationCheck(),
     {}
   );
-  useActionToast(state, "Benachrichtigungscheck abgeschlossen");
+  useActionToast(state, "Benachrichtigungscheck abgeschlossen", { toastErrors: false });
 
   return (
     <Card className="border-dashed border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/10">

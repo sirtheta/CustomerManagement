@@ -31,7 +31,7 @@ export function EditUserDialog({ user }: { user: User }) {
   const updateUserById = updateUser.bind(null, user.id);
   const [state, formAction, pending] = useActionState(updateUserById, {});
 
-  useActionToast(state, "Benutzer gespeichert");
+  useActionToast(state, "Benutzer gespeichert", { toastErrors: false });
   // Close the dialog once the save succeeds, derived from the action
   // result timestamp during render rather than in an effect.
   const [seenResultTs, setSeenResultTs] = useState(state._ts);

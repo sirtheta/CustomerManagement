@@ -166,7 +166,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <Button variant="outline" size="sm" render={<Link href={backHref} />}>
             Zurück
           </Button>
-          {invoice.state === "Draft" && (
+          {canEdit && invoice.state === "Draft" && (
             <Button
               size="sm"
               render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}

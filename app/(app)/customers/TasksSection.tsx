@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { createTask, deleteTask, setTaskDone } from "./task-actions";
 
 type TaskRecord = {
@@ -53,11 +54,17 @@ function NewTaskForm({ customerId, users }: { customerId: number; users: UserOpt
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-2">
-      <Input name="title" placeholder="Aufgabe (z.B. Rückruf wegen Offerte)" disabled={isPending} />
+    <form ref={formRef} action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
+      <Input
+        name="title"
+        placeholder="Aufgabe * (z.B. Rückruf wegen Offerte)"
+        aria-label="Aufgabe"
+        aria-required
+        disabled={isPending}
+      />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
-          <Label htmlFor="new-task-date">Fällig am</Label>
+          <Label htmlFor="new-task-date">Fällig am *</Label>
           <DatePickerInput
             id="new-task-date"
             name="dueDate"

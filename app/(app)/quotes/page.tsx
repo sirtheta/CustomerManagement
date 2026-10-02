@@ -20,6 +20,8 @@ import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 
@@ -69,6 +71,7 @@ type Props = {
 
 export default async function QuotesPage({ searchParams }: Props) {
   await requireModule("quotes");
+  const canEdit = isEditorSession(await auth());
   const { state, search, customerId, page, sortBy, order, dateFrom, dateTo } = await searchParams;
   const customerFilter = customerId ? parseInt(customerId, 10) || undefined : undefined;
   const activeFilter = state ?? "all";
@@ -155,7 +158,7 @@ export default async function QuotesPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold">Offerten</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportButton href={`/api/export/quotes${activeFilter !== "all" || dateFrom || dateTo ? "?" + new URLSearchParams({ ...(activeFilter !== "all" ? { state: activeFilter } : {}), ...(dateFrom ? { dateFrom } : {}), ...(dateTo ? { dateTo } : {}) }).toString() : ""}`} />
-          <Button render={<Link href="/quotes/new" />}>Neue Offerte</Button>
+          {canEdit && <Button render={<Link href="/quotes/new" />}>Neue Offerte</Button>}
         </div>
       </div>
 

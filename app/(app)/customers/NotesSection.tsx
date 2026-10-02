@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { createNote, deleteNote, updateNote } from "./note-actions";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 
 type NoteRecord = {
   noteId: number;
@@ -18,6 +19,8 @@ type NoteRecord = {
 type Props = {
   customerId: number;
   notes: NoteRecord[];
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
 const textareaClass =
@@ -58,8 +61,14 @@ function NewNoteForm({ customerId }: { customerId: number }) {
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-2">
-      <Input name="title" placeholder="Titel (z.B. Zugangsdaten Server)" disabled={isPending} />
+    <form ref={formRef} action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
+      <Input
+        name="title"
+        placeholder="Titel * (z.B. Zugangsdaten Server)"
+        aria-label="Titel"
+        aria-required
+        disabled={isPending}
+      />
       <textarea
         ref={contentRef}
         name="content"
@@ -79,9 +88,11 @@ function NewNoteForm({ customerId }: { customerId: number }) {
 function NoteItem({
   customerId,
   note,
+  canDelete,
 }: {
   customerId: number;
   note: NoteRecord;
+  canDelete: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(
     updateNote.bind(null, customerId, note.noteId),
@@ -99,7 +110,7 @@ function NoteItem({
 
   return (
     <li className="py-3 space-y-2">
-      <form action={formAction} className="space-y-2">
+      <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
         <div className="flex items-center gap-2 min-w-0">
           <Input
             ref={titleRef}
@@ -131,30 +142,48 @@ function NoteItem({
           >
             Als TXT herunterladen
           </Button>
-          <ConfirmDialog
-            title="Notiz löschen"
-            description="Soll diese Notiz wirklich gelöscht werden?"
-            confirmLabel="Löschen"
-            triggerVariant="ghost"
-            triggerSize="sm"
-            onConfirm={() => deleteNote(customerId, note.noteId)}
-          >
-            Löschen
-          </ConfirmDialog>
+          {canDelete && (
+            <ConfirmDialog
+              title="Notiz löschen"
+              description="Soll diese Notiz wirklich gelöscht werden?"
+              confirmLabel="Löschen"
+              triggerVariant="ghost"
+              triggerSize="sm"
+              onConfirm={() => deleteNote(customerId, note.noteId)}
+            >
+              Löschen
+            </ConfirmDialog>
+          )}
         </div>
       </form>
     </li>
   );
 }
 
-export default function NotesSection({ customerId, notes }: Props) {
+function ReadOnlyNote({ note }: { note: NoteRecord }) {
+  const date = new Date(note.updatedAt).toLocaleDateString("de-CH");
+  return (
+    <li className="py-3 space-y-1 text-sm">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="flex-1 min-w-0 font-medium truncate">{note.title}</span>
+        <span className="text-xs text-muted-foreground shrink-0">{date}</span>
+      </div>
+      {note.content && <p className="whitespace-pre-wrap break-words">{note.content}</p>}
+      <Button type="button" variant="ghost" size="sm" onClick={() => downloadAsTxt(note.title, note.content)}>
+        Als TXT herunterladen
+      </Button>
+    </li>
+  );
+}
+
+export default function NotesSection({ customerId, notes, canEdit, canDelete }: Props) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Notizen</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <NewNoteForm customerId={customerId} />
+        {canEdit && <NewNoteForm customerId={customerId} />}
 
         {notes.length === 0 ? (
           <p className="text-sm text-muted-foreground py-1">
@@ -162,9 +191,13 @@ export default function NotesSection({ customerId, notes }: Props) {
           </p>
         ) : (
           <ul className="divide-y divide-border">
-            {notes.map((note) => (
-              <NoteItem key={note.noteId} customerId={customerId} note={note} />
-            ))}
+            {notes.map((note) =>
+              canEdit ? (
+                <NoteItem key={note.noteId} customerId={customerId} note={note} canDelete={canDelete} />
+              ) : (
+                <ReadOnlyNote key={note.noteId} note={note} />
+              )
+            )}
           </ul>
         )}
       </CardContent>

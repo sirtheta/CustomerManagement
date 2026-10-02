@@ -47,7 +47,7 @@ export default function SendInvoiceButton({
     {}
   );
 
-  useActionToast(state, `${noun} ${documentLabel(documentNumber)} versendet`);
+  useActionToast(state, `${noun} ${documentLabel(documentNumber)} versendet`, { toastErrors: false });
 
   // Close the dialog once a send succeeds, derived from the action result
   // timestamp during render rather than in an effect.

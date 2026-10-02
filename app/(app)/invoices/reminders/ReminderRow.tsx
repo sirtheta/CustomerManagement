@@ -37,7 +37,7 @@ export default function ReminderRow(props: Props) {
   );
   const [dismissing, startDismiss] = useTransition();
 
-  useActionToast(state, `Mahnung für ${documentLabel(props.documentNumber)} versendet`);
+  useActionToast(state, `Mahnung für ${documentLabel(props.documentNumber)} versendet`, { toastErrors: false });
 
   const levelLabel = reminderTitle(props.reminderLevel);
 

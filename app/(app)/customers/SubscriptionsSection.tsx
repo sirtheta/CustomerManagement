@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import {
   createSubscription,
@@ -84,7 +85,7 @@ function SubscriptionFields({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label htmlFor={`${idPrefix}-date`}>Nächstes Rechnungsdatum</Label>
+          <Label htmlFor={`${idPrefix}-date`}>Nächstes Rechnungsdatum *</Label>
           <DatePickerInput
             id={`${idPrefix}-date`}
             name="nextInvoiceDate"
@@ -169,7 +170,7 @@ function NewSubscriptionForm({
   }, [state]);
 
   return (
-    <form action={formAction} className="space-y-2">
+    <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
       <SubscriptionFields
         idPrefix="new-sub"
         values={values}
@@ -212,7 +213,7 @@ function SubscriptionItem({
         {!sub.active && <Badge variant="secondary">Pausiert</Badge>}
         {sub.templateId == null && <Badge variant="destructive">Vorlage fehlt</Badge>}
       </div>
-      <form action={formAction} className="space-y-2">
+      <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
         <input type="hidden" name="loadedNextInvoiceDate" value={sub.nextInvoiceDate} />
         <SubscriptionFields
           idPrefix={`sub-${sub.id}`}

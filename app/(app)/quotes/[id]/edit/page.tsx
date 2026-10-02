@@ -3,6 +3,9 @@ import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { notFound } from "next/navigation";
 import QuoteForm from "../../QuoteForm";
 import { requireModule } from "@/lib/module-guard";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -11,6 +14,7 @@ type Props = {
 
 export default async function EditQuotePage({ params, searchParams }: Props) {
   await requireModule("quotes");
+  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/quotes" backLabel="Zu den Offerten" />;
   const { id } = await params;
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);

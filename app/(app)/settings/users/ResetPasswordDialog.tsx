@@ -17,9 +17,9 @@ export function ResetPasswordDialog({ user }: { user: User }) {
 
   const sendInviteById = sendPasswordSetupEmail.bind(null, user.id);
   const [inviteState, inviteAction, invitePending] = useActionState(sendInviteById, {});
-  useActionToast(inviteState, "Link gesendet");
+  useActionToast(inviteState, "Link gesendet", { toastErrors: false });
 
-  useActionToast(state, "Passwort gespeichert");
+  useActionToast(state, "Passwort gespeichert", { toastErrors: false });
   // Close the dialog once the reset succeeds, derived from the action
   // result timestamp during render rather than in an effect.
   const [seenResultTs, setSeenResultTs] = useState(state._ts);

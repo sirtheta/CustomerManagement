@@ -24,7 +24,7 @@ type Props = {
 export default function TemplateEditForm({ templateId, name, initialItems, services, categories }: Props) {
   const action = updateTemplate.bind(null, templateId);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(action, {});
-  useActionToast(state, "Vorlage gespeichert");
+  useActionToast(state, "Vorlage gespeichert", { toastErrors: false });
 
   return (
     <form action={formAction} className="space-y-4">

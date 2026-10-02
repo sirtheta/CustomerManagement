@@ -15,6 +15,8 @@ import { formatCurrency } from "@/lib/utils";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 
@@ -34,6 +36,7 @@ type Props = {
 
 export default async function ServicesPage({ searchParams }: Props) {
   const { search, page, sortBy, order } = await searchParams;
+  const canEdit = isEditorSession(await auth());
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const sortField: SortField = sortBy === "unitPrice" ? "unitPrice" : "name";
   const sortOrder: SortOrder = order === "desc" ? "desc" : "asc";
@@ -82,7 +85,7 @@ export default async function ServicesPage({ searchParams }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Leistungen</h1>
-        <Button render={<Link href="/services/new" />}>Neue Leistung</Button>
+        {canEdit && <Button render={<Link href="/services/new" />}>Neue Leistung</Button>}
       </div>
 
       <Suspense fallback={<div className="h-9 rounded-lg border border-input bg-muted animate-pulse" />}>

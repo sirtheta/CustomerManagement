@@ -12,6 +12,7 @@ import {
   updateDocumentNote,
 } from "./document-actions";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { cn } from "@/lib/utils";
 
 type DocumentRecord = {
@@ -25,6 +26,8 @@ type DocumentRecord = {
 type Props = {
   customerId: number;
   documents: DocumentRecord[];
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
 function fileLabel(ext: string): { label: string; color: string } {
@@ -108,7 +111,7 @@ function UploadForm({ customerId }: { customerId: number }) {
         isDragging ? "border-primary bg-primary/5" : "border-border"
       )}
     >
-      <form action={formAction} className="flex items-center gap-2">
+      <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="flex items-center gap-2">
         <Input
           ref={inputRef}
           name="file"
@@ -144,7 +147,7 @@ function NoteForm({
   useActionToast(state, "Notiz gespeichert");
 
   return (
-    <form action={formAction} className="flex gap-1.5 items-end">
+    <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="flex gap-1.5 items-end">
       <textarea
         key={initialNote}
         name="note"
@@ -160,14 +163,14 @@ function NoteForm({
   );
 }
 
-export default function DocumentsSection({ customerId, documents }: Props) {
+export default function DocumentsSection({ customerId, documents, canEdit, canDelete }: Props) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Dokumente</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <UploadForm customerId={customerId} />
+        {canEdit && <UploadForm customerId={customerId} />}
 
         {documents.length === 0 ? (
           <p className="text-sm text-muted-foreground py-1">
@@ -197,22 +200,28 @@ export default function DocumentsSection({ customerId, documents }: Props) {
                     <span className="text-xs text-muted-foreground shrink-0">
                       {date}
                     </span>
-                    <ConfirmDialog
-                      title="Dokument löschen"
-                      description="Soll dieses Dokument wirklich gelöscht werden?"
-                      confirmLabel="Löschen"
-                      triggerVariant="ghost"
-                      triggerSize="sm"
-                      onConfirm={() => deleteDocument(customerId, doc.documentId)}
-                    >
-                      Löschen
-                    </ConfirmDialog>
+                    {canDelete && (
+                      <ConfirmDialog
+                        title="Dokument löschen"
+                        description="Soll dieses Dokument wirklich gelöscht werden?"
+                        confirmLabel="Löschen"
+                        triggerVariant="ghost"
+                        triggerSize="sm"
+                        onConfirm={() => deleteDocument(customerId, doc.documentId)}
+                      >
+                        Löschen
+                      </ConfirmDialog>
+                    )}
                   </div>
-                  <NoteForm
-                    customerId={customerId}
-                    documentId={doc.documentId}
-                    initialNote={doc.note ?? ""}
-                  />
+                  {canEdit ? (
+                    <NoteForm
+                      customerId={customerId}
+                      documentId={doc.documentId}
+                      initialNote={doc.note ?? ""}
+                    />
+                  ) : (
+                    doc.note && <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{doc.note}</p>
+                  )}
                 </li>
               );
             })}

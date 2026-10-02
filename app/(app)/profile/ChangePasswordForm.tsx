@@ -12,7 +12,7 @@ export function ChangePasswordForm() {
   const [state, formAction, pending] = useActionState(changeOwnPassword, {});
   const formRef = useRef<HTMLFormElement>(null);
 
-  useActionToast(state, "Passwort geändert");
+  useActionToast(state, "Passwort geändert", { toastErrors: false });
   useEffect(() => {
     if (state.success) formRef.current?.reset();
   }, [state]);

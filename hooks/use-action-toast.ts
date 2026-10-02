@@ -2,25 +2,23 @@
 
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { actionToastFor, type ActionState, type ActionToastOptions } from "@/lib/action-toast";
 
-export type ActionState = {
-  success?: boolean;
-  error?: string;
-  _ts?: number; // timestamp so repeated saves still trigger the effect
-};
+export type { ActionState } from "@/lib/action-toast";
 
 export function useActionToast(
   state: ActionState | undefined,
-  successMessage = "Gespeichert"
+  successMessage = "Gespeichert",
+  options?: ActionToastOptions
 ) {
-  const prevTs = useRef<number | undefined>(undefined);
+  // The ref survives Strict Mode's effect re-run, so the same state is never toasted twice.
+  const prevState = useRef<ActionState | undefined>(undefined);
+  const toastErrors = options?.toastErrors ?? true;
 
   useEffect(() => {
-    if (!state) return;
-    if (state._ts === prevTs.current) return;
-    prevTs.current = state._ts;
-
-    if (state.success) toast.success(successMessage);
-    else if (state.error) toast.error(state.error);
-  }, [state, successMessage]);
+    const next = actionToastFor(state, prevState.current, successMessage, { toastErrors });
+    prevState.current = state;
+    if (next?.kind === "success") toast.success(next.message);
+    else if (next?.kind === "error") toast.error(next.message);
+  }, [state, successMessage, toastErrors]);
 }

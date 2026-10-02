@@ -36,12 +36,13 @@ const AUDIT_LABELS: Record<string, string> = {
 /**
  * Builds the customer timeline from data that already exists (documents, sent
  * logs, payments, notes, tasks and the audit entries of the customer itself).
- * Note contents are encrypted at rest, so only the title is shown.
+ * Note contents are encrypted at rest, so only the title is shown. Quotes and
+ * tasks are skipped while their module is switched off (the data stays).
  */
 export async function loadCustomerHistory(
   prisma: PrismaClient,
   customerId: number,
-  limit = 60
+  { quotes: withQuotes = true, tasks: withTasks = true, limit = 60 }: { quotes?: boolean; tasks?: boolean; limit?: number } = {}
 ): Promise<HistoryEvent[]> {
   const take = PER_SOURCE_LIMIT;
   const [invoices, quotes, invoiceLogs, quoteLogs, payments, notes, tasks, audits] = await Promise.all([
@@ -51,24 +52,28 @@ export async function loadCustomerHistory(
       orderBy: { date: "desc" },
       take,
     }),
-    prisma.quote.findMany({
-      where: { customerId },
-      select: { id: true, documentNumber: true, date: true },
-      orderBy: { date: "desc" },
-      take,
-    }),
+    withQuotes
+      ? prisma.quote.findMany({
+          where: { customerId },
+          select: { id: true, documentNumber: true, date: true },
+          orderBy: { date: "desc" },
+          take,
+        })
+      : [],
     prisma.invoiceSentLog.findMany({
       where: { invoice: { customerId } },
       select: { sentAt: true, sentTo: true, invoice: { select: { id: true, documentNumber: true } } },
       orderBy: { sentAt: "desc" },
       take,
     }),
-    prisma.quoteSentLog.findMany({
-      where: { quote: { customerId } },
-      select: { sentAt: true, sentTo: true, quote: { select: { id: true, documentNumber: true } } },
-      orderBy: { sentAt: "desc" },
-      take,
-    }),
+    withQuotes
+      ? prisma.quoteSentLog.findMany({
+          where: { quote: { customerId } },
+          select: { sentAt: true, sentTo: true, quote: { select: { id: true, documentNumber: true } } },
+          orderBy: { sentAt: "desc" },
+          take,
+        })
+      : [],
     prisma.payment.findMany({
       where: { invoice: { customerId } },
       select: { date: true, amount: true, invoice: { select: { id: true, documentNumber: true } } },
@@ -81,12 +86,14 @@ export async function loadCustomerHistory(
       orderBy: { createdAt: "desc" },
       take,
     }),
-    prisma.task.findMany({
-      where: { customerId },
-      select: { title: true, createdAt: true, doneAt: true },
-      orderBy: { createdAt: "desc" },
-      take,
-    }),
+    withTasks
+      ? prisma.task.findMany({
+          where: { customerId },
+          select: { title: true, createdAt: true, doneAt: true },
+          orderBy: { createdAt: "desc" },
+          take,
+        })
+      : [],
     prisma.auditLog.findMany({
       where: { entityType: "Customer", entityId: customerId, action: { in: Object.keys(AUDIT_LABELS) } },
       select: { action: true, userName: true, createdAt: true },

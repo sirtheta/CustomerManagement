@@ -119,9 +119,9 @@ export default function SettingsForm(props: Props) {
       document.removeEventListener("click", onClick, true);
     };
   }, [dirty]);
-  useActionToast(testState, "SMTP-Verbindung erfolgreich");
-  useActionToast(testEmailNotifState, "Test-E-Mail erfolgreich gesendet");
-  useActionToast(testTelegramState, "Telegram-Test erfolgreich gesendet");
+  useActionToast(testState, "SMTP-Verbindung erfolgreich", { toastErrors: false });
+  useActionToast(testEmailNotifState, "Test-E-Mail erfolgreich gesendet", { toastErrors: false });
+  useActionToast(testTelegramState, "Telegram-Test erfolgreich gesendet", { toastErrors: false });
 
   return (
     <form

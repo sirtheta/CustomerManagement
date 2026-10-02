@@ -22,7 +22,7 @@ export function CreateUserDialog() {
   const [role, setRole] = useState<UserRole>(UserRole.Viewer);
   const [state, formAction, pending] = useActionState(createUser, {});
 
-  useActionToast(state, "Benutzer erstellt");
+  useActionToast(state, "Benutzer erstellt", { toastErrors: false });
   // Close the dialog once the user is created, derived from the action
   // result timestamp during render rather than in an effect.
   const [seenResultTs, setSeenResultTs] = useState(state._ts);

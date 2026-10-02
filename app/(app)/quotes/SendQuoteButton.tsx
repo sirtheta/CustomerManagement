@@ -44,7 +44,7 @@ export default function SendQuoteButton({
     {}
   );
 
-  useActionToast(state, `Offerte ${documentLabel(documentNumber)} versendet`);
+  useActionToast(state, `Offerte ${documentLabel(documentNumber)} versendet`, { toastErrors: false });
 
   // Close the dialog once a send succeeds, derived from the action result
   // timestamp during render rather than in an effect.

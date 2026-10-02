@@ -22,6 +22,8 @@ import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 
@@ -67,11 +69,12 @@ type TableProps = {
   dateFrom?: string;
   dateTo?: string;
   sortHrefs: Record<SortField, string>;
+  canEdit: boolean;
 };
 
 async function InvoicesTable({
   activeFilter, term, customerId, currentPage, sortField, sortOrder, baseHref,
-  dateFrom, dateTo, sortHrefs,
+  dateFrom, dateTo, sortHrefs, canEdit,
 }: TableProps) {
   const dateFromDate = dateFrom ? new Date(dateFrom) : undefined;
   const dateToDate = dateTo ? new Date(dateTo + "T23:59:59") : undefined;
@@ -149,9 +152,11 @@ async function InvoicesTable({
                   ) : (
                     <div className="space-y-3">
                       <p className="text-muted-foreground">Noch keine Rechnungen erfasst.</p>
-                      <Button size="sm" render={<Link href="/invoices/new" />}>
-                        Erste Rechnung erstellen
-                      </Button>
+                      {canEdit && (
+                        <Button size="sm" render={<Link href="/invoices/new" />}>
+                          Erste Rechnung erstellen
+                        </Button>
+                      )}
                     </div>
                   )}
                 </TableCell>
@@ -241,6 +246,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
   const term = search?.trim() ?? "";
 
   const modules = await loadModules();
+  const canEdit = isEditorSession(await auth());
   const [pendingCount, reminderCount] = await Promise.all([
     modules.subscriptions ? prisma.pendingEmail.count() : 0,
     modules.reminders ? prisma.pendingReminder.count() : 0,
@@ -306,15 +312,19 @@ export default async function InvoicesPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold">Rechnungen</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportButton href={exportHref} />
-          {modules.bankImport && (
+          {canEdit && modules.bankImport && (
             <Button variant="outline" size="sm" render={<Link href="/invoices/import" />}>
               Zahlungen importieren
             </Button>
           )}
-          <Button variant="outline" size="sm" render={<Link href="/invoices/templates" />}>
-            Vorlagen
-          </Button>
-          <Button render={<Link href="/invoices/new" />}>Neue Rechnung</Button>
+          {canEdit && (
+            <>
+              <Button variant="outline" size="sm" render={<Link href="/invoices/templates" />}>
+                Vorlagen
+              </Button>
+              <Button render={<Link href="/invoices/new" />}>Neue Rechnung</Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -325,7 +335,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
               ? "1 Abo-Rechnung wartet auf Prüfung und Versand."
               : `${pendingCount} Abo-Rechnungen warten auf Prüfung und Versand.`}
           </p>
-          <Button size="sm" render={<Link href="/invoices/pending" />}>Jetzt prüfen</Button>
+          {canEdit && <Button size="sm" render={<Link href="/invoices/pending" />}>Jetzt prüfen</Button>}
         </div>
       )}
 
@@ -336,7 +346,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
               ? "1 überfällige Rechnung wartet auf Mahnung."
               : `${reminderCount} überfällige Rechnungen warten auf Mahnung.`}
           </p>
-          <Button size="sm" render={<Link href="/invoices/reminders" />}>Jetzt prüfen</Button>
+          {canEdit && <Button size="sm" render={<Link href="/invoices/reminders" />}>Jetzt prüfen</Button>}
         </div>
       )}
 
@@ -377,6 +387,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
           dateFrom={dateFrom}
           dateTo={dateTo}
           sortHrefs={sortHrefs}
+          canEdit={canEdit}
         />
       </Suspense>
     </div>

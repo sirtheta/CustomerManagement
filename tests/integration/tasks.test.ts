@@ -140,6 +140,25 @@ describe("customer tasks", () => {
       expect(events[0].href).toBe(`/invoices/${invoice.id}?from=customers/${customer.customerId}`);
     });
 
+    it("leaves out quotes, quote sends and tasks of switched-off modules", async () => {
+      const { customer, quote } = await seedQuote();
+      await db.prisma.quoteSentLog.create({
+        data: { quoteId: quote.id, sentAt: new Date(2026, 0, 6), sentTo: "a@b.ch", subject: "s" },
+      });
+      await db.prisma.task.create({
+        data: { customerId: customer.customerId, title: "Anrufen", dueDate: new Date() },
+      });
+      await db.prisma.customerNote.create({
+        data: { customerId: customer.customerId, title: "Notiz", content: "x" },
+      });
+
+      const all = await loadCustomerHistory(db.prisma, customer.customerId);
+      expect(new Set(all.map((e) => e.kind))).toEqual(new Set(["quote", "sent", "task", "note"]));
+
+      const off = await loadCustomerHistory(db.prisma, customer.customerId, { quotes: false, tasks: false });
+      expect(off.map((e) => e.kind)).toEqual(["note"]);
+    });
+
     it("only shows the customer's own data", async () => {
       const a = await seedQuote();
       await seedQuote();

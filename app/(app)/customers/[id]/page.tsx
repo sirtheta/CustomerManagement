@@ -144,7 +144,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
     modules.tasks
       ? prisma.user.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : [],
-    loadCustomerHistory(prisma, customerId),
+    loadCustomerHistory(prisma, customerId, { quotes: modules.quotes, tasks: modules.tasks }),
   ]);
 
   if (!customer) notFound();
@@ -220,8 +220,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
               }))}
             />
           )}
-          <DocumentsSection customerId={customerId} documents={documents} />
-          <NotesSection customerId={customerId} notes={decryptedNotes} />
+          <DocumentsSection customerId={customerId} documents={documents} canEdit={canEdit} canDelete={canDelete} />
+          <NotesSection customerId={customerId} notes={decryptedNotes} canEdit={canEdit} canDelete={canDelete} />
         </div>
       </div>
 
@@ -229,9 +229,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Rechnungen</CardTitle>
-          <Button size="sm" render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
-            Neue Rechnung
-          </Button>
+          {canEdit && (
+            <Button size="sm" render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
+              Neue Rechnung
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -251,9 +253,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="space-y-3">
                         <p className="text-muted-foreground">Noch keine Rechnungen vorhanden.</p>
-                        <Button size="sm" render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
-                          Neue Rechnung erstellen
-                        </Button>
+                        {canEdit && (
+                          <Button size="sm" render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
+                            Neue Rechnung erstellen
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -299,9 +303,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Offerten</CardTitle>
-            <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
-              Neue Offerte
-            </Button>
+            {canEdit && (
+              <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
+                Neue Offerte
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -321,9 +327,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                       <TableCell colSpan={5} className="text-center py-8">
                         <div className="space-y-3">
                           <p className="text-muted-foreground">Noch keine Offerten vorhanden.</p>
-                          <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
-                            Neue Offerte erstellen
-                          </Button>
+                          {canEdit && (
+                            <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
+                              Neue Offerte erstellen
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -29,9 +29,11 @@ export default async function SubscriptionsPage() {
             Intervall, nächste Rechnung und Versand pro Abo. Bearbeiten auf der Kundenseite.
           </p>
         </div>
-        <Button variant="outline" render={<Link href="/invoices/pending" />}>
-          Ausstehende Abo-Rechnungen
-        </Button>
+        {canEdit && (
+          <Button variant="outline" render={<Link href="/invoices/pending" />}>
+            Ausstehende Abo-Rechnungen
+          </Button>
+        )}
       </div>
 
       <div className="overflow-x-auto">

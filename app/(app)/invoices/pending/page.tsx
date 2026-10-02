@@ -3,9 +3,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import PendingEmailRow from "./PendingEmailRow";
 import { requireModule } from "@/lib/module-guard";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
 
 export default async function PendingEmailsPage() {
   await requireModule("subscriptions");
+  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const pending = await prisma.pendingEmail.findMany({
     include: {
       invoice: { include: { customer: true } },

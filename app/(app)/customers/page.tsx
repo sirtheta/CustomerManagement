@@ -18,6 +18,9 @@ import { Pagination } from "@/components/ui/pagination";
 import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { redirect } from "next/navigation";
+import { UserRole } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
 
@@ -32,9 +35,13 @@ type TableProps = {
   sortOrder: SortOrder;
   baseHref: string;
   sortHrefs: Record<SortField, string>;
+  canEdit: boolean;
+  canDelete: boolean;
 };
 
-async function CustomersTable({ term, archivedOnly, currentPage, sortField, sortOrder, baseHref, sortHrefs }: TableProps) {
+async function CustomersTable({
+  term, archivedOnly, currentPage, sortField, sortOrder, baseHref, sortHrefs, canEdit, canDelete,
+}: TableProps) {
   const where = {
     archivedAt: archivedOnly ? { not: null } : null,
     ...(term
@@ -92,9 +99,11 @@ async function CustomersTable({ term, archivedOnly, currentPage, sortField, sort
                   ) : (
                     <div className="space-y-3">
                       <p className="text-muted-foreground">Noch keine Kunden erfasst.</p>
-                      <Button size="sm" render={<Link href="/customers/new" />}>
-                        Ersten Kunden erstellen
-                      </Button>
+                      {canEdit && (
+                        <Button size="sm" render={<Link href="/customers/new" />}>
+                          Ersten Kunden erstellen
+                        </Button>
+                      )}
                     </div>
                   )}
                 </TableCell>
@@ -124,12 +133,15 @@ async function CustomersTable({ term, archivedOnly, currentPage, sortField, sort
                   <TableCell>{c.email}</TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   <TableCell>
-                    <DeleteCustomerButton
-                      customerId={c.customerId}
-                      size="sm"
-                      hasInvoices={c._count.invoices > 0}
-                      archived={archivedOnly}
-                    />
+                    {/* With invoices the button archives (Editor), otherwise it deletes (Admin only). */}
+                    {(c._count.invoices > 0 ? canEdit : canDelete) && (
+                      <DeleteCustomerButton
+                        customerId={c.customerId}
+                        size="sm"
+                        hasInvoices={c._count.invoices > 0}
+                        archived={archivedOnly}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -178,6 +190,10 @@ export default async function CustomersPage({ searchParams }: Props) {
   // Old link of the subscription filter, which now has its own overview.
   if (subscription === "true") redirect("/subscriptions");
 
+  const session = await auth();
+  const canEdit = isEditorSession(session);
+  const canDelete = session?.user.role === UserRole.Admin;
+
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const sortField: SortField =
     sortBy === "city" || sortBy === "email" ? sortBy : "contactPerson";
@@ -218,7 +234,7 @@ export default async function CustomersPage({ searchParams }: Props) {
             {archivedOnly ? "Aktive Kunden" : "Archiv"}
           </Button>
           <ExportButton href="/api/export/customers" />
-          <Button render={<Link href="/customers/new" />}>Neuer Kunde</Button>
+          {canEdit && <Button render={<Link href="/customers/new" />}>Neuer Kunde</Button>}
         </div>
       </div>
 
@@ -235,6 +251,8 @@ export default async function CustomersPage({ searchParams }: Props) {
           sortOrder={sortOrder}
           baseHref={baseHref}
           sortHrefs={sortHrefs}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       </Suspense>
     </div>

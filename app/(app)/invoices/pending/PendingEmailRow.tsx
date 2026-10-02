@@ -29,7 +29,7 @@ export default function PendingEmailRow(props: Props) {
   );
   const [discarding, startDiscard] = useTransition();
 
-  useActionToast(state, `Rechnung ${documentLabel(props.documentNumber)} versendet`);
+  useActionToast(state, `Rechnung ${documentLabel(props.documentNumber)} versendet`, { toastErrors: false });
 
   const isEmpty = props.totalAmount === 0;
 

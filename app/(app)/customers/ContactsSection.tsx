@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { createContact, deleteContact, updateContact } from "./contact-actions";
 import { useActionToast } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 
 type ContactRecord = {
   contactId: number;
@@ -48,7 +49,7 @@ function NewContactForm({ customerId }: { customerId: number }) {
   }, [state]);
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-2">
+    <form ref={formRef} action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
       <ContactFields disabled={isPending} />
       <Button type="submit" variant="outline" size="sm" disabled={isPending}>
         {isPending ? "Speichert…" : "Kontakt hinzufügen"}
@@ -66,7 +67,7 @@ function EditableContact({ customerId, contact }: { customerId: number; contact:
 
   return (
     <li className="py-3">
-      <form action={formAction} className="space-y-2">
+      <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-2">
         <ContactFields contact={contact} disabled={isPending} />
         <div className="flex items-center gap-1.5">
           <Button type="submit" variant="outline" size="sm" disabled={isPending}>
