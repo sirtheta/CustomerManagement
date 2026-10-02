@@ -98,7 +98,10 @@ export function IncomingTable({
           }))
         );
         if (result.error) toast.error(result.error);
-        else toast.success(`${result.paidCount ?? 0} Zahlung(en) verbucht.`);
+        else {
+          const count = result.paidCount ?? 0;
+          toast.success(`${count} Zahlung${count === 1 ? "" : "en"} verbucht.`);
+        }
       } catch {
         toast.error("Speichern fehlgeschlagen.");
       }
@@ -151,18 +154,25 @@ export function IncomingTable({
           />
         ) : (
           <Select
-            value={selection.invoiceId ? String(selection.invoiceId) : undefined}
+            // null, never undefined: undefined would make the Select uncontrolled
+            // until an invoice is chosen (React/Base UI warning on the switch).
+            value={selection.invoiceId ? String(selection.invoiceId) : null}
             onValueChange={(value) => {
               if (!value) return;
               if (value === SEARCH_ALL) update(row, { manual: true, invoiceId: null, checked: false });
               else update(row, { invoiceId: Number(value) });
             }}
           >
-            <SelectTrigger className="w-72" aria-label={`Rechnung für ${label}`}>
-              <SelectValue placeholder="Rechnung wählen">
+            <SelectTrigger className="w-72 max-w-full" aria-label={`Rechnung für ${label}`}>
+              <SelectValue placeholder="Rechnung wählen" className="min-w-0">
                 {(value: string | null) => {
                   const invoice = value ? invoiceById.get(Number(value)) : undefined;
-                  return invoice ? invoiceLabel(invoice) : "Rechnung wählen";
+                  const text = invoice ? invoiceLabel(invoice) : "Rechnung wählen";
+                  return (
+                    <span className="block min-w-0 truncate" title={invoice ? text : undefined}>
+                      {text}
+                    </span>
+                  );
                 }}
               </SelectValue>
             </SelectTrigger>
@@ -277,7 +287,7 @@ export function IncomingTable({
             kannst du eine offene Rechnung nach Nummer oder Kunde suchen. Wurde die Zahlung schon auf
             anderem Weg erfasst (von Hand oder automatisch übermittelt), ignoriere den Eingang hier.
           </p>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={confirm} disabled={isPending || chosen.length === 0}>
               {isPending
                 ? "Wird gespeichert…"

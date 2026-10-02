@@ -12,13 +12,13 @@ export function ImportWizard() {
 
   return (
     <div className="space-y-3">
-      <form action={action} className="flex items-center gap-2">
+      <form action={action} className="flex flex-wrap items-center gap-2">
         <input
           type="file"
           name="file"
           accept=".xml"
           required
-          className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"
+          className="min-w-0 max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"
         />
         <Button type="submit" disabled={isPending}>
           {isPending ? "Wird gelesen…" : "Datei importieren"}

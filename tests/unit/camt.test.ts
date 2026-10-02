@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCamt053 } from "@/lib/import/camt";
+import { CamtFormatError, parseCamt053 } from "@/lib/import/camt";
 
 /** Minimal but structurally faithful CAMT.053 document. */
 function camt(entries: string, options: { namespace?: string } = {}): string {
@@ -169,5 +169,42 @@ describe("parseCamt053", () => {
 
   it("rejects unparseable XML with a readable message", () => {
     expect(() => parseCamt053("<Document><unclosed>")).toThrow();
+  });
+
+  function formatErrorOf(xml: string): CamtFormatError {
+    try {
+      parseCamt053(xml);
+    } catch (err) {
+      if (err instanceof CamtFormatError) return err;
+      throw err;
+    }
+    throw new Error("expected a CamtFormatError");
+  }
+
+  it("tells a non-XML file apart from a wrong XML format", () => {
+    for (const content of ["not xml", "%PDF-1.7 …", "Datum;Betrag\n01.10.2026;100.00", ""]) {
+      const err = formatErrorOf(content);
+      expect(err.kind).toBe("not-xml");
+      expect(err.message).toContain("keine XML-Datei");
+      expect(err.message).not.toMatch(/camt\.054/);
+    }
+  });
+
+  it("names camt.054 only for a camt.054 notification", () => {
+    const err = formatErrorOf(`<?xml version="1.0"?><Document><BkToCstmrDbtCdtNtfctn/></Document>`);
+    expect(err.kind).toBe("camt054");
+    expect(err.message).toContain("camt.054");
+  });
+
+  it("reports another XML format without guessing camt.054", () => {
+    const err = formatErrorOf(`<?xml version="1.0"?><Invoice><Id>1</Id></Invoice>`);
+    expect(err.kind).toBe("wrong-format");
+    expect(err.message).not.toMatch(/camt\.054/);
+    expect(formatErrorOf(`<Document><BkToCstmrAcctRpt/></Document>`).message).toContain("camt.052");
+  });
+
+  it("reports a camt.053 file without statements", () => {
+    const err = formatErrorOf(`<Document><BkToCstmrStmt><GrpHdr/></BkToCstmrStmt></Document>`);
+    expect(err.kind).toBe("no-statement");
   });
 });

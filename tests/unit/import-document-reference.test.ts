@@ -27,6 +27,37 @@ describe("extractDocumentNumberCandidates", () => {
     expect(extractDocumentNumberCandidates("Ref 1260100421", P)).toEqual([]);
   });
 
+  it("accepts the bare digits with spaces or separators inside", () => {
+    for (const text of [
+      "Rg 2610 0135",
+      "Rechnung 2610.0135 danke",
+      "Nr. 2610-0135",
+      "Rg 2610/0135",
+      "26 10 01 35",
+    ]) {
+      expect(extractDocumentNumberCandidates(text, P)).toEqual(["I-26100135"]);
+    }
+  });
+
+  it("does not take eight separated digits out of a longer grouped number", () => {
+    // IBAN, QR reference and phone numbers in their usual grouping.
+    expect(extractDocumentNumberCandidates("IBAN CH93 0076 2011 6238 5295 7", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Ref 21 00000 00003 13947 14300 09017", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Tel. 079 123 45 67", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Tel. +41 79 123 45 67", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Tel 0791 2345 67", P)).toEqual([]);
+  });
+
+  it("does not read a date as an invoice number", () => {
+    expect(extractDocumentNumberCandidates("Zahlung vom 26.10.2025", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Valuta 26/10/2025", P)).toEqual([]);
+    expect(extractDocumentNumberCandidates("Datum 2025-10-26", P)).toEqual([]);
+  });
+
+  it("still blocks a quote number written with spaces", () => {
+    expect(extractDocumentNumberCandidates("Offerte Q-2601 0003", P)).toEqual([]);
+  });
+
   it("does not match a prefix that is the tail of another word, only the bare digits", () => {
     // The prefix form is blocked behind a word character; the digits alone
     // still count as an invoice number candidate.

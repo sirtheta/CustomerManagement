@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { requireEditor } from "@/lib/permissions";
 import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { logAudit } from "@/lib/audit";
-import { parseCamt053 } from "@/lib/import/camt";
+import { CamtFormatError, parseCamt053 } from "@/lib/import/camt";
 import { BankImportError, importStatement, undoImport } from "@/lib/import/bank-import";
 import { checkStatementAccount } from "@/lib/import/statement-checks";
 import { PaymentError, recordPayment } from "@/lib/payments";
@@ -66,8 +66,13 @@ export async function uploadStatement(
   try {
     statement = parseCamt053(await file.text());
   } catch (err) {
+    if (err instanceof CamtFormatError) {
+      // Wrong download or file type: expected, so no stack trace.
+      log.warn({ kind: err.kind, filename: file.name }, "uploadStatement: not a camt.053 statement");
+      return { error: err.message };
+    }
     log.error({ err }, "uploadStatement: CAMT parse failed");
-    return { error: err instanceof Error ? err.message : "Datei konnte nicht gelesen werden." };
+    return { error: "Die Datei konnte nicht gelesen werden." };
   }
 
   const settings = await prisma.applicationSettings.findFirst({

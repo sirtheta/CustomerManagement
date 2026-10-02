@@ -16,8 +16,8 @@ export default async function InvoicesImportPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Bankimport</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Kontoauszug aus dem E-Banking (camt.053) hochladen, Zahlungseingänge Rechnungen zuordnen und Geschäftsausgaben übernehmen

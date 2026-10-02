@@ -49,8 +49,12 @@ export function InvoicePicker({
       filter={(item, query) => textFilter.contains(item, query, searchText)}
       onValueChange={(next) => onChange((next as PickableInvoice | null)?.id ?? null)}
     >
-      <ComboboxInputGroup className="w-72">
-        <ComboboxInput aria-label={ariaLabel} placeholder="Rechnung oder Kunde suchen…" />
+      <ComboboxInputGroup className="w-72 max-w-full">
+        <ComboboxInput
+          className="min-w-0 text-ellipsis"
+          aria-label={ariaLabel}
+          placeholder="Rechnung oder Kunde suchen…"
+        />
         <ComboboxClear />
         <ComboboxTrigger />
       </ComboboxInputGroup>

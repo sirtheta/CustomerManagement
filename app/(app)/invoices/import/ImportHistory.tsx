@@ -29,7 +29,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
             <TableHead>Bewegungen</TableHead>
             <TableHead>Verbucht</TableHead>
             <TableHead>Warnungen</TableHead>
-            <TableHead className="w-56"></TableHead>
+            <TableHead className="w-72"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -64,7 +64,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
                   Rückgängig
                 </ConfirmDialog>
                 {entry.undoBlockedReason && (
-                  <p className="mt-1 max-w-56 whitespace-normal text-xs text-muted-foreground">
+                  <p className="mt-1 max-w-72 whitespace-normal text-xs text-muted-foreground">
                     {entry.undoBlockedReason}
                   </p>
                 )}

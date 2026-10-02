@@ -50,7 +50,10 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
           }))
         );
         if (result.error) toast.error(result.error);
-        else toast.success(`${result.expenseCount ?? 0} Ausgabe(n) übernommen.`);
+        else {
+          const count = result.expenseCount ?? 0;
+          toast.success(`${count} Ausgabe${count === 1 ? "" : "n"} übernommen.`);
+        }
       } catch {
         toast.error("Speichern fehlgeschlagen.");
       }
@@ -66,7 +69,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
       if (result.error) return { error: result.error };
       ignoredCount += result.ignoredCount ?? 0;
     }
-    toast.success(`${ignoredCount} Bewegung(en) ignoriert.`);
+    toast.success(`${ignoredCount} Abbuchung${ignoredCount === 1 ? "" : "en"} ignoriert.`);
     return {};
   }
 
@@ -183,7 +186,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         </details>
       )}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <ConfirmDialog
           title="Nicht angekreuzte Abbuchungen ignorieren"
           description={`${unticked.length} ${unticked.length === 1 ? "Abbuchung wird" : "Abbuchungen werden"} als ignoriert markiert und nicht als Ausgabe übernommen. Das lässt sich nur zurücknehmen, indem der ganze Import rückgängig gemacht wird.`}

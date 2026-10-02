@@ -159,7 +159,9 @@ type ImportPeriod = { id: number; iban: string | null; periodFrom: string | null
 
 /** Shown when an import cannot be undone because entries of it are booked. */
 export const UNDO_BLOCKED_BOOKED =
-  "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen.";
+  "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen: " +
+  "eine Zahlung auf der jeweiligen Rechnung (Rechnungen → Rechnung öffnen → Abschnitt «Zahlungen» → " +
+  "Löschen), eine Ausgabe unter Buchhaltung in der Ausgabenliste.";
 
 /** Shown when a later overlapping import relies on this import's entries. */
 export function undoBlockedByLaterImport(filename: string): string {
