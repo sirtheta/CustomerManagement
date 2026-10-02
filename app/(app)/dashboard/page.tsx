@@ -25,6 +25,7 @@ export default async function DashboardPage() {
     overdueCount,
     scheduledSubscriptionCount,
     scheduledSubscriptions,
+    openTasks,
   ] = await Promise.all([
     prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
@@ -61,6 +62,17 @@ export default async function DashboardPage() {
         },
       },
       orderBy: { nextInvoiceDate: "asc" },
+      take: 5,
+    }),
+    prisma.task.findMany({
+      where: { doneAt: null, customer: { archivedAt: null } },
+      select: {
+        id: true,
+        title: true,
+        dueDate: true,
+        customer: { select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true } },
+      },
+      orderBy: { dueDate: "asc" },
       take: 5,
     }),
   ]);
@@ -178,6 +190,38 @@ export default async function DashboardPage() {
           </Card>
         </Link>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Offene Aufgaben</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {openTasks.length === 0 ? (
+            <p className="text-sm text-gray-500">Keine offenen Aufgaben.</p>
+          ) : (
+            <ul className="divide-y">
+              {openTasks.map((task) => (
+                <li key={task.id} className="py-2 flex justify-between items-center gap-3">
+                  <Link href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
+                    <span className="font-medium">{task.title}</span>
+                    <span className="text-gray-500">
+                      {" · "}
+                      {task.customer.contactInsteadOfCompany
+                        ? task.customer.contactPerson
+                        : (task.customer.company || task.customer.contactPerson)}
+                    </span>
+                  </Link>
+                  <span
+                    className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-gray-500"}`}
+                  >
+                    {task.dueDate.toLocaleDateString("de-CH")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
