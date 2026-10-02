@@ -187,8 +187,50 @@ export async function saveSettings(
     });
   }
 
+  const sensitiveChanges = diffSensitiveSettings(
+    { ...settings, companyIBAN: settings?.companyInfo?.companyIBAN ?? null },
+    { ...appData, companyIBAN }
+  );
+  if (sensitiveChanges) {
+    await logAudit(session, "UPDATE", "Settings", settings?.applicationSettingsId, "Einstellungen", sensitiveChanges);
+  }
+
   revalidatePath("/settings");
   return { success: true, _ts: Date.now() };
+}
+
+// Fields that redirect money or mail (QR account, sender, numbering, admin channels)
+// are audited with old and new value; secrets only as changed, never in clear text.
+const AUDITED_SETTINGS = [
+  "companyIBAN",
+  "invoiceNumberPrefix",
+  "quoteNumberPrefix",
+  "smtpHost",
+  "smtpUser",
+  "smtpPassword",
+  "smtpFromAddress",
+  "notifyEmailAddress",
+  "notifyTelegramBotToken",
+  "notifyTelegramChatId",
+] as const;
+const SECRET_SETTINGS = new Set<string>(["smtpPassword", "notifyTelegramBotToken"]);
+
+type AuditedSettings = Partial<Record<(typeof AUDITED_SETTINGS)[number], string | null>>;
+
+function diffSensitiveSettings(
+  before: AuditedSettings,
+  after: AuditedSettings
+): Record<string, unknown> | null {
+  const changed: string[] = [];
+  const details: Record<string, unknown> = {};
+  for (const key of AUDITED_SETTINGS) {
+    const from = before[key] ?? null;
+    const to = after[key] ?? null;
+    if (from === to) continue;
+    changed.push(key);
+    details[key] = SECRET_SETTINGS.has(key) ? "geändert" : { from, to };
+  }
+  return changed.length > 0 ? { changed, ...details } : null;
 }
 
 export async function uploadLogo(

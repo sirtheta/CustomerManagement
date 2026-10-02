@@ -329,9 +329,37 @@ describe("invoices/templates actions", () => {
       });
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/templates");
     });
+
+    it("audits the new template with source invoice, item count and total", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        items: [
+          { name: "A", description: null, unit: "Stunde", unitPrice: 100, quantity: 2, categoryId: null },
+          { name: "B", description: null, unit: "Stk", unitPrice: 50.5, quantity: 1, categoryId: null },
+        ],
+      } as never);
+      vi.mocked(prisma.invoiceTemplate.create).mockResolvedValue({ id: 7, name: "Monatsrechnung" } as never);
+
+      await saveAsTemplate(4, "Monatsrechnung");
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "InvoiceTemplate", 7, "Monatsrechnung", {
+        fromInvoiceId: 4,
+        itemCount: 2,
+        total: 250.5,
+      });
+    });
   });
 
   describe("createTemplate", () => {
+    it("audits the empty template", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.invoiceTemplate.create).mockResolvedValue({ id: 8, name: "Leer" } as never);
+      await createTemplate({}, form({ name: "Leer" }));
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "InvoiceTemplate", 8, "Leer", {
+        itemCount: 0,
+        total: 0,
+      });
+    });
+
     it("returns error for missing name", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       const result = await createTemplate({}, form({}));
@@ -366,6 +394,34 @@ describe("invoices/templates actions", () => {
       expect(result.success).toBe(true);
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/templates");
     });
+
+    it("audits the update with name, item count and total, outside the transaction", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.templateItem.deleteMany).mockResolvedValue({ count: 0 } as never);
+      vi.mocked(prisma.invoiceTemplate.update).mockResolvedValue({} as never);
+      let inTransaction = false;
+      vi.mocked(prisma.$transaction).mockImplementation(async (arg: unknown) => {
+        inTransaction = true;
+        try {
+          return await (arg as (tx: typeof prisma) => Promise<unknown>)(prisma);
+        } finally {
+          inTransaction = false;
+        }
+      });
+      vi.mocked(logAudit).mockImplementationOnce(async () => {
+        expect(inTransaction).toBe(false);
+      });
+      const items = [
+        { name: "A", unit: "Stunde", unitPrice: 120, quantity: 1.5, categoryId: null },
+        { name: "B", unit: "Stk", unitPrice: 10, quantity: 3, categoryId: null },
+      ];
+
+      await updateTemplate(2, {}, form({ name: "Abo Hosting", itemsJson: JSON.stringify(items) }));
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "InvoiceTemplate", 2, "Abo Hosting", {
+        itemCount: 2,
+        total: 210,
+      });
+    });
   });
 
   describe("deleteTemplate", () => {
@@ -381,6 +437,13 @@ describe("invoices/templates actions", () => {
       expect(result.success).toBe(true);
       expect(prisma.invoiceTemplate.delete).toHaveBeenCalledWith({ where: { id: 3 } });
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/templates");
+    });
+
+    it("audits the deletion with the template name", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.invoiceTemplate.delete).mockResolvedValue({ id: 3, name: "Alt" } as never);
+      await deleteTemplate(3);
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "InvoiceTemplate", 3, "Alt");
     });
   });
 });

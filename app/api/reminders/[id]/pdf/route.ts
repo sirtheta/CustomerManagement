@@ -7,6 +7,7 @@ import { computeReminderCharges } from "@/lib/reminder-charges";
 import { UserRole } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { moduleDisabledResponse } from "@/lib/module-guard";
+import { safeFileSegment } from "@/lib/document-archive";
 
 // Preview of the notice as it would be sent now (amounts recomputed like sendReminder).
 // Nothing is archived or booked.
@@ -53,7 +54,7 @@ export async function GET(
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="mahnung-vorschau-${reminder.invoice.documentNumber}-stufe${reminder.reminderLevel}.pdf"`,
+      "Content-Disposition": `inline; filename="mahnung-vorschau-${safeFileSegment(reminder.invoice.documentNumber ?? "")}-stufe${reminder.reminderLevel}.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });

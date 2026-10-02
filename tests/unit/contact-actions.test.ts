@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/prisma", () => ({
   default: {
     customerContact: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    customer: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -32,6 +33,7 @@ describe("contact actions", () => {
     vi.mocked(auth).mockResolvedValue(editor);
     vi.mocked(prisma.customerContact.create).mockResolvedValue({ contactId: 7, name: "Buchhaltung" } as never);
     vi.mocked(prisma.customerContact.delete).mockResolvedValue({ contactId: 7, name: "Buchhaltung" } as never);
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue({ customerId: 1 } as never);
   });
 
   it("rejects viewers", async () => {
@@ -60,7 +62,16 @@ describe("contact actions", () => {
     expect(prisma.customerContact.create).toHaveBeenCalledWith({
       data: { customerId: 1, name: "Buchhaltung", role: null, email: "b@x.ch", phone: null },
     });
-    expect(logAudit).toHaveBeenCalledWith(editor, "CREATE", "CustomerContact", 7, "Buchhaltung");
+    expect(logAudit).toHaveBeenCalledWith(editor, "CREATE", "CustomerContact", 7, "Buchhaltung", { customerId: 1 });
+  });
+
+  it("refuses a contact for a customer that does not exist", async () => {
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue(null);
+    const result = await createContact(999, {}, form({ name: "Buchhaltung" }));
+    expect(result.error).toBe("Kunde nicht gefunden.");
+    expect(result._ts).toEqual(expect.any(Number));
+    expect(prisma.customerContact.create).not.toHaveBeenCalled();
+    expect(logAudit).not.toHaveBeenCalled();
   });
 
   it("updates a contact", async () => {
@@ -70,13 +81,13 @@ describe("contact actions", () => {
       where: { contactId: 7, customerId: 1 },
       data: { name: "Einkauf", role: "Einkauf", email: null, phone: null },
     });
-    expect(logAudit).toHaveBeenCalledWith(editor, "UPDATE", "CustomerContact", 7, "Einkauf");
+    expect(logAudit).toHaveBeenCalledWith(editor, "UPDATE", "CustomerContact", 7, "Einkauf", { customerId: 1 });
   });
 
   it("deletes a contact as editor and audits", async () => {
     await deleteContact(1, 7);
     expect(prisma.customerContact.delete).toHaveBeenCalledWith({ where: { contactId: 7, customerId: 1 } });
-    expect(logAudit).toHaveBeenCalledWith(editor, "DELETE", "CustomerContact", 7, "Buchhaltung");
+    expect(logAudit).toHaveBeenCalledWith(editor, "DELETE", "CustomerContact", 7, "Buchhaltung", { customerId: 1 });
   });
 
 it("update returns an error and no audit when the contact is already gone (P2025)", async () => {

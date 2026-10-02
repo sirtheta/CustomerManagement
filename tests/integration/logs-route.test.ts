@@ -6,8 +6,10 @@ import { LOG_DIR } from "@/lib/logs";
 
 let currentSession: Session | null;
 vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => currentSession) }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
 import { GET } from "@/app/api/logs/[filename]/route";
+import { logAudit } from "@/lib/audit";
 
 function sessionFor(role: "Admin" | "Editor" | "Viewer"): Session {
   return { user: { id: "1", name: "Test", email: "test@example.com", role }, expires: "2099-01-01" } as Session;
@@ -64,8 +66,19 @@ describe("GET /api/logs/[filename]", () => {
   });
 
   it("404s for a rotated-looking filename that does not exist", async () => {
+    vi.mocked(logAudit).mockClear();
     currentSession = sessionFor("Admin");
     const res = await GET(req("app-2000-01-01.log"), ctx("app-2000-01-01.log"));
     expect(res.status).toBe(404);
+    expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("audits the download with the filename", async () => {
+    vi.mocked(logAudit).mockClear();
+    currentSession = sessionFor("Admin");
+    await GET(req("app-2026-07-28.log"), ctx("app-2026-07-28.log"));
+    expect(logAudit).toHaveBeenCalledWith(currentSession, "EXPORT", "LogFile", undefined, "app-2026-07-28.log", {
+      size: 17,
+    });
   });
 });

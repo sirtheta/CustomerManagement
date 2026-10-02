@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { hasRole } from "@/lib/permissions";
-import { verifyArchived } from "@/lib/document-archive";
+import { safeFileSegment, verifyArchived } from "@/lib/document-archive";
 import { UserRole } from "@prisma/client";
 import { NextRequest } from "next/server";
 import logger from "@/lib/logger";
@@ -45,7 +45,7 @@ export async function GET(
   }
 
   const date = doc.createdAt.toLocaleDateString("sv-SE"); // YYYY-MM-DD in server time
-  const safeNumber = doc.documentNumber.replace(/[^A-Za-z0-9_-]/g, "_");
+  const safeNumber = safeFileSegment(doc.documentNumber);
   return new Response(new Uint8Array(result.data), {
     headers: {
       "Content-Type": "application/pdf",

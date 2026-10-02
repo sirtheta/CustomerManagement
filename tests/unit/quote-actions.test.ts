@@ -506,6 +506,48 @@ describe("quote actions", () => {
       });
     });
 
+    it("audits the new invoice and the accepted quote after the transaction", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.quote.findUnique).mockResolvedValue({
+        id: 1,
+        customerId: 10,
+        customUserText: null,
+        totalAmount: 500,
+        state: "Sent",
+        items: [],
+      } as never);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ defaultPaymentTermDays: 30 } as never);
+      vi.mocked(assignDocumentNumber).mockResolvedValueOnce("Q-26100001");
+      vi.mocked(prisma.invoice.create).mockResolvedValue({ id: 99 } as never);
+      vi.mocked(prisma.quote.update).mockResolvedValue({} as never);
+      let inTransaction = false;
+      vi.mocked(prisma.$transaction).mockImplementation(async (cb: (tx: typeof prisma) => Promise<unknown>) => {
+        inTransaction = true;
+        try {
+          return await cb(prisma);
+        } finally {
+          inTransaction = false;
+        }
+      });
+      vi.mocked(logAudit).mockImplementation(async () => {
+        expect(inTransaction).toBe(false);
+      });
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT:/invoices/99");
+      });
+
+      await expect(convertQuoteToInvoice(1)).rejects.toThrow("REDIRECT:/invoices/99");
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "Invoice", 99, undefined, {
+        fromQuoteId: 1,
+        fromQuote: "Q-26100001",
+      });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Quote", 1, "Q-26100001", {
+        from: "Sent",
+        to: "Accepted",
+      });
+      vi.mocked(logAudit).mockReset();
+    });
+
     it("uses the customer's payment term for the due date", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.quote.findUnique).mockResolvedValue({

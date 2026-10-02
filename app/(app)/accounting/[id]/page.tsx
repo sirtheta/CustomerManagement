@@ -2,8 +2,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import ExpenseForm from "../ExpenseForm";
 import DeleteExpenseButton from "../DeleteExpenseButton";
-import { auth } from "@/lib/auth";
-import { hasRole } from "@/lib/permissions";
+import { hasRole, requireEditor } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { requireModule } from "@/lib/module-guard";
 
@@ -12,12 +11,12 @@ type Props = {
 };
 
 export default async function EditExpensePage({ params }: Props) {
+  const session = await requireEditor();
   await requireModule("accounting");
   const { id } = await params;
   const expenseId = parseInt(id, 10);
 
-  const [session, expense, categories, receipts] = await Promise.all([
-    auth(),
+  const [expense, categories, receipts] = await Promise.all([
     prisma.expense.findUnique({ where: { id: expenseId } }),
     prisma.category.findMany({
       where: { isActive: true },
@@ -46,7 +45,7 @@ export default async function EditExpensePage({ params }: Props) {
         expense={serializedExpense}
         categories={categories}
         receipts={receipts}
-        canDeleteReceipts={!!session && hasRole(session, [UserRole.Admin])}
+        canDeleteReceipts={hasRole(session, [UserRole.Admin])}
       />
       <div className="max-w-2xl flex justify-start">
         <DeleteExpenseButton expenseId={expenseId} />

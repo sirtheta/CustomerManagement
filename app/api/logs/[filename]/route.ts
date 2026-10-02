@@ -4,6 +4,7 @@ import { Readable } from "stream";
 import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { resolveLogFilePath } from "@/lib/logs";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Streams one application log file for download. Admin-only: logs can
@@ -31,6 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ fil
   }
 
   const size = statSync(path).size;
+  await logAudit(session, "EXPORT", "LogFile", undefined, filename, { size });
   const stream = Readable.toWeb(createReadStream(path)) as ReadableStream;
 
   return new Response(stream, {

@@ -7,8 +7,10 @@ import { join } from "path";
 
 let currentSession: Session | null;
 vi.mock("@/lib/auth", () => ({ auth: vi.fn(async () => currentSession) }));
+vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 
 import { GET } from "@/app/api/backups/[filename]/route";
+import { logAudit } from "@/lib/audit";
 
 function sessionFor(role: "Admin" | "Editor" | "Viewer"): Session {
   return { user: { id: "1", name: "Test", email: "test@example.com", role }, expires: "2099-01-01" } as Session;
@@ -56,10 +58,24 @@ describe("GET /api/backups/[filename]", () => {
     expect(await res.text()).toBe("sqlite bytes");
   });
 
-  it("returns 404 for a backup that does not exist", async () => {
+  it("audits the download with the filename", async () => {
+    vi.mocked(logAudit).mockClear();
+    currentSession = sessionFor("Admin");
+    await GET(req("db-2026-09-30.db"), ctx("db-2026-09-30.db"));
+    expect(logAudit).toHaveBeenCalledWith(currentSession, "EXPORT", "Backup", undefined, "db-2026-09-30.db", {
+      size: 12,
+    });
+  });
+
+  it("returns 404 for a backup that does not exist, without an audit entry", async () => {
+    vi.mocked(logAudit).mockClear();
     currentSession = sessionFor("Admin");
     const res = await GET(req("db-2020-01-01.db"), ctx("db-2020-01-01.db"));
     expect(res.status).toBe(404);
+    const forbidden = sessionFor("Editor");
+    currentSession = forbidden;
+    await GET(req("db-2026-09-30.db"), ctx("db-2026-09-30.db"));
+    expect(logAudit).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a filename outside the exact backup shape", async () => {

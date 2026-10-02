@@ -4,6 +4,7 @@ import { Readable } from "stream";
 import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { resolveBackupFilePath } from "@/lib/backup";
+import { logAudit } from "@/lib/audit";
 
 /**
  * Streams one nightly database backup for download. Admin-only: a backup is a
@@ -29,6 +30,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ fil
   }
 
   const size = statSync(path).size;
+  // A backup carries password hashes, TOTP secrets and the encrypted SMTP
+  // credentials, so every download leaves a trail.
+  await logAudit(session, "EXPORT", "Backup", undefined, filename, { size });
   const stream = Readable.toWeb(createReadStream(path)) as ReadableStream;
 
   return new Response(stream, {

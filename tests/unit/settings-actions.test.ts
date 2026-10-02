@@ -222,6 +222,8 @@ describe("settings actions", () => {
         reminderFeeLevel3Rappen: 0,
         reminderFeeLevel4Rappen: 0,
         reminderInterestPercent: 5,
+        invoiceNumberPrefix: "R-",
+        quoteNumberPrefix: "A-",
       } as never);
       vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
       vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
@@ -229,6 +231,91 @@ describe("settings actions", () => {
       await saveSettings({}, form({ reminderFeeLevel2: "10", reminderInterestPercent: "5" }));
 
       expect(logAudit).not.toHaveBeenCalled();
+    });
+
+    it("audits IBAN, prefix, SMTP and notification changes, secrets without their value", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        companyInfo: { companyIBAN: "CH9300762011623852957" },
+        invoiceNumberPrefix: "R-",
+        quoteNumberPrefix: "A-",
+        smtpHost: "old.mail.ch",
+        smtpUser: "old",
+        smtpPassword: "enc:oldpass",
+        smtpFromAddress: null,
+        notifyEmailAddress: null,
+        notifyTelegramBotToken: "enc:oldtoken",
+        notifyTelegramChatId: null,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings(
+        {},
+        form({
+          companyIBAN: "CH56 0483 5012 3456 7800 9",
+          invoiceNumberPrefix: "RE-",
+          quoteNumberPrefix: "A-",
+          smtpHost: "new.mail.ch",
+          smtpUser: "old",
+          smtpPassword: "newpass",
+          smtpFromAddress: "info@test.ch",
+          notifyEmailAddress: "notify@test.ch",
+          notifyTelegramBotToken: "newtoken",
+          notifyTelegramChatId: "42",
+        })
+      );
+
+      expect(logAudit).toHaveBeenCalledTimes(1);
+      const [, action, entity, id, ref, details] = vi.mocked(logAudit).mock.calls[0];
+      expect([action, entity, id, ref]).toEqual(["UPDATE", "Settings", 1, "Einstellungen"]);
+      expect(details).toEqual({
+        changed: [
+          "companyIBAN",
+          "invoiceNumberPrefix",
+          "smtpHost",
+          "smtpPassword",
+          "smtpFromAddress",
+          "notifyEmailAddress",
+          "notifyTelegramBotToken",
+          "notifyTelegramChatId",
+        ],
+        companyIBAN: { from: "CH9300762011623852957", to: "CH5604835012345678009" },
+        invoiceNumberPrefix: { from: "R-", to: "RE-" },
+        smtpHost: { from: "old.mail.ch", to: "new.mail.ch" },
+        smtpPassword: "geändert",
+        smtpFromAddress: { from: null, to: "info@test.ch" },
+        notifyEmailAddress: { from: null, to: "notify@test.ch" },
+        notifyTelegramBotToken: "geändert",
+        notifyTelegramChatId: { from: null, to: "42" },
+      });
+      const serialized = JSON.stringify(details);
+      expect(serialized).not.toContain("newpass");
+      expect(serialized).not.toContain("newtoken");
+    });
+
+    it("audits a removed IBAN", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        companyInfo: { companyIBAN: "CH9300762011623852957" },
+        invoiceNumberPrefix: "R-",
+        quoteNumberPrefix: "A-",
+        smtpPassword: null,
+        notifyTelegramBotToken: null,
+      } as never);
+      vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);
+
+      await saveSettings({}, form({}));
+
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "Settings", 1, "Einstellungen", {
+        changed: ["companyIBAN"],
+        companyIBAN: { from: "CH9300762011623852957", to: null },
+      });
     });
 
     it("leaves the switches that save on click untouched", async () => {
@@ -239,6 +326,8 @@ describe("settings actions", () => {
         smtpPassword: null,
         notifyTelegramBotToken: null,
         roundTotalTo5Rappen: true,
+        invoiceNumberPrefix: "R-",
+        quoteNumberPrefix: "A-",
       } as never);
       vi.mocked(prisma.companyInformation.update).mockResolvedValue({} as never);
       vi.mocked(prisma.applicationSettings.update).mockResolvedValue({} as never);

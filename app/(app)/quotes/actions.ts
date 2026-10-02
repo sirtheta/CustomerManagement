@@ -194,9 +194,8 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   const dueDate = new Date(today);
   dueDate.setDate(dueDate.getDate() + paymentTermDays);
 
-  if (!quote.documentNumber) {
-    await assignDocumentNumber("quote", quoteId, { actor: session });
-  }
+  const quoteNumber =
+    quote.documentNumber ?? (await assignDocumentNumber("quote", quoteId, { actor: session }));
 
   let newInvoiceId: number;
 
@@ -237,6 +236,12 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
       data: { state: "Accepted" },
     });
   });
+
+  await logAudit(session, "CREATE", "Invoice", newInvoiceId!, undefined, {
+    fromQuoteId: quoteId,
+    fromQuote: quoteNumber,
+  });
+  await logAudit(session, "STATUS", "Quote", quoteId, quoteNumber, { from: quote.state, to: "Accepted" });
 
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
 

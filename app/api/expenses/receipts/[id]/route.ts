@@ -3,12 +3,15 @@ import prisma from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { RECEIPT_MIME_TYPES } from "@/lib/expense-receipts";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   await requireRole([UserRole.Admin, UserRole.Editor]);
+  const disabled = await moduleDisabledResponse("accounting");
+  if (disabled) return disabled;
 
   const { id } = await params;
   const receiptId = parseInt(id, 10);
@@ -22,7 +25,7 @@ export async function GET(
     headers: {
       "Content-Type": RECEIPT_MIME_TYPES[receipt.fileType] ?? "application/octet-stream",
       "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(receipt.name)}`,
-      "Cache-Control": "private, no-cache",
+      "Cache-Control": "private, no-store",
     },
   });
 }

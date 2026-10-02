@@ -35,8 +35,12 @@ export async function createContact(
   const parsed = readContact(formData);
   if ("error" in parsed) return { error: parsed.error, _ts: Date.now() };
 
+  // A forged id would otherwise end in an unhandled foreign key error.
+  const customer = await prisma.customer.findUnique({ where: { customerId }, select: { customerId: true } });
+  if (!customer) return { error: "Kunde nicht gefunden.", _ts: Date.now() };
+
   const contact = await prisma.customerContact.create({ data: { customerId, ...parsed.data } });
-  await logAudit(session, "CREATE", "CustomerContact", contact.contactId, parsed.data.name);
+  await logAudit(session, "CREATE", "CustomerContact", contact.contactId, parsed.data.name, { customerId });
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
 }
@@ -59,7 +63,7 @@ export async function updateContact(
     revalidatePath(`/customers/${customerId}`);
     return { error: "Kontakt nicht gefunden", _ts: Date.now() };
   }
-  await logAudit(session, "UPDATE", "CustomerContact", contactId, parsed.data.name);
+  await logAudit(session, "UPDATE", "CustomerContact", contactId, parsed.data.name, { customerId });
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
 }
@@ -75,6 +79,6 @@ export async function deleteContact(customerId: number, contactId: number): Prom
     revalidatePath(`/customers/${customerId}`);
     return;
   }
-  await logAudit(session, "DELETE", "CustomerContact", contactId, contact.name);
+  await logAudit(session, "DELETE", "CustomerContact", contactId, contact.name, { customerId });
   revalidatePath(`/customers/${customerId}`);
 }

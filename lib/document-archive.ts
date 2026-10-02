@@ -28,7 +28,8 @@ export function sha256Hex(data: Uint8Array): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-function safeSegment(value: string): string {
+/** Keeps a value safe for file names and quoted Content-Disposition headers. */
+export function safeFileSegment(value: string): string {
   return value.replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
@@ -49,7 +50,7 @@ export async function archivePdf(input: {
   now?: Date;
 }): Promise<ArchiveResult> {
   const now = input.now ?? new Date();
-  const relPath = `${now.getFullYear()}/${safeSegment(input.documentNumber)}_${input.kind}_${timestamp(now)}.pdf`;
+  const relPath = `${now.getFullYear()}/${safeFileSegment(input.documentNumber)}_${input.kind}_${timestamp(now)}.pdf`;
   const absPath = join(archiveRootDir(), relPath);
 
   await mkdir(dirname(absPath), { recursive: true });
