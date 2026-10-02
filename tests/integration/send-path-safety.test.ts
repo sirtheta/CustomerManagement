@@ -82,6 +82,7 @@ describe("send paths after the mail went out", () => {
         dueDate: new Date("2026-02-01"),
         totalAmount: 100,
         state: "Draft",
+        items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 100, quantity: 1, totalAmount: 100 }] },
         ...overrides,
       },
     });
@@ -206,7 +207,7 @@ describe("send paths after the mail went out", () => {
       expect(await sendPendingInvoice(input(pending.id))).toEqual({ error: SEND_IN_PROGRESS_ERROR });
 
       gate.resolve();
-      expect(await first).toEqual({ invoiceId: pending.invoiceId });
+      expect(await first).toMatchObject({ invoiceId: pending.invoiceId, documentNumber: expect.stringMatching(/^I-/) });
       expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
     });
 

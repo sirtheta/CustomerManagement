@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { approvePendingEmail, discardPendingEmail } from "./actions";
+import { approvePendingEmail, discardPendingEmail, type ApproveResult } from "./actions";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
@@ -29,10 +29,10 @@ export default function PendingEmailRow(props: Props) {
   // Toasted right where the result arrives: after a successful send the revalidated list
   // no longer contains this card, so an effect (useActionToast) would never run. Errors
   // stay inline under the form.
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
+  const [state, formAction, isPending] = useActionState<ApproveResult, FormData>(
     async (prev, formData) => {
       const result = await approvePendingEmail(prev, formData);
-      if (result.success) toast.success(`Rechnung ${documentLabel(props.documentNumber)} versendet`);
+      if (result.success) toast.success(`Rechnung ${documentLabel(result.documentNumber ?? props.documentNumber)} versendet`);
       return result;
     },
     {}
@@ -123,7 +123,7 @@ export default function PendingEmailRow(props: Props) {
               <Trash2Icon className="size-4 mr-1.5" />
               Verwerfen
             </ConfirmDialog>
-            <Button type="submit" size="sm" disabled={isPending}>
+            <Button type="submit" size="sm" disabled={isPending || isEmpty}>
               <SendIcon className="size-4 mr-1.5" />
               {isPending ? "Wird gesendet…" : "Senden"}
             </Button>

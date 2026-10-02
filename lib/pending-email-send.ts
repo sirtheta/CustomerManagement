@@ -1,3 +1,4 @@
+import { z } from "zod";
 import prisma from "@/lib/prisma";
 import type { Session } from "next-auth";
 import { renderArchiveAndSend, recordSend, sentDocumentData, auditArchived } from "@/lib/invoice-dispatch";
@@ -25,7 +26,7 @@ export async function sendPendingInvoice(input: {
   subject: string;
   body: string;
   actor: Session;
-}): Promise<{ error: string; mailSent?: true } | { invoiceId: number }> {
+}): Promise<{ error: string; mailSent?: true } | { invoiceId: number; documentNumber: string }> {
   const ref = await prisma.pendingEmail.findUnique({
     where: { id: input.pendingId },
     select: { invoiceId: true },
@@ -48,7 +49,7 @@ async function sendLocked(input: {
   subject: string;
   body: string;
   actor: Session;
-}): Promise<{ error: string; mailSent?: true } | { invoiceId: number }> {
+}): Promise<{ error: string; mailSent?: true } | { invoiceId: number; documentNumber: string }> {
   const { pendingId: id, to, subject, body, actor } = input;
 
   const pending = await prisma.pendingEmail.findUnique({
@@ -66,6 +67,14 @@ async function sendLocked(input: {
     include: { companyInfo: true },
   });
   if (!settings) return { error: "Einstellungen nicht konfiguriert." };
+
+  // Checked before the number is assigned, so a refused send does not use one up.
+  if (pending.invoice.items.length === 0) {
+    return { error: "Die Rechnung hat noch keine Positionen. Bitte zuerst Positionen eintragen." };
+  }
+  if (!z.string().email().safeParse(to).success) {
+    return { error: "Bitte eine gültige E-Mail-Adresse angeben." };
+  }
 
   let documentNumber: string;
   try {
@@ -133,5 +142,5 @@ async function sendLocked(input: {
   });
   await auditArchived(actor, sentDocument, documentNumber, archive);
 
-  return { invoiceId: pending.invoiceId };
+  return { invoiceId: pending.invoiceId, documentNumber };
 }

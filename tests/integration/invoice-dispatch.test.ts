@@ -81,6 +81,7 @@ describe("invoice send paths with real archive and database", () => {
         dueDate: new Date(),
         totalAmount: 100,
         state: "Overdue",
+        items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 100, quantity: 1, totalAmount: 100 }] },
       },
     });
   }

@@ -52,7 +52,14 @@ describe("sendPendingInvoice when recording the send fails", () => {
   async function seedPending() {
     const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
     const invoice = await db.prisma.invoice.create({
-      data: { customerId: customer.customerId, date: new Date(), dueDate: new Date(), totalAmount: 100, state: "Draft" },
+      data: {
+        customerId: customer.customerId,
+        date: new Date(),
+        dueDate: new Date(),
+        totalAmount: 100,
+        state: "Draft",
+        items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 100, quantity: 1, totalAmount: 100 }] },
+      },
     });
     return db.prisma.pendingEmail.create({
       data: { invoiceId: invoice.id, to: "a@b.ch", subject: "s", body: "b" },
@@ -85,7 +92,7 @@ describe("sendPendingInvoice when recording the send fails", () => {
 
     const result = await sendPendingInvoice(input(pending.id));
 
-    expect(result).toEqual({ invoiceId: pending.invoiceId });
+    expect(result).toMatchObject({ invoiceId: pending.invoiceId, documentNumber: expect.stringMatching(/^I-/) });
     expect(recordingCalls()).toBe(2);
     expect(sendInvoiceEmail).toHaveBeenCalledTimes(1);
     expect(await db.prisma.pendingEmail.count()).toBe(0);

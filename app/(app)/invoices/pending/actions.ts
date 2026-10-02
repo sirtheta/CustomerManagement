@@ -12,10 +12,15 @@ import logger from "@/lib/logger";
 
 const log = logger.child({ module: "pending-actions" });
 
+export type ApproveResult = ActionState & {
+  /** The number assigned when the invoice was sent, for the toast. */
+  documentNumber?: string;
+};
+
 export async function approvePendingEmail(
   _prev: ActionState,
   formData: FormData
-): Promise<ActionState> {
+): Promise<ApproveResult> {
   const session = await requireEditor();
   await requireModule("subscriptions");
 
@@ -29,7 +34,7 @@ export async function approvePendingEmail(
 
   revalidatePath("/invoices/pending");
   revalidatePath(`/invoices/${result.invoiceId}`);
-  return { success: true, _ts: Date.now() };
+  return { success: true, documentNumber: result.documentNumber, _ts: Date.now() };
 }
 
 export type DiscardResult = ActionState & {
