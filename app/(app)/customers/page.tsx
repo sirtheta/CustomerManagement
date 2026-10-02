@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import DeleteCustomerButton from "./DeleteCustomerButton";
+import { customerSearchConditions } from "@/lib/customer-search";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
@@ -39,13 +40,7 @@ async function CustomersTable({ term, subscriptionOnly, archivedOnly, currentPag
     ...(subscriptionOnly ? { subscriptions: { some: { active: true } } } : {}),
     ...(term
       ? {
-          OR: [
-            { company: { contains: term } },
-            { contactPerson: { contains: term } },
-            { email: { contains: term } },
-            { city: { contains: term } },
-            ...(/^\d{1,9}$/.test(term) ? [{ customerNumber: Number(term) }] : []),
-          ],
+          OR: customerSearchConditions(term),
         }
       : {}),
   };
@@ -229,7 +224,7 @@ export default async function CustomersPage({ searchParams }: Props) {
       </div>
 
       <Suspense fallback={<div className="h-9 rounded-lg border border-input bg-muted animate-pulse" />}>
-        <SearchInput defaultValue={search ?? ""} placeholder="Firma, Kontakt, Ort oder Kunden-Nr. suchen…" />
+        <SearchInput defaultValue={search ?? ""} placeholder="Firma, Kontakt, Ort, Kunden-Nr. oder UID suchen…" />
       </Suspense>
 
       <Suspense fallback={<CustomersTableSkeleton />}>

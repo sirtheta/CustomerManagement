@@ -1,4 +1,5 @@
 import type { InvoiceState, PrismaClient, QuoteState } from "@prisma/client";
+import { customerSearchConditions } from "@/lib/customer-search";
 import { customerDisplayName } from "@/lib/customer-display";
 
 export { customerDisplayName };
@@ -65,19 +66,10 @@ export async function searchGlobal(
     ],
   };
 
-  // Customer numbers are integers: match them exactly, only for purely numeric terms.
-  const numberMatch = /^\d{1,9}$/.test(q) ? [{ customerNumber: Number(q) }] : [];
-
   const [customers, invoices, quotes] = await Promise.all([
     db.customer.findMany({
       where: {
-        OR: [
-          { company: { contains: q } },
-          { contactPerson: { contains: q } },
-          { email: { contains: q } },
-          { city: { contains: q } },
-          ...numberMatch,
-        ],
+        OR: customerSearchConditions(q),
       },
       select: {
         customerId: true,
