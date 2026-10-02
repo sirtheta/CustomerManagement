@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { approvePendingEmail, discardPendingEmail } from "./actions";
-import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
+import type { ActionState } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
 
@@ -25,15 +26,19 @@ type Props = {
 };
 
 export default function PendingEmailRow(props: Props) {
+  // Toasted right where the result arrives: after a successful send the revalidated list
+  // no longer contains this card, so an effect (useActionToast) would never run. Errors
+  // stay inline under the form.
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(
-    approvePendingEmail,
+    async (prev, formData) => {
+      const result = await approvePendingEmail(prev, formData);
+      if (result.success) toast.success(`Rechnung ${documentLabel(props.documentNumber)} versendet`);
+      return result;
+    },
     {}
   );
-  useActionToast(state, `Rechnung ${documentLabel(props.documentNumber)} versendet`, { toastErrors: false });
 
-  // Toasted right where the result arrives: after a successful discard the revalidated
-  // list no longer contains this card, so an effect would never run. ConfirmDialog
-  // toasts the returned error itself.
+  // ConfirmDialog toasts the returned error itself.
   const discard = async () => {
     const result = await discardPendingEmail(props.id);
     if (result.error) return { error: result.error };
@@ -68,7 +73,7 @@ export default function PendingEmailRow(props: Props) {
         )}
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="space-y-3">
+        <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-3">
           <input type="hidden" name="id" value={props.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">

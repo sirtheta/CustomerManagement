@@ -147,7 +147,11 @@ export async function deleteQuote(id: number): Promise<{ error?: string }> {
   await requireModule("quotes");
   const q = await prisma.quote.findUnique({ where: { id }, select: { documentNumber: true } });
   try {
-    await prisma.quote.delete({ where: { id } });
+    // Item.quote has no onDelete (SET NULL), so the items would stay behind as orphans.
+    await prisma.$transaction([
+      prisma.item.deleteMany({ where: { quoteId: id } }),
+      prisma.quote.delete({ where: { id } }),
+    ]);
   } catch (err) {
     log.error({ id, err }, "deleteQuote failed");
     return { error: "Offerte konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };

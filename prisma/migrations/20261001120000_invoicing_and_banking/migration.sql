@@ -364,3 +364,6 @@ ALTER TABLE "ApplicationSettings" ADD COLUMN "roundTotalTo5Rappen" BOOLEAN NOT N
 
 -- Remove the unused "yearly invoice" default (replaced by subscriptions)
 ALTER TABLE "ApplicationSettings" DROP COLUMN "defaultYearlyInvoice";
+
+-- Remove items orphaned by deleting an invoice or quote (Item.invoiceId/quoteId are SET NULL)
+DELETE FROM "Item" WHERE "invoiceId" IS NULL AND "quoteId" IS NULL;

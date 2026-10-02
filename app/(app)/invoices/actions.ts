@@ -276,7 +276,11 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   }
 
   try {
-    await prisma.invoice.delete({ where: { id } });
+    // Item.invoice has no onDelete (SET NULL), so the items would stay behind as orphans.
+    await prisma.$transaction([
+      prisma.item.deleteMany({ where: { invoiceId: id } }),
+      prisma.invoice.delete({ where: { id } }),
+    ]);
   } catch (err) {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };

@@ -10,6 +10,8 @@ vi.mock("@/lib/prisma", () => ({
     pendingReminder: { deleteMany: vi.fn() },
     pendingEmail: { deleteMany: vi.fn() },
     payment: { count: vi.fn() },
+    item: { deleteMany: vi.fn() },
+    $transaction: vi.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
   },
 }));
 
@@ -339,6 +341,7 @@ describe("deleteInvoice", () => {
     });
 
     await expect(deleteInvoice(1)).rejects.toThrow("REDIRECT:/invoices");
+    expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
     expect(prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Invoice", 1, "I-25060005");
   });

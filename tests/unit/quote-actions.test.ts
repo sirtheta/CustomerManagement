@@ -331,11 +331,13 @@ describe("quote actions", () => {
         documentNumber: "Q-2026-001",
       } as never);
       vi.mocked(prisma.quote.delete).mockResolvedValue({} as never);
+      vi.mocked(prisma.$transaction).mockImplementation((ops) => Promise.all(ops as never[]) as never);
       vi.mocked(redirect).mockImplementation(() => {
         throw new Error("REDIRECT:/quotes");
       });
 
       await expect(deleteQuote(1)).rejects.toThrow("REDIRECT:/quotes");
+      expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { quoteId: 1 } });
       expect(prisma.quote.delete).toHaveBeenCalledWith({ where: { id: 1 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Quote", 1, "Q-2026-001");
     });
