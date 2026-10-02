@@ -6,11 +6,15 @@ import { hasRole } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { fetchReceivables } from "@/lib/receivables";
 import { receivablesCsv } from "@/lib/receivables-csv";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 export async function GET(request: Request) {
   const session = await auth();
   if (!session) redirect("/login");
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) redirect("/dashboard");
+
+  const disabled = await moduleDisabledResponse("accounting");
+  if (disabled) return disabled;
 
   const raw = new URL(request.url).searchParams.get("asOf");
   const parsed = raw ? new Date(`${raw}T23:59:59.999Z`) : null;

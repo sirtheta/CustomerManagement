@@ -27,6 +27,8 @@ import { hasRole } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
+import { billingEmail } from "@/lib/customer-billing";
+import { loadModules } from "@/lib/module-guard";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -59,6 +61,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
+  const modules = await loadModules();
   const session = await auth();
   const canEdit = session ? hasRole(session, [UserRole.Admin, UserRole.Editor]) : false;
 
@@ -398,13 +401,13 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         <div className="flex items-center gap-2 flex-wrap">
           <SendInvoiceButton
             invoiceId={invoice.id}
-            customerEmail={invoice.customer.email}
+            customerEmail={billingEmail(invoice.customer)}
             documentNumber={invoice.documentNumber}
             defaultSubject={defaultSubject}
             defaultBody={defaultBody}
             isCreditNote={isCreditNote}
           />
-          {canEdit && invoice.pendingReminder && (
+          {canEdit && modules.reminders && invoice.pendingReminder && (
             <Button
               variant="outline"
               render={<Link href={`/invoices/reminders?search=${encodeURIComponent(invoice.documentNumber ?? "")}`} />}

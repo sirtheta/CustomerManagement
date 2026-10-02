@@ -6,12 +6,14 @@ import { requireEditor } from "@/lib/permissions";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { logAudit } from "@/lib/audit";
 import { sendPendingInvoice } from "@/lib/pending-email-send";
+import { requireModule } from "@/lib/module-guard";
 
 export async function approvePendingEmail(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
 
   const id = parseInt(formData.get("id") as string, 10);
   const to = (formData.get("to") as string).trim();
@@ -28,6 +30,7 @@ export async function approvePendingEmail(
 
 export async function discardPendingEmail(id: number): Promise<void> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
   const discarded = await prisma.pendingEmail.delete({
     where: { id },
     include: { invoice: { select: { id: true, documentNumber: true } } },

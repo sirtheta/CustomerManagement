@@ -7,6 +7,10 @@ import ArchiveCustomerButton from "../ArchiveCustomerButton";
 import DocumentsSection from "../DocumentsSection";
 import NotesSection from "../NotesSection";
 import SubscriptionsSection from "../SubscriptionsSection";
+import ContactsSection from "../ContactsSection";
+import TasksSection from "../TasksSection";
+import HistorySection from "../HistorySection";
+import { loadCustomerHistory } from "@/lib/customer-history";
 import { toDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +29,7 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { auth } from "@/lib/auth";
 import { decryptSecret } from "@/lib/crypto";
 import { documentLabel } from "@/lib/document-display";
+import { loadModules } from "@/lib/module-guard";
 
 const invoiceStateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -82,8 +87,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   const isEditing = edit === "true" && canEdit;
 
   const DETAIL_LIST_LIMIT = 25;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates] =await Promise.all([
+  const modules = await loadModules();
+
+  const [customer, documents, notes, invoices, quotes, invoiceCount, quoteCount, subscriptions, templates, contacts, tasks, users, history] = await Promise.all([
     prisma.customer.findUnique({ where: { customerId } }),
     prisma.document.findMany({
       where: { customerId },
@@ -105,19 +114,37 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       orderBy: { date: "desc" },
       take: DETAIL_LIST_LIMIT,
     }),
-    prisma.quote.findMany({
-      where: { customerId },
-      orderBy: { date: "desc" },
-      take: DETAIL_LIST_LIMIT,
-    }),
+    modules.quotes
+      ? prisma.quote.findMany({
+          where: { customerId },
+          orderBy: { date: "desc" },
+          take: DETAIL_LIST_LIMIT,
+        })
+      : [],
     prisma.invoice.count({ where: { customerId } }),
-    prisma.quote.count({ where: { customerId } }),
-    prisma.subscription.findMany({
-      where: { customerId },
-      include: { template: { select: { name: true } } },
-      orderBy: { nextInvoiceDate: "asc" },
-    }),
-    prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    modules.quotes ? prisma.quote.count({ where: { customerId } }) : 0,
+    modules.subscriptions
+      ? prisma.subscription.findMany({
+          where: { customerId },
+          include: { template: { select: { name: true } } },
+          orderBy: { nextInvoiceDate: "asc" },
+        })
+      : [],
+    modules.subscriptions
+      ? prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : [],
+    prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),
+    modules.tasks
+      ? prisma.task.findMany({
+          where: { customerId },
+          include: { assignee: { select: { name: true } } },
+          orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+        })
+      : [],
+    modules.tasks
+      ? prisma.user.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : [],
+    loadCustomerHistory(prisma, customerId),
   ]);
 
   if (!customer) notFound();
@@ -141,28 +168,58 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <CustomerForm
-          key={`${customer.customerId}-${isEditing}`}
-          customer={customer}
-          readOnly={!isEditing}
-          cancelHref={`/customers/${customerId}`}
-          editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
-        />
         <div className="space-y-6">
-          <SubscriptionsSection
+          <CustomerForm
+            key={`${customer.customerId}-${isEditing}`}
+            customer={customer}
+            readOnly={!isEditing}
+            cancelHref={`/customers/${customerId}`}
+            editHref={!isEditing && canEdit ? `/customers/${customerId}?edit=true` : undefined}
+          />
+          <ContactsSection
             customerId={customerId}
             canEdit={canEdit}
-            templates={templates}
-            subscriptions={subscriptions.map((s) => ({
-              id: s.id,
-              interval: s.interval,
-              nextInvoiceDate: toDateString(s.nextInvoiceDate),
-              autoSend: s.autoSend,
-              active: s.active,
-              templateId: s.templateId,
-              templateName: s.template?.name ?? null,
+            contacts={contacts.map((c) => ({
+              contactId: c.contactId,
+              name: c.name,
+              role: c.role,
+              email: c.email,
+              phone: c.phone,
             }))}
           />
+          {modules.subscriptions && (
+            <SubscriptionsSection
+              customerId={customerId}
+              canEdit={canEdit}
+              templates={templates}
+              subscriptions={subscriptions.map((s) => ({
+                id: s.id,
+                interval: s.interval,
+                nextInvoiceDate: toDateString(s.nextInvoiceDate),
+                autoSend: s.autoSend,
+                active: s.active,
+                templateId: s.templateId,
+                templateName: s.template?.name ?? null,
+              }))}
+            />
+          )}
+        </div>
+        <div className="space-y-6">
+          {modules.tasks && (
+            <TasksSection
+              customerId={customerId}
+              canEdit={canEdit}
+              users={users}
+              tasks={tasks.map((t) => ({
+                id: t.id,
+                title: t.title,
+                dueDate: toDateString(t.dueDate),
+                overdue: t.dueDate < startOfToday,
+                done: t.doneAt !== null,
+                assigneeName: t.assignee?.name ?? null,
+              }))}
+            />
+          )}
           <DocumentsSection customerId={customerId} documents={documents} />
           <NotesSection customerId={customerId} notes={decryptedNotes} />
         </div>
@@ -238,72 +295,76 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Offerten</CardTitle>
-          <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
-            Neue Offerte
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nummer</TableHead>
-                  <TableHead>Datum</TableHead>
-                  <TableHead>Gültig bis</TableHead>
-                  <TableHead>Betrag</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotes.length === 0 ? (
+      {modules.quotes && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Offerten</CardTitle>
+            <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
+              Neue Offerte
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      <div className="space-y-3">
-                        <p className="text-muted-foreground">Noch keine Offerten vorhanden.</p>
-                        <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
-                          Neue Offerte erstellen
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableHead>Nummer</TableHead>
+                    <TableHead>Datum</TableHead>
+                    <TableHead>Gültig bis</TableHead>
+                    <TableHead>Betrag</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ) : (
-                  quotes.map((q) => (
-                    <TableRow key={q.id}>
-                      <TableCell className="font-medium">
-                        <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="hover:underline">
-                          {documentLabel(q.documentNumber)}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{formatDate(q.date)}</TableCell>
-                      <TableCell>{formatDate(q.validUntil)}</TableCell>
-                      <TableCell>{formatCurrency(q.totalAmount.toNumber())}</TableCell>
-                      <TableCell>
-                        <Badge variant={quoteStateVariants[q.state]}>
-                          {quoteStateLabels[q.state]}
-                        </Badge>
+                </TableHeader>
+                <TableBody>
+                  {quotes.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <div className="space-y-3">
+                          <p className="text-muted-foreground">Noch keine Offerten vorhanden.</p>
+                          <Button size="sm" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
+                            Neue Offerte erstellen
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          {quoteCount > quotes.length && (
-            <div className="pt-3 text-center">
-              <Link
-                href={`/quotes?customerId=${customerId}`}
-                className="text-sm text-muted-foreground hover:underline"
-              >
-                Alle {quoteCount} Offerten anzeigen
-              </Link>
+                  ) : (
+                    quotes.map((q) => (
+                      <TableRow key={q.id}>
+                        <TableCell className="font-medium">
+                          <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="hover:underline">
+                            {documentLabel(q.documentNumber)}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{formatDate(q.date)}</TableCell>
+                        <TableCell>{formatDate(q.validUntil)}</TableCell>
+                        <TableCell>{formatCurrency(q.totalAmount.toNumber())}</TableCell>
+                        <TableCell>
+                          <Badge variant={quoteStateVariants[q.state]}>
+                            {quoteStateLabels[q.state]}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {quoteCount > quotes.length && (
+              <div className="pt-3 text-center">
+                <Link
+                  href={`/quotes?customerId=${customerId}`}
+                  className="text-sm text-muted-foreground hover:underline"
+                >
+                  Alle {quoteCount} Offerten anzeigen
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       </div>
+
+      <HistorySection events={history} />
 
       {canDelete && (
         <div className="flex justify-start">

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { Prisma } from "@prisma/client";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
 import { checkSubscriptions } from "@/lib/subscriptions";
 
@@ -23,13 +24,14 @@ describe("checkSubscriptions", () => {
   }
 
   async function seedSubscription(
-    overrides: Partial<{ nextInvoiceDate: Date; interval: "Monthly" | "Quarterly" | "Yearly"; active: boolean; templateId: number | null; archived: boolean; email: string }> = {}
+    overrides: Partial<{ nextInvoiceDate: Date; interval: "Monthly" | "Quarterly" | "Yearly"; active: boolean; templateId: number | null; archived: boolean; email: string; customer: Partial<Prisma.CustomerUncheckedCreateInput> }> = {}
   ) {
     const customer = await db.prisma.customer.create({
       data: {
         ...createValidTestCustomer(),
         email: overrides.email ?? "jane@clientag.ch",
         archivedAt: overrides.archived ? new Date() : null,
+        ...overrides.customer,
       },
     });
     return db.prisma.subscription.create({
@@ -73,6 +75,25 @@ describe("checkSubscriptions", () => {
     expect(invoices).toHaveLength(1);
     expect(invoices[0].items).toHaveLength(0);
     expect(invoices[0].totalAmount.toNumber()).toBe(0);
+  });
+
+  it("sends to the billing e-mail when the customer has one", async () => {
+    await seedSubscription({ customer: { billingEmail: "buchhaltung@clientag.ch" } });
+    await checkSubscriptions(db.prisma);
+    const pending = await db.prisma.pendingEmail.findMany();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].to).toBe("buchhaltung@clientag.ch");
+  });
+
+  it("uses the customer's payment term for the invoice due date", async () => {
+    await db.prisma.applicationSettings.create({
+      data: { defaultPaymentTermDays: 30, companyInfo: { create: {} } },
+    });
+    await seedSubscription({ customer: { paymentTermDays: 14 } });
+    await checkSubscriptions(db.prisma);
+    const [invoice] = await db.prisma.invoice.findMany();
+    const days = Math.round((invoice.dueDate.getTime() - invoice.date.getTime()) / 86_400_000);
+    expect(days).toBe(14);
   });
 
   it("advances nextInvoiceDate by the interval", async () => {

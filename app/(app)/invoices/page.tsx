@@ -21,6 +21,7 @@ import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { documentLabel } from "@/lib/document-display";
+import { loadModules } from "@/lib/module-guard";
 
 const PAGE_SIZE = 25;
 
@@ -239,9 +240,10 @@ export default async function InvoicesPage({ searchParams }: Props) {
   const sortOrder: SortOrder = order === "asc" ? "asc" : "desc";
   const term = search?.trim() ?? "";
 
+  const modules = await loadModules();
   const [pendingCount, reminderCount] = await Promise.all([
-    prisma.pendingEmail.count(),
-    prisma.pendingReminder.count(),
+    modules.subscriptions ? prisma.pendingEmail.count() : 0,
+    modules.reminders ? prisma.pendingReminder.count() : 0,
   ]);
 
   function sortHref(col: SortField) {
@@ -304,9 +306,11 @@ export default async function InvoicesPage({ searchParams }: Props) {
         <h1 className="text-2xl font-semibold">Rechnungen</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <ExportButton href={exportHref} />
-          <Button variant="outline" size="sm" render={<Link href="/invoices/import" />}>
-            Zahlungen importieren
-          </Button>
+          {modules.bankImport && (
+            <Button variant="outline" size="sm" render={<Link href="/invoices/import" />}>
+              Zahlungen importieren
+            </Button>
+          )}
           <Button variant="outline" size="sm" render={<Link href="/invoices/templates" />}>
             Vorlagen
           </Button>

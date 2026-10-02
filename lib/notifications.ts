@@ -7,6 +7,8 @@ import { decryptSecret } from "@/lib/crypto";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
+import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
+import { getEnabledModules } from "@/lib/modules";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 
@@ -28,10 +30,30 @@ export function startNotificationScheduler(): void {
     // The shared client uses the better-sqlite3 driver adapter; a plain
     // `new PrismaClient()` has no datasource URL in this setup and throws.
     const { default: prisma } = await import("@/lib/prisma");
+    // Switched-off modules (Einstellungen → Module) are skipped entirely.
+    const modules = await getEnabledModules(prisma);
     const steps: [string, () => Promise<unknown>][] = [
       ["checkAndUpdateAllDocumentStates", () => checkAndUpdateAllDocumentStates(prisma)],
-      ["checkOverdueInvoices", () => checkOverdueInvoices(prisma)],
-      ["checkSubscriptions", () => checkSubscriptions(prisma)],
+      ...(modules.reminders
+        ? [["checkOverdueInvoices", () => checkOverdueInvoices(prisma)] as [string, () => Promise<unknown>]]
+        : []),
+      ...(modules.subscriptions
+        ? [["checkSubscriptions", () => checkSubscriptions(prisma)] as [string, () => Promise<unknown>]]
+        : []),
+      ...(modules.tasks
+        ? ([
+            ["closeAnsweredFollowUps", () => closeAnsweredFollowUps(prisma)],
+            [
+              "notifyDueTasks",
+              async () => {
+                const settings = await prisma.applicationSettings.findFirst({
+                  include: { companyInfo: true },
+                });
+                await notifyDueTasks(prisma, settings);
+              },
+            ],
+          ] as [string, () => Promise<unknown>][])
+        : []),
       [
         "sendAdminNotifications",
         async () => {
@@ -62,6 +84,7 @@ export async function sendAdminNotifications(
   if (!settings.notifyOverdueEnabled && !settings.notifyPendingEnabled) return;
 
   const now = new Date();
+  const modules = await getEnabledModules(prisma);
 
   const repeatCutoff = settings.notifyRepeatIntervalDays
     ? new Date(now.getTime() - settings.notifyRepeatIntervalDays * 24 * 60 * 60 * 1000)
@@ -71,7 +94,7 @@ export async function sendAdminNotifications(
     : { adminNotifiedAt: null };
 
   const [unnotifiedReminders, unnotifiedPending] = await Promise.all([
-    settings.notifyOverdueEnabled
+    settings.notifyOverdueEnabled && modules.reminders
       ? prisma.pendingReminder.findMany({
           where: {
             AND: [
@@ -82,7 +105,7 @@ export async function sendAdminNotifications(
           select: { id: true },
         })
       : Promise.resolve([]),
-    settings.notifyPendingEnabled
+    settings.notifyPendingEnabled && modules.subscriptions
       ? prisma.pendingEmail.findMany({
           where: notifiedFilter,
           select: { id: true },

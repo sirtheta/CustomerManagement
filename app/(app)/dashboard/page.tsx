@@ -9,9 +9,11 @@ import { AlertTriangle } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
+import { loadModules } from "@/lib/module-guard";
 
 export default async function DashboardPage() {
   await auth();
+  const modules = await loadModules();
 
   const currentYear = new Date().getFullYear();
 
@@ -25,12 +27,15 @@ export default async function DashboardPage() {
     overdueCount,
     scheduledSubscriptionCount,
     scheduledSubscriptions,
+    openTasks,
   ] = await Promise.all([
     prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
-    prisma.quote.count({
-      where: { state: { in: [QuoteState.Draft, QuoteState.Sent] } },
-    }),
+    modules.quotes
+      ? prisma.quote.count({
+          where: { state: { in: [QuoteState.Draft, QuoteState.Sent] } },
+        })
+      : 0,
     prisma.invoice.findMany({
       take: 5,
       orderBy: { date: "desc" },
@@ -45,24 +50,41 @@ export default async function DashboardPage() {
       },
       _sum: { amount: true },
     }),
-    prisma.pendingEmail.count(),
+    modules.subscriptions ? prisma.pendingEmail.count() : 0,
     prisma.invoice.count({ where: { state: InvoiceState.Overdue } }),
-    prisma.subscription.count({
-      where: { active: true, customer: { archivedAt: null } },
-    }),
-    prisma.subscription.findMany({
-      where: { active: true, customer: { archivedAt: null } },
-      select: {
-        id: true,
-        interval: true,
-        nextInvoiceDate: true,
-        customer: {
-          select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true },
-        },
-      },
-      orderBy: { nextInvoiceDate: "asc" },
-      take: 5,
-    }),
+    modules.subscriptions
+      ? prisma.subscription.count({
+          where: { active: true, customer: { archivedAt: null } },
+        })
+      : 0,
+    modules.subscriptions
+      ? prisma.subscription.findMany({
+          where: { active: true, customer: { archivedAt: null } },
+          select: {
+            id: true,
+            interval: true,
+            nextInvoiceDate: true,
+            customer: {
+              select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true },
+            },
+          },
+          orderBy: { nextInvoiceDate: "asc" },
+          take: 5,
+        })
+      : [],
+    modules.tasks
+      ? prisma.task.findMany({
+          where: { doneAt: null, customer: { archivedAt: null } },
+          select: {
+            id: true,
+            title: true,
+            dueDate: true,
+            customer: { select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true } },
+          },
+          orderBy: { dueDate: "asc" },
+          take: 5,
+        })
+      : [],
   ]);
 
   return (
@@ -135,20 +157,22 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/quotes" className="h-full">
-          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Offene Offerten
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{openQuotes}</p>
-            </CardContent>
-          </Card>
-        </Link>
+        {modules.quotes && (
+          <Link href="/quotes" className="h-full">
+            <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">
+                  Offene Offerten
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{openQuotes}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        <Link href="/analytics" className="h-full">
+        <Link href={modules.analytics ? "/analytics" : "/invoices"} className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
@@ -164,49 +188,87 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        <Link href="/customers?subscription=true" className="h-full">
-          <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Geplante Abos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{scheduledSubscriptionCount}</p>
-              <p className="text-sm text-gray-500 mt-1">Aktive Abos</p>
-            </CardContent>
-          </Card>
-        </Link>
+        {modules.subscriptions && (
+          <Link href="/customers?subscription=true" className="h-full">
+            <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">
+                  Geplante Abos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{scheduledSubscriptionCount}</p>
+                <p className="text-sm text-gray-500 mt-1">Aktive Abos</p>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Kommende Abo-Rechnungen</CardTitle>
-          <Button variant="outline" size="sm" render={<Link href="/customers?subscription=true" />}>
-            Alle anzeigen
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {scheduledSubscriptions.length === 0 ? (
-            <p className="text-sm text-gray-500">Keine Abos geplant.</p>
-          ) : (
-            <ul className="divide-y">
-              {scheduledSubscriptions.map((sub) => (
-                <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
-                  <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
-                    {sub.customer.contactInsteadOfCompany
-                      ? sub.customer.contactPerson
-                      : (sub.customer.company || sub.customer.contactPerson)}
-                  </Link>
-                  <span className="text-sm text-gray-500 whitespace-nowrap">
-                    {INTERVAL_LABELS[sub.interval]} · {sub.nextInvoiceDate.toLocaleDateString("de-CH")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {modules.tasks && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Offene Aufgaben</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {openTasks.length === 0 ? (
+              <p className="text-sm text-gray-500">Keine offenen Aufgaben.</p>
+            ) : (
+              <ul className="divide-y">
+                {openTasks.map((task) => (
+                  <li key={task.id} className="py-2 flex justify-between items-center gap-3">
+                    <Link href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
+                      <span className="font-medium">{task.title}</span>
+                      <span className="text-gray-500">
+                        {" · "}
+                        {task.customer.contactInsteadOfCompany
+                          ? task.customer.contactPerson
+                          : (task.customer.company || task.customer.contactPerson)}
+                      </span>
+                    </Link>
+                    <span
+                      className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-gray-500"}`}
+                    >
+                      {task.dueDate.toLocaleDateString("de-CH")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {modules.subscriptions && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Kommende Abo-Rechnungen</CardTitle>
+            <Button variant="outline" size="sm" render={<Link href="/customers?subscription=true" />}>
+              Alle anzeigen
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {scheduledSubscriptions.length === 0 ? (
+              <p className="text-sm text-gray-500">Keine Abos geplant.</p>
+            ) : (
+              <ul className="divide-y">
+                {scheduledSubscriptions.map((sub) => (
+                  <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
+                    <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
+                      {sub.customer.contactInsteadOfCompany
+                        ? sub.customer.contactPerson
+                        : (sub.customer.company || sub.customer.contactPerson)}
+                    </Link>
+                    <span className="text-sm text-gray-500 whitespace-nowrap">
+                      {INTERVAL_LABELS[sub.interval]} · {sub.nextInvoiceDate.toLocaleDateString("de-CH")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

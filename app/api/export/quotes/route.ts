@@ -5,6 +5,7 @@ import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { QuoteState, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { documentLabel } from "@/lib/document-display";
+import { moduleDisabledResponse } from "@/lib/module-guard";
 
 const stateLabels: Record<string, string> = {
   Draft: "Entwurf",
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
   if (session.user.role === UserRole.Viewer) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const disabled = await moduleDisabledResponse("quotes");
+  if (disabled) return disabled;
 
   const url = new URL(request.url);
   const parsed = querySchema.safeParse({

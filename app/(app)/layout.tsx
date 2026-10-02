@@ -12,6 +12,7 @@ import { UpdateNotification } from "@/components/update-notification";
 import { hasRole } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { Suspense } from "react";
+import { loadModules } from "@/lib/module-guard";
 
 export default async function AppLayout({
   children,
@@ -22,13 +23,16 @@ export default async function AppLayout({
   if (!session) redirect("/login");
 
   const now = new Date();
+  const modules = await loadModules();
   const [pendingCount, reminderCount] = await Promise.all([
-    prisma.pendingEmail.count(),
-    prisma.pendingReminder.count({
-      where: {
-        OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
-      },
-    }),
+    modules.subscriptions ? prisma.pendingEmail.count() : 0,
+    modules.reminders
+      ? prisma.pendingReminder.count({
+          where: {
+            OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
+          },
+        })
+      : 0,
   ]);
 
   return (
@@ -42,7 +46,7 @@ export default async function AppLayout({
             >
               CustomerManagement
             </Link>
-            <NavLinks role={session.user.role} pendingCount={pendingCount} reminderCount={reminderCount} />
+            <NavLinks role={session.user.role} modules={modules} pendingCount={pendingCount} reminderCount={reminderCount} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />

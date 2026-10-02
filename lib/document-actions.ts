@@ -16,6 +16,7 @@ import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes"
 import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
 import logger from "@/lib/logger";
+import { createQuoteFollowUp } from "@/lib/tasks";
 
 const log = logger.child({ module: "document-actions" });
 
@@ -305,6 +306,10 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     ]);
     await logAudit(input.actor, "SEND", "Quote", input.id, documentNumber, {
       to: input.to,
+    });
+    await createQuoteFollowUp(defaultPrisma, {
+      quoteId: input.id,
+      assigneeId: parseInt(input.actor.user.id, 10),
     });
     revalidatePath(`/quotes/${input.id}`);
   }

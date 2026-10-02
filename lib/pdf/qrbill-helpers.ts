@@ -1,3 +1,5 @@
+import { billingRecipient, type AddressCustomer } from "@/lib/customer-billing";
+
 export type QrBillInput = {
   invoice: {
     documentNumber: string | null;
@@ -14,16 +16,7 @@ export type QrBillInput = {
     companyCountry?: string | null;
     useHolderNameOnQR?: boolean | null;
   };
-  customer: {
-    contactInsteadOfCompany: boolean;
-    company?: string | null;
-    contactPerson: string;
-    street: string;
-    houseNumber?: string | null;
-    zipCode: string;
-    city: string;
-    country?: string | null;
-  };
+  customer: AddressCustomer;
 };
 
 export type QrBillData = {
@@ -69,10 +62,7 @@ export function buildQrBillData({
 
   const iban = company.companyIBAN.replace(/\s/g, "");
 
-  const debtorName =
-    customer.contactInsteadOfCompany || !customer.company
-      ? customer.contactPerson
-      : customer.company;
+  const debtor = billingRecipient(customer);
 
   const creditorName = company.useHolderNameOnQR
     ? (company.companyHolderName ?? company.companyName ?? "")
@@ -91,12 +81,12 @@ export function buildQrBillData({
       country: company.companyCountry || "CH",
     },
     debtor: {
-      name: debtorName,
-      address: customer.street,
-      ...buildingNumberField(customer.houseNumber),
-      zip: customer.zipCode,
-      city: customer.city,
-      country: customer.country || "CH",
+      name: debtor.name,
+      address: debtor.street,
+      ...buildingNumberField(debtor.houseNumber),
+      zip: debtor.zipCode,
+      city: debtor.city,
+      country: debtor.country,
     },
     message: invoice.documentNumber ?? undefined,
   };

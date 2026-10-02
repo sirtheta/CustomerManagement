@@ -19,6 +19,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { documentLabel } from "@/lib/document-display";
+import { requireModule } from "@/lib/module-guard";
 
 const PAGE_SIZE = 25;
 
@@ -67,6 +68,7 @@ type Props = {
 };
 
 export default async function QuotesPage({ searchParams }: Props) {
+  await requireModule("quotes");
   const { state, search, customerId, page, sortBy, order, dateFrom, dateTo } = await searchParams;
   const customerFilter = customerId ? parseInt(customerId, 10) || undefined : undefined;
   const activeFilter = state ?? "all";

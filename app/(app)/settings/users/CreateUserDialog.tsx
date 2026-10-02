@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createUser } from "./actions";
+import { useActionToast } from "@/hooks/use-action-toast";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   Admin: "Admin",
@@ -20,6 +21,18 @@ export function CreateUserDialog() {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>(UserRole.Viewer);
   const [state, formAction, pending] = useActionState(createUser, {});
+
+  useActionToast(state, "Benutzer erstellt");
+  // Close the dialog once the user is created, derived from the action
+  // result timestamp during render rather than in an effect.
+  const [seenResultTs, setSeenResultTs] = useState(state._ts);
+  if (state._ts !== seenResultTs) {
+    setSeenResultTs(state._ts);
+    if (state.success) {
+      setOpen(false);
+      setRole(UserRole.Viewer);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

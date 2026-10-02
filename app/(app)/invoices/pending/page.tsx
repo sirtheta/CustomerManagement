@@ -2,8 +2,10 @@ import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import PendingEmailRow from "./PendingEmailRow";
+import { requireModule } from "@/lib/module-guard";
 
 export default async function PendingEmailsPage() {
+  await requireModule("subscriptions");
   const pending = await prisma.pendingEmail.findMany({
     include: {
       invoice: { include: { customer: true } },

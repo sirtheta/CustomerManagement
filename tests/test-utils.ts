@@ -64,9 +64,11 @@ export function createTestDatabase() {
     await p.quote.deleteMany();
     await p.document.deleteMany();
     await p.service.deleteMany();
+    await p.task.deleteMany();
     await p.subscription.deleteMany();
     await p.templateItem.deleteMany();
     await p.invoiceTemplate.deleteMany();
+    await p.customerContact.deleteMany();
     await p.customer.deleteMany();
     await p.expenseReceipt.deleteMany();
     await p.expense.deleteMany();

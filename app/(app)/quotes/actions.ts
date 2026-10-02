@@ -1,5 +1,6 @@
 "use server";
 
+import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
@@ -17,6 +18,7 @@ import {
   updateDocumentWithItems,
   sendDocument,
 } from "@/lib/document-actions";
+import { requireModule } from "@/lib/module-guard";
 
 const log = logger.child({ module: "quotes" });
 
@@ -29,6 +31,7 @@ export async function createQuote(
   formData: FormData
 ): Promise<QuoteFormState> {
   const session = await requireEditor();
+  await requireModule("quotes");
   const customerIdRaw = formData.get("customerId") as string;
   const customUserText = formData.get("customUserText") as string | null;
   const dateRaw = formData.get("date") as string;
@@ -77,6 +80,7 @@ export async function updateQuote(
   formData: FormData
 ): Promise<QuoteFormState> {
   const session = await requireEditor();
+  await requireModule("quotes");
   const customerIdRaw = formData.get("customerId") as string;
   const customUserText = formData.get("customUserText") as string | null;
   const dateRaw = formData.get("date") as string;
@@ -125,6 +129,7 @@ export async function updateQuoteStatus(
   state: QuoteState
 ): Promise<void> {
   const session = await requireEditor();
+  await requireModule("quotes");
   const current = await prisma.quote.findUnique({ where: { id }, select: { state: true, documentNumber: true },
   });
   if (!current) return;
@@ -136,6 +141,7 @@ export async function updateQuoteStatus(
 
 export async function deleteQuote(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
+  await requireModule("quotes");
   const q = await prisma.quote.findUnique({ where: { id }, select: { documentNumber: true } });
   try {
     await prisma.quote.delete({ where: { id } });
@@ -153,6 +159,7 @@ export async function sendQuote(
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("quotes");
 
   const quoteId = parseInt(formData.get("quoteId") as string, 10);
   if (isNaN(quoteId)) return { error: "Ungültige Offerten-ID." };
@@ -169,15 +176,16 @@ export async function sendQuote(
 
 export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: string }> {
   const session = await requireEditor();
+  await requireModule("quotes");
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
-    include: { items: true },
+    include: { items: true, customer: { select: { paymentTermDays: true } } },
   });
 
   if (!quote) return { error: "Offerte nicht gefunden." };
 
   const settings = await prisma.applicationSettings.findFirst();
-  const paymentTermDays = settings?.defaultPaymentTermDays ?? 30;
+  const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);
 
   const today = new Date();
   const dueDate = new Date(today);

@@ -6,10 +6,13 @@ import { ImportWizard } from "./ImportWizard";
 import { IncomingTable } from "./IncomingTable";
 import { ExpensesTable } from "./ExpensesTable";
 import { ImportHistory } from "./ImportHistory";
+import { loadModules, requireModule } from "@/lib/module-guard";
 
 export default async function InvoicesImportPage() {
   await requireEditor();
+  await requireModule("bankImport");
   const overview = await loadImportOverview();
+  const modules = await loadModules();
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -32,16 +35,18 @@ export default async function InvoicesImportPage() {
         <IncomingTable rows={overview.incoming} />
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-lg font-medium">Ausgaben</h2>
-        <p className="text-sm text-muted-foreground">
-          Es werden nur angekreuzte Zeilen als Ausgabe übernommen. Privates lässt du offen oder ignorierst es.
-        </p>
-        <ExpensesTable
-          rows={overview.expenses}
-          categories={overview.categories}
-        />
-      </section>
+      {modules.accounting && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">Ausgaben</h2>
+          <p className="text-sm text-muted-foreground">
+            Es werden nur angekreuzte Zeilen als Ausgabe übernommen. Privates lässt du offen oder ignorierst es.
+          </p>
+          <ExpensesTable
+            rows={overview.expenses}
+            categories={overview.categories}
+          />
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Importverlauf</h2>

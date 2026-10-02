@@ -254,4 +254,41 @@ describe(`migration ${MIGRATION}`, () => {
       expect(col!.notnull).toBe(0);
     }
   });
+
+  it("numbers existing customers from 1001 and creates the contact table", () => {
+    const db = legacyDb();
+    const insert = db.prepare(
+      `INSERT INTO "Customer" ("contactPerson","address","city","zipCode","email")
+       VALUES (?,'Weg 1','Bern','3000','x@test.ch')`
+    );
+    insert.run("Erster");
+    insert.run("Zweiter");
+    insert.run("Dritter");
+    // A gap in the ids must not leave a gap in the numbers.
+    db.prepare(`DELETE FROM "Customer" WHERE "contactPerson" = 'Zweiter'`).run();
+
+    applyMigration(db, MIGRATION);
+
+    const rows = db
+      .prepare(
+        `SELECT "contactPerson", "customerNumber", "uid", "billingEmail", "paymentTermDays"
+         FROM "Customer" ORDER BY "customerId"`
+      )
+      .all();
+    expect(rows).toEqual([
+      { contactPerson: "Erster", customerNumber: 1001, uid: null, billingEmail: null, paymentTermDays: null },
+      { contactPerson: "Dritter", customerNumber: 1002, uid: null, billingEmail: null, paymentTermDays: null },
+    ]);
+
+    expect(() =>
+      db.prepare(`UPDATE "Customer" SET "customerNumber" = 1001 WHERE "contactPerson" = 'Dritter'`).run()
+    ).toThrow(/UNIQUE/);
+
+    db.prepare(
+      `INSERT INTO "CustomerContact" ("customerId","name") VALUES ((SELECT MIN("customerId") FROM "Customer"), 'Buchhaltung')`
+    ).run();
+    db.pragma("foreign_keys = ON");
+    db.prepare(`DELETE FROM "Customer" WHERE "contactPerson" = 'Erster'`).run();
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM "CustomerContact"`).get()).toEqual({ n: 0 });
+  });
 });

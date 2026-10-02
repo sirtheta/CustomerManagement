@@ -20,6 +20,7 @@ const SAMPLE_CUSTOMER = {
   zipCode: "8000",
   city: "Zürich",
   country: "CH",
+  customerNumber: 1001,
 };
 
 const SAMPLE_ITEMS = [

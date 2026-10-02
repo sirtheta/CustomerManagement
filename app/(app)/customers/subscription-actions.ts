@@ -7,6 +7,7 @@ import { requireEditor } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { isValidDateString, parseDate } from "@/lib/date";
+import { requireModule } from "@/lib/module-guard";
 
 type SubscriptionFields = {
   interval: SubscriptionIntervalName;
@@ -57,6 +58,7 @@ export async function createSubscription(
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
   const parsed = await parseSubscriptionForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
@@ -80,6 +82,7 @@ export async function updateSubscription(
   formData: FormData
 ): Promise<ActionState> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
   const parsed = await parseSubscriptionForm(formData);
   if ("error" in parsed) return { error: parsed.error };
 
@@ -112,6 +115,7 @@ export async function setSubscriptionActive(
   active: boolean
 ): Promise<void> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
   const { count } = await prisma.subscription.updateMany({ where: { id: subscriptionId, customerId }, data: { active } });
   if (count === 0) return;
   await logAudit(session, "UPDATE", "Subscription", subscriptionId, undefined, { customerId, active });
@@ -121,6 +125,7 @@ export async function setSubscriptionActive(
 
 export async function deleteSubscription(customerId: number, subscriptionId: number): Promise<void> {
   const session = await requireEditor();
+  await requireModule("subscriptions");
   const { count } = await prisma.subscription.deleteMany({ where: { id: subscriptionId, customerId } });
   if (count === 0) return;
   await logAudit(session, "DELETE", "Subscription", subscriptionId, undefined, { customerId });

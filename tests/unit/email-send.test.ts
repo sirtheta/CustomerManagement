@@ -72,6 +72,30 @@ describe("email.ts", () => {
   });
 
   describe("sendInvoiceEmail", () => {
+    it("sends invoices to the billing e-mail when set", async () => {
+      await sendInvoiceEmail(
+        makeInvoice(makeCustomer({ billingEmail: "buchhaltung@muster.ch" })),
+        makeSettings(),
+        Buffer.from("pdf")
+      );
+      expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "buchhaltung@muster.ch" }));
+    });
+
+    it("keeps an explicit recipient over the billing e-mail", async () => {
+      await sendInvoiceEmail(
+        makeInvoice(makeCustomer({ billingEmail: "buchhaltung@muster.ch" })),
+        makeSettings(),
+        Buffer.from("pdf"),
+        { to: "andere@muster.ch" }
+      );
+      expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "andere@muster.ch" }));
+    });
+
+    it("falls back to the customer e-mail without a billing e-mail", async () => {
+      await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"));
+      expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@muster.ch" }));
+    });
+
     it("uses the attachment name override (reminders)", async () => {
       await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"), { attachmentName: "mahnung-R-2026-001-stufe2.pdf" });
       expect(mockSendMail.mock.calls[0][0].attachments[0].filename).toBe("mahnung-R-2026-001-stufe2.pdf");
@@ -209,6 +233,15 @@ describe("email.ts", () => {
   });
 
   describe("sendQuoteEmail", () => {
+    it("always sends quotes to the customer e-mail", async () => {
+      await sendQuoteEmail(
+        makeQuote(makeCustomer({ billingEmail: "buchhaltung@muster.ch" })),
+        makeSettings(),
+        Buffer.from("pdf")
+      );
+      expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@muster.ch" }));
+    });
+
     it("skips sending when DISABLE_EMAIL=true", async () => {
       process.env.DISABLE_EMAIL = "true";
       await sendQuoteEmail(makeQuote(), makeSettings(), Buffer.from("pdf"));

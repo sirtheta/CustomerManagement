@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
     category: { create: vi.fn(), update: vi.fn() },
     pendingReminder: { updateMany: vi.fn() },
     pendingEmail: { updateMany: vi.fn() },
+    task: { updateMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -27,6 +28,7 @@ vi.mock("@/lib/state-manager", () => ({
 }));
 vi.mock("@/lib/reminders", () => ({ checkOverdueInvoices: vi.fn() }));
 vi.mock("@/lib/subscriptions", () => ({ checkSubscriptions: vi.fn() }));
+vi.mock("@/lib/tasks", () => ({ closeAnsweredFollowUps: vi.fn(), notifyDueTasks: vi.fn() }));
 vi.mock("@/lib/notifications", () => ({ sendAdminNotifications: vi.fn() }));
 vi.mock("@/lib/pdf/theme", () => ({
   resolveTheme: vi.fn((v: unknown) => v),
@@ -542,6 +544,7 @@ describe("settings actions", () => {
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);
       vi.mocked(prisma.pendingReminder.updateMany).mockResolvedValue({ count: 0 } as never);
       vi.mocked(prisma.pendingEmail.updateMany).mockResolvedValue({ count: 0 } as never);
+      vi.mocked(prisma.task.updateMany).mockResolvedValue({ count: 0 } as never);
 
       const result = await triggerNotificationCheck();
       expect(result.success).toBe(true);
