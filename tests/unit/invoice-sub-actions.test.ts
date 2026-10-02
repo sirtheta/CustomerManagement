@@ -36,7 +36,7 @@ vi.mock("@/components/items-editor-schema", () => ({
 }));
 
 import { sendReminder, dismissReminder } from "@/app/(app)/invoices/reminders/actions";
-import { saveAsTemplate, createTemplate, updateTemplate, deleteTemplate } from "@/app/(app)/invoices/templates/actions";
+import { saveAsTemplate, updateTemplate, deleteTemplate } from "@/app/(app)/invoices/templates/actions";
 import { approvePendingEmail, discardPendingEmail } from "@/app/(app)/invoices/pending/actions";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -346,32 +346,6 @@ describe("invoices/templates actions", () => {
         itemCount: 2,
         total: 250.5,
       });
-    });
-  });
-
-  describe("createTemplate", () => {
-    it("audits the empty template", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.invoiceTemplate.create).mockResolvedValue({ id: 8, name: "Leer" } as never);
-      await createTemplate({}, form({ name: "Leer" }));
-      expect(logAudit).toHaveBeenCalledWith(editorSession, "CREATE", "InvoiceTemplate", 8, "Leer", {
-        itemCount: 0,
-        total: 0,
-      });
-    });
-
-    it("returns error for missing name", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      const result = await createTemplate({}, form({}));
-      expect(result.error).toBe("Bitte einen Namen angeben.");
-    });
-
-    it("creates template and returns success", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.invoiceTemplate.create).mockResolvedValue({} as never);
-      const result = await createTemplate({}, form({ name: "Neue Vorlage" }));
-      expect(result.success).toBe(true);
-      expect(prisma.invoiceTemplate.create).toHaveBeenCalledWith({ data: { name: "Neue Vorlage" } });
     });
   });
 

@@ -31,8 +31,6 @@ const nextConfig: NextConfig = {
     "pdfkit",
     "swissqrbill",
     "sharp",
-    "jimp",
-    "@jimp/core",
     "better-sqlite3",
     "@prisma/adapter-better-sqlite3",
     "@prisma/driver-adapter-utils",

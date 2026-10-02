@@ -54,17 +54,3 @@ export function formatCityLine(zip?: string | null, city?: string | null): strin
     .filter(Boolean)
     .join(" ");
 }
-
-/**
- * Splits a free-text street line the same way the `structured_addresses`
- * migration does: the last space-separated token becomes the house number if
- * it starts with a digit. Anything else stays in the street.
- */
-export function splitStreetLine(line: string): { street: string; houseNumber: string | null } {
-  const trimmed = line.trim();
-  const sp = trimmed.lastIndexOf(" ");
-  if (sp > 0 && /^\d/.test(trimmed.slice(sp + 1))) {
-    return { street: trimmed.slice(0, sp).trim(), houseNumber: trimmed.slice(sp + 1) };
-  }
-  return { street: trimmed, houseNumber: null };
-}

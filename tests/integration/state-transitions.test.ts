@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { checkAndUpdateDocumentStates } from "@/lib/state-manager";
+import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 
 describe("DocumentStateManager", () => {
   const db = createTestDatabase();
@@ -41,7 +41,7 @@ describe("DocumentStateManager", () => {
       },
     });
 
-    await checkAndUpdateDocumentStates(prisma, [overdue.id, current.id], []);
+    await checkAndUpdateAllDocumentStates(prisma);
 
     const updatedOverdue = await prisma.invoice.findUnique({ where: { id: overdue.id } });
     const updatedCurrent = await prisma.invoice.findUnique({ where: { id: current.id } });
@@ -66,7 +66,7 @@ describe("DocumentStateManager", () => {
       },
     });
 
-    await checkAndUpdateDocumentStates(prisma, [draft.id], []);
+    await checkAndUpdateAllDocumentStates(prisma);
 
     const unchanged = await prisma.invoice.findUnique({ where: { id: draft.id } });
     expect(unchanged!.state).toBe("Draft");
@@ -87,7 +87,7 @@ describe("DocumentStateManager", () => {
       },
     });
 
-    await checkAndUpdateDocumentStates(prisma, [paid.id], []);
+    await checkAndUpdateAllDocumentStates(prisma);
 
     const unchanged = await prisma.invoice.findUnique({ where: { id: paid.id } });
     expect(unchanged!.state).toBe("Paid");
@@ -120,7 +120,7 @@ describe("DocumentStateManager", () => {
       },
     });
 
-    await checkAndUpdateDocumentStates(prisma, [], [expired.id, valid.id]);
+    await checkAndUpdateAllDocumentStates(prisma);
 
     const updatedExpired = await prisma.quote.findUnique({ where: { id: expired.id } });
     const updatedValid = await prisma.quote.findUnique({ where: { id: valid.id } });
@@ -129,10 +129,10 @@ describe("DocumentStateManager", () => {
     expect(updatedValid!.state).toBe("Sent");
   });
 
-  it("should handle empty id arrays without errors", async () => {
+  it("should handle a database without documents", async () => {
     const { prisma } = db;
     await expect(
-      checkAndUpdateDocumentStates(prisma, [], [])
+      checkAndUpdateAllDocumentStates(prisma)
     ).resolves.toBeUndefined();
   });
 
@@ -161,7 +161,7 @@ describe("DocumentStateManager", () => {
       },
     });
 
-    await checkAndUpdateDocumentStates(prisma, [credit.id], []);
+    await checkAndUpdateAllDocumentStates(prisma);
 
     const after = await prisma.invoice.findUniqueOrThrow({ where: { id: credit.id } });
     expect(after.state).toBe("Sent");

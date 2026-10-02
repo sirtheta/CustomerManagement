@@ -30,37 +30,6 @@ export function allowedInvoiceTargets(from: InvoiceState): InvoiceState[] {
  * Accepts a PrismaClient so it can be injected from tests or called
  * from a cron job / page loader with the global singleton.
  */
-export async function checkAndUpdateDocumentStates(
-  prisma: PrismaClient,
-  invoiceIds: number[],
-  quoteIds: number[]
-): Promise<void> {
-  const now = new Date();
-
-  if (invoiceIds.length > 0) {
-    await prisma.invoice.updateMany({
-      where: {
-        id: { in: invoiceIds },
-        state: "Sent",
-        dueDate: { lt: now },
-        creditNoteForId: null,
-      },
-      data: { state: "Overdue" },
-    });
-  }
-
-  if (quoteIds.length > 0) {
-    await prisma.quote.updateMany({
-      where: {
-        id: { in: quoteIds },
-        state: "Sent",
-        validUntil: { lt: now },
-      },
-      data: { state: "Expired" },
-    });
-  }
-}
-
 export async function checkAndUpdateAllDocumentStates(prisma: PrismaClient): Promise<void> {
   const now = new Date();
   await Promise.all([

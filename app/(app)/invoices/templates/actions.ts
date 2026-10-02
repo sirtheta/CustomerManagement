@@ -59,20 +59,6 @@ export async function saveAsTemplate(
   return { success: true, _ts: Date.now() };
 }
 
-export async function createTemplate(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const session = await requireEditor();
-  const name = (formData.get("name") as string)?.trim();
-  if (!name) return { error: "Bitte einen Namen angeben." };
-
-  const template = await prisma.invoiceTemplate.create({ data: { name } });
-  await logAudit(session, "CREATE", "InvoiceTemplate", template.id, template.name, templateSummary([]));
-  revalidatePath("/invoices/templates");
-  return { success: true, _ts: Date.now() };
-}
-
 export async function updateTemplate(
   id: number,
   _prev: ActionState,

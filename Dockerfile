@@ -85,7 +85,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modul
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 # Startup script: runs migrations + seeds admin user before the server starts
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/startup.js ./scripts/startup.js
 
 USER nextjs
 
