@@ -89,7 +89,9 @@ export async function verifyArchived(record: {
 
   let data: Buffer;
   try {
-    data = await readFile(abs);
+    // The path is only known at runtime (ARCHIVE_DIR / data volume); without the
+    // hint Turbopack traces the whole project into the standalone output.
+    data = await readFile(/* turbopackIgnore: true */ abs);
   } catch {
     return { ok: false, reason: "missing" };
   }
