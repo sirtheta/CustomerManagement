@@ -72,7 +72,6 @@ export default async function SettingsPage() {
           companyZip={c?.companyZip ?? ""}
           companyCity={c?.companyCity ?? ""}
           companyCountry={c?.companyCountry ?? "CH"}
-          companyAddressNeedsReview={c?.companyAddressNeedsReview ?? false}
           companyEmail={c?.companyEmail ?? ""}
           companyPhone={c?.companyPhone ?? ""}
           companyIBAN={c?.companyIBAN ?? ""}
