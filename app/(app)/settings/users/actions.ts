@@ -90,7 +90,7 @@ export async function createUser(
   }
 
   revalidatePath("/settings/users");
-  return {};
+  return { success: true, _ts: Date.now() };
 }
 
 async function guardLastAdmin(userId: number, newRole?: UserRole, newIsActive?: boolean, isDeleting = false): Promise<string | null> {
@@ -129,7 +129,7 @@ export async function updateUser(
   const user = await prisma.user.update({ where: { id }, data: { name, role, isActive } });
   await logAudit(session, "UPDATE", "User", id, user.email, { name, role, isActive });
   revalidatePath("/settings/users");
-  return {};
+  return { success: true, _ts: Date.now() };
 }
 
 export async function resetPassword(
