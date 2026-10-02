@@ -7,7 +7,9 @@ vi.mock("@/lib/prisma", () => ({
     applicationSettings: { findFirst: vi.fn() },
     invoiceSentLog: { create: vi.fn() },
     sentDocument: { create: vi.fn().mockResolvedValue({ id: 1 }), count: vi.fn().mockResolvedValue(0) },
-    invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    invoice: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), delete: vi.fn() },
+    item: { deleteMany: vi.fn() },
+    auditLog: { findFirst: vi.fn() },
     pendingEmail: { findUnique: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     invoiceTemplate: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     templateItem: { deleteMany: vi.fn() },
@@ -709,27 +711,85 @@ describe("invoices/pending actions", () => {
   });
 
   describe("discardPendingEmail", () => {
-    it("deletes pending email, writes an audit entry and revalidates", async () => {
+    const draftInvoice = {
+      id: 10,
+      customerId: 7,
+      documentNumber: null,
+      state: "Draft",
+      _count: { payments: 0, sentDocuments: 0, creditNotes: 0 },
+    };
+
+    function withPending(invoice: Record<string, unknown>) {
+      vi.mocked(prisma.pendingEmail.findUnique)
+        .mockResolvedValueOnce({ invoiceId: 10 } as never)
+        .mockResolvedValueOnce({ id: 5, invoiceId: 10, invoice } as never);
+      vi.mocked(prisma.$transaction).mockImplementation(((cb: (tx: unknown) => unknown) => cb(prisma)) as never);
+    }
+
+    it("deletes the draft with its items and the pending email, audits DELETE Invoice", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.pendingEmail.delete).mockResolvedValue({
-        id: 5,
-        invoiceId: 10,
-        invoice: { id: 10, documentNumber: "R-2026-010" },
+      withPending(draftInvoice);
+      vi.mocked(prisma.auditLog.findFirst).mockResolvedValue({
+        details: JSON.stringify({ subscriptionId: 3, source: "subscription" }),
       } as never);
-      await discardPendingEmail(5);
-      expect(prisma.pendingEmail.delete).toHaveBeenCalledWith({
-        where: { id: 5 },
-        include: { invoice: { select: { id: true, documentNumber: true } } },
+
+      const result = await discardPendingEmail(5);
+
+      expect(result).toEqual({ success: true, invoiceDeleted: true });
+      expect(prisma.pendingEmail.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+      expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 10 } });
+      expect(prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: 10 } });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "DELETE", "Invoice", 10, undefined, {
+        reason: "Abo-Entwurf verworfen",
+        subscriptionId: 3,
+        customerId: 7,
       });
-      expect(logAudit).toHaveBeenCalledWith(
-        editorSession,
-        "DELETE",
-        "Invoice",
-        10,
-        "R-2026-010",
-        { reason: "Pending-E-Mail verworfen" }
-      );
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/pending");
+    });
+
+    it("keeps an invoice that is no longer a draft and removes only the pending email", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      withPending({ ...draftInvoice, state: "Sent", documentNumber: "R-2026-010" });
+
+      const result = await discardPendingEmail(5);
+
+      expect(result.success).toBe(true);
+      expect(result.invoiceDeleted).toBe(false);
+      expect(result.message).toMatch(/bleibt bestehen/);
+      expect(prisma.pendingEmail.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+      expect(prisma.invoice.delete).not.toHaveBeenCalled();
+      expect(prisma.item.deleteMany).not.toHaveBeenCalled();
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "DELETE", "PendingEmail", 5, "R-2026-010", {
+        invoiceId: 10,
+        reason: "Wartende Abo-E-Mail verworfen, Rechnung bleibt",
+      });
+    });
+
+    it("keeps a draft that already has a number (mail out, booking failed)", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      withPending({ ...draftInvoice, documentNumber: "R-2026-011" });
+
+      const result = await discardPendingEmail(5);
+
+      expect(result.invoiceDeleted).toBe(false);
+      expect(prisma.invoice.delete).not.toHaveBeenCalled();
+    });
+
+    it("returns an error when the entry is gone", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.pendingEmail.findUnique).mockResolvedValueOnce(null);
+
+      const result = await discardPendingEmail(5);
+
+      expect(result.error).toBe("Eintrag nicht gefunden.");
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(logAudit).not.toHaveBeenCalled();
+    });
+
+    it("rejects viewers", async () => {
+      vi.mocked(auth).mockResolvedValue(viewerSession);
+      await expect(discardPendingEmail(5)).rejects.toThrow();
+      expect(prisma.pendingEmail.delete).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,9 +29,17 @@ export default function PendingEmailRow(props: Props) {
     approvePendingEmail,
     {}
   );
-  const [discarding, startDiscard] = useTransition();
-
   useActionToast(state, `Rechnung ${documentLabel(props.documentNumber)} versendet`, { toastErrors: false });
+
+  // Toasted right where the result arrives: after a successful discard the revalidated
+  // list no longer contains this card, so an effect would never run. ConfirmDialog
+  // toasts the returned error itself.
+  const discard = async () => {
+    const result = await discardPendingEmail(props.id);
+    if (result.error) return { error: result.error };
+    if (result.invoiceDeleted) toast.success("Abo-Entwurf und wartende E-Mail verworfen");
+    else toast.info(result.message ?? "Wartende E-Mail entfernt");
+  };
 
   const isEmpty = props.totalAmount === 0;
 
@@ -96,19 +106,18 @@ export default function PendingEmailRow(props: Props) {
             <p className="text-sm text-destructive">{state.error}</p>
           )}
           <div className="flex justify-between items-center gap-2 pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              disabled={discarding}
-              onClick={() =>
-                startDiscard(() => discardPendingEmail(props.id))
-              }
+            <ConfirmDialog
+              title="Abo-Rechnung verwerfen"
+              description="Entwurf und wartende E-Mail löschen? Die Abo-Periode wird übersprungen, das nächste Datum gilt bereits."
+              confirmLabel="Verwerfen"
+              onConfirm={discard}
+              triggerVariant="ghost"
+              triggerSize="sm"
+              triggerDisabled={isPending}
             >
               <Trash2Icon className="size-4 mr-1.5" />
-              {discarding ? "Wird verworfen…" : "Verwerfen"}
-            </Button>
+              Verwerfen
+            </ConfirmDialog>
             <Button type="submit" size="sm" disabled={isPending}>
               <SendIcon className="size-4 mr-1.5" />
               {isPending ? "Wird gesendet…" : "Senden"}
