@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useTransition, type MouseEvent } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { saveSettings, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
+import { saveSettings, setSetting, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
+import ImmediateCheckbox from "./ImmediateCheckbox";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { PasswordInput } from "@/components/ui/password-input";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES, countryName } from "@/lib/address";
@@ -77,12 +78,59 @@ export default function SettingsForm(props: Props) {
     startTransition(() => action(data));
   };
   useActionToast(state, "Einstellungen gespeichert");
+
+  // The form is dirty while its FormData differs from what it held when it was
+  // mounted (a save or a discard remounts it through `key`).
+  const formEl = useRef<HTMLFormElement | null>(null);
+  const savedValues = useRef("");
+  const [dirty, setDirty] = useState(false);
+  const [discardCount, setDiscardCount] = useState(0);
+  const serialize = (form: HTMLFormElement) =>
+    JSON.stringify(Array.from(new FormData(form).entries()));
+  const checkDirty = () => {
+    if (formEl.current) setDirty(serialize(formEl.current) !== savedValues.current);
+  };
+  const formRef = useCallback((el: HTMLFormElement | null) => {
+    formEl.current = el;
+    if (!el) return;
+    savedValues.current = JSON.stringify(Array.from(new FormData(el).entries()));
+    setDirty(false);
+  }, []);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    // Next.js has no navigation hook for the App Router, so internal links are
+    // caught before the router sees the click.
+    const onClick = (e: globalThis.MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || link.target === "_blank" || link.origin !== window.location.origin) return;
+      if (link.pathname === window.location.pathname && link.search === window.location.search) return;
+      if (!window.confirm("Ungespeicherte Änderungen gehen verloren. Seite trotzdem verlassen?")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
   useActionToast(testState, "SMTP-Verbindung erfolgreich");
   useActionToast(testEmailNotifState, "Test-E-Mail erfolgreich gesendet");
   useActionToast(testTelegramState, "Telegram-Test erfolgreich gesendet");
 
   return (
-    <form key={state?._ts ?? 0} action={formAction} className="space-y-6">
+    <form
+      key={`${state?._ts ?? 0}-${discardCount}`}
+      ref={formRef}
+      action={formAction}
+      onInput={checkDirty}
+      className="space-y-6"
+    >
       {/* Firmendaten */}
       <Card>
         <CardHeader>
@@ -129,7 +177,11 @@ export default function SettingsForm(props: Props) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="companyCountry">Land</Label>
-              <Select name="companyCountry" defaultValue={props.companyCountry}>
+              <Select
+                name="companyCountry"
+                defaultValue={props.companyCountry}
+                onValueChange={() => setTimeout(checkDirty, 0)}
+              >
                 <SelectTrigger id="companyCountry" className="w-full">
                   <SelectValue>
                     {(value: string | null) => (value ? countryName(value) : "")}
@@ -257,43 +309,29 @@ export default function SettingsForm(props: Props) {
           </div>
           </div>
 
-          <div className="flex items-start gap-3 pt-2 border-t">
-            <input
-              type="checkbox"
+          <div className="pt-2 border-t">
+            <ImmediateCheckbox
               id="useHolderNameOnQR"
-              name="useHolderNameOnQR"
-              defaultChecked={props.useHolderNameOnQR}
-              className="mt-0.5 h-4 w-4 accent-primary"
+              label="Inhabername auf QR-Rechnung verwenden"
+              description={
+                <>
+                  Aktivieren um «{props.companyHolderName || "Inhabername"}» statt «
+                  {props.companyName || "Firmenname"}» als Gläubiger zu drucken. Gilt sofort.
+                </>
+              }
+              checked={props.useHolderNameOnQR}
+              save={(next) => setSetting("useHolderNameOnQR", next)}
             />
-            <div>
-              <Label htmlFor="useHolderNameOnQR" className="cursor-pointer font-medium">
-                Inhabername auf QR-Rechnung verwenden
-              </Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Aktivieren um «{props.companyHolderName || "Inhabername"}» statt
-                «{props.companyName || "Firmenname"}» als Gläubiger zu drucken.
-              </p>
-            </div>
           </div>
 
-          <div className="flex items-start gap-3 pt-2 border-t">
-            <input
-              type="checkbox"
+          <div className="pt-2 border-t">
+            <ImmediateCheckbox
               id="roundTotalTo5Rappen"
-              name="roundTotalTo5Rappen"
-              defaultChecked={props.roundTotalTo5Rappen}
-              className="mt-0.5 h-4 w-4 accent-primary"
+              label="Rechnungsbetrag auf 5 Rappen runden"
+              description="Rundet das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen. Die Differenz steht als Zeile «Rundung» auf dem PDF. Positionen werden nicht gerundet, bereits versendete Rechnungen bleiben unverändert. Gilt sofort."
+              checked={props.roundTotalTo5Rappen}
+              save={(next) => setSetting("roundTotalTo5Rappen", next)}
             />
-            <div>
-              <Label htmlFor="roundTotalTo5Rappen" className="cursor-pointer font-medium">
-                Rechnungsbetrag auf 5 Rappen runden
-              </Label>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Rundet das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen.
-                Die Differenz steht als Zeile «Rundung» auf dem PDF. Positionen werden nicht gerundet,
-                bereits versendete Rechnungen bleiben unverändert.
-              </p>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -419,30 +457,20 @@ export default function SettingsForm(props: Props) {
           </div>
 
           <div className="space-y-3 pt-2 border-t">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="notifyOverdueEnabled"
-                name="notifyOverdueEnabled"
-                defaultChecked={props.notifyOverdueEnabled}
-                className="mt-0.5 h-4 w-4 accent-primary"
-              />
-              <Label htmlFor="notifyOverdueEnabled" className="cursor-pointer font-normal">
-                Bei neuen überfälligen Rechnungen benachrichtigen
-              </Label>
-            </div>
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="notifyPendingEnabled"
-                name="notifyPendingEnabled"
-                defaultChecked={props.notifyPendingEnabled}
-                className="mt-0.5 h-4 w-4 accent-primary"
-              />
-              <Label htmlFor="notifyPendingEnabled" className="cursor-pointer font-normal">
-                Bei neuen Abo-Rechnungen zur Überprüfung benachrichtigen
-              </Label>
-            </div>
+            <ImmediateCheckbox
+              id="notifyOverdueEnabled"
+              label="Bei neuen überfälligen Rechnungen benachrichtigen"
+              labelClassName="cursor-pointer font-normal"
+              checked={props.notifyOverdueEnabled}
+              save={(next) => setSetting("notifyOverdueEnabled", next)}
+            />
+            <ImmediateCheckbox
+              id="notifyPendingEnabled"
+              label="Bei neuen Abo-Rechnungen zur Überprüfung benachrichtigen"
+              labelClassName="cursor-pointer font-normal"
+              checked={props.notifyPendingEnabled}
+              save={(next) => setSetting("notifyPendingEnabled", next)}
+            />
           </div>
 
           <div className="space-y-1 pt-2 border-t">
@@ -529,13 +557,32 @@ export default function SettingsForm(props: Props) {
         </CardContent>
       </Card>
 
-      {state?.error && (
-        <p className="text-sm text-destructive">{state.error}</p>
+      {dirty && (
+        <div
+          role="region"
+          aria-label="Ungespeicherte Änderungen"
+          className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 px-4 py-3 shadow-lg backdrop-blur"
+        >
+          <div className="text-sm">
+            <p className="font-medium">Ungespeicherte Änderungen</p>
+            {state?.error && <p className="text-destructive">{state.error}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={() => setDiscardCount((n) => n + 1)}
+            >
+              Verwerfen
+            </Button>
+            <Button type="submit" size="sm" disabled={isPending}>
+              {isPending ? "Speichern…" : "Einstellungen speichern"}
+            </Button>
+          </div>
+        </div>
       )}
-
-      <Button type="submit" className="w-full sm:w-auto" disabled={isPending}>
-        {isPending ? "Speichern…" : "Einstellungen speichern"}
-      </Button>
     </form>
   );
 }
