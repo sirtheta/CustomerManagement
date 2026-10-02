@@ -1,6 +1,6 @@
 # Feature-Analyse CustomerManagement
 
-Stand: 02.10.2026 · Basis: Branch `ccr-742559e2-jlc1nl` (Release 1.5.0 plus die danach in `main` gemergten PRs bis #131)
+Stand: 02.10.2026 · Basis: Release 1.5.0 plus die danach in `main` gemergten PRs bis #136
 Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Historie) plus Web-Recherche für rechtliche/technische Standards.
 
 **Legende**
@@ -20,9 +20,9 @@ Methode: Nur lesende Code-Analyse (Schema, Server Actions, `lib/`, Tests, Git-Hi
 4. **Ein Mandant:** Es gibt genau eine Firma. Alle Zugriffe laufen über `companyInformation`/`applicationSettings.findFirst()`. [Code] z. B. `lib/document-actions.ts`, `lib/yearly-invoices.ts`
 5. **Heute vorhanden:** Kunden (mit Notizen, Dateien, Kundennummer, UID, abweichender Rechnungsadresse, Zahlungsfrist und Kontakten), Kundenverlauf und Aufgaben mit Wiedervorlage, Offerten, Umwandlung Offerte → Rechnung, Rechnungen mit Positions- und Gesamtrabatt, Festschreiben und Gutschriften, PDF mit QR-Zahlteil, E-Mail-Versand mit PDF-Archiv, flexible Abos mit Vorlage, Zahlungen mit Teilzahlungen und Offene-Posten-Liste, Mahnwesen mit vier Stufen und eigenem Mahnbeleg (optional mit Gebühr und Verzugszins), CAMT.053-Import mit gespeicherten Bewegungen, externe Zahlungs-API für eine „Budget-App“, Ausgaben mit Beleg, Einnahmen/Ausgaben-Übersicht, Jahresabschluss-Paket (ZIP), Auswertungen, Audit-Log mit Hash-Kette, nächtliches Backup, Rollen Admin/Editor/Viewer, Logs, DB-Export. Optionale Funktionen lassen sich unter Einstellungen → Module abschalten (#131).
 6. **Zielgruppe:** [Annahme] Einzelunternehmer oder sehr kleine Firmen (1–3 Nutzer) in der Deutschschweiz, nur Inlandskunden in CHF, die selbst hosten. Dafür spricht: nur CHF, Schuldnerland fest auf „CH“, nur deutsche Oberfläche, Rechnungsversand erst nach Prüfung, Hosting auf dem Raspberry Pi. Für **Vereine** gibt es keine besonderen Funktionen (z. B. Mitglieder, Beiträge).
-9. **MWST:** Die App enthält **bewusst keine MWST**, da sie höchstens für kleine Geschäfte gedacht ist (Entscheid des Entwicklers). Dieses Dokument schlägt deshalb keine MWST-Funktionen vor.
-7. **Qualität:** 124 Unit-/Integrationstest-Dateien, E2E nur für den Login (`tests/e2e/login.spec.ts`). CI mit Lint, Tests, Build und E2E (`.github/workflows/`). Keine TODO/FIXME-Kommentare (Suche nach `TODO|FIXME|HACK|XXX`).
+7. **Qualität:** 126 Unit-/Integrationstest-Dateien, E2E nur für den Login (`tests/e2e/login.spec.ts`). CI mit Lint, Tests, Build und E2E (`.github/workflows/`). Keine TODO/FIXME-Kommentare (Suche nach `TODO|FIXME|HACK|XXX`).
 8. **Zuletzt bearbeitet:** laut Git-Historie Mahnwesen mit Mahnbelegen (F8, #126), Aufgaben und Kundenverlauf (F12, #128), erweitertes Kundenmodell (F10, #129), abschaltbare Module (#131) sowie kleine Fixes (#127 Rabattfelder, #130 Benutzerdialoge). Das eingebaute Benutzerhandbuch (`public/benutzerhandbuch.html`) wird mit den Features mitgeführt.
+9. **MWST:** Die App enthält **bewusst keine MWST**, da sie höchstens für kleine Geschäfte gedacht ist (Entscheid des Entwicklers). Dieses Dokument schlägt deshalb keine MWST-Funktionen vor.
 
 ---
 
@@ -227,8 +227,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 **Phase 1: kurzfristig (0–3 Monate) – Korrektheit und Vertrauen**
 
 - [x] 1. F2 Nummer erst beim Versand bzw. bei der PDF-Erzeugung
-- [x] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen (offen: Bearbeiten in jedem Status möglich, keine `Restrict`-Löschung, keine Gutschrift, keine Zustandsmaschine)
-- [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
+- [x] 2. F3 Festschreiben, Gutschrift, keine Cascade-Löschung von Rechnungen- [x] 3. F1 IBAN-Prüfung (#113, `lib/iban.ts`, genutzt in `settings/actions.ts`)
 - [x] 4. F4 Belegarchiv und automatisches Backup (Teil A PDF-Archiv, Teil B Hash-Kette und Teil C Backup erledigt)
   - [x] C Automatisches nächtliches Backup (`lib/backup.ts`)
   - [x] A PDF-Archiv mit SHA-256-Hash (`lib/document-archive.ts`, `SentDocument`)
@@ -272,9 +271,7 @@ Aufwand ist gemessen an der bestehenden Architektur: **gering** = wenige Tage, *
 4. **Kunden:** Brauchst du Rechnungen in EUR (Auslandsadressen gehen seit #111)? *Beantwortet: nein, EUR ist bewusst verworfen.*
 5. **„Budget-App“:** Was ist das genau (`app/api/external/payments/route.ts`)? Soll sie bleiben oder durch F7 ersetzt werden? *Beantwortet: Haushaltsbudget-App des Nutzers, die nach ihrem Import Zahlungseingänge an diese Schnittstelle schickt. Das CRM muss auch ohne sie funktionieren. Seit F7 hat es einen eigenen Bankimport, die Schnittstelle bleibt optional (neu: optionales `bankReference`).*
 6. **Volumen:** Wie viele Rechnungen, Ausgaben und Belege pro Jahr? (Relevant für BLOB-Speicherung in SQLite und Backups.)
-7. **Nummern:** Sollen bestehende, nie versendete Entwürfe bei F2 ihre Nummer verlieren oder behalten? Soll das Format (Präfix + JJMM + 4 Ziffern) konfigurierbar werden?
-8. **Betrieb:** Läuft die Instanz aus dem Internet erreichbar oder nur im LAN? (Relevant für Online-Zahlungs-Webhooks und die Backup-Strategie.) Welche Zeitzone hat der Container?
-9. **Bearbeitete Rechnungen:** Gibt es heute schon versendete Rechnungen, die nachträglich geändert wurden? Das wäre vor F3 per Audit-Log zu prüfen.
+7. **Betrieb:** Läuft die Instanz aus dem Internet erreichbar oder nur im LAN? (Relevant für Online-Zahlungs-Webhooks und die Backup-Strategie.) Welche Zeitzone hat der Container?
 
 ---
 
