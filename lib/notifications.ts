@@ -7,6 +7,7 @@ import { decryptSecret } from "@/lib/crypto";
 import { checkAndUpdateAllDocumentStates } from "@/lib/state-manager";
 import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
+import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
 
@@ -32,6 +33,16 @@ export function startNotificationScheduler(): void {
       ["checkAndUpdateAllDocumentStates", () => checkAndUpdateAllDocumentStates(prisma)],
       ["checkOverdueInvoices", () => checkOverdueInvoices(prisma)],
       ["checkSubscriptions", () => checkSubscriptions(prisma)],
+      ["closeAnsweredFollowUps", () => closeAnsweredFollowUps(prisma)],
+      [
+        "notifyDueTasks",
+        async () => {
+          const settings = await prisma.applicationSettings.findFirst({
+            include: { companyInfo: true },
+          });
+          await notifyDueTasks(prisma, settings);
+        },
+      ],
       [
         "sendAdminNotifications",
         async () => {
