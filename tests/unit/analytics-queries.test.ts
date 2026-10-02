@@ -9,7 +9,27 @@ import {
   combineCategoryAmounts,
   yearBounds,
   monthBounds,
+  allocatePayment,
 } from "@/app/(app)/analytics/lib/analytics-queries";
+
+describe("allocatePayment", () => {
+  const item = (id: number, total: number) => ({ id, totalAmount: { toNumber: () => total } });
+
+  it("splits by item share and gives the remainder to the largest item", () => {
+    const shares = allocatePayment(1000, [item(1, 33.33), item(2, 33.33), item(3, 33.34)]);
+    expect(shares.map((s) => [s.item?.id, s.rappen])).toEqual([[1, 333], [2, 333], [3, 334]]);
+  });
+
+  it("always adds up to the payment, also with negative items", () => {
+    const shares = allocatePayment(777, [item(1, 120), item(2, -20), item(3, 0.07)]);
+    expect(shares.reduce((s, x) => s + x.rappen, 0)).toBe(777);
+  });
+
+  it("returns one share without item when there are no items or they sum to zero", () => {
+    expect(allocatePayment(500, [])).toEqual([{ item: null, rappen: 500 }]);
+    expect(allocatePayment(500, [item(1, 10), item(2, -10)])).toEqual([{ item: null, rappen: 500 }]);
+  });
+});
 
 describe("categoryParamValue", () => {
   it("encodes null as 'none'", () => {

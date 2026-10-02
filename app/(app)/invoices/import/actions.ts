@@ -195,6 +195,8 @@ export async function bookExpenses(
         const created = await tx.expense.create({
           data: {
             date: entry.date,
+            // Already debited per the statement, so it is not an open supplier invoice.
+            paidDate: entry.date,
             description,
             amount: Math.abs(entry.amountRappen) / 100,
             categoryId,

@@ -130,44 +130,104 @@ export type DrilldownExpense = {
   amount: number;
 };
 
+type CategoryRef = { categoryId: number; name: string; colorHex: string | null };
+type AllocItem = { id: number; name: string; totalAmount: { toNumber(): number }; category: CategoryRef | null };
+
+export type ItemShare<T> = { item: T | null; rappen: number };
+
+const toRappen = (value: { toNumber(): number }) => Math.round(value.toNumber() * 100);
+
+/**
+ * Splits one payment over the invoice items by their share of the item sum,
+ * so invoice discount, 5-Rappen rounding, credit notes and partial payments
+ * are all covered by the amount actually received. The rounding remainder
+ * goes to the largest item, so the shares always add up to the payment.
+ * Without items (or an item sum of 0) the whole payment has no item.
+ */
+export function allocatePayment<T extends { totalAmount: { toNumber(): number } }>(
+  paymentRappen: number,
+  items: T[],
+): ItemShare<T>[] {
+  const weights = items.map((item) => toRappen(item.totalAmount));
+  const weightSum = weights.reduce((s, w) => s + w, 0);
+  if (items.length === 0 || weightSum === 0) return [{ item: null, rappen: paymentRappen }];
+
+  const shares = items.map((item, i) => ({ item, rappen: Math.round((paymentRappen * weights[i]) / weightSum) }));
+  let largest = 0;
+  for (let i = 1; i < weights.length; i++) {
+    if (Math.abs(weights[i]) > Math.abs(weights[largest])) largest = i;
+  }
+  shares[largest].rappen += paymentRappen - shares.reduce((s, x) => s + x.rappen, 0);
+  return shares;
+}
+
+const PAYMENT_ALLOCATION_SELECT = {
+  date: true,
+  amount: true,
+  invoice: {
+    select: {
+      id: true,
+      customerId: true,
+      documentNumber: true,
+      customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
+      items: {
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          name: true,
+          totalAmount: true,
+          category: { select: { categoryId: true, name: true, colorHex: true } },
+        },
+      },
+    },
+  },
+} as const;
+
+function paymentsInYear(year: number) {
+  const { start, end } = yearBounds(year);
+  // Same filter as the annual revenue, so the categories add up to it.
+  return prisma.payment.findMany({
+    where: { date: { gte: start, lt: end } },
+    select: PAYMENT_ALLOCATION_SELECT,
+  });
+}
+
+const NO_ITEMS_LABEL = "Ohne Positionen";
+
 export async function fetchDrilldownIncomeItems(
   year: number,
   categoryId: number | null,
 ): Promise<DrilldownIncomeItem[]> {
-  const { start: yearStart, end: yearEnd } = yearBounds(year);
+  const payments = await paymentsInYear(year);
 
-  const items = await prisma.item.findMany({
-    where: {
-      categoryId,
-      invoice: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } },
-    },
-    orderBy: { invoice: { date: "desc" } },
-    select: {
-      id: true,
-      name: true,
-      totalAmount: true,
-      invoice: {
-        select: {
-          id: true,
-          documentNumber: true,
-          date: true,
-          customer: {
-            select: { company: true, contactPerson: true, contactInsteadOfCompany: true },
-          },
-        },
-      },
-    },
-  });
+  // One row per item (or per itemless invoice), summed over the year's payments.
+  const rows = new Map<number, DrilldownIncomeItem & { rappen: number; lastPaid: Date }>();
+  for (const p of payments) {
+    for (const share of allocatePayment<AllocItem>(toRappen(p.amount), p.invoice.items)) {
+      if ((share.item?.category?.categoryId ?? null) !== categoryId) continue;
+      // Negative ids keep itemless invoices apart from real item ids.
+      const key = share.item ? share.item.id : -p.invoice.id;
+      const row = rows.get(key) ?? {
+        id: key,
+        invoiceId: p.invoice.id,
+        invoiceNumber: documentLabel(p.invoice.documentNumber),
+        customerName: customerDisplayName(p.invoice.customer),
+        date: "",
+        name: share.item?.name ?? NO_ITEMS_LABEL,
+        totalAmount: 0,
+        rappen: 0,
+        lastPaid: p.date,
+      };
+      row.rappen += share.rappen;
+      if (p.date > row.lastPaid) row.lastPaid = p.date;
+      rows.set(key, row);
+    }
+  }
 
-  return items.map((item) => ({
-    id: item.id,
-    invoiceId: item.invoice!.id,
-    invoiceNumber: documentLabel(item.invoice!.documentNumber),
-    customerName: customerDisplayName(item.invoice!.customer),
-    date: formatDateIso(item.invoice!.date),
-    name: item.name,
-    totalAmount: item.totalAmount.toNumber(),
-  }));
+  return [...rows.values()]
+    .filter((row) => row.rappen !== 0)
+    .sort((a, b) => b.lastPaid.getTime() - a.lastPaid.getTime() || b.id - a.id)
+    .map(({ rappen, lastPaid, ...row }) => ({ ...row, date: formatDateIso(lastPaid), totalAmount: rappen / 100 }));
 }
 
 export async function fetchDrilldownExpenses(
@@ -298,7 +358,6 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
     allNonDraftInvoices,
     paidInYear,
     invoiceDateRange,
-    incomeItems,
     expenseRows,
   ] = await Promise.all([
     prisma.payment.aggregate({
@@ -310,18 +369,8 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
       where: { state: { notIn: [InvoiceState.Draft] }, creditNoteForId: null, date: { gte: yearStart, lt: yearEnd } },
       select: { state: true, totalAmount: true },
     }),
-    prisma.payment.findMany({
-      where: { date: { gte: yearStart, lt: yearEnd } },
-      select: { date: true, amount: true, invoice: { select: { customerId: true } } },
-    }),
+    paymentsInYear(year),
     prisma.invoice.aggregate({ _min: { date: true }, _max: { date: true } }),
-    prisma.item.findMany({
-      where: { invoice: { state: InvoiceState.Paid, paidDate: { gte: yearStart, lt: yearEnd } } },
-      select: {
-        totalAmount: true,
-        category: { select: { categoryId: true, name: true, colorHex: true } },
-      },
-    }),
     prisma.expense.findMany({
       where: { date: { gte: yearStart, lt: yearEnd } },
       select: {
@@ -362,9 +411,15 @@ async function fetchAnalyticsDataUncached(year: number): Promise<AnalyticsData> 
     amount: monthlyMap[i],
   }));
 
+  // Summed in Rappen so the categories add up exactly to the annual revenue.
   const incomeByCategory = groupByCategory(
-    incomeItems.map((item) => ({ amount: item.totalAmount.toNumber(), category: item.category })),
-  );
+    paidInYear.flatMap((p) =>
+      allocatePayment<AllocItem>(toRappen(p.amount), p.invoice.items).map((share) => ({
+        amount: share.rappen,
+        category: share.item?.category ?? null,
+      })),
+    ),
+  ).map((c) => ({ ...c, total: c.total / 100 }));
   const expensesByCategory = groupByCategory(
     expenseRows.map((exp) => ({ amount: exp.amount.toNumber(), category: exp.category })),
   );

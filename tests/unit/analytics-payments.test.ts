@@ -5,7 +5,6 @@ const dec = (n: number) => ({ toNumber: () => n });
 const mockPrisma = vi.hoisted(() => ({
   payment: { aggregate: vi.fn(), findMany: vi.fn() },
   invoice: { findMany: vi.fn(), aggregate: vi.fn() },
-  item: { findMany: vi.fn() },
   expense: { findMany: vi.fn() },
   customer: { findMany: vi.fn() },
 }));
@@ -22,7 +21,6 @@ describe("fetchAnalyticsData (payment based)", () => {
     vi.clearAllMocks();
     mockPrisma.invoice.findMany.mockResolvedValue([]);
     mockPrisma.invoice.aggregate.mockResolvedValue({ _min: { date: null }, _max: { date: null } });
-    mockPrisma.item.findMany.mockResolvedValue([]);
     mockPrisma.expense.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([]);
     mockSumOpen.mockResolvedValue({ amount: 75.5, count: 2 });
@@ -31,9 +29,9 @@ describe("fetchAnalyticsData (payment based)", () => {
   it("derives revenue, monthly series, top customers and outstanding from payments", async () => {
     mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amount: dec(200) } });
     mockPrisma.payment.findMany.mockResolvedValue([
-      { date: new Date(2026, 2, 5, 12), amount: dec(40), invoice: { customerId: 1 } },
-      { date: new Date(2026, 4, 2, 12), amount: dec(60), invoice: { customerId: 1 } },
-      { date: new Date(2026, 4, 3, 12), amount: dec(100), invoice: { customerId: 2 } },
+      { date: new Date(2026, 2, 5, 12), amount: dec(40), invoice: { customerId: 1, items: [] } },
+      { date: new Date(2026, 4, 2, 12), amount: dec(60), invoice: { customerId: 1, items: [] } },
+      { date: new Date(2026, 4, 3, 12), amount: dec(100), invoice: { customerId: 2, items: [] } },
     ]);
     mockPrisma.customer.findMany.mockResolvedValue([
       { customerId: 1, company: "Eins AG", contactPerson: null, contactInsteadOfCompany: false },
@@ -59,7 +57,7 @@ describe("fetchAnalyticsData (payment based)", () => {
       [1, 2, 3, 4, 5, 6].map((id) => ({
         date: new Date(2026, 0, 10, 12),
         amount: dec(id * 10),
-        invoice: { customerId: id },
+        invoice: { customerId: id, items: [] },
       })),
     );
 

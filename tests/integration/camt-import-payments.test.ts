@@ -206,6 +206,8 @@ describe("CAMT import actions against a real database", () => {
     expect(expenses[0].description).toBe("Swisscom AG – Rechnung März");
     expect(expenses[0].categoryId).toBe(category.categoryId);
     expect(expenses[0].date.toISOString().slice(0, 10)).toBe("2026-03-03");
+    // The money already left the account, so the expense is not an open supplier invoice.
+    expect(expenses[0].paidDate?.toISOString().slice(0, 10)).toBe("2026-03-03");
     const linked = await db.prisma.bankTransaction.findUniqueOrThrow({ where: { id: ids[0] } });
     expect(linked.expenseId).toBe(expenses[0].id);
     const untouched = await db.prisma.bankTransaction.findUniqueOrThrow({ where: { id: ids[1] } });
@@ -252,6 +254,62 @@ describe("CAMT import actions against a real database", () => {
     const result = await undoStatementImport(booked.importId);
     expect(result.error).toContain("verbucht");
     expect(await db.prisma.bankTransaction.count()).toBe(1);
+  });
+
+  describe("undo with an overlapping later import", () => {
+    const jan = [
+      { date: "2026-01-05", amountCents: -100, description: "Jan 1", counterparty: null, bankReference: "J1" },
+      { date: "2026-01-20", amountCents: -200, description: "Jan 2", counterparty: null, bankReference: "J2" },
+    ];
+    const feb = { date: "2026-02-03", amountCents: -300, description: "Feb", counterparty: null, bankReference: "F1" };
+
+    async function upload(transactions: ParsedTransaction[], periodFrom: string, periodTo: string) {
+      holder.prisma = db.prisma;
+      return importStatement(
+        {
+          statement: {
+            transactions,
+            iban: "CH9300762011623852957",
+            currency: "CHF",
+            openingBalanceCents: null,
+            closingBalanceCents: null,
+            periodFrom,
+            periodTo,
+            warnings: [],
+          },
+          filename: `${periodFrom}.xml`,
+          actor,
+        },
+        db.prisma
+      );
+    }
+
+    it("refuses to undo an import whose entries a later import skipped", async () => {
+      const a = await upload(jan, "2026-01-01", "2026-01-31");
+      const b = await upload([...jan, feb], "2026-01-01", "2026-02-28");
+      expect(b.skippedCount).toBe(2);
+
+      const result = await undoStatementImport(a.importId!);
+      expect(result.error).toContain("späterer Import");
+      expect(await db.prisma.bankTransaction.count()).toBe(3);
+
+      // Undoing the later one first frees the earlier one again.
+      expect(await undoStatementImport(b.importId!)).toEqual({});
+      expect(await undoStatementImport(a.importId!)).toEqual({});
+      expect(await db.prisma.bankTransaction.count()).toBe(0);
+    });
+
+    it("still undoes an import when the later one does not overlap", async () => {
+      const a = await upload(jan, "2026-01-01", "2026-01-31");
+      // The last import skips a known February entry, which cannot belong to January.
+      await upload([feb], "2026-02-01", "2026-02-15");
+      const late = { ...feb, date: "2026-02-20", bankReference: "F2" };
+      const c = await upload([feb, late], "2026-02-01", "2026-02-28");
+      expect(c.skippedCount).toBe(1);
+
+      expect(await undoStatementImport(a.importId!)).toEqual({});
+      expect(await db.prisma.bankTransaction.count()).toBe(2);
+    });
   });
 
   it("books an entry only once when two confirmations run at the same time", async () => {

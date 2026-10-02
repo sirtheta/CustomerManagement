@@ -155,7 +155,38 @@ export async function importStatement(
   };
 }
 
-/** Deletes an import with all its entries, as long as none of them was booked. */
+type ImportPeriod = { id: number; iban: string | null; periodFrom: string | null; periodTo: string | null };
+
+/**
+ * A later import only stores entries it did not know, and which earlier
+ * import the skipped ones belong to is not recorded. So any later import of
+ * the same account with skipped entries and an overlapping (or unknown)
+ * period may rely on this import's rows; deleting them would lose those
+ * entries for good.
+ */
+async function findShadowingImport(
+  target: ImportPeriod,
+  prisma: PrismaClient
+): Promise<{ filename: string } | null> {
+  const later = await prisma.bankStatementImport.findMany({
+    where: { id: { gt: target.id }, skippedCount: { gt: 0 } },
+    select: { id: true, filename: true, iban: true, periodFrom: true, periodTo: true },
+    orderBy: { id: "asc" },
+  });
+  return (
+    later.find((other) => {
+      if (target.iban && other.iban && target.iban !== other.iban) return false;
+      if (!target.periodFrom || !target.periodTo || !other.periodFrom || !other.periodTo) return true;
+      // YYYY-MM-DD compares as text; inclusive because both can hold the same day.
+      return other.periodFrom <= target.periodTo && target.periodFrom <= other.periodTo;
+    }) ?? null
+  );
+}
+
+/**
+ * Deletes an import with all its entries, as long as none of them was booked
+ * and no later import skipped entries that may be stored here.
+ */
 export async function undoImport(
   params: { importId: number; actor: Session },
   prisma: PrismaClient = defaultPrisma
@@ -168,6 +199,13 @@ export async function undoImport(
   if (existing.transactions.some((t) => t.paymentId !== null || t.expenseId !== null)) {
     throw new BankImportError(
       "Aus diesem Import sind bereits Zahlungen oder Ausgaben verbucht. Bitte zuerst diese löschen."
+    );
+  }
+  const shadowing = await findShadowingImport(existing, prisma);
+  if (shadowing) {
+    throw new BankImportError(
+      `Ein späterer Import (${shadowing.filename}) hat Bewegungen dieses Zeitraums als bereits bekannt übersprungen. ` +
+        "Sie gingen beim Rückgängigmachen verloren. Bitte zuerst den späteren Import rückgängig machen."
     );
   }
 
