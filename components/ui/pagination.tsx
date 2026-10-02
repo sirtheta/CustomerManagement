@@ -22,11 +22,13 @@ export function Pagination({ currentPage, totalPages, totalCount, pageSize, base
   const pages = buildPageList(currentPage, totalPages);
 
   return (
-    <div className="flex items-center justify-between gap-4 text-sm">
+    // Wraps on narrow screens: the page links move below the count instead of
+    // widening the page.
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
       <span className="text-muted-foreground">
         {from}–{to} von {totalCount} Einträgen
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <PaginationLink
           href={pageHref(currentPage - 1)}
           disabled={currentPage === 1}

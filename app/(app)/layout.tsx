@@ -30,7 +30,9 @@ export default async function AppLayout({
     <div className="min-h-screen flex flex-col bg-background">
       <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
         <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex h-14 items-center justify-between gap-4">
-          <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+          {/* self-stretch: the clipping box spans the full header height, so the
+              floating count badges above the nav pills are not cut off. */}
+          <div className="flex items-center gap-1 min-w-0 flex-1 self-stretch overflow-hidden">
             <Link
               href="/dashboard"
               className="font-bold text-sm text-primary mr-3 shrink-0 hidden md:block tracking-tight"

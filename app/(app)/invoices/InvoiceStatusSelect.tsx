@@ -105,7 +105,7 @@ export default function InvoiceStatusSelect({ invoiceId, currentState, nextDocum
       )}
 
       <Dialog open={confirmTarget !== null} onOpenChange={(open) => !open && setConfirmTarget(null)}>
-        <DialogContent showCloseButton={false}>
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               Ohne Versand als «{confirmTarget ? labelOf(confirmTarget) : ""}» markieren?
@@ -117,7 +117,7 @@ export default function InvoiceStatusSelect({ invoiceId, currentState, nextDocum
               Versenden bitte «Senden» verwenden.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="sm:flex-wrap">
             <DialogClose render={<Button variant="outline" />}>Abbrechen</DialogClose>
             <Button variant="secondary" onClick={confirmMark}>
               Trotzdem so markieren

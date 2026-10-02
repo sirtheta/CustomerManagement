@@ -23,7 +23,7 @@ import { UserRole, type InvoiceState } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
 import { toRappen } from "@/lib/calculations";
 import { auth } from "@/lib/auth";
-import { hasRole } from "@/lib/permissions";
+import { hasRole, isEditorSession } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
@@ -68,7 +68,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
   const modules = await loadModules();
   const session = await auth();
-  const canEdit = session ? hasRole(session, [UserRole.Admin, UserRole.Editor]) : false;
+  // Viewers only read: every action below is hidden for them (the actions check the role too).
+  const canEdit = isEditorSession(session);
+  const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
 
   const [invoice, settings] = await Promise.all([
     prisma.invoice.findUnique({
@@ -116,7 +118,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const { subject: defaultSubject, body: defaultBody } = invoiceMail(invoice, settings, companyName);
 
   // Read-only preview for the status confirmation; the real number is assigned on the change.
-  const nextDocumentNumber = invoice.state === "Draft" && !isCreditNote ? await generateInvoiceNumber() : null;
+  const nextDocumentNumber =
+    canEdit && invoice.state === "Draft" && !isCreditNote ? await generateInvoiceNumber() : null;
 
   const pending = invoice.pendingReminder;
   const reminder =
@@ -143,7 +146,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       case "awaitingJob":
         return "Überfällig: Die Mahnung wird beim nächsten täglichen Abgleich vorbereitet und erscheint dann unter «Mahnungen».";
       case "partiallyPaid":
-        return "Teilbezahlte Rechnungen werden nicht automatisch gemahnt.";
+        return "Teilbezahlte Rechnungen können in der App nicht gemahnt werden.";
       default:
         return null;
     }
@@ -398,7 +401,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </Card>
       )}
 
-      {!isCreditNote && (
+      {/* Viewers see the status only as the badge in the header. */}
+      {canEdit && !isCreditNote && (
         <Card>
           <CardHeader>
             <CardTitle>Status ändern</CardTitle>
@@ -414,16 +418,23 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        {invoice.state === "Draft" ? <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} /> : <span />}
+        {canDelete && invoice.state === "Draft" ? (
+          <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} />
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-2 flex-wrap">
-          <SendInvoiceButton
-            invoiceId={invoice.id}
-            customerEmail={billingEmail(invoice.customer)}
-            documentNumber={invoice.documentNumber}
-            defaultSubject={defaultSubject}
-            defaultBody={defaultBody}
-            isCreditNote={isCreditNote}
-          />
+          {canEdit && (
+            <SendInvoiceButton
+              invoiceId={invoice.id}
+              customerEmail={billingEmail(invoice.customer)}
+              documentNumber={invoice.documentNumber}
+              defaultSubject={defaultSubject}
+              defaultBody={defaultBody}
+              isCreditNote={isCreditNote}
+              expectedDocumentNumber={nextDocumentNumber}
+            />
+          )}
           {reminder.kind === "available" && pending && (
             <Button
               variant="outline"
@@ -440,7 +451,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
             <CreateCreditNoteButton invoiceId={invoice.id} />
           )}
-          {!isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}
+          {canEdit && !isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}
           <Button
             variant="outline"
             render={<Link href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
