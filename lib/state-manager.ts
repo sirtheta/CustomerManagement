@@ -24,6 +24,15 @@ export function allowedInvoiceTargets(from: InvoiceState): InvoiceState[] {
 }
 
 /**
+ * True when a manual status change takes a draft out of Draft (Sent, Paid,
+ * Overdue): updateInvoiceStatus then numbers and locks it, but sends no mail.
+ * The status select asks for confirmation in exactly this case.
+ */
+export function locksDraftWithoutMail(from: InvoiceState, to: InvoiceState): boolean {
+  return from === "Draft" && to !== "Draft";
+}
+
+/**
  * Marks overdue invoices (state=Sent, dueDate < now) as Overdue,
  * and expired quotes (state=Sent, validUntil < now) as Expired.
  *

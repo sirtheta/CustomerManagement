@@ -31,6 +31,9 @@ import { billingEmail } from "@/lib/customer-billing";
 import { loadModules } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
 import { invoiceMail } from "@/lib/mail-templates";
+import { generateInvoiceNumber } from "@/lib/document-number";
+import { isLastReminderLevelSent, latestSentReminders, reminderAvailability } from "@/lib/reminders";
+import { SendDialogProvider } from "../SendDialogContext";
 
 const stateLabels: Record<InvoiceState, string> = {
   Draft: "Entwurf",
@@ -77,7 +80,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         sentDocuments: { orderBy: { createdAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
         creditNoteFor: { select: { id: true, documentNumber: true } },
-        pendingReminder: { select: { reminderLevel: true, snoozedUntil: true } },
+        pendingReminder: { select: { id: true, invoiceId: true, reminderLevel: true, snoozedUntil: true, createdAt: true } },
         creditNotes: {
           where: { state: { not: "Draft" } },
           orderBy: { date: "asc" },
@@ -112,7 +115,42 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
   const { subject: defaultSubject, body: defaultBody } = invoiceMail(invoice, settings, companyName);
 
+  // Read-only preview for the status confirmation; the real number is assigned on the change.
+  const nextDocumentNumber = invoice.state === "Draft" && !isCreditNote ? await generateInvoiceNumber() : null;
+
+  const pending = invoice.pendingReminder;
+  const reminder =
+    canEdit && modules.reminders
+      ? reminderAvailability({
+          state: invoice.state,
+          dueDate: invoice.dueDate,
+          isCreditNote,
+          pendingReminder: pending,
+          lastLevelSent: pending ? await isLastReminderLevelSent(prisma, pending) : false,
+        })
+      : ({ kind: "none" } as const);
+  // Newest notice of the current reminder (same source and cut-off as the Mahnungen list).
+  const lastSentReminder = pending ? (await latestSentReminders(prisma, [pending])).get(invoice.id) : undefined;
+  const lastSentText = lastSentReminder
+    ? `Letzte Mahnung: ${reminderTitle(lastSentReminder.level)} (Stufe ${lastSentReminder.level}) am ${formatDate(lastSentReminder.sentAt)}.`
+    : "";
+  const reminderHint: string | null = (() => {
+    switch (reminder.kind) {
+      case "snoozed":
+        return `${reminderTitle(reminder.level)} wieder möglich ab ${formatDate(reminder.until)} (zuletzt versendet oder zurückgestellt). ${lastSentText}`.trim();
+      case "lastLevelSent":
+        return `Letzte Mahnstufe versendet, die App sendet keine weitere Mahnung. ${lastSentText}`.trim();
+      case "awaitingJob":
+        return "Überfällig: Die Mahnung wird beim nächsten täglichen Abgleich vorbereitet und erscheint dann unter «Mahnungen».";
+      case "partiallyPaid":
+        return "Teilbezahlte Rechnungen werden nicht automatisch gemahnt.";
+      default:
+        return null;
+    }
+  })();
+
   return (
+    <SendDialogProvider>
     <div className="space-y-4">
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -369,6 +407,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <InvoiceStatusSelect
               invoiceId={invoice.id}
               currentState={invoice.state}
+              nextDocumentNumber={nextDocumentNumber}
             />
           </CardContent>
         </Card>
@@ -385,12 +424,17 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             defaultBody={defaultBody}
             isCreditNote={isCreditNote}
           />
-          {canEdit && modules.reminders && invoice.pendingReminder && (
+          {reminder.kind === "available" && pending && (
             <Button
               variant="outline"
-              render={<Link href={`/invoices/reminders?search=${encodeURIComponent(invoice.documentNumber ?? "")}`} />}
+              title={lastSentText || undefined}
+              render={
+                <Link
+                  href={`/invoices/reminders?search=${encodeURIComponent(invoice.documentNumber ?? "")}#reminder-${pending.id}`}
+                />
+              }
             >
-              {reminderTitle(invoice.pendingReminder.reminderLevel)} senden
+              {reminderTitle(reminder.level)} senden
             </Button>
           )}
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
@@ -405,6 +449,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           </Button>
         </div>
       </div>
+      {reminderHint && <p className="text-sm text-muted-foreground text-right">{reminderHint}</p>}
     </div>
+    </SendDialogProvider>
   );
 }

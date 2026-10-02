@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestDatabase, createValidTestCustomer } from "../test-utils";
-import { checkOverdueInvoices, isLastReminderLevelSent } from "@/lib/reminders";
+import { checkOverdueInvoices, isLastReminderLevelSent, latestSentReminders } from "@/lib/reminders";
 
 describe("checkOverdueInvoices", () => {
   const db = createTestDatabase();
@@ -267,5 +267,54 @@ describe("isLastReminderLevelSent", () => {
     await sentLevel4(inv.id, new Date(Date.now() - 60_000));
     const fresh = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id, reminderLevel: 4 } });
     expect(await isLastReminderLevelSent(db.prisma, fresh)).toBe(false);
+  });
+});
+
+describe("latestSentReminders", () => {
+  const db = createTestDatabase();
+
+  async function seed(num: string) {
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+    return db.prisma.invoice.create({
+      data: {
+        customerId: customer.customerId, documentNumber: num, date: new Date(),
+        dueDate: new Date(Date.now() - 5 * 86_400_000), totalAmount: 500, state: "Overdue",
+      },
+    });
+  }
+  function sent(invoiceId: number, kind: string, reminderLevel: number | null, createdAt: Date) {
+    return db.prisma.sentDocument.create({
+      data: {
+        invoiceId, kind, reminderLevel, documentNumber: "I-1",
+        path: `2026/${invoiceId}-${kind}-${createdAt.getTime()}.pdf`, sha256: "a".repeat(64), size: 1,
+        sentTo: "a@b.ch", subject: "M", createdById: 1, createdAt,
+      },
+    });
+  }
+
+  it("returns the newest reminder notice per invoice, ignoring invoice mails", async () => {
+    const a = await seed("I-26100001");
+    const b = await seed("I-26100002");
+    const ra = await db.prisma.pendingReminder.create({ data: { invoiceId: a.id, reminderLevel: 3 } });
+    const rb = await db.prisma.pendingReminder.create({ data: { invoiceId: b.id, reminderLevel: 1 } });
+    const t = ra.createdAt.getTime();
+    await sent(a.id, "Reminder", 1, new Date(t + 1000));
+    await sent(a.id, "Reminder", 2, new Date(t + 2000));
+    await sent(a.id, "Invoice", null, new Date(t + 3000));
+
+    const result = await latestSentReminders(db.prisma, [ra, rb]);
+    expect(result.get(a.id)).toEqual({ level: 2, sentAt: new Date(t + 2000) });
+    expect(result.has(b.id)).toBe(false);
+  });
+
+  it("skips notices from before the reminder was recreated", async () => {
+    const inv = await seed("I-26100003");
+    await sent(inv.id, "Reminder", 4, new Date(Date.now() - 60_000));
+    const fresh = await db.prisma.pendingReminder.create({ data: { invoiceId: inv.id } });
+    expect((await latestSentReminders(db.prisma, [fresh])).size).toBe(0);
+  });
+
+  it("does not query without reminders", async () => {
+    expect((await latestSentReminders(db.prisma, [])).size).toBe(0);
   });
 });

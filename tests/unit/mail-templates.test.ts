@@ -137,7 +137,7 @@ describe("quoteMail", () => {
 
 describe("reminderMail", () => {
   const base = {
-    levelLabel: "1. Mahnung",
+    level: 2,
     numberLabel: "I-1",
     contactPerson: "Max Muster",
     companyName: "Test AG",
@@ -145,8 +145,47 @@ describe("reminderMail", () => {
     openAmount: 100,
   };
 
+  it("fills number, contact, amount, due date and company", () => {
+    const mail = reminderMail(base);
+    expect(mail.subject).toBe("1. Mahnung: Rechnung I-1 – Test AG");
+    expect(mail.body).toMatch(/^Guten Tag Max Muster\n\n/);
+    expect(mail.body).toContain(`Rechnung Nr.: I-1\nBetrag: ${formatCurrency(100)}\n`);
+    expect(mail.body).toContain(`Fälligkeitsdatum: ${formatDate(new Date("2026-09-01T00:00:00Z"))}`);
+    expect(mail.body).toMatch(/Mit freundlichen Grüssen\nTest AG$/);
+    expect(mail.body).not.toMatch(/\{\w+\}/);
+  });
+
+  it("uses its own wording per level, getting firmer", () => {
+    const bodies = [1, 2, 3, 4].map((level) => reminderMail({ ...base, level }).body);
+    expect(new Set(bodies).size).toBe(4);
+    expect(bodies[0]).toContain("gegenstandslos");
+    expect(bodies[0]).not.toContain("Mahnung");
+    expect(bodies[1]).toContain("trotz unserer Zahlungserinnerung");
+    expect(bodies[2]).toContain("dringend");
+    expect(bodies[3]).toContain("letzte Mahnung");
+    expect(bodies[3]).toContain("weitere Schritte");
+  });
+
+  it("never promises debt collection, not even on the last level", () => {
+    for (const level of [1, 2, 3, 4]) {
+      const { subject, body } = reminderMail({ ...base, level });
+      expect(`${subject}\n${body}`).not.toMatch(/Betreibung|Inkasso/i);
+    }
+  });
+
+  it("titles the subject by level and marks the last one", () => {
+    expect(reminderMail({ ...base, level: 1 }).subject).toBe("Zahlungserinnerung: Rechnung I-1 – Test AG");
+    expect(reminderMail({ ...base, level: 4 }).subject).toBe("3. Mahnung (letzte Mahnung): Rechnung I-1 – Test AG");
+    // Out-of-range levels fall back to the nearest one instead of failing.
+    expect(reminderMail({ ...base, level: 9 }).subject).toBe(reminderMail({ ...base, level: 4 }).subject);
+  });
+
+  it("inserts names literally, without treating braces in them as placeholders", () => {
+    const mail = reminderMail({ ...base, contactPerson: "A {companyName} $&" });
+    expect(mail.body).toMatch(/^Guten Tag A \{companyName\} \$&\n/);
+  });
+
   it("lists fee and interest only when there are any", () => {
-    expect(reminderMail(base).subject).toBe("1. Mahnung: Rechnung I-1 – Test AG");
     expect(reminderMail({ ...base, charges: { feeRappen: 0, interestRappen: 0, totalRappen: 10000 } }).body).not.toContain(
       "Mahngebühr"
     );

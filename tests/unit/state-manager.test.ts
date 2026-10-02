@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { checkAndUpdateAllDocumentStates, canTransitionInvoice, allowedInvoiceTargets } from "@/lib/state-manager";
+import { checkAndUpdateAllDocumentStates, canTransitionInvoice, allowedInvoiceTargets, locksDraftWithoutMail } from "@/lib/state-manager";
 
 const mockUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrisma = {
@@ -65,5 +65,23 @@ describe("canTransitionInvoice", () => {
   it("lists the current state plus the allowed targets", () => {
     expect(allowedInvoiceTargets("Sent")).toEqual(["Sent", "Overdue", "Paid"]);
     expect(allowedInvoiceTargets("Canceled")).toEqual(["Canceled"]);
+  });
+});
+
+describe("locksDraftWithoutMail", () => {
+  it("is true when a draft is marked Sent, Paid or Overdue", () => {
+    expect(locksDraftWithoutMail("Draft", "Sent")).toBe(true);
+    expect(locksDraftWithoutMail("Draft", "Paid")).toBe(true);
+    expect(locksDraftWithoutMail("Draft", "Overdue")).toBe(true);
+  });
+
+  it("is false when the draft stays a draft", () => {
+    expect(locksDraftWithoutMail("Draft", "Draft")).toBe(false);
+  });
+
+  it("is false for invoices that are already out", () => {
+    expect(locksDraftWithoutMail("Sent", "Paid")).toBe(false);
+    expect(locksDraftWithoutMail("Overdue", "Sent")).toBe(false);
+    expect(locksDraftWithoutMail("PartiallyPaid", "Paid")).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { SendIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
+import { useSendDialog } from "./SendDialogContext";
 
 type Props = {
   invoiceId: number;
@@ -36,7 +37,11 @@ export default function SendInvoiceButton({
   isCreditNote = false,
 }: Props) {
   const noun = isCreditNote ? "Gutschrift" : "Rechnung";
-  const [open, setOpen] = useState(false);
+  // Shared with the page when it provides one (status confirmation → «Stattdessen senden»).
+  const shared = useSendDialog();
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = shared ? shared.open : localOpen;
+  const setOpen = shared ? shared.setOpen : setLocalOpen;
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [to, setTo] = useState(customerEmail);
   const [subject, setSubject] = useState(defaultSubject);

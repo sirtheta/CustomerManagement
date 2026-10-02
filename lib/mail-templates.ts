@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { customerDisplayName, type CustomerNameFields } from "@/lib/customer-display";
+import { MAX_REMINDER_LEVEL, reminderTitle } from "@/lib/reminder-charges";
 
 /**
  * Mail placeholders and default texts for every customer mail (invoice, credit
@@ -160,9 +161,44 @@ export function quoteMail(quote: QuoteMailSource, companyName: string): MailTemp
   };
 }
 
+type ReminderText = { subjectSuffix: string; opening: string; closing: string };
+
+/**
+ * Wording per reminder level (1 = Zahlungserinnerung, 2–4 = 1.–3. Mahnung),
+ * getting firmer with each level. Level 4 is the last notice the app sends; it
+ * only announces "weitere Schritte", because the app has no debt collection.
+ */
+const REMINDER_TEXTS: Record<number, ReminderText> = {
+  1: {
+    subjectSuffix: "",
+    opening: "vielleicht ist es Ihnen entgangen: Folgende Rechnung ist noch offen.",
+    closing:
+      "Wir bitten Sie, den Betrag in den nächsten Tagen zu überweisen. Falls Sie die Zahlung bereits veranlasst haben, betrachten Sie diese Nachricht bitte als gegenstandslos.",
+  },
+  2: {
+    subjectSuffix: "",
+    opening: "trotz unserer Zahlungserinnerung ist folgende Rechnung noch nicht beglichen.",
+    closing:
+      "Bitte überweisen Sie den offenen Betrag innerhalb der Frist auf der beiliegenden Mahnung. Sollte sich Ihre Zahlung mit dieser Nachricht gekreuzt haben, betrachten Sie sie bitte als gegenstandslos.",
+  },
+  3: {
+    subjectSuffix: "",
+    opening: "leider haben wir trotz Zahlungserinnerung und Mahnung noch keine Zahlung für folgende Rechnung erhalten.",
+    closing:
+      "Wir bitten Sie dringend, den offenen Betrag innerhalb der Frist auf der beiliegenden Mahnung zu begleichen. Falls Sie Fragen zur Rechnung haben oder nicht fristgerecht zahlen können, melden Sie sich bitte umgehend bei uns.",
+  },
+  4: {
+    subjectSuffix: " (letzte Mahnung)",
+    opening: "dies ist unsere letzte Mahnung: Folgende Rechnung ist trotz mehrerer Mahnungen weiterhin offen.",
+    closing:
+      "Bitte begleichen Sie den offenen Betrag innerhalb der Frist auf der beiliegenden Mahnung. Erhalten wir bis dahin weder Ihre Zahlung noch eine Rückmeldung, behalten wir uns weitere Schritte vor.",
+  },
+};
+
 /** Prefilled reminder mail; amounts are passed in because they depend on payments and charges. */
 export function reminderMail(params: {
-  levelLabel: string;
+  /** Reminder level 1–4 (`PendingReminder.reminderLevel`); picks title and wording. */
+  level: number;
   /** Display label of the invoice number (`documentLabel`, "Entwurf" without one). */
   numberLabel: string;
   contactPerson: string;
@@ -171,13 +207,20 @@ export function reminderMail(params: {
   openAmount: number;
   charges?: { feeRappen: number; interestRappen: number; totalRappen: number } | null;
 }): MailTemplate {
-  const { levelLabel, numberLabel: number, contactPerson, companyName, dueDate, openAmount, charges } = params;
+  const { level, numberLabel, contactPerson, companyName, dueDate, openAmount, charges } = params;
+  const text = REMINDER_TEXTS[Math.min(Math.max(level, 1), MAX_REMINDER_LEVEL)];
   const extra =
     charges && (charges.feeRappen > 0 || charges.interestRappen > 0)
       ? `\nMahngebühr: ${formatCurrency(charges.feeRappen / 100)}\nVerzugszins: ${formatCurrency(charges.interestRappen / 100)}\nTotal: ${formatCurrency(charges.totalRappen / 100)}`
       : "";
-  return {
-    subject: `${levelLabel}: Rechnung ${number} – ${companyName}`,
-    body: `Guten Tag ${contactPerson}\n\nwir möchten Sie höflich daran erinnern, dass folgende Rechnung noch offen ist:\n\nRechnung Nr.: ${number}\nBetrag: ${formatCurrency(openAmount)}${extra}\nFälligkeitsdatum: ${formatDate(dueDate)}\n\nBitte überweisen Sie den Betrag umgehend auf unser Konto.\n\nMit freundlichen Grüssen\n${companyName}`,
+  const values: PlaceholderValues = {
+    documentNumber: numberLabel,
+    contactPerson,
+    companyName,
+    totalAmount: formatCurrency(openAmount),
+    dueDate: formatDate(dueDate),
   };
+  const subject = `${reminderTitle(level)}${text.subjectSuffix}: Rechnung {documentNumber} – {companyName}`;
+  const body = `Guten Tag {contactPerson}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\nBetrag: {totalAmount}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
+  return { subject: fillPlaceholders(subject, values), body: fillPlaceholders(body, values) };
 }

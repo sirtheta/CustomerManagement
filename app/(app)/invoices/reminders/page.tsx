@@ -8,7 +8,7 @@ import { Suspense } from "react";
 import { getPaymentSummary } from "@/lib/payments";
 import { documentLabel } from "@/lib/document-display";
 import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";
-import { isLastReminderLevelSent } from "@/lib/reminders";
+import { DEFAULT_REMINDER_COOLDOWN_DAYS, isLastReminderLevelSent, latestSentReminders } from "@/lib/reminders";
 import { billingEmail } from "@/lib/customer-billing";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
@@ -45,7 +45,7 @@ export default async function RemindersPage({ searchParams }: Props) {
       }
     : undefined;
 
-  const [reminders, settings] = await Promise.all([
+  const [reminders, snoozed, settings] = await Promise.all([
     prisma.pendingReminder.findMany({
       include: {
         invoice: { include: { customer: true } },
@@ -55,10 +55,19 @@ export default async function RemindersPage({ searchParams }: Props) {
       },
       orderBy: { createdAt: "asc" },
     }),
+    // Snoozed ones are hidden from the list; named here so a search for one (e.g. from
+    // the invoice page) does not just end in an empty list.
+    prisma.pendingReminder.findMany({
+      where: { AND: [{ snoozedUntil: { gt: now } }, ...(searchFilter ? [searchFilter] : [])] },
+      select: { id: true, snoozedUntil: true, invoice: { select: { documentNumber: true } } },
+      orderBy: { snoozedUntil: "asc" },
+    }),
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
   ]);
 
   const companyName = settings?.companyInfo.companyName ?? "";
+  const cooldownDays = settings?.reminderCooldownDays ?? DEFAULT_REMINDER_COOLDOWN_DAYS;
+  const lastSent = await latestSentReminders(prisma, reminders);
   // Open amount after payments and sent credit notes (not the invoice total).
   const remainingByInvoice = new Map(
     await Promise.all(
@@ -91,9 +100,20 @@ export default async function RemindersPage({ searchParams }: Props) {
         <SearchInput defaultValue={search ?? ""} placeholder="Rechnung oder Kunde suchen…" />
       </Suspense>
 
+      {snoozed.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {term
+            ? `Zurückgestellt und darum ausgeblendet: ${snoozed
+                .map((s) => `${documentLabel(s.invoice.documentNumber)} bis ${formatDate(s.snoozedUntil!)}`)
+                .join(", ")}.`
+            : `${snoozed.length} ${snoozed.length === 1 ? "Mahnung ist" : "Mahnungen sind"} zurückgestellt und ausgeblendet.`}{" "}
+          Nach dem Versand oder Zurückstellen erscheint eine Mahnung nach {cooldownDays} Tagen wieder.
+        </p>
+      )}
+
       {reminders.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          {term ? "Keine Mahnungen für diesen Suchbegriff." : "Keine ausstehenden Mahnungen."}
+          {term ? "Keine fälligen Mahnungen für diesen Suchbegriff." : "Keine ausstehenden Mahnungen."}
         </p>
       ) : (
         <div className="space-y-4">
@@ -102,7 +122,7 @@ export default async function RemindersPage({ searchParams }: Props) {
             const c = inv.customer;
             const customerName = customerDisplayName(c);
 
-            const levelLabel = reminderTitle(r.reminderLevel);
+            const sent = lastSent.get(inv.id);
             const remaining = remainingByInvoice.get(inv.id) ?? inv.totalAmount.toNumber();
             const remainingRappen = Math.round(remaining * 100);
             const charges = settings
@@ -115,7 +135,7 @@ export default async function RemindersPage({ searchParams }: Props) {
                 })
               : null;
             const { subject: defaultSubject, body: defaultBody } = reminderMail({
-              levelLabel,
+              level: r.reminderLevel,
               numberLabel: documentLabel(inv.documentNumber),
               contactPerson: c.contactPerson,
               companyName,
@@ -140,6 +160,8 @@ export default async function RemindersPage({ searchParams }: Props) {
                 feeRappen={charges?.feeRappen ?? 0}
                 interestRappen={charges?.interestRappen ?? 0}
                 lastLevelSent={lastLevelSentIds.has(r.id)}
+                lastSent={sent ? { level: sent.level, title: reminderTitle(sent.level), date: formatDate(sent.sentAt) } : null}
+                cooldownDays={cooldownDays}
               />
             );
           })}

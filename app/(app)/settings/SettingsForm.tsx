@@ -261,7 +261,7 @@ export default function SettingsForm(props: Props) {
           <div className={props.showReminders ? "space-y-4" : "hidden"}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label htmlFor="reminderCooldownDays">Mahnungs-Cooldown (Tage)</Label>
+              <Label htmlFor="reminderCooldownDays">Frist zwischen Mahnungen (Tage)</Label>
               <Input
                 id="reminderCooldownDays"
                 name="reminderCooldownDays"
@@ -270,7 +270,7 @@ export default function SettingsForm(props: Props) {
                 defaultValue={props.reminderCooldownDays}
               />
               <p className="text-xs text-muted-foreground">
-                Wartezeit nach einer Mahnung, bevor dieselbe Rechnung wieder erscheint
+                Zahlungsfrist auf dem Mahnbeleg. So lange bleibt eine versendete oder zurückgestellte Mahnung ausgeblendet, danach erscheint sie wieder unter «Mahnungen».
               </p>
             </div>
           </div>
