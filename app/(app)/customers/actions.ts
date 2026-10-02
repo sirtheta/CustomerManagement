@@ -51,7 +51,14 @@ const customerSchema = z
     uid: z
       .string()
       .nullable()
-      .refine((v) => v === null || isValidUid(v), "Ungültige UID (Format CHE-123.456.789, Prüfziffer stimmt nicht)."),
+      .superRefine((v, ctx) => {
+        if (v === null) return;
+        if (normalizeUid(v) === null) {
+          ctx.addIssue({ code: "custom", message: "Ungültiges UID-Format. Erwartet wird z. B. CHE-123.456.788 (optional mit MWST)." });
+        } else if (!isValidUid(v)) {
+          ctx.addIssue({ code: "custom", message: "Ungültige UID: Die Prüfziffer stimmt nicht. Bitte die Nummer prüfen." });
+        }
+      }),
     paymentTermDays: z
       .string()
       .nullable()

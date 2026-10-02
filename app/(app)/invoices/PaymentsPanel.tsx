@@ -39,8 +39,11 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
   const [amount, setAmount] = useState(summary.remaining > 0 ? summary.remaining.toFixed(2) : "");
   const [date, setDate] = useState(() => swissDateString());
   const [overpaidBy, setOverpaidBy] = useState<number | null>(null);
+  // Nothing open (paid, overpaid or fully credited): the form stays behind a link.
+  const [formRequested, setFormRequested] = useState(false);
 
   const canPay = canEdit && (state === "Sent" || state === "Overdue" || state === "PartiallyPaid" || state === "Paid");
+  const showForm = canPay && (summary.remaining > 0 || formRequested);
 
   function run(action: () => Promise<{ error?: string; needsConfirmation?: { overpaidBy: number } }>) {
     setError(null);
@@ -107,7 +110,13 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
         </Table>
       )}
 
-      {canPay && (
+      {canPay && !showForm && (
+        <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setFormRequested(true)}>
+          Zahlung trotzdem erfassen
+        </Button>
+      )}
+
+      {showForm && (
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="paymentAmount">Betrag (CHF)</Label>

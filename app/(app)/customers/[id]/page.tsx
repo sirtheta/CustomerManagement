@@ -163,7 +163,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           {customer.archivedAt && <Badge variant="outline">Archiviert</Badge>}
         </div>
         {canEdit && (
-          <ArchiveCustomerButton customerId={customerId} archived={customer.archivedAt !== null} />
+          <ArchiveCustomerButton
+            customerId={customerId}
+            archived={customer.archivedAt !== null}
+            activeSubscriptions={subscriptions.filter((s) => s.active).length}
+          />
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -378,6 +382,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           <DeleteCustomerButton
             customerId={customerId}
             hasInvoices={invoiceCount > 0}
+            activeSubscriptions={subscriptions.filter((s) => s.active).length}
             archived={customer.archivedAt !== null}
           />
         </div>

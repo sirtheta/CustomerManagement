@@ -99,17 +99,20 @@ export default function ReminderRow(props: Props) {
     <Card id={`reminder-${props.reminderId}`} className="scroll-mt-28 py-0">
       {/* Collapsed to one line so a long list stays scannable; ReminderHighlight opens the targeted card. */}
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-          <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="font-medium">{label}</span>
-            <span className="text-xs text-muted-foreground">{levelLabel}</span>
-            <span className="min-w-0 truncate text-muted-foreground">{props.customerName}</span>
-          </span>
-          <span className="shrink-0 text-right tabular-nums">
-            <span className="font-medium">{formatCurrency(props.totalAmount)}</span>
-            <span className="ml-2 text-xs text-destructive">
-              {props.daysOverdue} {props.daysOverdue === 1 ? "Tag" : "Tage"} überfällig
+        <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 sm:items-center [&::-webkit-details-marker]:hidden">
+          <ChevronRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 sm:mt-0" />
+          {/* Two rows on narrow screens (number + amount, then level, customer, days), one line from sm up. */}
+          <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 sm:flex sm:gap-x-2">
+            <span className="font-medium sm:shrink-0">{label}</span>
+            <span className="col-start-2 row-start-1 text-right font-medium tabular-nums sm:order-1 sm:ml-auto sm:shrink-0">
+              {formatCurrency(props.totalAmount)}
+            </span>
+            <span className="col-span-2 row-start-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:contents">
+              <span className="text-xs text-muted-foreground sm:shrink-0">{levelLabel}</span>
+              <span className="min-w-0 text-muted-foreground sm:truncate">{props.customerName}</span>
+              <span className="text-xs text-destructive tabular-nums sm:order-2 sm:shrink-0">
+                {props.daysOverdue} {props.daysOverdue === 1 ? "Tag" : "Tage"} überfällig
+              </span>
             </span>
           </span>
         </summary>

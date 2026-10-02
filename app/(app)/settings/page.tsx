@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   const modules = modulesFromSettings(s);
   // Only these two keep the Abos module from being switched off.
   const [activeSubscriptions, pendingEmails] = modules.subscriptions
-    ? await Promise.all([prisma.subscription.count({ where: { active: true } }), prisma.pendingEmail.count()])
+    ? await Promise.all([prisma.subscription.count({ where: { active: true, customer: { archivedAt: null } } }), prisma.pendingEmail.count()])
     : [0, 0];
 
   return (

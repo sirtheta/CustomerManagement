@@ -431,9 +431,10 @@ export async function testTelegramNotification(
 const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> = {
   // Active subscriptions would keep creating invoices in the background, and
   // drafts waiting for approval would be unreachable once the page is hidden.
+  // Subscriptions of archived customers never run (daily job, overview), so they do not count.
   subscriptions: async () => {
     const [activeSubscriptions, pendingEmails] = await Promise.all([
-      prisma.subscription.count({ where: { active: true } }),
+      prisma.subscription.count({ where: { active: true, customer: { archivedAt: null } } }),
       prisma.pendingEmail.count(),
     ]);
     if (activeSubscriptions > 0) {
@@ -450,12 +451,13 @@ const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> 
  * Pauses every active subscription so the Abos module can be switched off.
  * Paused subscriptions keep their date and can be resumed later; the audit
  * trail gets one `UPDATE Subscription` entry per subscription, as when
- * pausing one by one.
+ * pausing one by one. Subscriptions of archived customers are left alone: they
+ * never run and are not counted by the blocker.
  */
 export async function pauseAllSubscriptions(): Promise<ActionState & { paused?: number }> {
   const session = await requireAdmin();
   const active = await prisma.subscription.findMany({
-    where: { active: true },
+    where: { active: true, customer: { archivedAt: null } },
     select: { id: true, customerId: true },
   });
   if (active.length === 0) return { success: true, paused: 0 };

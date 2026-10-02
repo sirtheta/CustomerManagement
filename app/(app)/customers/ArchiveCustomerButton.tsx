@@ -4,11 +4,12 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { archiveSubscriptionNote } from "@/lib/customer-archive";
 import { archiveCustomer, restoreCustomer } from "./actions";
 
-type Props = { customerId: number; archived: boolean };
+type Props = { customerId: number; archived: boolean; activeSubscriptions?: number };
 
-export default function ArchiveCustomerButton({ customerId, archived }: Props) {
+export default function ArchiveCustomerButton({ customerId, archived, activeSubscriptions = 0 }: Props) {
   const [isPending, startTransition] = useTransition();
 
   if (archived) {
@@ -32,7 +33,7 @@ export default function ArchiveCustomerButton({ customerId, archived }: Props) {
   return (
     <ConfirmDialog
       title="Kunde archivieren"
-      description="Der Kunde erscheint nicht mehr in der Kundenliste und in Auswahllisten. Rechnungen und Daten bleiben erhalten. Du kannst ihn im Archiv wiederherstellen."
+      description={`Der Kunde erscheint nicht mehr in der Kundenliste und in Auswahllisten. Rechnungen und Daten bleiben erhalten. Du kannst ihn im Archiv wiederherstellen. ${archiveSubscriptionNote(activeSubscriptions)}`.trim()}
       confirmLabel="Archivieren"
       confirmVariant="default"
       triggerVariant="outline"

@@ -87,6 +87,7 @@ describe("setModule", () => {
 
     const result = await setModule("subscriptions", false);
 
+    expect(prisma.subscription.count).toHaveBeenCalledWith({ where: { active: true, customer: { archivedAt: null } } });
     expect(result.error).toContain("3 aktive Abos");
     expect(result.error).toContain("bleibt eingeschaltet");
     expect(result.error).toContain("Alle Abos pausieren");
@@ -158,7 +159,7 @@ describe("pauseAllSubscriptions", () => {
 
     expect(result).toEqual({ success: true, paused: 2 });
     expect(prisma.subscription.findMany).toHaveBeenCalledWith({
-      where: { active: true },
+      where: { active: true, customer: { archivedAt: null } },
       select: { id: true, customerId: true },
     });
     expect(prisma.subscription.updateMany).toHaveBeenCalledWith({

@@ -104,6 +104,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           </Button>
           <Button
             size="sm"
+            variant={quote.state === "Accepted" ? "outline" : "default"}
             render={<Link href={`/quotes/${quote.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
           >
             Bearbeiten

@@ -106,6 +106,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     overpaid: Math.max(paidRappen + creditedRappen - totalRappen, 0) / 100,
   };
 
+  // The server refuses further credit notes once the sent ones cover the total.
+  const fullyCredited = totalRappen > 0 && creditedRappen >= totalRappen;
+
   const fromCustomer = from?.startsWith("customers/") ? from : null;
   const backHref = fromCustomer ? `/${fromCustomer}` : "/invoices";
   const customerName = customerDisplayName(invoice.customer);
@@ -117,9 +120,10 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
   const { subject: defaultSubject, body: defaultBody } = invoiceMail(invoice, settings, companyName);
 
-  // Read-only preview for the status confirmation; the real number is assigned on the change.
+  // Read-only preview for the status confirmation and the send dialog (credit notes share the invoice
+  // series); the real number is assigned on the change.
   const nextDocumentNumber =
-    canEdit && invoice.state === "Draft" && !isCreditNote ? await generateInvoiceNumber() : null;
+    canEdit && invoice.state === "Draft" ? await generateInvoiceNumber() : null;
 
   const pending = invoice.pendingReminder;
   const reminder =
@@ -433,6 +437,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               defaultBody={defaultBody}
               isCreditNote={isCreditNote}
               expectedDocumentNumber={nextDocumentNumber}
+              variant={!isCreditNote && invoice.state === "Paid" ? "outline" : "default"}
             />
           )}
           {reminder.kind === "available" && pending && (
@@ -448,7 +453,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               {reminderTitle(reminder.level)} senden
             </Button>
           )}
-          {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
+          {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && !fullyCredited && (
             <CreateCreditNoteButton invoiceId={invoice.id} paid={summary.paid} remaining={summary.remaining} />
           )}
           {canEdit && !isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}

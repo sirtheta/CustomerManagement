@@ -350,7 +350,14 @@ describe("customer actions", () => {
       );
       vi.mocked(prisma.customer.create).mockClear();
       const result = await create({ uid: "CHE-116.281.711" });
-      expect(result.fieldErrors?.uid).toBeDefined();
+      expect(result.fieldErrors?.uid).toContain("Prüfziffer stimmt nicht");
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+    });
+
+    it("names the format error separately and gives a valid example", async () => {
+      const result = await create({ uid: "CHE-12.345" });
+      expect(result.fieldErrors?.uid).toContain("UID-Format");
+      expect(result.fieldErrors?.uid).toContain("CHE-123.456.788");
       expect(prisma.customer.create).not.toHaveBeenCalled();
     });
 

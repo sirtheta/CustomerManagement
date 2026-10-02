@@ -5,6 +5,7 @@ import type { HistoryEvent, HistoryKind } from "@/lib/customer-history";
 
 const kindLabels: Record<HistoryKind, string> = {
   invoice: "Rechnung",
+  creditNote: "Gutschrift",
   quote: "Offerte",
   sent: "Versand",
   payment: "Zahlung",
@@ -27,7 +28,7 @@ export default function HistorySection({ events }: { events: HistoryEvent[] }) {
             {events.map((e, i) => (
               <li key={i} className="py-2 flex items-baseline gap-3 text-sm">
                 <span className="w-24 shrink-0 text-muted-foreground">{formatDate(e.date)}</span>
-                <span className="w-20 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
+                <span className="w-24 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
                   {kindLabels[e.kind]}
                 </span>
                 {e.href ? (

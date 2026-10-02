@@ -188,8 +188,11 @@ describe("customer tasks", () => {
         ],
       });
 
-      const texts = (await loadCustomerHistory(db.prisma, customer.customerId)).map((e) => e.text);
+      const events = await loadCustomerHistory(db.prisma, customer.customerId);
+      const texts = events.map((e) => e.text);
 
+      expect(events.find((e) => e.text === "Gutschrift I-2 erstellt")?.kind).toBe("creditNote");
+      expect(events.find((e) => e.text === "Rechnung I-1 erstellt")?.kind).toBe("invoice");
       expect(texts).toContain("Rechnung I-1 an a@b.ch gesendet");
       expect(texts).toContain("Gutschrift I-2 an a@b.ch gesendet");
       expect(texts).toContain("Gutschrift I-2 erstellt");

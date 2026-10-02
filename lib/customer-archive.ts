@@ -11,6 +11,14 @@ export function selectableCustomersWhere(currentId?: number): Prisma.CustomerWhe
     : { OR: [{ archivedAt: null }, { customerId: currentId }] };
 }
 
+/** Sentence for the archive dialog: subscriptions of archived customers are not billed. */
+export function archiveSubscriptionNote(activeSubscriptions: number): string {
+  if (activeSubscriptions <= 0) return "";
+  return activeSubscriptions === 1
+    ? "Dieser Kunde hat 1 aktives Abo. Es wird nicht mehr verrechnet, solange er archiviert ist."
+    : `Dieser Kunde hat ${activeSubscriptions} aktive Abos. Sie werden nicht mehr verrechnet, solange er archiviert ist.`;
+}
+
 export const CUSTOMER_ARCHIVED_ERROR = "Der Kunde ist archiviert. Bitte zuerst wiederherstellen.";
 export const CUSTOMER_NOT_FOUND_ERROR = "Kunde nicht gefunden.";
 

@@ -22,6 +22,7 @@ import { UserRole } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
+import { loadModules } from "@/lib/module-guard";
 
 const PAGE_SIZE = 25;
 
@@ -52,13 +53,14 @@ async function CustomersTable({
       : {}),
   };
 
+  const subscriptionsOn = (await loadModules()).subscriptions;
   const [customers, totalCount] = await Promise.all([
     prisma.customer.findMany({
       where,
       orderBy: { [sortField]: sortOrder },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { _count: { select: { invoices: true } } },
+      include: { _count: { select: { invoices: true, subscriptions: { where: { active: true } } } } },
     }),
     prisma.customer.count({ where }),
   ]);
@@ -138,6 +140,7 @@ async function CustomersTable({
                         customerId={c.customerId}
                         size="sm"
                         hasInvoices={c._count.invoices > 0}
+                        activeSubscriptions={subscriptionsOn ? c._count.subscriptions : 0}
                         archived={archivedOnly}
                       />
                     )}

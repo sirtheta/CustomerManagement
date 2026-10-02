@@ -21,12 +21,14 @@ describe("isValidUid", () => {
   it("accepts UIDs with a correct check digit", () => {
     expect(isValidUid("CHE-116.281.710")).toBe(true);
     expect(isValidUid("CHE-100.000.006")).toBe(true);
+    expect(isValidUid("CHE-123.456.788")).toBe(true);
     expect(isValidUid("CHE116281710MWST")).toBe(true);
   });
 
   it("rejects a wrong check digit", () => {
     expect(isValidUid("CHE-116.281.711")).toBe(false);
     expect(isValidUid("CHE-100.000.007")).toBe(false);
+    expect(isValidUid("CHE-123.456.789")).toBe(false);
   });
 
   it("rejects UIDs whose check digit would be 10", () => {

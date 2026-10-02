@@ -28,6 +28,8 @@ type Props = {
   isCreditNote?: boolean;
   /** For drafts: the number the next numbering would assign (shown only, never sent). */
   expectedDocumentNumber?: string | null;
+  /** "outline" when sending is not the next step (e.g. an invoice that is already paid). */
+  variant?: "default" | "outline";
 };
 
 const NUMBER_PLACEHOLDER = "{documentNumber}";
@@ -44,6 +46,7 @@ export default function SendInvoiceButton({
   defaultBody,
   isCreditNote = false,
   expectedDocumentNumber = null,
+  variant = "default",
 }: Props) {
   const noun = isCreditNote ? "Gutschrift" : "Rechnung";
   // Shared with the page when it provides one (status confirmation → «Stattdessen senden»).
@@ -99,7 +102,7 @@ export default function SendInvoiceButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant="default" size="sm">
+          <Button variant={variant} size="sm">
             <SendIcon className="size-4 mr-1.5" />
             {noun} senden
           </Button>

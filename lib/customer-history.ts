@@ -4,6 +4,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export type HistoryKind =
   | "invoice"
+  | "creditNote"
   | "quote"
   | "sent"
   | "payment"
@@ -105,7 +106,7 @@ export async function loadCustomerHistory(
   const events: HistoryEvent[] = [
     ...invoices.map((i) => ({
       date: i.date,
-      kind: "invoice" as const,
+      kind: i.creditNoteForId !== null ? ("creditNote" as const) : ("invoice" as const),
       text: `${i.creditNoteForId !== null ? "Gutschrift" : "Rechnung"} ${documentLabel(i.documentNumber)} erstellt`,
       href: `/invoices/${i.id}?from=customers/${customerId}`,
     })),
