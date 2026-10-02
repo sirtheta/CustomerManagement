@@ -14,7 +14,7 @@ import { checkOverdueInvoices } from "@/lib/reminders";
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { closeAnsweredFollowUps, notifyDueTasks } from "@/lib/tasks";
 import { sendAdminNotifications } from "@/lib/notifications";
-import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleFlags } from "@/lib/modules";
+import { getEnabledModules, MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleFlags, type ModuleKey } from "@/lib/modules";
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 
@@ -411,22 +411,27 @@ export async function testTelegramNotification(
 // what to show (a refused switch stays on, the others keep their new state).
 export type ModulesActionState = ActionState & { values?: ModuleFlags };
 
-/** Why subscriptions cannot be hidden right now, or null when they can. */
-async function subscriptionsHiddenBlocker(): Promise<string | null> {
+/**
+ * A module can only be switched off while this returns null; otherwise it
+ * returns the reason. Modules without an entry can always be hidden.
+ */
+const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> = {
   // Active subscriptions would keep creating invoices in the background, and
   // drafts waiting for approval would be unreachable once the page is hidden.
-  const [activeSubscriptions, pendingEmails] = await Promise.all([
-    prisma.subscription.count({ where: { active: true } }),
-    prisma.pendingEmail.count(),
-  ]);
-  if (activeSubscriptions > 0) {
-    return `Abos bleiben eingeschaltet: Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos beenden.`;
-  }
-  if (pendingEmails > 0) {
-    return `Abos bleiben eingeschaltet: Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe.`;
-  }
-  return null;
-}
+  subscriptions: async () => {
+    const [activeSubscriptions, pendingEmails] = await Promise.all([
+      prisma.subscription.count({ where: { active: true } }),
+      prisma.pendingEmail.count(),
+    ]);
+    if (activeSubscriptions > 0) {
+      return `Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos beenden.`;
+    }
+    if (pendingEmails > 0) {
+      return `Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe.`;
+    }
+    return null;
+  },
+};
 
 export async function saveModules(
   _prev: ModulesActionState,
@@ -440,12 +445,16 @@ export async function saveModules(
     MODULE_KEYS.map((key) => [key, formData.get(`module_${key}`) === "on"])
   ) as ModuleFlags;
 
-  // A refused switch does not block the others: they are saved, only
-  // subscriptions stay on.
-  let refused: string | null = null;
-  if (!wanted.subscriptions && settings.moduleSubscriptions) {
-    refused = await subscriptionsHiddenBlocker();
-    if (refused) wanted.subscriptions = true;
+  // A refused switch does not block the others: they are saved, only the
+  // refused module stays on.
+  const refusals: string[] = [];
+  for (const key of MODULE_KEYS) {
+    if (wanted[key] || !settings[MODULE_FIELDS[key]]) continue;
+    const reason = await MODULE_BLOCKERS[key]?.();
+    if (reason) {
+      wanted[key] = true;
+      refusals.push(`${MODULE_INFO[key].label} bleibt eingeschaltet: ${reason}`);
+    }
   }
 
   const data = Object.fromEntries(MODULE_KEYS.map((key) => [MODULE_FIELDS[key], wanted[key]]));
@@ -463,11 +472,12 @@ export async function saveModules(
 
   // The navigation lives in the layout, so everything has to be re-rendered.
   revalidatePath("/", "layout");
-  if (refused) {
+  if (refusals.length > 0) {
+    const message = refusals.join(" ");
     return {
       _ts: Date.now(),
       values: wanted,
-      error: changed.length > 0 ? `Übrige Änderungen gespeichert. ${refused}` : refused,
+      error: changed.length > 0 ? `Übrige Änderungen gespeichert. ${message}` : message,
     };
   }
   return { success: true, _ts: Date.now(), values: wanted };
