@@ -409,20 +409,11 @@ describe("customer actions", () => {
       );
     });
 
-    it("update keeps the customer number when the field is empty", async () => {
+    it("update never changes the customer number", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
-      await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "" }));
+      await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "9" }));
       const data = vi.mocked(prisma.customer.update).mock.calls[0][0].data as Record<string, unknown>;
       expect("customerNumber" in data).toBe(false);
-    });
-
-    it("update reports a duplicate customer number", async () => {
-      vi.mocked(auth).mockResolvedValue(editorSession);
-      vi.mocked(prisma.customer.update).mockRejectedValueOnce(
-        Object.assign(new Error("unique"), { code: "P2002" })
-      );
-      const result = await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "9" }));
-      expect(result.fieldErrors?.customerNumber).toBe("Kundennummer bereits vergeben.");
     });
   });
 });

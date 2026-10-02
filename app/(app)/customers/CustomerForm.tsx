@@ -351,10 +351,14 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                       name="customerNumber"
                       inputMode="numeric"
                       defaultValue={val("customerNumber", customer?.customerNumber)}
-                      placeholder={customer ? "" : "automatisch"}
+                      placeholder="automatisch"
+                      disabled={customer != null}
                       aria-invalid={!!fe.customerNumber}
                       aria-describedby={fe.customerNumber ? "customerNumber-error" : undefined}
                     />
+                    {customer != null && (
+                      <p className="text-xs text-muted-foreground">Nach dem Anlegen nicht änderbar.</p>
+                    )}
                     <FieldError id="customerNumber-error" message={fe.customerNumber} />
                   </div>
                   <div className="space-y-1.5">

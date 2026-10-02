@@ -220,15 +220,8 @@ export async function updateCustomer(
   const result = validate(formData);
   if (!result.ok) return result.state;
   const data = customerData(result.data, formData);
-  // An empty field keeps the current number.
-  const customerNumber = result.data.customerNumber ? { customerNumber: Number(result.data.customerNumber) } : {};
-
-  try {
-    await prisma.customer.update({ where: { customerId: id }, data: { ...data, ...customerNumber } });
-  } catch (err) {
-    if (isUniqueViolation(err)) return duplicateNumber(formData);
-    throw err;
-  }
+  // The customer number is fixed after creation: archived PDFs and sent documents carry it.
+  await prisma.customer.update({ where: { customerId: id }, data });
   await logAudit(session, "UPDATE", "Customer", id, result.data.contactPerson);
   // Top-customer names come from the cached analytics payload.
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
