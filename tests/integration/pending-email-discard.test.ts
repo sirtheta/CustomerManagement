@@ -23,6 +23,7 @@ vi.mock("@/lib/logger", () => ({
 
 import { checkSubscriptions } from "@/lib/subscriptions";
 import { discardPendingEmail } from "@/app/(app)/invoices/pending/actions";
+import { acquireSendLock, invoiceSendLockKey, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 
 function sessionFor(role: "Admin" | "Editor" | "Viewer"): Session {
   return { user: { id: "1", name: "Test", email: "test@example.com", role }, expires: "2099-01-01" } as Session;
@@ -94,6 +95,24 @@ describe("discardPendingEmail (integration)", () => {
   it("answers 'nicht gefunden' for an unknown entry", async () => {
     expect(await discardPendingEmail(99999)).toEqual({ error: "Eintrag nicht gefunden." });
     expect(await db.prisma.invoice.count()).toBe(1);
+  });
+
+  it("refuses while the send lock of the invoice is held and deletes nothing", async () => {
+    const pending = await db.prisma.pendingEmail.findFirstOrThrow();
+    const release = acquireSendLock(invoiceSendLockKey(pending.invoiceId));
+    expect(release).not.toBeNull();
+    try {
+      expect(await discardPendingEmail(pending.id)).toEqual({ error: SEND_IN_PROGRESS_ERROR });
+    } finally {
+      release?.();
+    }
+
+    expect(await db.prisma.pendingEmail.count()).toBe(1);
+    expect(await db.prisma.invoice.count()).toBe(1);
+    expect(await db.prisma.item.count({ where: { invoiceId: pending.invoiceId } })).toBe(1);
+    expect(await db.prisma.auditLog.count({ where: { action: "DELETE" } })).toBe(0);
+    // The lock is free again afterwards
+    expect(await discardPendingEmail(pending.id)).toEqual({ success: true, invoiceDeleted: true });
   });
 
   it("refuses viewers and changes nothing", async () => {

@@ -4,7 +4,8 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     applicationSettings: { findFirst: vi.fn(), update: vi.fn() },
     subscription: { count: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
-    pendingEmail: { count: vi.fn() },
+    pendingEmail: { count: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
+    invoice: { deleteMany: vi.fn(), updateMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -153,7 +154,7 @@ describe("pauseAllSubscriptions", () => {
       { id: 4, customerId: 10 },
       { id: 7, customerId: 11 },
     ] as never);
-    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 2 } as never);
+    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
 
     const result = await pauseAllSubscriptions();
 
@@ -162,10 +163,8 @@ describe("pauseAllSubscriptions", () => {
       where: { active: true, customer: { archivedAt: null } },
       select: { id: true, customerId: true },
     });
-    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: [4, 7] }, active: true },
-      data: { active: false },
-    });
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({ where: { id: 4, active: true }, data: { active: false } });
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({ where: { id: 7, active: true }, data: { active: false } });
     expect(logAudit).toHaveBeenCalledTimes(2);
     expect(vi.mocked(logAudit).mock.calls[0].slice(1, 6)).toEqual([
       "UPDATE", "Subscription", 4, undefined, { customerId: 10, active: false },
@@ -174,8 +173,39 @@ describe("pauseAllSubscriptions", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
   });
 
+  it("audits and counts only the subscriptions it really paused", async () => {
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([
+      { id: 4, customerId: 10 },
+      { id: 7, customerId: 11 },
+    ] as never);
+    // 4 was paused by someone else in the meantime
+    vi.mocked(prisma.subscription.updateMany).mockImplementation((async (args: { where: { id: number } }) => ({
+      count: args.where.id === 4 ? 0 : 1,
+    })) as never);
+
+    const result = await pauseAllSubscriptions();
+
+    expect(result).toEqual({ success: true, paused: 1 });
+    expect(logAudit).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(logAudit).mock.calls[0][3]).toBe(7);
+  });
+
   it("lets the module be switched off afterwards", async () => {
-    vi.mocked(prisma.subscription.count).mockResolvedValue(0);
+    let active = 2;
+    vi.mocked(prisma.subscription.count).mockImplementation((async () => active) as never);
+    vi.mocked(prisma.subscription.findMany).mockResolvedValue([
+      { id: 1, customerId: 1 },
+      { id: 2, customerId: 2 },
+    ] as never);
+    vi.mocked(prisma.subscription.updateMany).mockImplementation((async () => {
+      active -= 1;
+      return { count: 1 };
+    }) as never);
+
+    const before = await setModule("subscriptions", false);
+    expect(before.error).toContain("Es bestehen noch 2 aktive Abos.");
+
+    await pauseAllSubscriptions();
 
     expect((await setModule("subscriptions", false)).success).toBe(true);
   });
@@ -198,7 +228,17 @@ describe("pauseAllSubscriptions", () => {
     await pauseAllSubscriptions();
     const refused = await setModule("subscriptions", false);
 
-    expect(refused.error).toContain("2 Abo-Rechnung");
+    expect(prisma.pendingEmail.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.pendingEmail.updateMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+    expect(refused.error).toContain("Es warten noch 2 Abo-Rechnungen auf Freigabe.");
+  });
+
+  it("uses the singular for one waiting draft", async () => {
+    vi.mocked(prisma.pendingEmail.count).mockResolvedValue(1);
+
+    expect((await setModule("subscriptions", false)).error).toContain("Es wartet noch 1 Abo-Rechnung auf Freigabe.");
   });
 
   it("is admin only", async () => {

@@ -1,12 +1,15 @@
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { requireEditor } from "@/lib/permissions";
+import { UserRole } from "@prisma/client";
+import { hasRole, requireEditor } from "@/lib/permissions";
 import DeleteTemplateButton from "./DeleteTemplateButton";
 import ItemsView from "@/components/items-view";
 
 export default async function TemplatesPage() {
-  await requireEditor();
+  const session = await requireEditor();
+  // deleteTemplate requires an Admin
+  const canDelete = hasRole(session, [UserRole.Admin]);
 
   const templates = await prisma.invoiceTemplate.findMany({
     include: { items: { orderBy: { id: "asc" } } },
@@ -48,7 +51,7 @@ export default async function TemplatesPage() {
                   >
                     Bearbeiten
                   </Button>
-                  <DeleteTemplateButton templateId={tpl.id} />
+                  {canDelete && <DeleteTemplateButton templateId={tpl.id} />}
                 </div>
               </div>
               {tpl.items.length > 0 && (

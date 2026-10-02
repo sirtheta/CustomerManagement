@@ -53,6 +53,7 @@ describe("sendDocument for credit notes against a real database", () => {
         dueDate: new Date("2099-01-01"),
         totalAmount: total,
         state: "Sent",
+        items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 100, quantity: 1, totalAmount: 100 }] },
       },
     });
   }
@@ -125,6 +126,7 @@ describe("sendDocument for credit notes against a real database", () => {
         dueDate: new Date("2099-01-01"),
         totalAmount: 100,
         state: "Draft",
+        items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 100, quantity: 1, totalAmount: 100 }] },
       },
     });
 

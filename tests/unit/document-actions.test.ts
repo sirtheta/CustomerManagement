@@ -200,7 +200,7 @@ describe("sendDocument", () => {
       creditNoteForId: 1,
       totalAmount: -50,
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-002");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -224,7 +224,7 @@ describe("sendDocument", () => {
   it("does not send or number a credit note that exceeds the original", async () => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
-      id: 5, documentNumber: null, creditNoteForId: 1, totalAmount: -500, customer: {}, items: [],
+      id: 5, documentNumber: null, creditNoteForId: 1, totalAmount: -500, customer: {}, items: [{ id: 1 }],
     } as never);
     vi.mocked(assertCreditWithinOriginal).mockRejectedValue(new CreditNoteError("Zu hoch."));
 
@@ -247,7 +247,7 @@ describe("sendDocument", () => {
       id: 1,
       documentNumber: "I-2026-001",
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-001");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -270,7 +270,7 @@ describe("sendDocument", () => {
         id: 1,
         documentNumber: "I-2026-001",
         customer: {},
-        items: [],
+        items: [{ id: 1 }],
       } as never);
       vi.mocked(assignDocumentNumber).mockResolvedValue("I-2026-001");
       vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -290,7 +290,7 @@ describe("sendDocument", () => {
       id: 2,
       documentNumber: "Q-2026-001",
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("Q-2026-001");
     vi.mocked(generateQuotePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -310,7 +310,7 @@ describe("sendDocument", () => {
       id: 1,
       documentNumber: null,
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("R-26090001");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -348,7 +348,7 @@ describe("sendDocument", () => {
       id: 2,
       documentNumber: null,
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("O-26090001");
     vi.mocked(generateQuotePdf).mockResolvedValue(Buffer.from("pdf"));
@@ -371,13 +371,13 @@ describe("sendDocument", () => {
       id: 1,
       documentNumber: null,
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(prisma.quote.findUnique).mockResolvedValue({
       id: 1,
       documentNumber: null,
       customer: {},
-      items: [],
+      items: [{ id: 1 }],
     } as never);
     vi.mocked(assignDocumentNumber).mockRejectedValue(new Error("DB down"));
 
@@ -395,7 +395,7 @@ describe("sendDocument", () => {
 
   it("archives the invoice PDF and records a SentDocument in the same transaction", async () => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
-    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [] } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [{ id: 1 }] } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("I-1");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
     vi.mocked(sendInvoiceEmail).mockResolvedValue(undefined);
@@ -411,7 +411,7 @@ describe("sendDocument", () => {
 
   it("does not send or change state when archiving fails", async () => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
-    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [] } as never);
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({ id: 1, documentNumber: "I-1", customer: {}, items: [{ id: 1 }] } as never);
     vi.mocked(assignDocumentNumber).mockResolvedValue("I-1");
     vi.mocked(generateInvoicePdf).mockResolvedValue(Buffer.from("pdf"));
     vi.mocked(archivePdf).mockRejectedValueOnce(new Error("EACCES"));

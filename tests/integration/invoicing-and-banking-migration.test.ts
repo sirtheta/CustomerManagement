@@ -122,7 +122,8 @@ describe(`migration ${MIGRATION}`, () => {
       `INSERT INTO "Customer" ("contactPerson","address","city","zipCode","email","yearlyInvoice","nextInvoiceDate")
        VALUES (?,?,?,?,?,?,?)`
     );
-    const date = new Date("2027-03-01T00:00:00.000Z").getTime();
+    // v1.5.0 (Prisma adapter) stored dates as ISO text, not as epoch milliseconds
+    const date = "2027-03-01T00:00:00.000+00:00";
     insert.run("Yearly Kunde", "Weg 1", "Bern", "3000", "a@test.ch", 1, date);
     insert.run("Ohne Abo", "Weg 1", "Bern", "3000", "b@test.ch", 0, null);
     insert.run("Jahr ohne Datum", "Weg 1", "Bern", "3000", "c@test.ch", 1, null);
@@ -139,7 +140,21 @@ describe(`migration ${MIGRATION}`, () => {
     expect(subs[0].nextInvoiceDate).toBe(date);
     // No date: kept as a paused subscription on 1 January of next year (local midnight)
     expect(subs[1]).toMatchObject({ contactPerson: "Jahr ohne Datum", interval: "Yearly", autoSend: 0, active: 0, templateId: null });
-    expect(subs[1].nextInvoiceDate).toBe(new Date(new Date().getFullYear() + 1, 0, 1).getTime());
+    // Stored as ISO text like the app does: an INTEGER would sort before every text date
+    // and make the subscription "due" as soon as it is resumed.
+    const expectedPaused = new Date(new Date().getFullYear() + 1, 0, 1).toISOString().replace("Z", "+00:00");
+    expect(subs[1].nextInvoiceDate).toBe(expectedPaused);
+    expect(
+      db.prepare(`SELECT typeof("nextInvoiceDate") AS t FROM "Subscription" ORDER BY "id"`).all()
+    ).toEqual([{ t: "text" }, { t: "text" }]);
+
+    // After resuming, the due query of checkSubscriptions (nextInvoiceDate <= today) must not pick it up
+    db.prepare(`UPDATE "Subscription" SET "active" = 1`).run();
+    const today = new Date().toISOString().replace("Z", "+00:00");
+    const due = db
+      .prepare(`SELECT "id" FROM "Subscription" WHERE "active" = 1 AND "nextInvoiceDate" <= ?`)
+      .all(today);
+    expect(due).toEqual([]);
 
     const cols = (db.prepare(`PRAGMA table_info("Customer")`).all() as { name: string }[]).map((c) => c.name);
     expect(cols).not.toContain("yearlyInvoice");

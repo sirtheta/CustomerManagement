@@ -149,6 +149,8 @@ docker compose up -d
 
 Beim Start spielt die App fehlende Migrationen automatisch ein, ein Backup einer älteren Version lässt sich also direkt verwenden.
 
+Vor dem Einspielen von Migrationen in eine bestehende Datenbank (Update auf eine neue Version) legt die App zusätzlich einen Snapshot `pre-migration-<Migrationsname>.db` im Backup-Ordner ab. Er wird nicht automatisch gelöscht und lässt sich wie ein normales Backup zurückspielen. Schlägt der Snapshot fehl (z. B. Platte voll), startet die App trotzdem und schreibt nur eine Warnung ins Log.
+
 ### Manuelles Backup
 
 Bei laufender App **nicht** die DB-Datei mit `cp` kopieren: ohne die `-wal`-Datei ist die Kopie unvollständig oder inkonsistent. Stattdessen:

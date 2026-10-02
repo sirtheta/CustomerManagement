@@ -314,6 +314,17 @@ describe("invoice actions against a real database", () => {
       expect(await db.prisma.item.count({ where: { invoiceId: id } })).toBe(1);
     });
 
+    it("deleteInvoice refuses a numbered draft (mail may have gone out) and keeps it with its items", async () => {
+      const id = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await db.prisma.invoice.update({ where: { id }, data: { documentNumber: "I-26060010" } });
+
+      const result = await deleteInvoice(id);
+
+      expect(result.error).toContain("bereits eine Nummer");
+      expect(await db.prisma.invoice.findUnique({ where: { id } })).not.toBeNull();
+      expect(await db.prisma.item.count({ where: { invoiceId: id } })).toBe(1);
+    });
+
     it("deleteQuote deletes the quote's items and keeps the items of other documents", async () => {
       const quote = await db.prisma.quote.create({
         data: {

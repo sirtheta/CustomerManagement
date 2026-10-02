@@ -92,12 +92,13 @@ CREATE TABLE "Subscription" (
 -- manual approval), keeping their planned date. A customer flagged yearly
 -- without a date was never invoiced by the old job; they become a PAUSED
 -- subscription dated 1 January of next year (local midnight, like dates saved
--- through the app), so nothing is lost and nothing is billed unasked.
+-- through the app, stored as ISO text like the adapter does: an INTEGER would sort
+-- before every text date), so nothing is lost and nothing is billed unasked.
 INSERT INTO "Subscription" ("customerId", "interval", "nextInvoiceDate", "autoSend", "active")
 SELECT "customerId", 'Yearly',
   COALESCE(
     "nextInvoiceDate",
-    CAST(strftime('%s', date('now', 'localtime', 'start of year', '+1 year'), 'utc') AS INTEGER) * 1000
+    strftime('%Y-%m-%dT%H:%M:%S.000+00:00', date('now', 'localtime', 'start of year', '+1 year'), 'utc')
   ),
   false,
   "nextInvoiceDate" IS NOT NULL

@@ -64,6 +64,23 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
   const val = (name: string, fallback: string | number | null | undefined) =>
     submitted ? (submitted[name] ?? "") : (fallback ?? "");
 
+  // "Weitere Angaben" stays open when it holds values or errors, and keeps what the user chose across the
+  // remount after a failed save (the state lives above the keyed form).
+  const [moreOpen, setMoreOpen] = useState<boolean | null>(null);
+  const moreHasValues = [
+    val("uid", customer?.uid),
+    val("paymentTermDays", customer?.paymentTermDays),
+    val("billingName", customer?.billingName),
+    val("billingStreet", customer?.billingStreet),
+    val("billingZipCode", customer?.billingZipCode),
+    val("billingCity", customer?.billingCity),
+    val("billingEmail", customer?.billingEmail),
+    val("customerNumber", null),
+  ].some((v) => String(v).trim() !== "");
+  const moreHasErrors = Object.keys(fe).some(
+    (k) => k === "customerNumber" || k === "uid" || k === "paymentTermDays" || k.startsWith("billing")
+  );
+
   if (customer && readOnly) {
     return (
       <Card>
@@ -341,13 +358,8 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
 
             <details
               className="rounded-lg border border-input px-3 py-2"
-              open={Boolean(
-                customer &&
-                  (customer.uid ||
-                    customer.paymentTermDays != null ||
-                    customer.billingStreet ||
-                    customer.billingEmail)
-              ) || Object.keys(fe).some((k) => k === "customerNumber" || k === "uid" || k === "paymentTermDays" || k.startsWith("billing"))}
+              open={moreHasErrors || (moreOpen ?? moreHasValues)}
+              onToggle={(e) => setMoreOpen(e.currentTarget.open)}
             >
               <summary className="cursor-pointer text-sm font-medium">Weitere Angaben</summary>
               <div className="space-y-4 pt-3">

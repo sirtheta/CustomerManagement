@@ -438,10 +438,14 @@ const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> 
       prisma.pendingEmail.count(),
     ]);
     if (activeSubscriptions > 0) {
-      return `Es bestehen noch ${activeSubscriptions} aktive Abos. Bitte zuerst alle Abos pausieren («Alle Abos pausieren» unter Module).`;
+      const state =
+        activeSubscriptions === 1 ? "Es besteht noch 1 aktives Abo." : `Es bestehen noch ${activeSubscriptions} aktive Abos.`;
+      return `${state} Bitte zuerst alle Abos pausieren («Alle Abos pausieren» unter Module).`;
     }
     if (pendingEmails > 0) {
-      return `Es warten noch ${pendingEmails} Abo-Rechnung(en) auf Freigabe. Bitte unter «Ausstehende E-Mails» freigeben oder verwerfen.`;
+      const state =
+        pendingEmails === 1 ? "Es wartet noch 1 Abo-Rechnung" : `Es warten noch ${pendingEmails} Abo-Rechnungen`;
+      return `${state} auf Freigabe. Bitte unter «Ausstehende E-Mails» freigeben oder verwerfen.`;
     }
     return null;
   },
@@ -462,18 +466,22 @@ export async function pauseAllSubscriptions(): Promise<ActionState & { paused?: 
   });
   if (active.length === 0) return { success: true, paused: 0 };
 
-  const { count } = await prisma.subscription.updateMany({
-    where: { id: { in: active.map((s) => s.id) }, active: true },
-    data: { active: false },
-  });
+  // One by one: only a subscription that was really paused here (not meanwhile by someone else) is audited and counted.
+  let paused = 0;
   for (const sub of active) {
+    const { count } = await prisma.subscription.updateMany({
+      where: { id: sub.id, active: true },
+      data: { active: false },
+    });
+    if (count === 0) continue;
+    paused += count;
     await logAudit(session, "UPDATE", "Subscription", sub.id, undefined, { customerId: sub.customerId, active: false });
   }
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");
   revalidatePath("/subscriptions");
-  return { success: true, paused: count };
+  return { success: true, paused };
 }
 
 /**

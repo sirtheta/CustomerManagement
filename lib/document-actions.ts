@@ -16,6 +16,9 @@ import {
   invoiceSendLockKey,
   SEND_IN_PROGRESS_ERROR,
   CANCELED_INVOICE_SEND_ERROR,
+  INVOICE_WITHOUT_ITEMS_ERROR,
+  INVALID_RECIPIENT_ERROR,
+  isValidRecipient,
 } from "@/lib/send-lock";
 import type { ArchiveResult } from "@/lib/document-archive";
 import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
@@ -189,6 +192,7 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
     include: { customer: true, items: { orderBy: { id: "asc" } } },
   });
   if (!quote) return { error: "Offerte nicht gefunden." };
+  if (!isValidRecipient(input.to)) return { error: INVALID_RECIPIENT_ERROR };
 
   let documentNumber: string;
   try {
@@ -267,6 +271,10 @@ async function sendInvoiceLocked(input: SendDocumentInput, settings: DispatchSet
   if (invoice.creditNoteForId == null && invoice.state === "Canceled") {
     return { error: CANCELED_INVOICE_SEND_ERROR };
   }
+
+  // Checked before the number is assigned, so a refused send does not use one up.
+  if (invoice.items.length === 0) return { error: INVOICE_WITHOUT_ITEMS_ERROR };
+  if (!isValidRecipient(input.to)) return { error: INVALID_RECIPIENT_ERROR };
 
   // Drafts are not counted when a credit note is saved, so this is the real
   // enforcement of the credit limit. It must run before a number is assigned.

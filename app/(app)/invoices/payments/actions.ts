@@ -10,10 +10,9 @@ import {
   deletePayment,
   getPaymentSummary,
   recordPayment,
-  recordRemainingPayment,
 } from "@/lib/payments";
 import { toRappen } from "@/lib/calculations";
-import { isValidDateString, swissToday } from "@/lib/date";
+import { isValidDateString } from "@/lib/date";
 
 const log = logger.child({ module: "payment-actions" });
 
@@ -56,19 +55,6 @@ export async function recordPaymentAction(
   } catch (err) {
     if (err instanceof PaymentError) return { error: err.message };
     log.error({ invoiceId, err }, "recordPaymentAction failed");
-    return { error: "Zahlung konnte nicht gespeichert werden." };
-  }
-  refresh(invoiceId);
-  return {};
-}
-
-export async function markInvoicePaidAction(invoiceId: number): Promise<{ error?: string }> {
-  const session = await requireEditor();
-  try {
-    await recordRemainingPayment({ invoiceId, date: swissToday(), source: "manual", actor: session });
-  } catch (err) {
-    if (err instanceof PaymentError) return { error: err.message };
-    log.error({ invoiceId, err }, "markInvoicePaidAction failed");
     return { error: "Zahlung konnte nicht gespeichert werden." };
   }
   refresh(invoiceId);

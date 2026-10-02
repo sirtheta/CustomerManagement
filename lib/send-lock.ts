@@ -1,8 +1,16 @@
+import { z } from "zod";
+
 export const SEND_IN_PROGRESS_ERROR =
   "Diese Rechnung wird gerade versendet. Bitte kurz warten und die Seite neu laden.";
 
 /** A fully credited invoice has nothing open; mailing it again would carry a QR slip for the full amount. */
 export const CANCELED_INVOICE_SEND_ERROR = "Eine stornierte Rechnung kann nicht erneut versendet werden.";
+
+/** Refusals shared by every path that mails an invoice; they must come before a number is assigned. */
+export const INVOICE_WITHOUT_ITEMS_ERROR = "Die Rechnung hat noch keine Positionen. Bitte zuerst Positionen eintragen.";
+export const INVALID_RECIPIENT_ERROR = "Bitte eine gültige E-Mail-Adresse angeben.";
+
+export const isValidRecipient = (to: string) => z.string().email().safeParse(to).success;
 
 // The scheduler and the Server Actions are bundled separately, so the set lives on
 // globalThis (same reason as the scheduler's start flags).

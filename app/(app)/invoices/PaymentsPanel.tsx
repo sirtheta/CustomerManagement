@@ -36,7 +36,14 @@ const SOURCE_LABELS: Record<string, string> = {
 export default function PaymentsPanel({ invoiceId, state, canEdit, summary, payments }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [amount, setAmount] = useState(summary.remaining > 0 ? summary.remaining.toFixed(2) : "");
+  const prefill = (remaining: number) => (remaining > 0 ? remaining.toFixed(2) : "");
+  const [amount, setAmount] = useState(prefill(summary.remaining));
+  // A recorded or deleted payment changes the open amount: prefill the new one (adjusting state while rendering, no effect).
+  const [syncedRemaining, setSyncedRemaining] = useState(summary.remaining);
+  if (syncedRemaining !== summary.remaining) {
+    setSyncedRemaining(summary.remaining);
+    setAmount(prefill(summary.remaining));
+  }
   const [date, setDate] = useState(() => swissDateString());
   const [overpaidBy, setOverpaidBy] = useState<number | null>(null);
   // Nothing open (paid, overpaid or fully credited): the form stays behind a link.

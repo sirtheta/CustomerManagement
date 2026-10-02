@@ -243,7 +243,11 @@ export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   if (invoiceCount > 0) {
     return { error: "Der Kunde hat Rechnungen und kann nicht gelöscht werden. Bitte archivieren." };
   }
-  await prisma.customer.delete({ where: { customerId: id } });
+  // The quotes cascade with the customer, but Item.quote is SET NULL: delete their items first or they stay as orphans.
+  await prisma.$transaction([
+    prisma.item.deleteMany({ where: { quote: { customerId: id } } }),
+    prisma.customer.delete({ where: { customerId: id } }),
+  ]);
   await logAudit(session, "DELETE", "Customer", id);
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/customers");

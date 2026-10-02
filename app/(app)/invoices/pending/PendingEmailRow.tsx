@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { approvePendingEmail, discardPendingEmail, type ApproveResult } from "./actions";
-import type { ActionState } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";

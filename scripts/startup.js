@@ -10,20 +10,21 @@ const bcrypt = require('bcryptjs');
 const dbPath = (process.env.DATABASE_URL ?? 'file:/app/data/customermanagement.db')
   .replace(/^file:/, '');
 
-const db = new Database(dbPath);
-try {
-  applyMigrations(db);
-  seedAdminUser(db);
-} finally {
-  db.close();
+if (require.main === module) {
+  const db = new Database(dbPath);
+  try {
+    applyMigrations(db);
+    seedAdminUser(db);
+  } finally {
+    db.close();
+  }
 }
 
 // ── Apply pending Prisma migrations ──────────────────────────────────────────
 // The production image has no Prisma CLI (it's a devDependency, pruned out), so
 // we apply the migration SQL ourselves. Tracked in `_prisma_migrations` so this
 // is idempotent and only new migrations run on an app upgrade.
-function applyMigrations(db) {
-  const migrationsDir = path.join(__dirname, '..', 'prisma', 'migrations');
+function applyMigrations(db, migrationsDir = path.join(__dirname, '..', 'prisma', 'migrations')) {
   if (!fs.existsSync(migrationsDir)) {
     console.warn('[startup] No migrations directory found — skipping migrations.');
     return;
@@ -51,6 +52,11 @@ function applyMigrations(db) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+
+  const pending = folders.filter(
+    (name) => !applied.has(name) && fs.existsSync(path.join(migrationsDir, name, 'migration.sql')),
+  );
+  if (pending.length > 0 && applied.size > 0) snapshotBeforeMigration(db, pending[0]);
 
   for (const name of folders) {
     if (applied.has(name)) continue;
@@ -81,6 +87,28 @@ function applyMigrations(db) {
     }
 
     console.log(`[startup] Applied migration: ${name}`);
+  }
+}
+
+// Safety net for upgrades: a migration rewrites tables, so before the first pending
+// one runs on an existing database we keep a snapshot next to the nightly backups
+// (`pre-migration-<name>.db` does not match the `db-YYYY-MM-DD.db` shape, so the
+// backup pruning never touches it). A failing snapshot only logs a warning: a full
+// disk or an unwritable BACKUP_DIR must not take the app down on its own.
+function snapshotBeforeMigration(db, migrationName) {
+  const dir = process.env.BACKUP_DIR || path.join(path.dirname(db.name), 'backups');
+  const target = path.join(dir, `pre-migration-${migrationName}.db`);
+  const tmp = `${target}.tmp`;
+  try {
+    if (fs.existsSync(target)) return;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.rmSync(tmp, { force: true });
+    db.prepare('VACUUM INTO ?').run(tmp);
+    fs.renameSync(tmp, target);
+    console.log(`[startup] Snapshot before migration written: ${target}`);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    console.warn(`[startup] Snapshot before migration failed (continuing): ${err.message}`);
   }
 }
 
@@ -115,3 +143,5 @@ function seedAdminUser(db) {
     throw err;
   }
 }
+
+module.exports = { applyMigrations, snapshotBeforeMigration };

@@ -111,6 +111,8 @@ export default function SettingsForm(props: Props) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!link || link.target === "_blank" || link.origin !== window.location.origin) return;
+      // Downloads and API routes do not leave the page
+      if (link.hasAttribute("download") || link.pathname.startsWith("/api/")) return;
       if (link.pathname === window.location.pathname && link.search === window.location.search) return;
       e.preventDefault();
       e.stopPropagation();

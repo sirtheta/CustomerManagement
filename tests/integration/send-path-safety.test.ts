@@ -44,7 +44,12 @@ import { sendPendingInvoice } from "@/lib/pending-email-send";
 import { sendReminder } from "@/app/(app)/invoices/reminders/actions";
 import { sendInvoiceEmail } from "@/lib/email";
 import { createCreditNoteDraft } from "@/lib/credit-notes";
-import { SEND_IN_PROGRESS_ERROR, CANCELED_INVOICE_SEND_ERROR } from "@/lib/send-lock";
+import {
+  SEND_IN_PROGRESS_ERROR,
+  CANCELED_INVOICE_SEND_ERROR,
+  INVOICE_WITHOUT_ITEMS_ERROR,
+  INVALID_RECIPIENT_ERROR,
+} from "@/lib/send-lock";
 
 const actor = { user: { id: "1", name: "Editor", email: "e@test.ch", role: "Editor" } } as Session;
 
@@ -246,6 +251,53 @@ describe("send paths after the mail went out", () => {
       const creditId = await createCreditNoteDraft(original.id, db.prisma);
 
       expect(await send(creditId)).toEqual({ success: true });
+    });
+  });
+
+  describe("recipient and items checks before a number is assigned", () => {
+    const send = (id: number, to = "kunde@example.ch") =>
+      sendDocument({ kind: "invoice", id, to, subject: "Rechnung", body: "Text", actor });
+
+    async function expectNothingConsumed(id: number) {
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+      expect((await db.prisma.invoice.findUniqueOrThrow({ where: { id } })).documentNumber).toBeNull();
+      expect(await db.prisma.sentDocument.count({ where: { invoiceId: id } })).toBe(0);
+      expect(await db.prisma.invoiceSentLog.count({ where: { invoiceId: id } })).toBe(0);
+    }
+
+    it("refuses an invoice without items", async () => {
+      const invoice = await seedInvoice({ items: undefined });
+
+      expect(await send(invoice.id)).toEqual({ error: INVOICE_WITHOUT_ITEMS_ERROR });
+
+      await expectNothingConsumed(invoice.id);
+    });
+
+    it("refuses an invalid recipient address", async () => {
+      const invoice = await seedInvoice();
+
+      expect(await send(invoice.id, "kein-mail")).toEqual({ error: INVALID_RECIPIENT_ERROR });
+
+      await expectNothingConsumed(invoice.id);
+    });
+
+    it("refuses an invalid recipient address for a quote without consuming a number", async () => {
+      const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+      const quote = await db.prisma.quote.create({
+        data: {
+          customerId: customer.customerId,
+          date: new Date("2026-01-01"),
+          validUntil: new Date("2026-02-01"),
+          totalAmount: 10,
+          state: "Draft",
+          items: { create: [{ name: "A", unit: "Piece", unitPrice: 10, quantity: 1, totalAmount: 10 }] },
+        },
+      });
+
+      const result = await sendDocument({ kind: "quote", id: quote.id, to: "x", subject: "s", body: "b", actor });
+
+      expect(result).toEqual({ error: INVALID_RECIPIENT_ERROR });
+      expect((await db.prisma.quote.findUniqueOrThrow({ where: { id: quote.id } })).documentNumber).toBeNull();
     });
   });
 

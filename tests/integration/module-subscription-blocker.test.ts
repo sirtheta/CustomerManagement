@@ -61,7 +61,7 @@ describe("subscriptions module blocker and archived customers", () => {
 
     const result = await setModule("subscriptions", false);
 
-    expect(result.error).toContain("1 aktive Abos");
+    expect(result.error).toContain("Es besteht noch 1 aktives Abo.");
   });
 
   it("pauses only subscriptions of non-archived customers", async () => {

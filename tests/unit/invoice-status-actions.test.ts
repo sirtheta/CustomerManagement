@@ -318,7 +318,7 @@ describe("deleteInvoice", () => {
 
   it("returns an error and does not delete when payments exist", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
-      documentNumber: "I-25060007",
+      documentNumber: null,
       state: "Draft",
     } as never);
     vi.mocked(prisma.payment.count).mockResolvedValue(2 as never);
@@ -330,9 +330,25 @@ describe("deleteInvoice", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
+  it("refuses a draft that already has a document number and deletes nothing", async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      documentNumber: "I-25060009",
+      state: "Draft",
+    } as never);
+
+    const result = await deleteInvoice(1);
+
+    expect(result.error).toBe(
+      "Die Rechnung hat bereits eine Nummer und wurde möglicherweise versendet. Sie kann nicht gelöscht werden."
+    );
+    expect(prisma.item.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.invoice.delete).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
   it("deletes the invoice, writes an audit log, and redirects", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
-      documentNumber: "I-25060005",
+      documentNumber: null,
       state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockResolvedValue({} as never);
@@ -343,12 +359,12 @@ describe("deleteInvoice", () => {
     await expect(deleteInvoice(1)).rejects.toThrow("REDIRECT:/invoices");
     expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
     expect(prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Invoice", 1, "I-25060005");
+    expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Invoice", 1);
   });
 
   it("returns an error instead of throwing when the delete fails", async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
-      documentNumber: "I-25060006",
+      documentNumber: null,
       state: "Draft",
     } as never);
     vi.mocked(prisma.invoice.delete).mockRejectedValue(new Error("FOREIGN KEY constraint failed"));

@@ -4,6 +4,8 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn() },
     invoice: { count: vi.fn() },
+    item: { deleteMany: vi.fn() },
+    $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
   },
 }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
@@ -213,6 +215,7 @@ describe("customer actions", () => {
       });
 
       await expect(deleteCustomer(7)).rejects.toThrow("REDIRECT:/customers");
+      expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { quote: { customerId: 7 } } });
       expect(prisma.customer.delete).toHaveBeenCalledWith({ where: { customerId: 7 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Customer", 7);
     });

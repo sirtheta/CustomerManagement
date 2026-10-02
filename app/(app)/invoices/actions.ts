@@ -287,6 +287,10 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
       error: "Versendete Rechnungen können nicht gelöscht werden. Stattdessen eine Gutschrift erstellen.",
     };
   }
+  // A draft with a number was mailed but its booking failed (see recordSend), so it must stay.
+  if (inv.documentNumber !== null) {
+    return { error: "Die Rechnung hat bereits eine Nummer und wurde möglicherweise versendet. Sie kann nicht gelöscht werden." };
+  }
   const paymentCount = await prisma.payment.count({ where: { invoiceId: id } });
   if (paymentCount > 0) {
     return { error: "Die Rechnung hat erfasste Zahlungen. Bitte zuerst die Zahlungen löschen." };
@@ -302,7 +306,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id, inv.documentNumber ?? undefined);
+  await logAudit(session, "DELETE", "Invoice", id);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect("/invoices");
