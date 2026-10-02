@@ -15,7 +15,6 @@ model Customer {
   city                    String
   zipCode                 String
   country                 String     @default("CH")
-  addressNeedsReview      Boolean    @default(false)
   email                   String
   phone                   String?
   contactInsteadOfCompany Boolean    @default(false)
@@ -353,7 +352,6 @@ model CompanyInformation {
   companyZip           String?
   companyCity          String?
   companyCountry       String               @default("CH")
-  companyAddressNeedsReview Boolean         @default(false)
   companyEmail         String?
   companyPhone         String?
   companyIBAN          String?

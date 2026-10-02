@@ -92,27 +92,27 @@ describe(`migration ${MIGRATION}`, () => {
 
     const rows = db
       .prepare(
-        `SELECT "street", "houseNumber", "country", "addressNeedsReview" FROM "Customer" ORDER BY "customerId"`
+        `SELECT "street", "houseNumber", "country" FROM "Customer" ORDER BY "customerId"`
       )
       .all();
     expect(rows).toEqual([
-      { street: "Musterstrasse", houseNumber: "12a", country: "CH", addressNeedsReview: 1 },
-      { street: "Rue du Marché", houseNumber: "5", country: "CH", addressNeedsReview: 1 },
-      { street: "Hauptstrasse", houseNumber: "3", country: "CH", addressNeedsReview: 1 },
-      { street: "Postfach", houseNumber: null, country: "CH", addressNeedsReview: 1 },
-      { street: "Weg 1, 2. Stock", houseNumber: null, country: "CH", addressNeedsReview: 1 },
-      { street: "", houseNumber: null, country: "CH", addressNeedsReview: 0 },
+      { street: "Musterstrasse", houseNumber: "12a", country: "CH" },
+      { street: "Rue du Marché", houseNumber: "5", country: "CH" },
+      { street: "Hauptstrasse", houseNumber: "3", country: "CH" },
+      { street: "Postfach", houseNumber: null, country: "CH" },
+      { street: "Weg 1, 2. Stock", houseNumber: null, country: "CH" },
+      { street: "", houseNumber: null, country: "CH" },
     ]);
 
     const company = db
       .prepare(
-        `SELECT "companyStreet", "companyHouseNumber", "companyCountry", "companyAddressNeedsReview"
+        `SELECT "companyStreet", "companyHouseNumber", "companyCountry"
          FROM "CompanyInformation" ORDER BY "companyInformationId"`
       )
       .all();
     expect(company).toEqual([
-      { companyStreet: "Beispielweg", companyHouseNumber: "1", companyCountry: "CH", companyAddressNeedsReview: 1 },
-      { companyStreet: null, companyHouseNumber: null, companyCountry: "CH", companyAddressNeedsReview: 0 },
+      { companyStreet: "Beispielweg", companyHouseNumber: "1", companyCountry: "CH" },
+      { companyStreet: null, companyHouseNumber: null, companyCountry: "CH" },
     ]);
   });
 

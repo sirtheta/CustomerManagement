@@ -165,8 +165,6 @@ function customerData(d: ParsedCustomer, formData: FormData) {
     city: d.city,
     zipCode: d.zipCode,
     country: d.country,
-    // Saving confirms the address, e.g. after the migration's automatic split.
-    addressNeedsReview: false,
     email: d.email,
     phone: d.phone || null,
     contactInsteadOfCompany: formData.get("contactInsteadOfCompany") === "on",

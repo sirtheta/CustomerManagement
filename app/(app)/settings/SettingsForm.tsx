@@ -26,7 +26,6 @@ type Props = {
   companyZip: string;
   companyCity: string;
   companyCountry: string;
-  companyAddressNeedsReview: boolean;
   companyEmail: string;
   companyPhone: string;
   companyIBAN: string;
@@ -161,15 +160,6 @@ export default function SettingsForm(props: Props) {
               <Input id="companyHolderName" name="companyHolderName" defaultValue={props.companyHolderName} />
             </div>
           </div>
-          {props.companyAddressNeedsReview && (
-            <p
-              role="status"
-              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-            >
-              Die Adresse wurde automatisch in Strasse und Hausnummer aufgeteilt. Bitte prüfen und
-              speichern — die QR-Rechnung verlangt getrennte Felder.
-            </p>
-          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-2 space-y-1">
               <Label htmlFor="companyStreet">Strasse</Label>

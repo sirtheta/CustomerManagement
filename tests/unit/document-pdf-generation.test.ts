@@ -437,7 +437,6 @@ describe("generateQuotePdf", () => {
           street: "Weg",
         houseNumber: "1",
         country: "CH",
-        addressNeedsReview: false,
           zipCode: "8000",
           city: "Zürich",
           email: "anna@muster.ch",

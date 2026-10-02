@@ -70,8 +70,6 @@ export async function saveSettings(
     companyZip: (formData.get("companyZip") as string)?.trim() || null,
     companyCity: (formData.get("companyCity") as string)?.trim() || null,
     companyCountry,
-    // Saving confirms the address, e.g. after the migration's automatic split.
-    companyAddressNeedsReview: false,
     companyEmail: (formData.get("companyEmail") as string) || null,
     companyPhone: (formData.get("companyPhone") as string) || null,
     companyIBAN,

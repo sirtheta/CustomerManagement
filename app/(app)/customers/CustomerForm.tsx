@@ -27,18 +27,6 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-function ReviewNotice() {
-  return (
-    <p
-      role="status"
-      className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-    >
-      Die Adresse wurde automatisch in Strasse und Hausnummer aufgeteilt. Bitte prüfen und
-      speichern — die QR-Rechnung verlangt getrennte Felder.
-    </p>
-  );
-}
-
 export default function CustomerForm({ customer, readOnly = false, cancelHref = "/customers", editHref }: Props) {
   const action = customer
     ? updateCustomer.bind(null, customer.customerId)
@@ -106,7 +94,6 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 {formatCityLine(customer.zipCode, customer.city)}
                 {customer.country !== "CH" && `, ${countryName(customer.country)}`}
               </dd>
-              {customer.addressNeedsReview && <ReviewNotice />}
             </div>
             <div>
               <dt className="text-muted-foreground">E-Mail</dt>
@@ -220,8 +207,6 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <FieldError id="contactPerson-error" message={fe.contactPerson} />
               </div>
             </div>
-
-            {customer?.addressNeedsReview && <ReviewNotice />}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5 sm:col-span-2">

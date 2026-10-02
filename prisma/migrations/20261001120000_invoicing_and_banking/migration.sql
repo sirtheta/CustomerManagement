@@ -12,14 +12,12 @@
 -- Existing free-text addresses are split heuristically: the last
 -- whitespace-separated token becomes the house number when it starts with a
 -- digit ("Musterstrasse 12a" -> "Musterstrasse" / "12a"). Anything else stays
--- entirely in the street field. Every migrated row is flagged for review so
--- the user can confirm the split in the UI (saving the record clears the flag).
+-- entirely in the street field.
 
 -- Customer
 ALTER TABLE "Customer" RENAME COLUMN "address" TO "street";
 ALTER TABLE "Customer" ADD COLUMN "houseNumber" TEXT;
 ALTER TABLE "Customer" ADD COLUMN "country" TEXT NOT NULL DEFAULT 'CH';
-ALTER TABLE "Customer" ADD COLUMN "addressNeedsReview" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "Customer" ADD COLUMN "_sp" INTEGER;
 
 UPDATE "Customer" SET "street" = trim("street");
@@ -39,14 +37,12 @@ UPDATE "Customer" SET
   "street" = trim(substr("street", 1, "_sp"))
 WHERE "_sp" > 1 AND substr("street", "_sp" + 1) GLOB '[0-9]*';
 
-UPDATE "Customer" SET "addressNeedsReview" = true WHERE "street" <> '';
 ALTER TABLE "Customer" DROP COLUMN "_sp";
 
 -- CompanyInformation
 ALTER TABLE "CompanyInformation" RENAME COLUMN "companyAddress" TO "companyStreet";
 ALTER TABLE "CompanyInformation" ADD COLUMN "companyHouseNumber" TEXT;
 ALTER TABLE "CompanyInformation" ADD COLUMN "companyCountry" TEXT NOT NULL DEFAULT 'CH';
-ALTER TABLE "CompanyInformation" ADD COLUMN "companyAddressNeedsReview" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "CompanyInformation" ADD COLUMN "_sp" INTEGER;
 
 UPDATE "CompanyInformation" SET "companyStreet" = trim("companyStreet")
@@ -68,8 +64,6 @@ UPDATE "CompanyInformation" SET
   "companyStreet" = trim(substr("companyStreet", 1, "_sp"))
 WHERE "_sp" > 1 AND substr("companyStreet", "_sp" + 1) GLOB '[0-9]*';
 
-UPDATE "CompanyInformation" SET "companyAddressNeedsReview" = true
-WHERE "companyStreet" IS NOT NULL AND "companyStreet" <> '';
 ALTER TABLE "CompanyInformation" DROP COLUMN "_sp";
 
 -- ── Subscriptions ───────────────────────────────────────────────────────
@@ -124,13 +118,12 @@ CREATE TABLE "new_Customer" (
     "city" TEXT NOT NULL,
     "zipCode" TEXT NOT NULL,
     "country" TEXT NOT NULL DEFAULT 'CH',
-    "addressNeedsReview" BOOLEAN NOT NULL DEFAULT false,
     "email" TEXT NOT NULL,
     "phone" TEXT,
     "contactInsteadOfCompany" BOOLEAN NOT NULL DEFAULT false,
     "archivedAt" DATETIME
 );
-INSERT INTO "new_Customer" ("addressNeedsReview", "city", "company", "contactInsteadOfCompany", "contactPerson", "country", "customerId", "email", "houseNumber", "phone", "street", "zipCode") SELECT "addressNeedsReview", "city", "company", "contactInsteadOfCompany", "contactPerson", "country", "customerId", "email", "houseNumber", "phone", "street", "zipCode" FROM "Customer";
+INSERT INTO "new_Customer" ("city", "company", "contactInsteadOfCompany", "contactPerson", "country", "customerId", "email", "houseNumber", "phone", "street", "zipCode") SELECT "city", "company", "contactInsteadOfCompany", "contactPerson", "country", "customerId", "email", "houseNumber", "phone", "street", "zipCode" FROM "Customer";
 DROP TABLE "Customer";
 ALTER TABLE "new_Customer" RENAME TO "Customer";
 CREATE INDEX "Customer_email_idx" ON "Customer"("email");

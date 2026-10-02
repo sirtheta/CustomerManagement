@@ -59,7 +59,6 @@ function baseSettings() {
       companyStreet: null,
       companyHouseNumber: null,
       companyCountry: "CH",
-      companyAddressNeedsReview: false,
       companyZip: null,
       companyCity: null,
       companyEmail: null,
