@@ -9,7 +9,20 @@ export function customerSearchConditions(term: string) {
     { contactPerson: { contains: term } },
     { email: { contains: term } },
     { city: { contains: term } },
+    { billingEmail: { contains: term } },
     { uid: { contains: term } },
+    {
+      contacts: {
+        some: {
+          OR: [
+            { name: { contains: term } },
+            { role: { contains: term } },
+            { email: { contains: term } },
+            { phone: { contains: term } },
+          ],
+        },
+      },
+    },
     ...(uid ? [{ uid }] : []),
     // Customer numbers are integers: match them exactly, only for purely numeric terms.
     ...(/^\d{1,9}$/.test(term) ? [{ customerNumber: Number(term) }] : []),

@@ -12,4 +12,12 @@ describe("customerSearchConditions", () => {
     expect(customerSearchConditions("1001")).toContainEqual({ customerNumber: 1001 });
     expect(customerSearchConditions("Muster")).not.toContainEqual({ customerNumber: expect.anything() });
   });
+
+  it("matches additional contacts and the billing e-mail", () => {
+    const c = customerSearchConditions("buchhaltung@example.ch");
+    expect(c).toContainEqual({ billingEmail: { contains: "buchhaltung@example.ch" } });
+    expect(c).toContainEqual({
+      contacts: { some: { OR: expect.arrayContaining([{ email: { contains: "buchhaltung@example.ch" } }]) } },
+    });
+  });
 });
