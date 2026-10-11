@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.7.0...customer-management-v1.7.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* **docs:** use the new product name in the manual, README and TOTP script ([c32e3cc](https://github.com/sirtheta/CustomerManagement/commit/c32e3cc4f1b96ac262ed29c75edb1d0b5178b02c))
+
 ## [1.7.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.6.0...customer-management-v1.7.0) (2026-10-11)
 
 
