@@ -63,4 +63,25 @@ describe("deleteCustomer (real database)", () => {
     expect((await db.prisma.item.findMany()).map((i) => i.name)).toEqual(["Bleibt"]);
     expect(await db.prisma.item.count({ where: { invoiceId: null, quoteId: null } })).toBe(0);
   });
+
+  it("refuses to delete a customer that has work entries and keeps everything", async () => {
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+    await db.prisma.workEntry.create({
+      data: {
+        customerId: customer.customerId,
+        date: new Date("2026-10-12T00:00:00.000Z"),
+        name: "Arbeitsstunde",
+        unit: "Hour",
+        quantity: 1,
+        createdById: 1,
+      },
+    });
+
+    expect(await deleteCustomer(customer.customerId)).toEqual({
+      error: "Der Kunde hat erfasste Leistungen und kann nicht gelöscht werden. Bitte archivieren.",
+    });
+
+    expect(await db.prisma.customer.count({ where: { customerId: customer.customerId } })).toBe(1);
+    expect(await db.prisma.workEntry.count()).toBe(1);
+  });
 });

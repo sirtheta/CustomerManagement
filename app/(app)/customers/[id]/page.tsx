@@ -147,6 +147,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
       : [],
     loadCustomerHistory(prisma, customerId, { quotes: modules.quotes, tasks: modules.tasks }),
   ]);
+  const workEntryCount = await prisma.workEntry.count({ where: { customerId } });
 
   if (!customer) notFound();
 
@@ -382,6 +383,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           <DeleteCustomerButton
             customerId={customerId}
             hasInvoices={invoiceCount > 0}
+            hasWorkEntries={workEntryCount > 0}
             activeSubscriptions={subscriptions.filter((s) => s.active).length}
             archived={customer.archivedAt !== null}
           />

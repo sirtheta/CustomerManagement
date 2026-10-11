@@ -36,6 +36,7 @@ model Customer {
   subscriptions           Subscription[]
   contacts                CustomerContact[]
   tasks                   Task[]
+  workEntries             WorkEntry[]
 
   @@index([email])
   @@index([archivedAt])
@@ -63,6 +64,7 @@ model Invoice {
   pendingReminder PendingReminder?
   payments        Payment[]
   sentDocuments   SentDocument[]
+  workEntries     WorkEntry[]
 
   @@unique([documentNumber])
   @@index([customerId])
@@ -236,6 +238,7 @@ model Service {
   isActive    Boolean   @default(true)
   categoryId  Int?
   category    Category? @relation(fields: [categoryId], references: [categoryId])
+  workEntries WorkEntry[]
 }
 
 model Category {
@@ -394,6 +397,7 @@ model ApplicationSettings {
   moduleBankImport         Boolean            @default(true)
   moduleAccounting         Boolean            @default(true)
   moduleAnalytics          Boolean            @default(true)
+  moduleTimeTracking       Boolean            @default(true)
   pdfTheme                 Json?
   companyInformationId     Int                @unique
   companyInfo              CompanyInformation @relation(fields: [companyInformationId], references: [companyInformationId], onDelete: Cascade)
@@ -540,4 +544,29 @@ model BankTransaction {
 
   @@index([importId])
   @@index([date])
+}
+
+/// A piece of work or material recorded on site. Time vs. material follows from `unit`
+/// (Hour/Day = time, Piece/Package = material). `invoiceId` set = already billed; the price is
+/// not stored but read from the service catalog when the entries are billed.
+model WorkEntry {
+  id          Int       @id @default(autoincrement())
+  customerId  Int
+  date        DateTime  // calendar day as UTC midnight, like Payment.date
+  serviceId   Int?
+  name        String    // snapshot of the service name, or free text for material
+  unit        Unit
+  quantity    Decimal
+  note        String?   // internal only, never printed on the invoice
+  invoiceId   Int?
+  createdById Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  customer    Customer  @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  service     Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  invoice     Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([date])
+  @@index([invoiceId])
 }

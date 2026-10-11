@@ -60,7 +60,7 @@ async function CustomersTable({
       orderBy: { [sortField]: sortOrder },
       skip: (currentPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { _count: { select: { invoices: true, subscriptions: { where: { active: true } } } } },
+      include: { _count: { select: { invoices: true, workEntries: true, subscriptions: { where: { active: true } } } } },
     }),
     prisma.customer.count({ where }),
   ]);
@@ -129,12 +129,13 @@ async function CustomersTable({
                   <TableCell>{c.email}</TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
                   <TableCell>
-                    {/* With invoices the button archives (Editor), otherwise it deletes (Admin only). */}
-                    {(c._count.invoices > 0 ? canEdit : canDelete) && (
+                    {/* With invoices or recorded work the button archives (Editor), otherwise it deletes (Admin only). */}
+                    {(c._count.invoices > 0 || c._count.workEntries > 0 ? canEdit : canDelete) && (
                       <DeleteCustomerButton
                         customerId={c.customerId}
                         size="sm"
                         hasInvoices={c._count.invoices > 0}
+                        hasWorkEntries={c._count.workEntries > 0}
                         activeSubscriptions={subscriptionsOn ? c._count.subscriptions : 0}
                         archived={archivedOnly}
                       />
