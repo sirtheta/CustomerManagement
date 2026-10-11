@@ -14,6 +14,7 @@ import { loadWorkCounts } from "@/lib/attention-counts";
 import { UserRole } from "@prisma/client";
 import { Suspense } from "react";
 import { loadModules } from "@/lib/module-guard";
+import { APP_NAME } from "@/lib/app-name";
 
 export default async function AppLayout({
   children,
@@ -37,7 +38,7 @@ export default async function AppLayout({
               href="/dashboard"
               className="font-bold text-sm text-primary mr-3 shrink-0 hidden md:block tracking-tight"
             >
-              CustomerManagement
+              {APP_NAME}
             </Link>
             <NavLinks role={session.user.role} modules={modules} counts={navCounts} />
           </div>

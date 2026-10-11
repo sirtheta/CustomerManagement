@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { APP_NAME, APP_SHORT_NAME } from "@/lib/app-name";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,10 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CustomerManagement",
+  title: APP_NAME,
   description: "Customer, Invoice and Quote Management",
   icons: { apple: "/icons/apple-touch-icon.png" },
-  appleWebApp: { capable: true, title: "Kunden", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: APP_SHORT_NAME, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = { themeColor: "#4f46e5" };

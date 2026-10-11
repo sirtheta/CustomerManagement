@@ -86,7 +86,7 @@ Audit: `CREATE`, `UPDATE`, `DELETE` auf `WorkEntry` über `logAudit` (nie innerh
 
 ## PWA
 
-- `app/manifest.ts`: Name «CustomerManagement» und Kurzname «Kunden» (neutral, weil das Manifest für die ganze App gilt, auch für Viewer und bei ausgeschaltetem Modul), `display: standalone`, `start_url: /time`, Icons 192, 512 und maskable in `public/icons/` (erzeugt mit `npm run pwa:icons`).
+- `app/manifest.ts`: Name «Nemicomp Quote & Invoice» und Kurzname «Q&I» (`lib/app-name.ts`; neutral, weil das Manifest für die ganze App gilt, auch für Viewer und bei ausgeschaltetem Modul), `display: standalone`, `start_url: /time`, Icons 192, 512 und maskable in `public/icons/` (erzeugt mit `npm run pwa:icons`).
 - Kein Service Worker, keine Offline-Funktion.
 - `proxy.ts` leitet nicht angemeldete Anfragen auf `/login` um. Der Browser lädt das Manifest ohne Cookies, deshalb werden `/manifest.webmanifest` und die Icon-Dateien von diesem Redirect ausgenommen. Es sind öffentliche Dateien ohne sensible Inhalte.
 - Die Sitzung bleibt wie bisher 7 Tage gültig und verlängert sich bei Nutzung.

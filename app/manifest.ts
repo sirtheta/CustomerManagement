@@ -1,11 +1,12 @@
 import type { MetadataRoute } from "next";
+import { APP_NAME, APP_SHORT_NAME } from "@/lib/app-name";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     // The manifest applies to the whole app (also for Viewers and with the module off), so the name
     // stays neutral; only the start page is the capture page.
-    name: "CustomerManagement",
-    short_name: "Kunden",
+    name: APP_NAME,
+    short_name: APP_SHORT_NAME,
     description: "Kundenverwaltung, auch zum Erfassen von Zeit und Material vor Ort.",
     start_url: "/time",
     scope: "/",
