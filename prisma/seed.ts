@@ -10,6 +10,7 @@ import { archivePdf } from "../lib/document-archive";
 import { generateReminderPdf } from "../lib/pdf/reminder-pdf";
 import { computeReminderCharges, reminderTitle } from "../lib/reminder-charges";
 import { checkOverdueInvoices } from "../lib/reminders";
+import { swissDateString } from "../lib/date";
 
 loadEnvConfig(process.cwd());
 
@@ -357,9 +358,62 @@ async function main() {
 
   const bankCount = await seedBankStatement(company.companyIBAN);
 
+  const workEntryCount = await seedWorkEntries(customers);
+
   console.log(
-    `Seeding complete: ${categories.length + expenseCategories.length} categories, 25 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingSubscription.count} pending subscription invoice mails, ${reminderCount} dunning invoices, ${bankCount} open bank transactions.`,
+    `Seeding complete: ${categories.length + expenseCategories.length} categories, 27 services, 50 customers, ${invoiceCounter - 1} invoices, ${quoteCounter - 1} quotes, ${expenseCount} expenses, ${pendingSubscription.count} pending subscription invoice mails, ${reminderCount} dunning invoices, ${bankCount} open bank transactions, ${workEntryCount} open work entries.`,
   );
+}
+
+// Time tracking demo data: two fixed catalog services (the random ones above may have no active
+// hourly service) and open work entries for a few customers, so /time, «Offene Erfassungen» and the
+// billing page have something to show. One entry is free text without a catalog price («Preis im
+// Entwurf ergänzen») and the last customer is archived (badge «archiviert», billing blocked).
+async function seedWorkEntries(customers: { customerId: number }[]): Promise<number> {
+  const admin = await prisma.user.findFirstOrThrow({ where: { role: UserRole.Admin } });
+  const hourly = await prisma.service.create({
+    data: { name: "Arbeitsstunde", description: "Arbeit vor Ort", unit: Unit.Hour, unitPrice: 85, isActive: true },
+  });
+  const mulch = await prisma.service.create({
+    data: { name: "Rindenmulch", description: "Sack à 70 Liter", unit: Unit.Piece, unitPrice: 12.5, isActive: true },
+  });
+
+  // Calendar day as UTC midnight, n days back from today's Swiss day (like WorkEntry.date)
+  const day = (n: number) => new Date(`${swissDateString(new Date(Date.now() - n * DAY_MS))}T00:00:00.000Z`);
+  const archived = customers[customers.length - 1];
+  await prisma.customer.update({ where: { customerId: archived.customerId }, data: { archivedAt: new Date() } });
+
+  type Seeded = { customer: { customerId: number }; daysAgo: number; quantity: number; note?: string } & (
+    | { service: typeof hourly }
+    | { service: null; name: string; unit: Unit }
+  );
+  const entries: Seeded[] = [
+    { customer: customers[10], daysAgo: 6, quantity: 2.5, service: hourly, note: "Hecke vorne" },
+    { customer: customers[10], daysAgo: 4, quantity: 4, service: hourly },
+    { customer: customers[10], daysAgo: 1, quantity: 1.5, service: hourly, note: "Rasen mähen" },
+    { customer: customers[10], daysAgo: 4, quantity: 6, service: mulch },
+    { customer: customers[11], daysAgo: 3, quantity: 8, service: hourly, note: "Beet neu angelegt" },
+    { customer: customers[11], daysAgo: 2, quantity: 0.5, service: hourly },
+    { customer: customers[11], daysAgo: 2, quantity: 1, service: null, name: "Kies 8/16", unit: Unit.Package },
+    { customer: customers[12], daysAgo: 0, quantity: 3, service: hourly },
+    { customer: customers[13], daysAgo: 10, quantity: 7.5, service: hourly, note: "Baumschnitt" },
+    { customer: archived, daysAgo: 20, quantity: 2, service: hourly },
+    { customer: archived, daysAgo: 19, quantity: 3, service: mulch },
+  ];
+
+  await prisma.workEntry.createMany({
+    data: entries.map((e) => ({
+      customerId: e.customer.customerId,
+      date: day(e.daysAgo),
+      serviceId: e.service?.id ?? null,
+      name: e.service ? e.service.name : e.name,
+      unit: e.service ? e.service.unit : e.unit,
+      quantity: e.quantity,
+      note: e.note ?? null,
+      createdById: admin.id,
+    })),
+  });
+  return entries.length;
 }
 
 // Overdue invoices at every dunning stage. `pendingLevel` is the level of the
