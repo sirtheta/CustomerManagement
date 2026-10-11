@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.6.0...customer-management-v1.7.0) (2026-10-11)
+
+
+### Features
+
+* **time-tracking:** add time and material tracking module ([#142](https://github.com/sirtheta/CustomerManagement/issues/142)) ([3b9dc71](https://github.com/sirtheta/CustomerManagement/commit/3b9dc71284008e801d74bab7f8380a36f2b3e2b7))
+
 ## [1.6.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.5.0...customer-management-v1.6.0) (2026-10-02)
 
 
