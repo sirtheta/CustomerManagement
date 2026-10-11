@@ -74,8 +74,14 @@ export type DocumentInput = {
   items: ItemData[];
 };
 
+export type CreateDocumentOptions = {
+  /** Runs inside the creating transaction once the document and its items exist; throw to roll everything back. */
+  onCreated?: (tx: Prisma.TransactionClient, id: number) => Promise<void>;
+};
+
 export async function createDocumentWithItems(
-  input: DocumentInput
+  input: DocumentInput,
+  options: CreateDocumentOptions = {}
 ): Promise<{ id: number; documentNumber: null }> {
   // Drafts are created without a number; assignDocumentNumber hands it out
   // when the document first leaves Draft.
@@ -111,6 +117,7 @@ export async function createDocumentWithItems(
 
     await saveItemsToCatalog(tx, input.items);
     await createItems(tx, input.kind, documentId, input.items);
+    await options.onCreated?.(tx, documentId);
     return documentId;
   });
 
