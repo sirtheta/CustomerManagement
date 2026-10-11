@@ -26,6 +26,7 @@ const MODULE_PATHS: Record<ModuleKey, string[]> = {
     "api/export/year-package",
   ],
   analytics: ["(app)/analytics"],
+  timeTracking: ["(app)/time"],
 };
 
 function walk(dir: string): string[] {

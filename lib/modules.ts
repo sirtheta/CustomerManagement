@@ -14,6 +14,7 @@ export const MODULE_KEYS = [
   "bankImport",
   "accounting",
   "analytics",
+  "timeTracking",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -26,7 +27,8 @@ type ModuleField =
   | "moduleReminders"
   | "moduleBankImport"
   | "moduleAccounting"
-  | "moduleAnalytics";
+  | "moduleAnalytics"
+  | "moduleTimeTracking";
 
 export const MODULE_FIELDS: Record<ModuleKey, ModuleField> = {
   tasks: "moduleTasks",
@@ -36,6 +38,7 @@ export const MODULE_FIELDS: Record<ModuleKey, ModuleField> = {
   bankImport: "moduleBankImport",
   accounting: "moduleAccounting",
   analytics: "moduleAnalytics",
+  timeTracking: "moduleTimeTracking",
 };
 
 export const MODULE_INFO: Record<ModuleKey, { label: string; description: string }> = {
@@ -66,6 +69,10 @@ export const MODULE_INFO: Record<ModuleKey, { label: string; description: string
   analytics: {
     label: "Auswertung",
     description: "Umsatz-Diagramme, Kategorien und Top-Kunden.",
+  },
+  timeTracking: {
+    label: "Zeiterfassung",
+    description: "Zeit und Material mobil pro Kunde erfassen und daraus Rechnungsentwürfe erstellen.",
   },
 };
 
