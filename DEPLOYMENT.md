@@ -40,6 +40,9 @@ nano .env  # Werte setzen (AUTH_SECRET, AUTH_URL, ADMIN_EMAIL, ADMIN_PASSWORD_HA
 
 # 3. Datenbankdatei ablegen
 mkdir -p data
+# Der Container läuft als Benutzer nextjs (UID 1001) und muss hier schreiben dürfen,
+# sonst startet er nicht ("unable to open database file", SQLITE_CANTOPEN):
+sudo chown -R 1001:1001 data
 # Bestehende DB kopieren (z.B. per scp vom PC):
 # scp customermanagement.db pi@raspberrypi.local:~/customer-management/data/
 
