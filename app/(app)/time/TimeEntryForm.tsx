@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -39,6 +39,10 @@ export default function TimeEntryForm({
   today,
 }: Props) {
   const router = useRouter();
+  // The picker is uncontrolled, so what it shows is kept here: the prop only changes after the
+  // server round trip of router.replace, and a quick save must book on the customer shown.
+  const [pickedCustomerId, setPickedCustomerId] = useState<number | null>(customerId);
+  const [isNavigating, startNavigation] = useTransition();
   const [state, formAction, isPending] = useActionState<WorkEntryState, FormData>(createWorkEntry, {});
   const prevState = useRef<WorkEntryState | undefined>(undefined);
 
@@ -62,7 +66,8 @@ export default function TimeEntryForm({
   const step = isTime ? 0.25 : 1;
   const parsed = parseQuantity(quantity);
   const canSubmit =
-    customerId !== null &&
+    pickedCustomerId !== null &&
+    !isNavigating &&
     parsed !== null &&
     parsed > 0 &&
     (isTime ? service !== undefined : serviceId === FREE_TEXT ? freeName.trim() !== "" : service !== undefined);
@@ -99,7 +104,7 @@ export default function TimeEntryForm({
 
   return (
     <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-4">
-      <input type="hidden" name="customerId" value={customerId ?? ""} />
+      <input type="hidden" name="customerId" value={pickedCustomerId ?? ""} />
       <input type="hidden" name="serviceId" value={serviceId === FREE_TEXT ? "" : serviceId} />
       <input type="hidden" name="quantity" value={quantity} />
       {serviceId === FREE_TEXT && mode === "material" && (
@@ -116,7 +121,10 @@ export default function TimeEntryForm({
           customers={customers}
           defaultValue={customers.find((c) => c.customerId === customerId) ?? null}
           // "none" keeps the picker empty: without a parameter the page would preselect the last customer again.
-          onValueChange={(c) => router.replace(c ? `/time?customer=${c.customerId}` : "/time?customer=none")}
+          onValueChange={(c) => {
+            setPickedCustomerId(c?.customerId ?? null);
+            startNavigation(() => router.replace(c ? `/time?customer=${c.customerId}` : "/time?customer=none"));
+          }}
         />
       </div>
 
