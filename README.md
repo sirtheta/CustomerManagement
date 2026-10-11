@@ -1,4 +1,4 @@
-# CustomerManagement
+# Nemicomp Quote & Invoice
 
 [![CI/CD](https://github.com/sirtheta/CustomerManagement/actions/workflows/release.yml/badge.svg)](https://github.com/sirtheta/CustomerManagement/actions/workflows/release.yml)
 

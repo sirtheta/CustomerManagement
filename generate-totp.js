@@ -5,7 +5,7 @@ const { OTP } = require("otplib");
 const otp = new OTP({ strategy: "totp" });
 const secret = otp.generateSecret();
 const uri = otp.generateURI({
-  issuer: "CustomerManagement",
+  issuer: "Nemicomp Quote & Invoice",
   label: "admin",
   secret,
 });
