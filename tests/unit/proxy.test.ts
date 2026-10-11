@@ -25,4 +25,18 @@ describe("proxy", () => {
     expect([307, 308]).toContain(res.status);
     expect(res.headers.get("location")).toContain("/login");
   });
+
+  it("serves the PWA manifest and icons without a login", async () => {
+    for (const path of ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/apple-touch-icon.png"]) {
+      const res = await proxy(requestTo(path));
+      expect(res.headers.get("location"), path).toBeNull();
+    }
+  });
+
+  it("does not open other public-looking paths", async () => {
+    for (const path of ["/manifest.webmanifest.bak", "/iconsx/a.png", "/icons"]) {
+      const res = await proxy(requestTo(path));
+      expect([307, 308], path).toContain(res.status);
+    }
+  });
 });
