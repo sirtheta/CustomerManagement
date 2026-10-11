@@ -117,6 +117,16 @@ describe("work entry actions", () => {
     expect(entry.date.toISOString()).toBe("2026-10-13T00:00:00.000Z");
   });
 
+  it("stores the quantity of an update rounded to two decimals", async () => {
+    const { entryId } = await createWorkEntry({}, timeForm({ serviceId: String(pieceServiceId), quantity: "1" }));
+    const result = await updateWorkEntry(entryId!, {}, form({ date: "2026-10-12", quantity: "2.000000000001", note: "" }));
+    expect(result.success).toBe(true);
+    const entry = await db.prisma.workEntry.findUniqueOrThrow({ where: { id: entryId! } });
+    expect(Number(entry.quantity)).toBe(2);
+    const audit = await db.prisma.auditLog.findFirstOrThrow({ where: { entityType: "WorkEntry", action: "UPDATE" } });
+    expect(JSON.parse(audit.details!).quantity).toBe(2);
+  });
+
   it("validates the quantity of an update against the entry's unit", async () => {
     const { entryId } = await createWorkEntry({}, timeForm());
     expect((await updateWorkEntry(entryId!, {}, form({ date: "2026-10-12", quantity: "30", note: "" }))).error).toMatch(/24 Stunden/);

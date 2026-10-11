@@ -93,6 +93,15 @@ describe("resolveWorkEntry", () => {
     expect("value" in resolveWorkEntry({ ...base, serviceId: 2, quantityRaw: "3.5" }, pieceService)).toBe(true);
   });
 
+  it("rounds the stored quantity to two decimals", () => {
+    expect(resolveWorkEntry({ ...base, serviceId: 2, quantityRaw: "1.000000000001" }, pieceService)).toMatchObject({
+      value: { quantity: 1 },
+    });
+    expect(
+      resolveWorkEntry({ ...base, freeName: "Kies", freeUnit: "Piece", quantityRaw: "1,000000000001" }, null)
+    ).toMatchObject({ value: { quantity: 1 } });
+  });
+
   it("trims the note, nulls an empty one and limits its length", () => {
     const withNote = resolveWorkEntry({ ...base, serviceId: 1, note: "  Hecke hinten " }, hourService);
     expect(withNote).toMatchObject({ value: { note: "Hecke hinten" } });

@@ -7,7 +7,14 @@ import { requireEditor } from "@/lib/permissions";
 import { requireModule } from "@/lib/module-guard";
 import { logAudit } from "@/lib/audit";
 import { assertCustomerActive } from "@/lib/customer-archive";
-import { MAX_NOTE_LENGTH, parseQuantity, parseWorkDate, resolveWorkEntry, validateQuantity } from "@/lib/work-entries";
+import {
+  MAX_NOTE_LENGTH,
+  parseQuantity,
+  parseWorkDate,
+  resolveWorkEntry,
+  roundQuantity,
+  validateQuantity,
+} from "@/lib/work-entries";
 
 export type WorkEntryState = ActionState & { entryId?: number };
 
@@ -86,10 +93,11 @@ export async function updateWorkEntry(id: number, _prev: ActionState, formData: 
   });
   if (!existing || existing.invoiceId !== null) return { error: BILLED_ERROR };
 
-  const quantity = parseQuantity(text(formData, "quantity"));
-  if (quantity === null) return { error: "Bitte eine gültige Menge angeben." };
-  const quantityError = validateQuantity(quantity, existing.unit);
+  const parsedQuantity = parseQuantity(text(formData, "quantity"));
+  if (parsedQuantity === null) return { error: "Bitte eine gültige Menge angeben." };
+  const quantityError = validateQuantity(parsedQuantity, existing.unit);
   if (quantityError) return { error: quantityError };
+  const quantity = roundQuantity(parsedQuantity);
 
   const note = text(formData, "note").trim();
   if (note.length > MAX_NOTE_LENGTH) return { error: `Die Notiz ist zu lang (max. ${MAX_NOTE_LENGTH} Zeichen).` };

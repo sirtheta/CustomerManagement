@@ -45,6 +45,11 @@ function isMultipleOf(value: number, step: number): boolean {
   return Math.abs(ratio - Math.round(ratio)) < 1e-9;
 }
 
+/** Rounds a validated quantity to two decimals (what gets stored). */
+export function roundQuantity(quantity: number): number {
+  return Math.round(quantity * 100) / 100;
+}
+
 /** A German error message, or null when the quantity is acceptable for the unit. */
 export function validateQuantity(quantity: number, unit: Unit): string | null {
   if (!Number.isFinite(quantity) || quantity <= 0) return "Die Menge muss grösser als 0 sein.";
@@ -125,5 +130,6 @@ export function resolveWorkEntry(
   const quantityError = validateQuantity(quantity, unit);
   if (quantityError) return { error: quantityError };
 
-  return { value: { name, unit, quantity, serviceId, note: note || null } };
+  // The tolerance of isMultipleOf lets values like 1.000000000001 through; store exactly two decimals.
+  return { value: { name, unit, quantity: roundQuantity(quantity), serviceId, note: note || null } };
 }

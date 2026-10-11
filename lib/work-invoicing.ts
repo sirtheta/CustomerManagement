@@ -14,10 +14,12 @@ export const WORK_ALREADY_BILLED_ERROR =
   "Mindestens ein Eintrag wurde inzwischen verrechnet, geändert oder gehört nicht zu diesem Kunden. Bitte die Seite neu laden.";
 
 /**
- * Marks the entries as billed by `invoiceId`. Matches only entries that are still open, belong to the
- * customer and have not changed since they were read (`updatedAt`), because the invoice lines were built
- * from exactly that state. Throws when any selected entry no longer matches, which rolls the surrounding
- * transaction back (a double click, a second tab, or an edit made while the draft was being created).
+ * Marks the entries as billed by `invoiceId`. Succeeds only when every entry is still open, belongs to
+ * the customer and has not changed since it was read (`updatedAt`), because the invoice lines were built
+ * from exactly that state. Throws otherwise, which rolls the surrounding transaction back (a double
+ * click, a second tab, or an edit made while the draft was being created). It checks with an `id IN (...)`
+ * lookup instead of an OR list of (id, updatedAt) pairs, which hits SQLite's expression depth limit
+ * at about 1000 entries.
  */
 export async function claimWorkEntries(
   tx: Prisma.TransactionClient,
@@ -25,14 +27,18 @@ export async function claimWorkEntries(
   entries: { id: number; updatedAt: Date }[],
   invoiceId: number
 ): Promise<void> {
-  const { count } = await tx.workEntry.updateMany({
-    where: {
-      customerId,
-      invoiceId: null,
-      OR: entries.map((e) => ({ id: e.id, updatedAt: e.updatedAt })),
-    },
-    data: { invoiceId },
-  });
+  const ids = entries.map((e) => e.id);
+  const readAt = new Map(entries.map((e) => [e.id, e.updatedAt.getTime()]));
+  const where = { id: { in: ids }, customerId, invoiceId: null };
+
+  // Check-then-update is race-free: the Prisma better-sqlite3 adapter serialises interactive
+  // transactions, so no other writer can change these rows between the lookup and the update.
+  const current = await tx.workEntry.findMany({ where, select: { id: true, updatedAt: true } });
+  if (current.length !== entries.length || current.some((row) => row.updatedAt.getTime() !== readAt.get(row.id))) {
+    throw new WorkBillingError(WORK_ALREADY_BILLED_ERROR);
+  }
+
+  const { count } = await tx.workEntry.updateMany({ where, data: { invoiceId } });
   if (count !== entries.length) throw new WorkBillingError(WORK_ALREADY_BILLED_ERROR);
 }
 

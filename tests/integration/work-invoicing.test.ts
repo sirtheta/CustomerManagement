@@ -132,7 +132,7 @@ describe("billing work entries", () => {
           },
         }
       )
-    ).rejects.toThrow(WORK_ALREADY_BILLED_ERROR);
+    ).rejects.toBeInstanceOf(WorkBillingError);
     expect(await db.prisma.invoice.count()).toBe(0);
   });
 
@@ -144,11 +144,34 @@ describe("billing work entries", () => {
       data: { customerId, date: new Date(), dueDate: new Date(), totalAmount: 0, state: "Draft" },
     });
 
-    await expect(
-      db.prisma.$transaction((tx) => claimWorkEntries(tx, customerId, read, invoice.id))
-    ).rejects.toThrow(WORK_ALREADY_BILLED_ERROR);
+    const claim = db.prisma.$transaction((tx) => claimWorkEntries(tx, customerId, read, invoice.id));
+    await expect(claim).rejects.toBeInstanceOf(WorkBillingError);
+    await expect(claim).rejects.toThrow(WORK_ALREADY_BILLED_ERROR);
     // The two unchanged entries were matched too, but the rollback leaves all three open.
     expect(await db.prisma.workEntry.count({ where: { invoiceId: { not: null } } })).toBe(0);
+  });
+
+  it("claims a very large selection (no SQLite expression depth limit)", async () => {
+    const date = new Date("2026-10-12T00:00:00.000Z");
+    await db.prisma.workEntry.createMany({
+      data: Array.from({ length: 1100 }, () => ({
+        customerId,
+        createdById: 2,
+        date,
+        name: "Bulk",
+        unit: "Piece" as const,
+        quantity: 1,
+      })),
+    });
+    const bulk = await db.prisma.workEntry.findMany({ where: { name: "Bulk" }, select: { id: true, updatedAt: true } });
+    expect(bulk).toHaveLength(1100);
+    const invoice = await db.prisma.invoice.create({
+      data: { customerId, date: new Date(), dueDate: new Date(), totalAmount: 0, state: "Draft" },
+    });
+
+    await db.prisma.$transaction((tx) => claimWorkEntries(tx, customerId, bulk, invoice.id));
+
+    expect(await db.prisma.workEntry.count({ where: { name: "Bulk", invoiceId: invoice.id } })).toBe(1100);
   });
 
   it("frees the entries again when the draft is deleted", async () => {
@@ -177,6 +200,25 @@ describe("billing work entries", () => {
       await createInvoiceFromWorkEntries(customerId, entryIds);
       const result = await createInvoiceFromEntries(customerId, {}, formFor(entryIds));
       expect(result).toEqual({ error: WORK_ALREADY_BILLED_ERROR });
+    });
+
+    it("creates only one invoice when the same selection is submitted twice at once", async () => {
+      const results = await Promise.allSettled([
+        createInvoiceFromEntries(customerId, {}, formFor(entryIds)),
+        createInvoiceFromEntries(customerId, {}, formFor(entryIds)),
+      ]);
+
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+      const fulfilled = results.filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof createInvoiceFromEntries>>> => r.status === "fulfilled");
+      expect(rejected).toHaveLength(1);
+      expect(String((rejected[0].reason as Error).message)).toMatch(/^redirect \/invoices\/\d+$/);
+      expect(fulfilled).toHaveLength(1);
+      expect(fulfilled[0].value).toEqual({ error: WORK_ALREADY_BILLED_ERROR });
+
+      expect(await db.prisma.invoice.count()).toBe(1);
+      const invoice = await db.prisma.invoice.findFirstOrThrow();
+      const entries = await db.prisma.workEntry.findMany({ where: { id: { in: entryIds } } });
+      expect(entries.every((e) => e.invoiceId === invoice.id)).toBe(true);
     });
 
     it("redirects viewers", async () => {
