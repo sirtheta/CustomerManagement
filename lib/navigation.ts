@@ -44,6 +44,7 @@ const NAV_DEFINITION: NavDefinition[] = [
     ],
   },
   { href: "/quotes", label: "Offerten", access: "all", module: "quotes" },
+  { href: "/time", label: "Zeiterfassung", access: "editor", module: "timeTracking" },
   { href: "/analytics", label: "Auswertung", access: "all", module: "analytics" },
   {
     href: "/accounting",
