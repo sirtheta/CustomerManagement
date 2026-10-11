@@ -16,6 +16,7 @@ const BILLED_ERROR = "Der Eintrag ist bereits verrechnet oder existiert nicht me
 function revalidate() {
   revalidatePath("/time");
   revalidatePath("/time/open");
+  revalidatePath("/time/open/[customerId]", "page");
 }
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");

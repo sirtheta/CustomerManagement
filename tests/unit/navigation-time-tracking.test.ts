@@ -22,4 +22,9 @@ describe("navigation: Zeiterfassung", () => {
   it("hides it while the module is off", () => {
     expect(hrefs(UserRole.Admin, true)).not.toContain("/time");
   });
+
+  it("offers the capture and the open-entries page as children", () => {
+    const entry = buildNavigation(UserRole.Editor, allModulesEnabled()).find((e) => e.href === "/time");
+    expect(entry?.children?.map((c) => c.href)).toEqual(["/time", "/time/open"]);
+  });
 });
