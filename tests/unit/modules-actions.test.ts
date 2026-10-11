@@ -38,6 +38,7 @@ const allOn = {
   moduleBankImport: true,
   moduleAccounting: true,
   moduleAnalytics: true,
+  moduleTimeTracking: true,
 };
 
 beforeEach(() => {

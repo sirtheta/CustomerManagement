@@ -20,7 +20,8 @@
     "marketing:screenshots": "tsx scripts/marketing-screenshots.ts",
     "marketing:html": "tsx scripts/generate-marketing-html.ts",
     "manual:screenshots": "tsx scripts/manual-screenshots.ts",
-    "manual:splice": "tsx scripts/splice-manual-screenshots.ts"
+    "manual:splice": "tsx scripts/splice-manual-screenshots.ts",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

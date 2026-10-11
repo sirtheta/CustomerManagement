@@ -8,6 +8,7 @@ type Props = {
   customerId: number;
   size?: "sm" | "default";
   hasInvoices?: boolean;
+  hasWorkEntries?: boolean;
   archived?: boolean;
   activeSubscriptions?: number;
 };
@@ -16,16 +17,18 @@ export default function DeleteCustomerButton({
   customerId,
   size = "default",
   hasInvoices = false,
+  hasWorkEntries = false,
   archived = false,
   activeSubscriptions = 0,
 }: Props) {
-  if (hasInvoices) {
-    // Invoices are booking records, so the customer cannot be deleted: offer archiving instead.
+  if (hasInvoices || hasWorkEntries) {
+    // Invoices and recorded work are kept, so the customer cannot be deleted: offer archiving instead.
     if (archived) return null;
+    const kept = hasInvoices ? "Rechnungen" : "erfasste Leistungen";
     return (
       <ConfirmDialog
         title="Kunde archivieren?"
-        description={`Dieser Kunde hat Rechnungen und kann nicht gelöscht werden. Soll er stattdessen archiviert werden? Rechnungen und Daten bleiben erhalten, der Kunde kann im Archiv wiederhergestellt werden. ${archiveSubscriptionNote(activeSubscriptions)}`.trim()}
+        description={`Dieser Kunde hat ${kept} und kann nicht gelöscht werden. Soll er stattdessen archiviert werden? Rechnungen und Daten bleiben erhalten, der Kunde kann im Archiv wiederhergestellt werden. ${archiveSubscriptionNote(activeSubscriptions)}`.trim()}
         confirmLabel="Archivieren"
         confirmVariant="default"
         triggerSize={size}

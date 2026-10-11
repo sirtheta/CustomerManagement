@@ -366,6 +366,7 @@
       <nav class="nav-group">
         <div class="nav-group-label">Erweiterter Zugriff</div>
         <a href="#buchhaltung">Buchhaltung<span class="nav-pill editor">Editor</span></a>
+        <a href="#zeiterfassung">Zeiterfassung<span class="nav-pill editor">Editor</span></a>
       </nav>
       <nav class="nav-group">
         <div class="nav-group-label">Admin-Bereich</div>
@@ -718,6 +719,31 @@
       </div>
     </section>
 
+    <section class="doc" id="zeiterfassung">
+      <div class="section-head">
+        <h2>Zeiterfassung</h2>
+        <div class="pill-row"><span class="pill editor">Editor &amp; Admin</span></div>
+      </div>
+      <p class="dek">Zeit und Material direkt vor Ort erfassen und daraus mit einem Klick einen Rechnungsentwurf erstellen. Das Modul lässt sich unter Einstellungen → Module ausschalten.</p>
+      <ol class="steps">
+        <li><strong>Erfassen</strong> – Unter «Zeiterfassung» den Kunden und das Datum wählen. Bei «Zeit» die Leistung wählen (z. B. «Gartenpflege») und die Stunden eintippen oder über die Schnellwahl setzen; bei «Material» einen Artikel aus dem Katalog oder einen Freitext mit Menge wählen. Die Notiz ist nur intern und erscheint nicht auf der Rechnung. Nach dem Speichern bleiben Kunde und Datum stehen, die Menge wird geleert, und «Rückgängig» nimmt den Eintrag zurück.</li>
+        <li><strong>Korrigieren</strong> – Solange ein Eintrag nicht verrechnet ist, lassen sich Datum, Menge und Notiz ändern oder der Eintrag löschen.</li>
+        <li><strong>Verrechnen</strong> – Unter «Offene Erfassungen» zeigt die Liste alle Kunden mit noch nicht verrechneten Einträgen. «Verrechnen» öffnet die Einträge des Kunden; einzelne lassen sich abwählen. Die Vorschau fasst pro Leistung zusammen und nennt die Einsatztage. «Rechnungsentwurf erstellen» legt den Entwurf an, den Sie wie jede Rechnung bearbeiten.</li>
+      </ol>
+      <div class="callout tip">
+        <div class="ic">💡</div>
+        <div><strong>Preise</strong> Stundensätze und Materialpreise stehen im Leistungskatalog; beim Erfassen werden keine Preise angezeigt. Der Preis wird erst beim Verrechnen übernommen. Material ohne Katalogartikel erscheint mit Preis 0 im Entwurf und wird dort ergänzt.</div>
+      </div>
+      <div class="callout tip">
+        <div class="ic">📱</div>
+        <div><strong>Auf dem Handy</strong> Die Seite lässt sich im Browser zum Startbildschirm hinzufügen und öffnet danach direkt die Erfassung.</div>
+      </div>
+      <div class="callout tip">
+        <div class="ic">🔒</div>
+        <div><strong>Verrechnete Einträge</strong> sind gesperrt. Wird der Rechnungsentwurf (durch einen Administrator) gelöscht, werden die Einträge wieder frei. Löschen Sie nur eine Position im Entwurf, bleiben die zugehörigen Einträge verrechnet.</div>
+      </div>
+    </section>
+
     <!-- ══════════════════════ ADMIN: EINSTELLUNGEN ══════════════════════ -->
     <section class="doc" id="admin-einstellungen">
       <div class="section-head">
@@ -736,7 +762,7 @@
         <li><strong>Rechnungsbetrag auf 5 Rappen runden</strong> – optional, standardmässig aus. Ist die Option an, wird das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen gerundet (1–2 Rappen ab, 3–4 Rappen auf). Positionen werden nicht gerundet. Auf dem PDF steht die Differenz als Zeile «Rundung», der QR-Zahlteil und die offenen Posten verwenden den gerundeten Betrag. Bereits versendete Rechnungen und Entwürfe, die nicht erneut gespeichert werden, bleiben unverändert. Änderungen werden im Aktivitätsprotokoll festgehalten.</li>
         <li><strong>SMTP (E-Mail-Versand)</strong> – Voraussetzung für automatischen Rechnungsversand, Mahnungen und Passwort-Rücksetzlinks. Das SMTP-Passwort wird verschlüsselt gespeichert.</li>
         <li><strong>Mahngebühren &amp; Verzugszins</strong> – Gebühr für die 1., 2. und 3. Mahnung (CHF) sowie Verzugszins in % p.&nbsp;a. Standardmässig 0, d.&nbsp;h. es wird nichts verrechnet. Der Zins wird erst ab der 1. Mahnung auf den offenen Betrag für die Tage seit Fälligkeit berechnet und auf dem Mahnbeleg ausgewiesen. Gebühren und Zins dürfen nur verlangt werden, wenn sie vereinbart sind (z.&nbsp;B. in den AGB) – bitte rechtlich klären. Änderungen werden im Aktivitätsprotokoll festgehalten.</li>
-        <li><strong>Module</strong> – optionale Funktionen (Aufgaben, Abos, Offerten, Mahnungen, Bankimport, Buchhaltung, Auswertung) lassen sich ausblenden; die Daten bleiben erhalten. Ein Modul wird mit dem Klick auf das Kästchen sofort gespeichert («Gilt sofort», ebenso wie die Optionen zu QR-Rechnung, Rundung und Benachrichtigungen). Abos lassen sich erst ausschalten, wenn keines mehr aktiv ist (Abos archivierter Kunden zählen nicht, sie laufen ohnehin nicht) und keine Abo-Rechnung auf Freigabe wartet: Der Knopf «Alle Abos pausieren» unter Module pausiert alle aktiven Abos auf einmal (im Aktivitätsprotokoll je Abo festgehalten); wartende Entwürfe müssen unter «Ausstehende E-Mails» freigegeben oder verworfen werden. Die Zahlungen und Rechnungen bleiben unverändert.</li>
+        <li><strong>Module</strong> – optionale Funktionen (Aufgaben, Abos, Offerten, Mahnungen, Bankimport, Buchhaltung, Auswertung, Zeiterfassung) lassen sich ausblenden; die Daten bleiben erhalten. Ein Modul wird mit dem Klick auf das Kästchen sofort gespeichert («Gilt sofort», ebenso wie die Optionen zu QR-Rechnung, Rundung und Benachrichtigungen). Abos lassen sich erst ausschalten, wenn keines mehr aktiv ist (Abos archivierter Kunden zählen nicht, sie laufen ohnehin nicht) und keine Abo-Rechnung auf Freigabe wartet: Der Knopf «Alle Abos pausieren» unter Module pausiert alle aktiven Abos auf einmal (im Aktivitätsprotokoll je Abo festgehalten); wartende Entwürfe müssen unter «Ausstehende E-Mails» freigegeben oder verworfen werden. Die Zahlungen und Rechnungen bleiben unverändert.</li>
         <li><strong>Datenbank-Export</strong> – lädt eine Sicherungskopie der Datenbank herunter.</li>
       </ul>
       <div class="callout warn">

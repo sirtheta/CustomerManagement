@@ -31,6 +31,12 @@ function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
+// The browser fetches the web app manifest and its icons without cookies, so they must not be
+// redirected to /login. Both are public files without sensitive content.
+function isPublicAsset(pathname: string): boolean {
+  return pathname === "/manifest.webmanifest" || pathname.startsWith("/icons/");
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -50,7 +56,7 @@ export async function proxy(request: NextRequest) {
   // server-to-server caller (e.g. the Budget app) gets redirected to
   // /login and fetch() silently follows it, handing back the login page's
   // HTML where JSON was expected.
-  if (!pathname.startsWith("/api/auth") && !pathname.startsWith("/api/external")) {
+  if (!pathname.startsWith("/api/auth") && !pathname.startsWith("/api/external") && !isPublicAsset(pathname)) {
     const isLoggedIn = !!request.cookies.get(SESSION_COOKIE)?.value;
     const isLoginPage = pathname.startsWith("/login");
 

@@ -52,6 +52,7 @@ import { deleteQuote } from "@/app/(app)/quotes/actions";
 import { dismissReminder } from "@/app/(app)/invoices/reminders/actions";
 import { ignoreTransactions, undoStatementImport } from "@/app/(app)/invoices/import/actions";
 import { deleteExpense } from "@/app/(app)/accounting/actions";
+import { deleteWorkEntry } from "@/app/(app)/time/actions";
 import AnalyticsPage from "@/app/(app)/analytics/page";
 import { GET as quotePdf } from "@/app/api/quotes/[id]/pdf/route";
 import { GET as quotesExport } from "@/app/api/export/quotes/route";
@@ -74,6 +75,7 @@ type Fixture = {
   transactionId: number;
   expenseId: number;
   receiptId: number;
+  workEntryId: number;
 };
 
 const admin = { user: { id: "1", name: "Admin", email: "a@test.ch", role: "Admin" }, expires: "2099-01-01" } as Session;
@@ -101,6 +103,7 @@ describe("module switches reach actions and routes (real guard)", () => {
       transactions: await p.bankTransaction.findMany({ orderBy: { id: "asc" } }),
       expenses: await p.expense.findMany({ orderBy: { id: "asc" } }),
       receipts: await p.expenseReceipt.count(),
+      workEntries: await p.workEntry.findMany({ orderBy: { id: "asc" } }),
       audit: await p.auditLog.count(),
     };
   }
@@ -163,6 +166,9 @@ describe("module switches reach actions and routes (real guard)", () => {
     const receipt = await p.expenseReceipt.create({
       data: { expenseId: expense.id, name: "beleg.pdf", fileType: "pdf", size: 3, content: Buffer.from("abc") },
     });
+    const workEntry = await p.workEntry.create({
+      data: { customerId, date: new Date("2026-06-04T00:00:00.000Z"), name: "Arbeitsstunde", unit: "Hour", quantity: 2, createdById: 1 },
+    });
     f = {
       customerId,
       taskId: task.id,
@@ -174,6 +180,7 @@ describe("module switches reach actions and routes (real guard)", () => {
       transactionId: transaction.id,
       expenseId: expense.id,
       receiptId: receipt.id,
+      workEntryId: workEntry.id,
     };
   });
 
@@ -194,6 +201,7 @@ describe("module switches reach actions and routes (real guard)", () => {
     { module: "bankImport", name: "ignoreTransactions", run: () => ignoreTransactions([f.transactionId]) },
     { module: "bankImport", name: "undoStatementImport", run: () => undoStatementImport(f.importId) },
     { module: "accounting", name: "deleteExpense", run: () => deleteExpense(f.expenseId) },
+    { module: "timeTracking", name: "deleteWorkEntry", run: () => deleteWorkEntry(f.workEntryId) },
     // Analytics has no Server Action and no API route; its page is the only entry point.
     {
       module: "analytics",

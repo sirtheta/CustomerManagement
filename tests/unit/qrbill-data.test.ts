@@ -246,6 +246,7 @@ describe("QRBill data preparation", () => {
         moduleBankImport: true,
         moduleAccounting: true,
         moduleAnalytics: true,
+        moduleTimeTracking: true,
         roundTotalTo5Rappen: false,
         pdfTheme: null,
         companyInformationId: 1,

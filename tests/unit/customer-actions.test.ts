@@ -4,6 +4,7 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn() },
     invoice: { count: vi.fn() },
+    workEntry: { count: vi.fn() },
     item: { deleteMany: vi.fn() },
     $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
   },
@@ -57,6 +58,8 @@ describe("customer actions", () => {
     vi.mocked(prisma.customer.create).mockResolvedValue({ customerId: 1 } as never);
     // vi.clearAllMocks() keeps implementations: an earlier test leaves redirect throwing.
     vi.mocked(redirect).mockImplementation(() => undefined as never);
+    // Same reason: the work-entry test sets a count that must not leak into the next test.
+    vi.mocked(prisma.workEntry.count).mockResolvedValue(0);
   });
 
   describe("createCustomer", () => {
@@ -202,6 +205,21 @@ describe("customer actions", () => {
         error: "Der Kunde hat Rechnungen und kann nicht gelöscht werden. Bitte archivieren.",
       });
       expect(prisma.invoice.count).toHaveBeenCalledWith({ where: { customerId: 7 } });
+      expect(prisma.customer.delete).not.toHaveBeenCalled();
+      expect(redirect).not.toHaveBeenCalled();
+    });
+
+    it("refuses deletion when the customer has work entries", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.invoice.count).mockResolvedValue(0);
+      vi.mocked(prisma.workEntry.count).mockResolvedValue(2);
+
+      const res = await deleteCustomer(7);
+
+      expect(res).toEqual({
+        error: "Der Kunde hat erfasste Leistungen und kann nicht gelöscht werden. Bitte archivieren.",
+      });
+      expect(prisma.workEntry.count).toHaveBeenCalledWith({ where: { customerId: 7 } });
       expect(prisma.customer.delete).not.toHaveBeenCalled();
       expect(redirect).not.toHaveBeenCalled();
     });

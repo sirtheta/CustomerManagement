@@ -241,6 +241,11 @@ export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   if (invoiceCount > 0) {
     return { error: "Der Kunde hat Rechnungen und kann nicht gelöscht werden. Bitte archivieren." };
   }
+  // Recorded work (WorkEntry.customer is Restrict) is kept like invoices, so the customer is archived instead.
+  const workEntryCount = await prisma.workEntry.count({ where: { customerId: id } });
+  if (workEntryCount > 0) {
+    return { error: "Der Kunde hat erfasste Leistungen und kann nicht gelöscht werden. Bitte archivieren." };
+  }
   // The quotes cascade with the customer, but Item.quote is SET NULL: delete their items first or they stay as orphans.
   await prisma.$transaction([
     prisma.item.deleteMany({ where: { quote: { customerId: id } } }),

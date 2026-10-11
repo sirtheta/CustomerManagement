@@ -14,6 +14,7 @@ import { MODULE_KEYS, MODULE_FIELDS, MODULE_INFO, type ModuleKey } from "@/lib/m
 import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 import { DEFAULT_PREFIXES } from "@/lib/document-number";
+import { APP_NAME } from "@/lib/app-name";
 
 const log = logger.child({ module: "settings" });
 
@@ -339,8 +340,8 @@ export async function testEmailNotification(
     await transporter.sendMail({
       from: formatSender(fromName, fromAddress || user),
       to,
-      subject: "Test-Benachrichtigung – CustomerManagement",
-      text: "Dies ist eine Test-Benachrichtigung von CustomerManagement. Die E-Mail-Benachrichtigungen sind korrekt konfiguriert.",
+      subject: `Test-Benachrichtigung – ${APP_NAME}`,
+      text: `Dies ist eine Test-Benachrichtigung von ${APP_NAME}. Die E-Mail-Benachrichtigungen sind korrekt konfiguriert.`,
     });
     return { success: true, _ts: Date.now() };
   } catch (err) {
@@ -405,7 +406,7 @@ export async function testTelegramNotification(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
-          text: "Test-Benachrichtigung von CustomerManagement. Telegram-Integration ist korrekt konfiguriert.",
+          text: `Test-Benachrichtigung von ${APP_NAME}. Telegram-Integration ist korrekt konfiguriert.`,
         }),
       }
     );

@@ -18,6 +18,7 @@ import { createPasswordResetToken } from "@/lib/password-reset";
 import { sendAccountMail } from "@/lib/email";
 import { appOrigin } from "@/lib/origin";
 import logger from "@/lib/logger";
+import { APP_NAME } from "@/lib/app-name";
 
 const log = logger.child({ module: "settings.users" });
 const otp = new OTP({ strategy: "totp" });
@@ -174,7 +175,7 @@ export async function generateTotpSetup(
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const secret = otp.generateSecret();
-  const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=CustomerManagement`;
+  const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(APP_NAME)}`;
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   // Store the pending secret temporarily in the user record (not yet enabled)
   await prisma.user.update({
