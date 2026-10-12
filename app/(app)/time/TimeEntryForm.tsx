@@ -14,6 +14,7 @@ import { CustomerCombobox } from "@/components/customer-combobox";
 import { actionToastFor } from "@/lib/action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { cn } from "@/lib/utils";
+import { MaterialPicker, FREE_TEXT, type MaterialOption } from "./MaterialPicker";
 import { QUICK_AMOUNTS, UNIT_LABELS, formatQuantity, parseQuantity } from "@/lib/work-entries";
 import { createWorkEntry, deleteWorkEntry, type WorkEntryState } from "./actions";
 
@@ -22,12 +23,17 @@ type Props = {
   customers: Customer[];
   customerId: number | null;
   timeServices: ServiceOption[];
-  materialServices: ServiceOption[];
+  materialServices: MaterialOption[];
+  recentMaterialIds: number[];
   defaultTimeServiceId: number | null;
   today: string; // YYYY-MM-DD
 };
 
-const FREE_TEXT = "free";
+function shiftDay(day: string, delta: number): string {
+  const d = new Date(`${day}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
 const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
 export default function TimeEntryForm({
@@ -35,6 +41,7 @@ export default function TimeEntryForm({
   customerId,
   timeServices,
   materialServices,
+  recentMaterialIds,
   defaultTimeServiceId,
   today,
 }: Props) {
@@ -56,7 +63,9 @@ export default function TimeEntryForm({
   const onlyTimeService = timeServices.length === 1 ? String(timeServices[0].id) : "";
   const preferred = timeServices.some((s) => s.id === defaultTimeServiceId) ? String(defaultTimeServiceId) : "";
   const [timeServiceId, setTimeServiceId] = useState(onlyTimeService || preferred);
-  const [materialServiceId, setMaterialServiceId] = useState(materialServices.length ? String(materialServices[0].id) : FREE_TEXT);
+  const [materialServiceId, setMaterialServiceId] = useState(
+    String(recentMaterialIds.find((id) => materialServices.some((s) => s.id === id)) ?? materialServices[0]?.id ?? FREE_TEXT),
+  );
 
   const services = mode === "time" ? timeServices : materialServices;
   const serviceId = mode === "time" ? timeServiceId : materialServiceId;
@@ -130,6 +139,17 @@ export default function TimeEntryForm({
 
       <div className="space-y-1.5">
         <Label htmlFor="time-date">Datum</Label>
+        <div className="flex gap-2">
+          {[
+            { label: "Heute", value: today },
+            { label: "Gestern", value: shiftDay(today, -1) },
+            { label: "Vorgestern", value: shiftDay(today, -2) },
+          ].map((d) => (
+            <Button key={d.label} type="button" variant={date === d.value ? "default" : "outline"} className="h-11 flex-1 text-base" aria-pressed={date === d.value} onClick={() => setDate(d.value)}>
+              {d.label}
+            </Button>
+          ))}
+        </div>
         <Input id="time-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11 text-base" required />
       </div>
 
@@ -152,19 +172,27 @@ export default function TimeEntryForm({
         ))}
       </div>
 
-      {services.length === 0 && mode === "time" ? (
+      {mode === "material" ? (
+        <MaterialPicker
+          services={materialServices}
+          recentIds={recentMaterialIds}
+          value={materialServiceId}
+          onChange={setMaterialServiceId}
+          onFreeText={setFreeName}
+        />
+      ) : services.length === 0 ? (
         <p className="rounded-lg border p-3 text-sm text-muted-foreground">
           Es gibt keine aktive Leistung mit der Einheit Stunde oder Tag.{" "}
           <Link href="/services" className="underline">Leistung im Katalog anlegen</Link>.
         </p>
       ) : (
         <div className="space-y-1.5">
-          <Label htmlFor="time-service">{mode === "time" ? "Leistung" : "Artikel"}</Label>
-          <Select value={serviceId} onValueChange={(v) => (mode === "time" ? setTimeServiceId(v ?? "") : setMaterialServiceId(v ?? FREE_TEXT))}>
+          <Label htmlFor="time-service">Leistung</Label>
+          <Select value={serviceId} onValueChange={(v) => setTimeServiceId(v ?? "")}>
             <SelectTrigger id="time-service" className="h-11 w-full text-base">
               <SelectValue>
                 {(value: string | null) =>
-                  value === FREE_TEXT ? "Freitext (nicht im Katalog)" : (services.find((s) => String(s.id) === value)?.name ?? "Bitte wählen")
+                  services.find((s) => String(s.id) === value)?.name ?? "Bitte wählen"
                 }
               </SelectValue>
             </SelectTrigger>
@@ -174,7 +202,6 @@ export default function TimeEntryForm({
                   {s.name} ({UNIT_LABELS[s.unit]})
                 </SelectItem>
               ))}
-              {mode === "material" && <SelectItem value={FREE_TEXT}>Freitext (nicht im Katalog)</SelectItem>}
             </SelectContent>
           </Select>
         </div>
