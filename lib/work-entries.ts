@@ -133,3 +133,27 @@ export function resolveWorkEntry(
   // The tolerance of isMultipleOf lets values like 1.000000000001 through; store exactly two decimals.
   return { value: { name, unit, quantity: roundQuantity(quantity), serviceId, note: note || null } };
 }
+
+export type PickableService = { id: number; name: string; category: string | null };
+
+/** Max. number of "zuletzt verwendet" shortcuts next to the material picker. */
+export const RECENT_SERVICE_LIMIT = 3;
+
+/** Case-insensitive name search plus optional category filter (null = all) for the material picker. */
+export function filterServices<T extends PickableService>(services: T[], query: string, category: string | null): T[] {
+  const q = query.trim().toLowerCase();
+  return services.filter(
+    (s) => (category === null || s.category === category) && (q === "" || s.name.toLowerCase().includes(q)),
+  );
+}
+
+/** First `limit` distinct ids of a newest-first list that are still selectable. */
+export function pickRecentServiceIds(newestFirst: (number | null)[], selectable: Set<number>, limit = RECENT_SERVICE_LIMIT): number[] {
+  const out: number[] = [];
+  for (const id of newestFirst) {
+    if (id === null || !selectable.has(id) || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= limit) break;
+  }
+  return out;
+}

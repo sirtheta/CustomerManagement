@@ -5,7 +5,7 @@ import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { swissDateString } from "@/lib/date";
-import { MATERIAL_UNITS, TIME_UNITS } from "@/lib/work-entries";
+import { MATERIAL_UNITS, TIME_UNITS, pickRecentServiceIds } from "@/lib/work-entries";
 import TimeEntryForm from "./TimeEntryForm";
 import WorkEntryList from "./WorkEntryList";
 
@@ -15,7 +15,7 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
 
   const { customer: customerParam } = await searchParams;
-  const [customers, services, lastEntry, lastTimeEntry] = await Promise.all([
+  const [customers, services, lastEntry, lastTimeEntry, recentMaterial] = await Promise.all([
     prisma.customer.findMany({
       where: selectableCustomersWhere(),
       orderBy: [{ company: "asc" }, { contactPerson: "asc" }],
@@ -23,7 +23,7 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
     prisma.service.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, unit: true },
+      select: { id: true, name: true, unit: true, category: { select: { name: true } } },
     }),
     prisma.workEntry.findFirst({ orderBy: { id: "desc" }, select: { customerId: true } }),
     prisma.workEntry.findFirst({
@@ -31,7 +31,20 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
       orderBy: { id: "desc" },
       select: { serviceId: true },
     }),
+    prisma.workEntry.findMany({
+      where: { unit: { in: [...MATERIAL_UNITS] }, serviceId: { not: null } },
+      orderBy: { id: "desc" },
+      take: 50,
+      select: { serviceId: true },
+    }),
   ]);
+  const materialServices = services
+    .filter((s) => (MATERIAL_UNITS as readonly string[]).includes(s.unit))
+    .map((s) => ({ id: s.id, name: s.name, unit: s.unit, category: s.category?.name ?? null }));
+  const recentMaterialIds = pickRecentServiceIds(
+    recentMaterial.map((e) => e.serviceId),
+    new Set(materialServices.map((s) => s.id)),
+  );
 
   const selectable = new Set(customers.map((c) => c.customerId));
   // Without a parameter the customer of the last entry is preselected. With one (`?customer=none`
@@ -65,7 +78,8 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
         customers={customers}
         customerId={customerId}
         timeServices={services.filter((s) => (TIME_UNITS as readonly string[]).includes(s.unit))}
-        materialServices={services.filter((s) => (MATERIAL_UNITS as readonly string[]).includes(s.unit))}
+        materialServices={materialServices}
+        recentMaterialIds={recentMaterialIds}
         defaultTimeServiceId={lastTimeEntry?.serviceId ?? null}
         today={swissDateString()}
       />
