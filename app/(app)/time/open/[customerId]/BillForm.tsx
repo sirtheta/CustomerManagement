@@ -64,7 +64,46 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
 
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Einträge</h2>
-        <div className="overflow-x-auto">
+        {/* Phones: one card per entry, the five-column table is too wide for them. */}
+        <ul className="space-y-2 md:hidden">
+          {entries.map((e) => (
+            <li key={e.id} className="rounded-xl border bg-card p-3">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={selected.has(e.id)}
+                  onChange={(ev) => toggle(e.id, ev.target.checked)}
+                  aria-label={`${e.name} vom ${formatDay(e.date)} verrechnen`}
+                  className="mt-0.5 size-6 shrink-0 rounded border-input accent-primary"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="truncate text-base font-semibold">{e.name}</span>
+                    <span className="shrink-0 font-semibold">
+                      {formatQuantity(e.quantity)} {UNIT_SHORT_LABELS[e.unit]}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">{formatDay(e.date)}</div>
+                  {e.note && <p className="mt-1 text-sm text-muted-foreground">{e.note}</p>}
+                </div>
+              </div>
+              <div className="mt-2 flex justify-end gap-1">
+                <EditDialog entry={e} />
+                <ConfirmDialog
+                  title="Eintrag löschen"
+                  description="Soll dieser Eintrag wirklich gelöscht werden?"
+                  confirmLabel="Löschen"
+                  triggerVariant="ghost"
+                  triggerSize="sm"
+                  onConfirm={() => deleteWorkEntry(e.id)}
+                >
+                  Löschen
+                </ConfirmDialog>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -159,10 +198,19 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
         )}
       </section>
 
-      {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-      <Button type="submit" className="h-11 text-base" disabled={!canBill || chosen.length === 0 || isPending}>
-        {isPending ? "Erstellt…" : "Rechnungsentwurf erstellen"}
-      </Button>
+      {/* Room for the fixed bar below, only on phones. */}
+      <div className="h-28 md:hidden" aria-hidden="true" />
+      {/* Phones: pinned above the tab bar with the total; from md on it is a plain button. */}
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 border-t bg-card px-4 py-3 md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
+        {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+        <div className="flex items-baseline justify-between md:hidden">
+          <span className="text-sm text-muted-foreground">Total{roundTo5Rappen ? " (gerundet)" : ""}</span>
+          <span className="text-xl font-bold">{formatCurrency(total)}</span>
+        </div>
+        <Button type="submit" className="h-12 w-full text-base md:h-11 md:w-auto" disabled={!canBill || chosen.length === 0 || isPending}>
+          {isPending ? "Erstellt…" : "Rechnungsentwurf erstellen"}
+        </Button>
+      </div>
     </form>
   );
 }
