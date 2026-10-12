@@ -29,6 +29,9 @@ type Props = {
   today: string; // YYYY-MM-DD
 };
 
+/** Up to this many time services are shown as chips, more fall back to a dropdown. */
+const MAX_SERVICE_CHIPS = 6;
+
 function shiftDay(day: string, delta: number): string {
   const d = new Date(`${day}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + delta);
@@ -186,24 +189,46 @@ export default function TimeEntryForm({
           <Link href="/services" className="underline">Leistung im Katalog anlegen</Link>.
         </p>
       ) : (
-        <div className="space-y-1.5">
-          <Label htmlFor="time-service">Leistung</Label>
-          <Select value={serviceId} onValueChange={(v) => setTimeServiceId(v ?? "")}>
-            <SelectTrigger id="time-service" className="h-11 w-full text-base">
-              <SelectValue>
-                {(value: string | null) =>
-                  services.find((s) => String(s.id) === value)?.name ?? "Bitte wählen"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {services.map((s) => (
-                <SelectItem key={s.id} value={String(s.id)}>
-                  {s.name} ({UNIT_LABELS[s.unit]})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-2">
+          <Label id="time-service-label" htmlFor={timeServices.length > MAX_SERVICE_CHIPS ? "time-service" : undefined}>
+            Leistung
+          </Label>
+          {timeServices.length > MAX_SERVICE_CHIPS ? (
+            <Select value={serviceId} onValueChange={(v) => setTimeServiceId(v ?? "")}>
+              <SelectTrigger id="time-service" className="h-11 w-full text-base">
+                <SelectValue>
+                  {(value: string | null) => services.find((s) => String(s.id) === value)?.name ?? "Bitte wählen"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {services.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    {s.name} ({UNIT_LABELS[s.unit]})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div role="group" aria-labelledby="time-service-label" className="flex flex-wrap gap-2">
+              {timeServices.map((s) => {
+                const selected = String(s.id) === timeServiceId;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setTimeServiceId(String(s.id))}
+                    className={cn(
+                      "min-h-11 rounded-lg border px-3 text-base font-medium transition-colors",
+                      selected ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+                    )}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
