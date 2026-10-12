@@ -200,16 +200,18 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
 
       {/* Room for the fixed bar below, only on phones. */}
       <div className="h-28 lg:hidden" aria-hidden="true" />
-      {/* Phones: pinned above the tab bar with the total; from md on it is a plain button. */}
+      {/* Phones: pinned above the tab bar with the total; from lg on it is a plain button. */}
       <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 border-t bg-card px-4 py-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
-        {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-        <div className="flex items-baseline justify-between lg:hidden">
-          <span className="text-sm text-muted-foreground">Total{roundTo5Rappen ? " (gerundet)" : ""}</span>
-          <span className="text-xl font-bold">{formatCurrency(total)}</span>
+        <div className="mx-auto w-full max-w-xl space-y-2 lg:mx-0 lg:max-w-none">
+          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
+          <div className="flex items-baseline justify-between lg:hidden">
+            <span className="text-sm text-muted-foreground">Total{roundTo5Rappen ? " (gerundet)" : ""}</span>
+            <span className="text-xl font-bold">{formatCurrency(total)}</span>
+          </div>
+          <Button type="submit" className="h-12 w-full text-base lg:h-11 lg:w-auto" disabled={!canBill || chosen.length === 0 || isPending}>
+            {isPending ? "Erstellt…" : "Rechnungsentwurf erstellen"}
+          </Button>
         </div>
-        <Button type="submit" className="h-12 w-full text-base lg:h-11 lg:w-auto" disabled={!canBill || chosen.length === 0 || isPending}>
-          {isPending ? "Erstellt…" : "Rechnungsentwurf erstellen"}
-        </Button>
       </div>
     </form>
   );
