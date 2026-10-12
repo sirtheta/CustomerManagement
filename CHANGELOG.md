@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.7.1...customer-management-v1.8.0) (2026-10-12)
+
+
+### Features
+
+* **time:** mobile layout and material picker ([#146](https://github.com/sirtheta/CustomerManagement/issues/146)) ([8bb77b4](https://github.com/sirtheta/CustomerManagement/commit/8bb77b411f949c8ceedb72d2274d91779b1e6263))
+
 ## [1.7.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.7.0...customer-management-v1.7.1) (2026-10-11)
 
 
