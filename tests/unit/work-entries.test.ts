@@ -125,3 +125,26 @@ describe("isTimeUnit / formatQuantity", () => {
     expect(formatQuantity(0.25)).toBe("0.25");
   });
 });
+
+import { filterServices, pickRecentServiceIds } from "@/lib/work-entries";
+
+describe("material picker helpers", () => {
+  const services = [
+    { id: 1, name: "Netzwerkkabel Cat6", category: "Kabel" },
+    { id: 2, name: "Toner schwarz", category: "Verbrauch" },
+    { id: 3, name: "HDMI-Kabel 2 m", category: "Kabel" },
+    { id: 4, name: "Switch", category: null },
+  ];
+
+  it("filters by name case-insensitively and by category", () => {
+    expect(filterServices(services, "kabel", null).map((s) => s.id)).toEqual([1, 3]);
+    expect(filterServices(services, "", "Verbrauch").map((s) => s.id)).toEqual([2]);
+    expect(filterServices(services, " TONER ", "Kabel")).toEqual([]);
+    expect(filterServices(services, "", null)).toHaveLength(4);
+  });
+
+  it("picks distinct, still selectable recent ids, newest first", () => {
+    expect(pickRecentServiceIds([2, null, 2, 9, 1, 3, 4], new Set([1, 2, 3, 4]), 3)).toEqual([2, 1, 3]);
+    expect(pickRecentServiceIds([], new Set([1]))).toEqual([]);
+  });
+});
