@@ -8,7 +8,7 @@ export default async function TimeLayout({ children }: { children: React.ReactNo
   return (
     <>
       {/* Room for the fixed tab bar on phones. */}
-      <div className={editor ? "pb-20 md:pb-0" : undefined}>{children}</div>
+      <div className={editor ? "pb-20 lg:pb-0" : undefined}>{children}</div>
       {editor && <TimeTabBar />}
     </>
   );

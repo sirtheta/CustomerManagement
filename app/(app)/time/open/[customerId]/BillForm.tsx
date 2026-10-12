@@ -65,7 +65,7 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Einträge</h2>
         {/* Phones: one card per entry, the five-column table is too wide for them. */}
-        <ul className="space-y-2 md:hidden">
+        <ul className="space-y-2 lg:hidden">
           {entries.map((e) => (
             <li key={e.id} className="rounded-xl border bg-card p-3">
               <div className="flex items-start gap-3">
@@ -103,7 +103,7 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
             </li>
           ))}
         </ul>
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden overflow-x-auto lg:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -199,15 +199,15 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
       </section>
 
       {/* Room for the fixed bar below, only on phones. */}
-      <div className="h-28 md:hidden" aria-hidden="true" />
+      <div className="h-28 lg:hidden" aria-hidden="true" />
       {/* Phones: pinned above the tab bar with the total; from md on it is a plain button. */}
-      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 border-t bg-card px-4 py-3 md:static md:z-auto md:border-0 md:bg-transparent md:p-0">
+      <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 border-t bg-card px-4 py-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
         {state.error && <p className="text-sm text-destructive">{state.error}</p>}
-        <div className="flex items-baseline justify-between md:hidden">
+        <div className="flex items-baseline justify-between lg:hidden">
           <span className="text-sm text-muted-foreground">Total{roundTo5Rappen ? " (gerundet)" : ""}</span>
           <span className="text-xl font-bold">{formatCurrency(total)}</span>
         </div>
-        <Button type="submit" className="h-12 w-full text-base md:h-11 md:w-auto" disabled={!canBill || chosen.length === 0 || isPending}>
+        <Button type="submit" className="h-12 w-full text-base lg:h-11 lg:w-auto" disabled={!canBill || chosen.length === 0 || isPending}>
           {isPending ? "Erstellt…" : "Rechnungsentwurf erstellen"}
         </Button>
       </div>

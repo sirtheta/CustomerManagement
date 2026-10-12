@@ -28,7 +28,7 @@ export default async function OpenWorkPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Erfasste Zeit und erfasstes Material, das noch nicht verrechnet ist.</p>
       </div>
       {/* Phones: one card per customer; the table needs more width than they have. */}
-      <ul className="space-y-3 md:hidden">
+      <ul className="space-y-3 lg:hidden">
         {rows.length === 0 && <li className="py-12 text-center text-muted-foreground">Keine offenen Erfassungen.</li>}
         {rows.map((r) => (
           <li key={r.customerId}>
@@ -54,7 +54,7 @@ export default async function OpenWorkPage() {
           </li>
         ))}
       </ul>
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto lg:block">
         <Table>
           <TableHeader>
             <TableRow>
