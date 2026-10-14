@@ -52,7 +52,7 @@
     "nodemailer": "^8.0.11",
     "otplib": "^13.5.0",
     "pdfkit": "^0.20.2",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-day-picker": "^10.0.1",
