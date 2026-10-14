@@ -68,7 +68,7 @@
   "devDependencies": {
     "@faker-js/faker": "^10.6.0",
     "@napi-rs/canvas": "^1.0.3",
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26",
