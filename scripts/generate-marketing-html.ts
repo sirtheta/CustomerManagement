@@ -1,7 +1,7 @@
 /**
  * Turns the PNGs in marketing/screenshots/ (see marketing-screenshots.ts)
  * into a single HTML block for the "Screenshots" section of
- * https://nemicomp.ch/customer-management/ — <img> tags point at the
+ * https://nemicomp.ch/nemicomp-quote-invoice/ — <img> tags point at the
  * WordPress media library rather than embedding base64 data, so upload the
  * PNGs from marketing/screenshots/ to the WordPress media library FIRST
  * (keeping their filenames — see WP_IMAGE_BASE_URL below), then paste this
@@ -24,65 +24,116 @@ const OUT_FILE = path.join(ROOT, "marketing", "screenshots-section.html");
 // Where the PNGs from marketing/screenshots/ get uploaded to in WordPress
 // (same filenames). Update this if WordPress assigns a different month/year
 // folder or renames a file to avoid a collision (e.g. dashboard-2.png).
-const WP_IMAGE_BASE_URL = "https://nemicomp.ch/wp-content/uploads/2026/08/";
+const WP_IMAGE_BASE_URL = "https://nemicomp.ch/wp-content/uploads/2026/10/";
 
-type Section = {
+type Split = {
+  kind: "split";
   file: string;
   eyebrow: string;
   title: string;
   text: string;
 };
 
-const SECTIONS: Section[] = [
+// Several images side by side under a centered heading (PDF pages, phone screens).
+type Pair = {
+  kind: "pair";
+  eyebrow: string;
+  title: string;
+  text: string;
+  files: { file: string; alt: string }[];
+  maxWidth: number;
+};
+
+type Block = Split | Pair;
+
+// Order = order on the page; splits alternate image left/right. Kept short on purpose:
+// the feature cards above (features-section.html) cover the basics, these show the workflow.
+// Screenshots that are captured but not used here: customers, invoices-overview, receivables,
+// analytics, settings-design.
+const BLOCKS: Block[] = [
   {
+    kind: "split",
     file: "dashboard.png",
     eyebrow: "Übersicht",
     title: "Alles auf einen Blick",
-    text: "Offene Rechnungen, offene Offerten, Jahresumsatz und überfällige Zahlungen sofort sichtbar beim Einloggen – ohne Klicks, ohne Suchen.",
+    text: "Offene Rechnungen, Einnahmen, fällige Mahnungen und Aufgaben siehst du sofort beim Einloggen – ohne Klicks, ohne Suchen.",
   },
   {
-    file: "customers.png",
-    eyebrow: "Kundenverwaltung",
-    title: "Kunden einfach und übersichtlich verwalten",
-    text: "Volltextsuche über Firma, Kontakt und Ort, CSV-Export und alle wichtigen Informationen auf einen Blick.",
+    kind: "split",
+    file: "customer-detail.png",
+    eyebrow: "Kunden",
+    title: "Die ganze Geschichte eines Kunden an einem Ort",
+    text: "Rechnungen, Offerten, Zahlungen und Mails im Verlauf. Aufgaben erinnern dich, zum Beispiel ans Nachfassen nach einer Offerte.",
   },
   {
-    file: "invoices-overview.png",
-    eyebrow: "Rechnungen & Offerten",
-    title: "Immer den Überblick behalten",
-    text: "Status auf einen Blick – Entwurf, versendet, bezahlt oder überfällig. Mit Filtern nach Zeitraum und Status schnell die richtige Rechnung finden.",
-  },
-  {
+    kind: "split",
     file: "invoice-new.png",
-    eyebrow: "Erstellung",
-    title: "Neue Rechnungen und Offerten in Sekunden",
-    text: "Kunde auswählen, Positionen aus der Leistungsdatenbank oder frei erfassen – der Gesamtbetrag wird automatisch berechnet.",
+    eyebrow: "Rechnungen & Offerten",
+    title: "Neue Rechnungen in Sekunden",
+    text: "Kunde wählen, Positionen aus der Leistungsdatenbank übernehmen, fertig. Der Betrag wird automatisch berechnet.",
   },
   {
-    file: "analytics.png",
-    eyebrow: "Auswertungen",
-    title: "Umsatz und Kennzahlen auf einen Blick",
-    text: "Monatlicher Umsatzverlauf, Einnahmen und Ausgaben nach Kategorie sowie die Top-Kunden – interaktiv und mit Drilldown bis zur einzelnen Rechnung.",
+    kind: "split",
+    file: "subscriptions.png",
+    eyebrow: "Abonnements",
+    title: "Wiederkehrende Rechnungen laufen von selbst",
+    text: "Monatlich, quartalsweise oder jährlich: Die Rechnung entsteht automatisch und geht nach deiner Prüfung raus – oder ganz ohne Zutun.",
   },
   {
+    kind: "split",
+    file: "reminders.png",
+    eyebrow: "Mahnwesen",
+    title: "Überfällige Zahlungen konsequent nachfassen",
+    text: "Überfällige Rechnungen werden erkannt und in vier Stufen gemahnt – auf Wunsch mit Mahngebühr und Verzugszins.",
+  },
+  {
+    kind: "split",
+    file: "bank-import.png",
+    eyebrow: "Bankimport",
+    title: "Zahlungseingänge in Minuten verbucht",
+    text: "Kontoauszug aus dem E-Banking hochladen – Zahlungen werden den Rechnungen automatisch zugeordnet.",
+  },
+  {
+    kind: "pair",
+    eyebrow: "Zeiterfassung",
+    title: "Zeit und Material unterwegs erfassen",
+    text: "Direkt beim Kunden mit dem Smartphone erfassen und am Monatsende per Tippen in einen Rechnungsentwurf verwandeln.",
+    files: [
+      { file: "time-capture.png", alt: "Zeiterfassung auf dem Smartphone" },
+      { file: "time-open.png", alt: "Offene Einträge verrechnen auf dem Smartphone" },
+    ],
+    maxWidth: 300,
+  },
+  {
+    kind: "split",
     file: "accounting.png",
     eyebrow: "Buchhaltung",
     title: "Erfolgsrechnung ohne Excel",
-    text: "Einnahmen, Ausgaben und Ergebnis pro Monat auf einen Blick, inklusive Gewinn- und Verlust-Chart und CSV-Export für die Steuererklärung.",
+    text: "Einnahmen, Ausgaben und Ergebnis pro Monat – dazu das Jahrespaket für die Steuererklärung.",
   },
   {
-    file: "settings-design.png",
-    eyebrow: "Individualisierung",
-    title: "Rechnungsdesign nach Ihrem Geschmack",
-    text: "Akzentfarbe, Schriftart, Logo-Position und Inhalte frei wählbar – mit Live-Vorschau der echten PDF-Rechnung.",
+    kind: "pair",
+    eyebrow: "PDF-Export",
+    title: "Rechnungen mit Schweizer QR-Code",
+    text: "Jede Rechnung wird als fertiges PDF mit QR-Rechnung erzeugt – bereit zum Versand oder Druck und direkt per E-Banking bezahlbar.",
+    files: [
+      { file: "invoice-pdf.png", alt: "Beispiel einer Rechnung als PDF" },
+      { file: "invoice-pdf-qr.png", alt: "Schweizer QR-Rechnung Zahlteil mit QR-Code" },
+    ],
+    maxWidth: 420,
   },
 ];
 
-const PDF_SECTION = {
-  eyebrow: "PDF-Export",
-  title: "Professionell gestaltete Rechnungen mit Schweizer QR-Code",
-  text: "Jede Rechnung wird als fertige PDF-Datei mit Schweizer QR-Rechnung erzeugt – bereit zum Versand oder Druck, direkt bezahlbar per QR-Code am Bankomat oder in der E-Banking-App.",
-  files: ["invoice-pdf.png", "invoice-pdf-qr.png"],
+// Same target as the menu's "Kontakt" and the page's "Kostenlos testen" button: the theme's contact popup.
+const CONTACT_URL = "#omw-323";
+
+const HOSTING = {
+  eyebrow: "Hosting",
+  title: "Ich hoste und betreue deine Kundenverwaltung",
+  text: "Du möchtest dich nicht um Technik kümmern? Dann betreibe ich die Software für dich – du meldest dich einfach an und arbeitest.",
+  bullets: ["Kein eigener Server nötig", "Updates und Wartung durch mich", "Nächtliche Datensicherung"],
+  cta: "Unverbindlich anfragen",
+  note: "Ich berate dich gerne persönlich.",
 };
 
 // Only reads dimensions (for the <img width/height> layout-stability hint) —
@@ -204,39 +255,64 @@ async function main() {
   mkdirSync(path.dirname(OUT_FILE), { recursive: true });
 
   const rows: string[] = [];
+  let splitIndex = 0;
 
-  for (let i = 0; i < SECTIONS.length; i++) {
-    const s = SECTIONS[i];
-    const { url, width, height } = await imageMeta(s.file);
-    const reverse = i % 2 === 1;
-    rows.push(`
+  for (const block of BLOCKS) {
+    if (block.kind === "split") {
+      const { url, width, height } = await imageMeta(block.file);
+      const reverse = splitIndex++ % 2 === 1;
+      rows.push(`
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:48px;margin:0 0 88px;${reverse ? "flex-direction:row-reverse;" : ""}">
       <div style="flex:1 1 480px;min-width:280px;">
-        ${imageFigure(url, width, height, s.title)}
+        ${imageFigure(url, width, height, block.title)}
       </div>
       <div style="flex:1 1 360px;min-width:260px;">
-        <div style="font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4f46e5;margin:0 0 10px;">${s.eyebrow}</div>
-        <h3 style="font-size:26px;line-height:1.25;margin:0 0 14px;color:#0f172a;">${s.title}</h3>
-        <p style="font-size:17px;line-height:1.6;color:#475569;margin:0;">${s.text}</p>
+        <div style="font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4f46e5;margin:0 0 10px;">${block.eyebrow}</div>
+        <h3 style="font-size:26px;line-height:1.25;margin:0 0 14px;color:#0f172a;">${block.title}</h3>
+        <p style="font-size:17px;line-height:1.6;color:#475569;margin:0;">${block.text}</p>
       </div>
+    </div>`);
+      continue;
+    }
+
+    // Centered heading, then the images side by side.
+    const metas = await Promise.all(block.files.map((f) => imageMeta(f.file)));
+    const figures = metas
+      .map(
+        (m, i) => `
+      <div style="flex:1 1 ${Math.min(320, block.maxWidth)}px;max-width:${block.maxWidth}px;">
+        ${imageFigure(m.url, m.width, m.height, block.files[i].alt)}
+      </div>`,
+      )
+      .join("");
+    rows.push(`
+    <div style="margin:0 0 24px;text-align:center;">
+      <div style="font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4f46e5;margin:0 0 10px;">${block.eyebrow}</div>
+      <h3 style="font-size:26px;line-height:1.25;margin:0 auto 14px;color:#0f172a;max-width:640px;">${block.title}</h3>
+      <p style="font-size:17px;line-height:1.6;color:#475569;margin:0 auto;max-width:640px;">${block.text}</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:32px;justify-content:center;align-items:flex-start;margin:0 0 88px;">${figures}
     </div>`);
   }
 
-  // Paired invoice + QR-bill close-up, side by side — mirrors the old
-  // showcase's final "invoice + QR" pairing.
-  const [invoice, qr] = await Promise.all(PDF_SECTION.files.map(imageMeta));
   rows.push(`
-    <div style="margin:0 0 24px;text-align:center;">
-      <div style="font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#4f46e5;margin:0 0 10px;">${PDF_SECTION.eyebrow}</div>
-      <h3 style="font-size:26px;line-height:1.25;margin:0 auto 14px;color:#0f172a;max-width:640px;">${PDF_SECTION.title}</h3>
-      <p style="font-size:17px;line-height:1.6;color:#475569;margin:0 auto;max-width:640px;">${PDF_SECTION.text}</p>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:32px;justify-content:center;align-items:flex-start;">
-      <div style="flex:1 1 320px;max-width:420px;">
-        ${imageFigure(invoice.url, invoice.width, invoice.height, "Beispiel einer Rechnung als PDF")}
+    <div style="margin:0;padding:48px 40px;border-radius:16px;background:linear-gradient(135deg,#312e81 0%,#4f46e5 100%);color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:32px 56px;">
+      <div style="flex:1 1 380px;min-width:260px;">
+        <div style="font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c7d2fe;margin:0 0 10px;">${HOSTING.eyebrow}</div>
+        <h3 style="font-size:30px;line-height:1.25;margin:0 0 14px;color:#fff;">${HOSTING.title}</h3>
+        <p style="font-size:17px;line-height:1.6;color:#e0e7ff;margin:0;">${HOSTING.text}</p>
       </div>
-      <div style="flex:1 1 320px;max-width:420px;">
-        ${imageFigure(qr.url, qr.width, qr.height, "Schweizer QR-Rechnung Zahlteil mit QR-Code")}
+      <div style="flex:1 1 300px;min-width:260px;">
+        <ul style="list-style:none;margin:0 0 28px;padding:0;">
+          ${HOSTING.bullets
+            .map(
+              (b) =>
+                `<li style="display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.5;color:#fff;margin:0 0 12px;"><span aria-hidden="true" style="flex:none;font-weight:700;color:#a5b4fc;">&#10003;</span><span>${b}</span></li>`,
+            )
+            .join("\n          ")}
+        </ul>
+        <a href="${CONTACT_URL}" style="display:inline-block;padding:14px 28px;border-radius:999px;background:#fff;color:#312e81;font-size:17px;font-weight:700;text-decoration:none;">${HOSTING.cta}</a>
+        <div style="font-size:15px;color:#c7d2fe;margin:12px 0 0;">${HOSTING.note}</div>
       </div>
     </div>`);
 

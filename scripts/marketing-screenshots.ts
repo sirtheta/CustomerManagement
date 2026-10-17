@@ -11,7 +11,7 @@
  * routes, and writes PNGs to marketing/screenshots/.
  *
  * Re-run any time the UI changes to refresh the screenshots used on
- * https://nemicomp.ch/customer-management/ (see marketing/README.md and
+ * https://nemicomp.ch/nemicomp-quote-invoice/ (see marketing/README.md and
  * scripts/generate-marketing-html.ts for the next step).
  */
 import { chromium, type Page } from "@playwright/test";
@@ -31,13 +31,27 @@ const ADMIN_PASSWORD = "marketing-admin-password";
 
 const VIEWPORT = { width: 1600, height: 1000 };
 
+type Clip = { x: number; y: number; width: number; height: number };
+
 type Shot = {
   name: string;
   path: string;
   fullPage?: boolean;
-  clip?: { x: number; y: number; width: number; height: number };
-  waitFor?: (page: Page) => Promise<void>;
+  clip?: Clip;
+  /** Runs before the shot; may return a page-coordinate clip computed from the live layout. */
+  waitFor?: (page: Page) => Promise<void | Clip>;
+  /** Phone viewport (390x844) instead of the desktop one. */
+  mobile?: boolean;
 };
+
+// Optional names on the command line limit the run (e.g. `customer-detail invoice-pdf`).
+const ONLY = process.argv.slice(2);
+const wanted = (name: string) => ONLY.length === 0 || ONLY.includes(name);
+
+let detailCustomerId = 0;
+let pdfInvoiceId = 0;
+
+const MOBILE_VIEWPORT = { width: 390, height: 844 };
 
 const SHOTS: Shot[] = [
   { name: "dashboard", path: "/dashboard" },
@@ -48,8 +62,64 @@ const SHOTS: Shot[] = [
     path: "/invoices/new",
     fullPage: true,
   },
+  {
+    name: "customer-detail",
+    path: "/customers",
+    fullPage: true,
+    // The customer with the fullest history, picked by scripts/marketing-prepare.ts.
+    // The page is tall and the interesting part (documents + history) is below the
+    // fold, so clip from the invoice card down to the first rows of the history.
+    // Faker data changes the layout between runs, hence measured, not hard-coded.
+    waitFor: async (page) => {
+      await page.goto(`${BASE_URL}/customers/${detailCustomerId}`);
+      await page.waitForURL(/\/customers\/\d+$/);
+      await page.waitForLoadState("networkidle");
+      const top = await page.getByText("Rechnungen", { exact: true }).last().boundingBox();
+      const history = await page.getByText("Verlauf", { exact: true }).first().boundingBox();
+      if (!top || !history) throw new Error("customer detail layout not found");
+      const scrollY = await page.evaluate(() => window.scrollY);
+      const y = Math.max(0, top.y + scrollY - 40);
+      return { x: 0, y, width: VIEWPORT.width, height: history.y + scrollY + 440 - y };
+    },
+  },
+  { name: "subscriptions", path: "/subscriptions" },
+  {
+    name: "reminders",
+    path: "/invoices/reminders",
+    // Each reminder is a collapsed <details>; open a 2nd-level one so the card shows fee lines.
+    waitFor: async (page) => {
+      await page.locator("details > summary", { hasText: "2. Mahnung" }).first().click();
+    },
+  },
+  { name: "bank-import", path: "/invoices/import" },
+  { name: "receivables", path: "/accounting/receivables" },
   { name: "analytics", path: "/analytics" },
   { name: "accounting", path: "/accounting" },
+  {
+    name: "time-capture",
+    path: "/time",
+    mobile: true,
+    waitFor: async (page) => {
+      await page.getByPlaceholder("Kunde suchen…").click();
+      await page.getByRole("option").first().click();
+      await page.getByRole("button", { name: "4", exact: true }).click();
+    },
+  },
+  {
+    name: "time-open",
+    path: "/time/open",
+    mobile: true,
+    // Open the billing preview of the first customer with open entries.
+    waitFor: async (page) => {
+      const hrefs = await page
+        .locator('a[href^="/time/open/"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute("href")));
+      const href = hrefs.find((h) => h && /^\/time\/open\/\d+$/.test(h));
+      if (!href) throw new Error("No open-entries link found");
+      await page.goto(`${BASE_URL}${href}`);
+      await page.waitForLoadState("networkidle");
+    },
+  },
   {
     name: "settings-design",
     path: "/settings/design",
@@ -152,6 +222,20 @@ async function startServer(): Promise<ChildProcess> {
   return child;
 }
 
+// Polishes the seeded DB (templates, tasks) and returns the customer to show on the detail page.
+function prepareData(): { customerId: number; pdfInvoiceId: number } {
+  const output = execFileSync("npx", ["tsx", "scripts/marketing-prepare.ts"], {
+    cwd: ROOT,
+    encoding: "utf8",
+    shell: true,
+    env: { ...process.env, DATABASE_URL: `file:${DB_PATH}` },
+  });
+  const match = output.match(/RESULT (\{.*\})/);
+  if (!match) throw new Error(`marketing-prepare.ts produced no RESULT line:
+${output}`);
+  return JSON.parse(match[1]) as { customerId: number; pdfInvoiceId: number };
+}
+
 // Chromium's built-in PDF viewer isn't reliably available in Playwright's
 // bundled browser (top-level goto()s to a PDF download instead of render,
 // and an <iframe> embed just stays blank), so instead of screenshotting a
@@ -201,6 +285,7 @@ async function main() {
   const server = await startServer();
 
   try {
+    ({ customerId: detailCustomerId, pdfInvoiceId } = prepareData());
     const browser = await chromium.launch();
     const context = await browser.newContext({
       viewport: VIEWPORT,
@@ -212,31 +297,41 @@ async function main() {
     console.log("Logging in as seeded admin...");
     await login(page);
 
-    for (const shot of SHOTS) {
+    const mobileContext = await browser.newContext({
+      viewport: MOBILE_VIEWPORT,
+      colorScheme: "light",
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      storageState: await context.storageState(),
+    });
+    const mobilePage = await mobileContext.newPage();
+
+    for (const shot of SHOTS.filter((s) => wanted(s.name))) {
+      const shotPage = shot.mobile ? mobilePage : page;
       console.log(`Capturing ${shot.name} (${shot.path})...`);
-      await page.goto(`${BASE_URL}${shot.path}`);
-      await page.waitForLoadState("networkidle");
-      if (shot.waitFor) await shot.waitFor(page);
-      await hideDevIndicator(page);
-      await page.screenshot({
+      await shotPage.goto(`${BASE_URL}${shot.path}`);
+      await shotPage.waitForLoadState("networkidle");
+      const dynamicClip = shot.waitFor ? await shot.waitFor(shotPage) : undefined;
+      await hideDevIndicator(shotPage);
+      await shotPage.screenshot({
         path: path.join(OUT_DIR, `${shot.name}.png`),
         fullPage: shot.fullPage ?? false,
-        clip: shot.clip,
+        clip: shot.clip ?? (dynamicClip || undefined),
       });
     }
 
     // Bonus: a real generated invoice PDF (Swiss QR bill), rendered via
     // Chromium's built-in PDF viewer so the screenshot shows the actual
     // typeset document, not the app UI.
-    await page.goto(`${BASE_URL}/invoices`);
-    // Invoice ids are plain integers, so filter out static routes like
-    // /invoices/new, /invoices/templates, /invoices/pending, /invoices/reminders.
-    const invoiceHrefs = await page.locator('a[href^="/invoices/"]').evaluateAll((els) =>
-      els.map((el) => el.getAttribute("href")),
-    );
-    const firstInvoiceHref = invoiceHrefs.find((href) => href && /^\/invoices\/\d+$/.test(href)) ?? null;
-    if (firstInvoiceHref) {
-      const invoiceId = firstInvoiceHref.split("/").filter(Boolean).pop();
+    if (!wanted("invoice-pdf")) {
+      await browser.close();
+      return;
+    }
+    // A regular numbered invoice picked by marketing-prepare.ts (the first one in the list
+    // can be a credit note with negative quantities).
+    {
+      const invoiceId = pdfInvoiceId;
       console.log(`Capturing invoice PDF for invoice ${invoiceId}...`);
       const cookieHeader = (await context.cookies())
         .map((c) => `${c.name}=${c.value}`)
@@ -256,8 +351,6 @@ async function main() {
         renderPdfPage(pdfPath, numPages, path.join(OUT_DIR, "invoice-pdf-qr.png"), 105 / 297);
       }
       rmSync(pdfPath, { force: true });
-    } else {
-      console.warn("No invoice found to screenshot a PDF for — skipping invoice-pdf.png");
     }
 
     await browser.close();
