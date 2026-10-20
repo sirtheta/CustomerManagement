@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatTime } from "@/lib/utils";
 import ItemsView from "@/components/items-view";
 import QuoteStatusSelect from "../QuoteStatusSelect";
 import DeleteQuoteButton from "../DeleteQuoteButton";
@@ -191,7 +191,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
                       <TableCell className="whitespace-nowrap">
                         {formatDate(log.sentAt)}{" "}
                         <span className="text-xs text-gray-500">
-                          {log.sentAt.toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(log.sentAt)}
                         </span>
                       </TableCell>
                       <TableCell>{log.sentTo}</TableCell>
