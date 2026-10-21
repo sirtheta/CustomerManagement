@@ -55,6 +55,8 @@ async function main() {
     prisma.category.create({ data: { name: "Versicherung", colorHex: "#06b6d4", isActive: true } }),
     prisma.category.create({ data: { name: "Software & Abos", colorHex: "#64748b", isActive: true } }),
   ]);
+  // Not used anywhere, so the categories screenshot shows the delete button next to the usage note.
+  await prisma.category.create({ data: { name: "Schulung", colorHex: "#eab308", isActive: true } });
   const [websites, hosting, support] = serviceCategories;
 
   await prisma.service.createMany({
