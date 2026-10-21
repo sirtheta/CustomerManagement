@@ -8,8 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { createCategory, updateCategory, type CategoryFormState } from "./actions";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Trash2 } from "lucide-react";
+import { createCategory, deleteCategory, updateCategory, type CategoryFormState } from "./actions";
 import type { Category } from "@prisma/client";
+
+export type CategoryRowData = Category & { usageCount: number };
 
 const COLOR_PALETTE = [
   "#64748b", // Schiefer
@@ -103,7 +107,7 @@ function CreateCategoryForm() {
   );
 }
 
-function CategoryRow({ category }: { category: Category }) {
+function CategoryRow({ category }: { category: CategoryRowData }) {
   const action = updateCategory.bind(null, category.categoryId);
   const [state, formAction, isPending] = useActionState<CategoryFormState, FormData>(
     action,
@@ -133,12 +137,29 @@ function CategoryRow({ category }: { category: Category }) {
           </Button>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
         </form>
+        <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+          {category.usageCount > 0 ? (
+            <span>Wird {category.usageCount}× verwendet und kann nicht gelöscht werden.</span>
+          ) : (
+            <ConfirmDialog
+              title="Kategorie löschen"
+              description={`Soll die Kategorie «${category.name}» wirklich gelöscht werden? Sie wird nirgends verwendet.`}
+              confirmLabel="Löschen"
+              triggerVariant="ghost"
+              triggerSize="sm"
+              triggerClassName="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onConfirm={() => deleteCategory(category.categoryId)}
+            >
+              <Trash2 /> Löschen
+            </ConfirmDialog>
+          )}
+        </div>
       </td>
     </tr>
   );
 }
 
-export function CategoryManagement({ categories }: { categories: Category[] }) {
+export function CategoryManagement({ categories }: { categories: CategoryRowData[] }) {
   return (
     <div className="space-y-6">
       <Card>
