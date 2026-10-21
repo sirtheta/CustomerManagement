@@ -31,6 +31,7 @@ type Props = {
   defaultCustomerId?: number;
   from?: string;
   unitOrder?: readonly Unit[];
+  roundTo5Rappen?: boolean;
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -56,6 +57,7 @@ export default function QuoteForm({
   defaultCustomerId,
   from,
   unitOrder,
+  roundTo5Rappen,
 }: Props) {
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
@@ -81,6 +83,8 @@ export default function QuoteForm({
       })();
 
   const [validUntil, setValidUntil] = useState(defaultValidUntil);
+  const [discountInput, setDiscountInput] = useState(quote?.discountPercent?.toString() ?? "0");
+  const discountPercent = Number(discountInput.replace(",", ".")) || 0;
 
   function handleDateChange(value: string) {
     setValidUntil(addDays(value, defaultQuoteValidityDays));
@@ -171,7 +175,12 @@ export default function QuoteForm({
             <CardTitle>Positionen</CardTitle>
           </CardHeader>
           <CardContent>
-            <ItemsEditor services={services} categories={categories} initialItems={initialItems} showDiscount unitOrder={unitOrder} />
+            <ItemsEditor services={services} categories={categories} initialItems={initialItems}
+              showDiscount
+              unitOrder={unitOrder}
+              documentDiscountPercent={discountPercent}
+              roundTo5Rappen={roundTo5Rappen}
+            />
           </CardContent>
         </Card>
 
@@ -186,7 +195,8 @@ export default function QuoteForm({
               min="0"
               max="100"
               step="any"
-              defaultValue={quote?.discountPercent?.toString() ?? "0"}
+              value={discountInput}
+              onChange={(e) => setDiscountInput(e.target.value)}
               className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
             />
           </CardContent>

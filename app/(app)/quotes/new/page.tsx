@@ -38,6 +38,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
       defaultCustomerId={defaultCustomerId}
         categories={categories}
       unitOrder={unitOrder}
+      roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
     />
   );
 }

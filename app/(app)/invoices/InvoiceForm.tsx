@@ -60,6 +60,7 @@ type Props = {
   from?: string;
   creditNoteFor?: { id: number; documentNumber: string | null };
   unitOrder?: readonly Unit[];
+  roundTo5Rappen?: boolean;
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -87,6 +88,7 @@ export default function InvoiceForm({
   from,
   creditNoteFor,
   unitOrder,
+  roundTo5Rappen,
 }: Props) {
   const action = invoice
     ? updateInvoice.bind(null, invoice.id)
@@ -118,6 +120,8 @@ export default function InvoiceForm({
     : addDays(defaultDate, termDays);
 
   const [dueDate, setDueDate] = useState(defaultDueDate);
+  const [discountInput, setDiscountInput] = useState(invoice?.discountPercent?.toString() ?? "0");
+  const discountPercent = Number(discountInput.replace(",", ".")) || 0;
 
   function handleDateChange(value: string) {
     setInvoiceDate(value);
@@ -269,7 +273,12 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor} unitOrder={unitOrder} />
+            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor}
+              unitOrder={unitOrder}
+              documentDiscountPercent={discountPercent}
+              roundTo5Rappen={roundTo5Rappen}
+              documentDiscountLabel={creditNoteFor ? `Rabatt der Originalrechnung ${discountPercent} %` : undefined}
+            />
           </CardContent>
         </Card>
 
@@ -288,7 +297,8 @@ export default function InvoiceForm({
                 min="0"
                 max="100"
                 step="any"
-                defaultValue={invoice?.discountPercent?.toString() ?? "0"}
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
                 className="h-9 w-32 rounded-lg border border-input bg-transparent px-2.5 text-sm"
               />
             </CardContent>

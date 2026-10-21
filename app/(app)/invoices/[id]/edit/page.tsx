@@ -58,6 +58,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
         categories={categories}
       creditNoteFor={original ?? undefined}
       unitOrder={unitOrder}
+      roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
     />
   );
 }

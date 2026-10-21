@@ -62,6 +62,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
       from={from?.startsWith("customers/") ? from : undefined}
         categories={categories}
       unitOrder={unitOrder}
+      roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
     />
   );
 }
