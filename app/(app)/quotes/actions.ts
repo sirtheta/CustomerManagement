@@ -9,6 +9,7 @@ import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
+import { DocumentItemsError } from "@/lib/document-items-error";
 import { loadTotalOptions } from "@/lib/total-options";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -55,7 +56,7 @@ export async function createQuote(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ err }, "createQuote: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   let newQuoteId: number;
@@ -111,7 +112,7 @@ export async function updateQuote(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ id, err }, "updateQuote: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   try {

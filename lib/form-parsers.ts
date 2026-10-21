@@ -1,4 +1,5 @@
 import { itemDataSchema, type ItemData } from "@/components/items-editor-schema";
+import { DocumentItemsError } from "@/lib/document-items-error";
 import { calculateInvoiceTotal, calculateItemTotal, type TotalOptions } from "@/lib/calculations";
 
 export type ParsedItems = {
@@ -13,6 +14,10 @@ export function parseDocumentItems(formData: FormData, totalOptions: TotalOption
     ...item,
     totalAmount: calculateItemTotal(item),
   }));
+  const unnamed = items.findIndex((item) => !item.name.trim());
+  if (unnamed !== -1) {
+    throw new DocumentItemsError(`Position ${unnamed + 1} hat keine Bezeichnung. Bitte ausfüllen oder die Position entfernen.`);
+  }
   const rawDiscount = formData.get("discountPercent");
   const discountPercent = rawDiscount === null || rawDiscount === ""
     ? 0
