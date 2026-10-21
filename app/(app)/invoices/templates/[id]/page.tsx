@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { loadUnitOrder } from "@/lib/unit-usage";
 import { notFound } from "next/navigation";
 import { requireEditor } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -14,7 +15,7 @@ export default async function TemplateEditPage({ params }: Props) {
   const { id } = await params;
   const templateId = parseInt(id, 10);
 
-    const [template, services, categories] = await Promise.all([
+    const [template, services, categories, unitOrder] = await Promise.all([
     prisma.invoiceTemplate.findUnique({
       where: { id: templateId },
       include: { items: { orderBy: { id: "asc" } } },
@@ -23,6 +24,7 @@ export default async function TemplateEditPage({ params }: Props) {
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
+    loadUnitOrder(prisma),
   ]);
 
   if (!template) notFound();
@@ -53,6 +55,7 @@ export default async function TemplateEditPage({ params }: Props) {
         initialItems={initialItems}
         services={services}
           categories={categories}
+        unitOrder={unitOrder}
       />
     </div>
   );

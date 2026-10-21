@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { notFound, redirect } from "next/navigation";
 import InvoiceForm from "../../InvoiceForm";
@@ -18,7 +19,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
-    const [invoice, services, settings, categories] = await Promise.all([
+    const [invoice, services, settings, categories, unitOrder] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { items: true },
@@ -28,6 +29,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
     ),
     prisma.applicationSettings.findFirst(),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
+    loadUnitOrder(prisma),
   ]);
 
   if (!invoice) notFound();
@@ -55,6 +57,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       from={from?.startsWith("customers/") ? from : undefined}
         categories={categories}
       creditNoteFor={original ?? undefined}
+      unitOrder={unitOrder}
     />
   );
 }

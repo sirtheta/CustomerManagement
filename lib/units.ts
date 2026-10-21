@@ -61,3 +61,8 @@ export const UNIT_OPTIONS: { value: Unit; label: string }[] = UNIT_VALUES.map((v
   value,
   label: UNIT_INFO[value].label,
 }));
+
+/** Every unit, most used first; ties (and units never used) keep the `UNIT_VALUES` order. */
+export function sortUnitsByUsage(counts: ReadonlyMap<Unit, number>): Unit[] {
+  return [...UNIT_VALUES].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+}
