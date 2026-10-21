@@ -43,6 +43,16 @@ export function hasSmtpSettings(settings: Pick<ApplicationSettings, "smtpHost" |
   return Boolean(settings.smtpHost && settings.smtpUser && settings.smtpPassword);
 }
 
+export const SMTP_NOT_CONFIGURED_ERROR =
+  "E-Mail-Versand ist noch nicht eingerichtet (Einstellungen → E-Mail Versand). Die Rechnung wurde nicht versendet und hat keine Nummer erhalten.";
+
+/** Error text when a customer mail cannot go out because SMTP is missing; null when sending can work. */
+export function mailNotConfiguredError(
+  settings: Pick<ApplicationSettings, "smtpHost" | "smtpUser" | "smtpPassword">
+): string | null {
+  return isEmailDisabled() || hasSmtpSettings(settings) ? null : SMTP_NOT_CONFIGURED_ERROR;
+}
+
 /** Transport from the stored settings (password decrypted); throws when SMTP is not configured. */
 export function createSettingsTransport(settings: SmtpSettings) {
   if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPassword) {

@@ -221,6 +221,24 @@ describe("sendDocument", () => {
     );
   });
 
+  it("refuses an invoice without SMTP settings before a number is used up", async () => {
+    delete process.env.DISABLE_EMAIL;
+    try {
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
+      vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        id: 5, documentNumber: null, creditNoteForId: null, state: "Draft", totalAmount: 50, customer: {}, items: [{ id: 1 }],
+      } as never);
+
+      const result = await sendDocument({ kind: "invoice", id: 5, to: "a@b.ch", subject: "s", body: "b", actor });
+
+      expect(result.error).toMatch(/E-Mail-Versand ist noch nicht eingerichtet/);
+      expect(assignDocumentNumber).not.toHaveBeenCalled();
+      expect(sendInvoiceEmail).not.toHaveBeenCalled();
+    } finally {
+      process.env.DISABLE_EMAIL = "true";
+    }
+  });
+
   it("does not send or number a credit note that exceeds the original", async () => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ companyInfo: {} } as never);
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({

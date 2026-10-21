@@ -15,6 +15,7 @@ import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
 import { formatCurrency } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
+import { mailNotConfiguredError } from "@/lib/smtp";
 import logger from "@/lib/logger";
 
 const log = logger.child({ module: "pending-email-send" });
@@ -78,6 +79,8 @@ async function sendLocked(input: {
   // Checked before the number is assigned, so a refused send does not use one up.
   if (pending.invoice.state === "Canceled") return { error: CANCELED_INVOICE_SEND_ERROR };
   if (pending.invoice.items.length === 0) return { error: INVOICE_WITHOUT_ITEMS_ERROR };
+  const mailError = mailNotConfiguredError(settings);
+  if (mailError) return { error: mailError };
   if (!isValidRecipient(to)) return { error: INVALID_RECIPIENT_ERROR };
 
   let documentNumber: string;

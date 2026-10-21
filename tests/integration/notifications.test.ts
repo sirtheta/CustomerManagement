@@ -80,6 +80,7 @@ describe("sendAdminNotifications", () => {
     mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
     mockSendMail.mockClear();
     mockFetch.mockClear();
+    delete process.env.DISABLE_EMAIL;
   });
 
   afterEach(() => {
@@ -394,6 +395,7 @@ describe("notifyAdmins", () => {
     mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
     mockSendMail.mockClear();
     mockFetch.mockClear();
+    delete process.env.DISABLE_EMAIL;
   });
 
   afterEach(() => {
