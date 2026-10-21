@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
+import { UNIT_LABELS, UNIT_VALUES } from "@/lib/units";
 import { GripVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type { Category, Service, Unit } from "@prisma/client";
 import {
@@ -43,13 +44,6 @@ type Props = {
   initialItems?: ItemData[];
   inputName?: string;
   showDiscount?: boolean;
-};
-
-const unitLabels: Record<Unit, string> = {
-  Hour: "Stunde",
-  Day: "Tag",
-  Piece: "Stück",
-  Package: "Pauschal",
 };
 
 function emptyItem(): ItemData {
@@ -222,13 +216,13 @@ function SortableItemRow({
               aria-label={`Einheit Position ${position}`}
             >
               <SelectValue>
-                {(value: string | null) => value ? (unitLabels[value as Unit] ?? value) : "Einheit"}
+                {(value: string | null) => value ? (UNIT_LABELS[value as Unit] ?? value) : "Einheit"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(unitLabels) as Unit[]).map((u) => (
+              {UNIT_VALUES.map((u) => (
                 <SelectItem key={u} value={u}>
-                  {unitLabels[u]}
+                  {UNIT_LABELS[u]}
                 </SelectItem>
               ))}
             </SelectContent>

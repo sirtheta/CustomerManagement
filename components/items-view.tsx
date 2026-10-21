@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatCurrency } from "@/lib/utils";
+import { UNIT_LABELS } from "@/lib/units";
 import type { Unit } from "@prisma/client";
 
 export type ItemViewData = {
@@ -18,13 +19,6 @@ export type ItemViewData = {
   unitPrice: number;
   discountPercent?: number;
   totalAmount: number;
-};
-
-const unitLabels: Record<Unit, string> = {
-  Hour: "Stunde",
-  Day: "Tag",
-  Piece: "Stück",
-  Package: "Pauschal",
 };
 
 export default function ItemsView({ items }: { items: ItemViewData[] }) {
@@ -55,7 +49,7 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
             )}
             <div className="flex items-center justify-between gap-2 pt-1">
               <span className="text-sm text-muted-foreground">
-                {item.quantity} × {unitLabels[item.unit]} à{" "}
+                {item.quantity} × {UNIT_LABELS[item.unit]} à{" "}
                 {formatCurrency(item.unitPrice)}
               </span>
               <span className="text-sm font-semibold">
@@ -90,7 +84,7 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
                 <TableCell className="text-gray-500">
                   {item.description ?? "—"}
                 </TableCell>
-                <TableCell>{unitLabels[item.unit]}</TableCell>
+                <TableCell>{UNIT_LABELS[item.unit]}</TableCell>
                 <TableCell className="text-right">{item.quantity}</TableCell>
                 <TableCell className="text-right">
                   {formatCurrency(item.unitPrice)}

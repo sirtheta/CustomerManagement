@@ -9,20 +9,6 @@ export const MAX_HOURS_PER_ENTRY = 24;
 export const MAX_NAME_LENGTH = 200;
 export const MAX_NOTE_LENGTH = 500;
 
-export const UNIT_LABELS: Record<Unit, string> = {
-  Hour: "Stunde",
-  Day: "Tag",
-  Piece: "Stück",
-  Package: "Pauschal",
-};
-
-export const UNIT_SHORT_LABELS: Record<Unit, string> = {
-  Hour: "h",
-  Day: "Tg.",
-  Piece: "Stk.",
-  Package: "pausch.",
-};
-
 /** Quick-pick buttons on the capture form. */
 export const QUICK_AMOUNTS: Record<"Hour" | "Day", number[]> = {
   Hour: [0.5, 1, 2, 4, 8],

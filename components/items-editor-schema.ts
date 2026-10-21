@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { UNIT_VALUES } from "@/lib/units";
 
 export const itemDataSchema = z.object({
   name: z.string(),
   description: z.string(),
-  unit: z.enum(["Hour", "Day", "Piece", "Package"]),
+  unit: z.enum(UNIT_VALUES),
   unitPrice: z.number(),
   quantity: z.number(),
   discountPercent: z.number().min(0).max(100).default(0),

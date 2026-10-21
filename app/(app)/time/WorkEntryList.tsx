@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { UNIT_SHORT_LABELS, formatQuantity } from "@/lib/work-entries";
+import { formatQuantity } from "@/lib/work-entries";
+import { UNIT_SHORT_LABELS } from "@/lib/units";
 import { deleteWorkEntry, updateWorkEntry } from "./actions";
 
 export type ListEntry = { id: number; date: string; name: string; unit: Unit; quantity: number; note: string | null };
