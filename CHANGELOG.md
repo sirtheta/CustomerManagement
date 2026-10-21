@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.2...customer-management-v1.8.3) (2026-10-21)
+
+
+### Bug Fixes
+
+* **services:** add time, length, area and weight units ([#164](https://github.com/sirtheta/CustomerManagement/issues/164)) ([5570b1a](https://github.com/sirtheta/CustomerManagement/commit/5570b1a2af3c4ce82c4f61d530a352ae99283d5d))
+* **ui:** date picker year range, dropdown font and consistent date fields ([#162](https://github.com/sirtheta/CustomerManagement/issues/162)) ([98df67b](https://github.com/sirtheta/CustomerManagement/commit/98df67b29f4dabe030e647ded2c34f1ee4df57d6))
+
 ## [1.8.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.1...customer-management-v1.8.2) (2026-10-21)
 
 
