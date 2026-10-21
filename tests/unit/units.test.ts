@@ -22,6 +22,11 @@ describe("units", () => {
     expect(UNIT_PDF_LABELS.SquareMeter).toBe("m²");
   });
 
+  it("spells out liter, because a lone «l» reads like «1» next to a quantity", () => {
+    expect(UNIT_SHORT_LABELS.Liter).toBe("Liter");
+    expect(UNIT_PDF_LABELS.Liter).toBe("Liter");
+  });
+
   it("accepts the new units in an item", () => {
     const base = {
       name: "x", description: "", unitPrice: 1, quantity: 1, totalAmount: 1, customText: "", categoryId: null,
