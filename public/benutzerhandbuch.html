@@ -238,6 +238,13 @@
   .shot-row { display: flex; gap: 20px; flex-wrap: wrap; }
   .shot-row figure.shot { flex: 1 1 320px; max-width: 480px; }
 
+  pre {
+    max-width: 72ch; margin: 10px 0 18px; padding: 12px 14px; overflow-x: auto;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    font-size: 13px; line-height: 1.55;
+  }
+  pre code { background: none; border: 0; padding: 0; }
+
   /* ── Callouts ──────────────────────────────────────────────────────── */
   .callout {
     max-width: 72ch; margin: 18px 0; padding: 14px 16px; border-radius: 10px;
@@ -760,7 +767,7 @@
         <li><strong>Nummernpräfixe</strong> – z.&nbsp;B. <code>I-</code> für Rechnungen und <code>Q-</code> für Offerten (siehe <a href="#konventionen">Referenz</a>).</li>
         <li><strong>Zahlungsfrist (Tage)</strong> – Standardfrist für das Fälligkeitsdatum. Sie gilt für alle Kunden ohne eigene Zahlungsfrist (siehe <a href="#kunden-weitere-angaben">Kunden</a>).</li>
         <li><strong>Rechnungsbetrag auf 5 Rappen runden</strong> – optional, standardmässig aus. Ist die Option an, wird das Gesamttotal neuer und neu gespeicherter Rechnungen und Offerten auf 5 Rappen gerundet (1–2 Rappen ab, 3–4 Rappen auf). Positionen werden nicht gerundet. Auf dem PDF steht die Differenz als Zeile «Rundung», der QR-Zahlteil und die offenen Posten verwenden den gerundeten Betrag. Bereits versendete Rechnungen und Entwürfe, die nicht erneut gespeichert werden, bleiben unverändert. Änderungen werden im Aktivitätsprotokoll festgehalten.</li>
-        <li><strong>SMTP (E-Mail-Versand)</strong> – Voraussetzung für automatischen Rechnungsversand, Mahnungen und Passwort-Rücksetzlinks. Das SMTP-Passwort wird verschlüsselt gespeichert.</li>
+        <li><strong>SMTP (E-Mail-Versand)</strong> – Voraussetzung für automatischen Rechnungsversand, Mahnungen und Passwort-Rücksetzlinks. Das SMTP-Passwort wird verschlüsselt gespeichert. Darunter lassen sich Betreff und Text der Rechnungs-E-Mail mit <a href="#mail-platzhalter">Platzhaltern</a> vorgeben.</li>
         <li><strong>Mahngebühren &amp; Verzugszins</strong> – Gebühr für die 1., 2. und 3. Mahnung (CHF) sowie Verzugszins in % p.&nbsp;a. Standardmässig 0, d.&nbsp;h. es wird nichts verrechnet. Der Zins wird erst ab der 1. Mahnung auf den offenen Betrag für die Tage seit Fälligkeit berechnet und auf dem Mahnbeleg ausgewiesen. Gebühren und Zins dürfen nur verlangt werden, wenn sie vereinbart sind (z.&nbsp;B. in den AGB) – bitte rechtlich klären. Änderungen werden im Aktivitätsprotokoll festgehalten.</li>
         <li><strong>Module</strong> – optionale Funktionen (Aufgaben, Abos, Offerten, Mahnungen, Bankimport, Buchhaltung, Auswertung, Zeiterfassung) lassen sich ausblenden; die Daten bleiben erhalten. Ein Modul wird mit dem Klick auf das Kästchen sofort gespeichert («Gilt sofort», ebenso wie die Optionen zu QR-Rechnung, Rundung und Benachrichtigungen). Abos lassen sich erst ausschalten, wenn keines mehr aktiv ist (Abos archivierter Kunden zählen nicht, sie laufen ohnehin nicht) und keine Abo-Rechnung auf Freigabe wartet: Der Knopf «Alle Abos pausieren» unter Module pausiert alle aktiven Abos auf einmal (im Aktivitätsprotokoll je Abo festgehalten); wartende Entwürfe müssen unter «Ausstehende E-Mails» freigegeben oder verworfen werden. Die Zahlungen und Rechnungen bleiben unverändert.</li>
         <li><strong>Datenbank-Export</strong> – lädt eine Sicherungskopie der Datenbank herunter.</li>
@@ -769,6 +776,46 @@
         <div class="ic">⚠️</div>
         <div><strong>Ohne SMTP</strong> funktionieren weder automatischer Rechnungsversand noch Mahnungen noch «Passwort vergessen» – Rechnungen und Offerten lassen sich aber weiterhin als PDF herunterladen und manuell verschicken.</div>
       </div>
+      <h3 class="sub" id="mail-platzhalter">E-Mail-Vorlagen &amp; Platzhalter</h3>
+      <p>In den Feldern <strong>«Betreff-Vorlage»</strong> und <strong>«Text-Vorlage»</strong> (Karte «E-Mail Versand (SMTP)») legst du fest, wie Rechnungs-E-Mails beginnen. Im Text stehen <strong>Platzhalter in geschweiften Klammern</strong>, z.&nbsp;B. <code>{contactPerson}</code>. Sie werden beim Versand durch die Werte der jeweiligen Rechnung ersetzt. Bleiben die Felder leer, gilt der Standardtext.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Platzhalter</th><th>Bedeutung</th><th>Was eingesetzt wird</th><th>Beispiel</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>{documentNumber}</code></td><td>Dokumentnummer</td><td>Die Nummer der Rechnung, Gutschrift oder Offerte. Bei Entwürfen wird sie erst beim Versand vergeben und eingesetzt.</td><td>I-25090001</td></tr>
+            <tr><td><code>{contactPerson}</code></td><td>Ansprechperson</td><td>Name der Kontaktperson beim Kunden, so wie er im Kundendatensatz steht. Gedacht für die Anrede («Guten Tag …»).</td><td>Anna Muster</td></tr>
+            <tr><td><code>{customerName}</code></td><td>Kundenname</td><td>Name des Kunden: die Firma, bei Privatkunden der Name der Person.</td><td>Muster AG</td></tr>
+            <tr><td><code>{companyName}</code></td><td>Firmenname (dein Unternehmen)</td><td>Der Name deiner eigenen Firma aus den Einstellungen unter «Firmendaten». Gedacht für Betreff und Grussformel.</td><td>Nemicomp</td></tr>
+            <tr><td><code>{totalAmount}</code></td><td>Gesamtbetrag</td><td>Der Total-Betrag des Dokuments im Schweizer Format. Bei Gutschriften ohne Minuszeichen, bei Mahnungen der noch offene Betrag.</td><td>CHF 1'250.00</td></tr>
+            <tr><td><code>{date}</code></td><td>Dokumentdatum</td><td>Das Datum, mit dem die Rechnung, Gutschrift oder Offerte ausgestellt wurde.</td><td>15.09.2025</td></tr>
+            <tr><td><code>{dueDate}</code></td><td>Fälligkeitsdatum</td><td>Das Datum, bis zu dem die Rechnung bezahlt sein muss («Zahlbar bis»). Bei Mahnungen das ursprüngliche Fälligkeitsdatum der Rechnung.</td><td>15.10.2025</td></tr>
+            <tr><td><code>{validUntil}</code></td><td>Gültig bis</td><td>Das Datum, bis zu dem eine Offerte gültig ist. Nur bei Offerten, nicht in der Rechnungs-Vorlage der Einstellungen.</td><td>15.10.2025</td></tr>
+            <tr><td><code>{customUserText}</code></td><td>Zusatztext</td><td>Der freie Text, den du im Feld «Zusatztext» der Rechnung oder Offerte erfasst hast. Ohne Zusatztext bleibt die Stelle leer.</td><td>Vielen Dank für den Auftrag.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Wo gelten die Platzhalter?</strong></p>
+      <ul>
+        <li><strong>Rechnungen</strong> – verwenden die Vorlage aus den Einstellungen. Im Versanddialog erscheint der Text bereits ausgefüllt und lässt sich vor dem Senden anpassen; auch dort eingetippte Platzhalter werden beim Versand ersetzt.</li>
+        <li><strong>Abo-Rechnungen</strong> – die Vorlage wird beim Erstellen des Entwurfs eingesetzt. Nur <code>{documentNumber}</code> und <code>{totalAmount}</code> bleiben bis zur Freigabe unter «Ausstehende E-Mails» offen, weil sich Nummer und Betrag bis dahin noch ändern können. Andere Platzhalter, die du dort selbst in den Text schreibst, werden nicht ersetzt.</li>
+        <li><strong>Gutschriften und Offerten</strong> – haben feste Standardtexte, die sich nicht in den Einstellungen ändern lassen. Im Versanddialog kannst du den Vorschlag anpassen; eingetippte Platzhalter werden beim Versand ersetzt.</li>
+        <li><strong>Mahnungen</strong> – haben je Stufe einen festen Standardtext. Er erscheint auf der Mahnungskarte schon ausgefüllt (Nummer, Kontaktperson, Firma, offener Betrag, Fälligkeitsdatum) und lässt sich anpassen; hier eingetippte Platzhalter werden <strong>nicht</strong> mehr ersetzt, schreibe Werte also direkt aus.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="ic">💡</div>
+        <div><strong>Schreibweise beachten</strong> Platzhalter müssen genau so geschrieben werden, inklusive Gross- und Kleinschreibung (<code>{contactPerson}</code>, nicht <code>{Kontaktperson}</code>). Unbekannte oder falsch geschriebene Wörter in Klammern werden nicht ersetzt, sondern unverändert mitgesendet – prüfe deshalb den Text in der Vorschau des Versanddialogs.</div>
+      </div>
+      <p><strong>Beispiel</strong> – Text-Vorlage:</p>
+      <pre><code>Guten Tag {contactPerson}
+
+anbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.
+
+Zahlbar bis: {dueDate}
+
+Mit freundlichen Grüssen
+{companyName}</code></pre>
     </section>
 
     <!-- ══════════════════════ ADMIN: DESIGN ══════════════════════ -->
