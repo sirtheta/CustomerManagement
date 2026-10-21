@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.1...customer-management-v1.8.2) (2026-10-21)
+
+
+### Bug Fixes
+
+* **auth:** let logged-out users reach the password reset pages ([#159](https://github.com/sirtheta/CustomerManagement/issues/159)) ([54884eb](https://github.com/sirtheta/CustomerManagement/commit/54884eb998ddd109c48dc3c18a15bd91f92e928d))
+
 ## [1.8.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.0...customer-management-v1.8.1) (2026-10-20)
 
 
