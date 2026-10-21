@@ -26,6 +26,18 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toContain("/login");
   });
 
+  it("lets unauthenticated users reach the password reset pages", async () => {
+    for (const path of ["/forgot-password", "/reset-password"]) {
+      const res = await proxy(requestTo(path));
+      expect(res.headers.get("location"), path).toBeNull();
+    }
+  });
+
+  it("does not open look-alike paths of the reset pages", async () => {
+    const res = await proxy(requestTo("/forgot-passwordx"));
+    expect([307, 308]).toContain(res.status);
+  });
+
   it("serves the PWA manifest and icons without a login", async () => {
     for (const path of ["/manifest.webmanifest", "/icons/icon-192.png", "/icons/apple-touch-icon.png"]) {
       const res = await proxy(requestTo(path));
