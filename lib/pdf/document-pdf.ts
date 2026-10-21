@@ -10,6 +10,7 @@ import { applyFonts } from "@/lib/pdf/fonts";
 import { Prisma } from "@prisma/client";
 import type { Customer, Unit } from "@prisma/client";
 import { splitTotals } from "@/lib/calculations";
+import { UNIT_PDF_LABELS } from "@/lib/units";
 import { billingRecipient, customerRecipient, type BillingFields } from "@/lib/customer-billing";
 
 const log = logger.child({ module: "pdf" });
@@ -19,13 +20,6 @@ const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 
 const TEXT_COLOR = "#000000";
-
-const UNIT_LABELS: Record<Unit, string> = {
-  Hour: "Std.",
-  Day: "Tag",
-  Piece: "Stk.",
-  Package: "Pausch.",
-};
 
 // Document-type-agnostic shape consumed by the renderer. Invoice/quote wrappers
 // map their models onto this and supply the type-specific labels + optional QR.
@@ -364,7 +358,7 @@ export async function generateDocumentPdf(
         pdf.font(FONT).fontSize(BASE);
         pdf.text(fmt(Number(item.quantity), locale), x, y, { width: COL_W.qty, align: "right" });
         x += COL_W.qty;
-        pdf.text(UNIT_LABELS[item.unit], x, y, { width: COL_W.unit, align: "right" });
+        pdf.text(UNIT_PDF_LABELS[item.unit], x, y, { width: COL_W.unit, align: "right" });
         x += COL_W.unit;
         pdf.text(`CHF ${fmt(Number(item.unitPrice), locale)}`, x, y, {
           width: COL_W.price,

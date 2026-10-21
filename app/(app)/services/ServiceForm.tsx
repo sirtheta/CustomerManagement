@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createService, updateService, type ServiceFormState } from "./actions";
-import type { Category, Service, Unit } from "@prisma/client";
+import { UNIT_OPTIONS } from "@/lib/units";
+import type { Category, Service } from "@prisma/client";
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
 
@@ -22,13 +23,6 @@ type Props = {
   service?: SerializedService;
   categories: Category[];
 };
-
-const unitOptions: { value: Unit; label: string }[] = [
-  { value: "Hour", label: "Stunde" },
-  { value: "Day", label: "Tag" },
-  { value: "Piece", label: "Stück" },
-  { value: "Package", label: "Pauschal" },
-];
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
@@ -109,12 +103,12 @@ export default function ServiceForm({ service, categories }: Props) {
                   <SelectTrigger id="unit" className="w-full">
                     <SelectValue placeholder="Einheit wählen">
                       {(value: string | null) =>
-                        value ? (unitOptions.find((o) => o.value === value)?.label ?? value) : "Einheit wählen"
+                        value ? (UNIT_OPTIONS.find((o) => o.value === value)?.label ?? value) : "Einheit wählen"
                       }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {unitOptions.map((opt) => (
+                    {UNIT_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>

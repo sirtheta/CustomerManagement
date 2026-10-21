@@ -15,7 +15,8 @@ import { actionToastFor } from "@/lib/action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { cn } from "@/lib/utils";
 import { MaterialPicker, FREE_TEXT, type MaterialOption } from "./MaterialPicker";
-import { QUICK_AMOUNTS, UNIT_LABELS, formatQuantity, parseQuantity } from "@/lib/work-entries";
+import { QUICK_AMOUNTS, formatQuantity, parseQuantity } from "@/lib/work-entries";
+import { UNIT_LABELS } from "@/lib/units";
 import { createWorkEntry, deleteWorkEntry, type WorkEntryState } from "./actions";
 
 type ServiceOption = { id: number; name: string; unit: Unit };

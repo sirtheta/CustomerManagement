@@ -496,6 +496,15 @@ enum Unit {
   Day
   Piece
   Package
+  Minute
+  Week
+  Month
+  Year
+  Meter
+  SquareMeter
+  Kilometer
+  Kilogram
+  Liter
 }
 
 model BankStatementImport {

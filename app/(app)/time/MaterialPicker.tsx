@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { UNIT_LABELS, filterServices } from "@/lib/work-entries";
+import { filterServices } from "@/lib/work-entries";
+import { UNIT_LABELS } from "@/lib/units";
 
 export type MaterialOption = { id: number; name: string; unit: Unit; category: string | null };
 

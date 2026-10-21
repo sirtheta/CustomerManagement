@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useActionToast } from "@/hooks/use-action-toast";
 import { formatCurrency } from "@/lib/utils";
 import { billingTotal, buildBillingLines, type BillableService } from "@/lib/work-billing";
-import { UNIT_SHORT_LABELS, formatQuantity } from "@/lib/work-entries";
+import { formatQuantity } from "@/lib/work-entries";
+import { UNIT_SHORT_LABELS } from "@/lib/units";
 import { deleteWorkEntry } from "../../actions";
 import { createInvoiceFromEntries } from "../../billing-actions";
 import { EditDialog } from "../../WorkEntryList";

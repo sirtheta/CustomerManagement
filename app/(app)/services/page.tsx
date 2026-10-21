@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import { UNIT_LABELS } from "@/lib/units";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
@@ -19,13 +20,6 @@ import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 
 const PAGE_SIZE = 25;
-
-const unitLabels = {
-  Hour: "Stunde",
-  Day: "Tag",
-  Piece: "Stück",
-  Package: "Pauschal",
-};
 
 type SortField = "name" | "unitPrice";
 type SortOrder = "asc" | "desc";
@@ -129,7 +123,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                     )}
                   </TableCell>
                   <TableCell>{s.category?.name ?? "—"}</TableCell>
-                  <TableCell>{unitLabels[s.unit]}</TableCell>
+                  <TableCell>{UNIT_LABELS[s.unit]}</TableCell>
                   <TableCell>{formatCurrency(s.unitPrice.toNumber())}</TableCell>
                   <TableCell>
                     <Badge variant={s.isActive ? "default" : "secondary"}>
