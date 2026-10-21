@@ -176,7 +176,7 @@ export function CategoryManagement({ categories }: { categories: CategoryRowData
           <thead className="bg-muted/50">
             <tr>
               <th className="text-left px-4 py-3 font-medium" colSpan={4}>
-                {categories.length} Kategorien
+                {categories.length === 1 ? "1 Kategorie" : `${categories.length} Kategorien`}
               </th>
             </tr>
           </thead>

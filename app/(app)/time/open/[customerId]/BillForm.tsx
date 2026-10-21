@@ -161,7 +161,23 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
         {lines.length === 0 ? (
           <p className="text-sm text-muted-foreground">Keine Einträge ausgewählt.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <ul className="space-y-2 lg:hidden">
+            {lines.map((l) => (
+              <li key={l.key} className="rounded-lg border p-3">
+                <div className="font-medium">{l.name}</div>
+                <div className="whitespace-pre-line text-xs text-muted-foreground">{l.description}</div>
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+                  <span className="text-muted-foreground">
+                    {formatQuantity(l.quantity)} {UNIT_SHORT_LABELS[l.unit]} ×{" "}
+                    {l.priceMissing ? <Badge variant="destructive">Preis im Entwurf ergänzen</Badge> : formatCurrency(l.unitPrice)}
+                  </span>
+                  <span className="font-semibold">{formatCurrency(l.totalAmount)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto lg:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -196,6 +212,7 @@ export default function BillForm({ customerId, canBill, roundTo5Rappen, services
               </TableBody>
             </Table>
           </div>
+          </>
         )}
       </section>
 

@@ -164,11 +164,25 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           {customer.archivedAt && <Badge variant="outline">Archiviert</Badge>}
         </div>
         {canEdit && (
-          <ArchiveCustomerButton
-            customerId={customerId}
-            archived={customer.archivedAt !== null}
-            activeSubscriptions={subscriptions.filter((s) => s.active).length}
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            {!customer.archivedAt && (
+              <>
+                <Button size="sm" render={<Link href={`/invoices/new?customerId=${customerId}`} />}>
+                  Neue Rechnung
+                </Button>
+                {modules.quotes && (
+                  <Button size="sm" variant="outline" render={<Link href={`/quotes/new?customerId=${customerId}`} />}>
+                    Neue Offerte
+                  </Button>
+                )}
+              </>
+            )}
+            <ArchiveCustomerButton
+              customerId={customerId}
+              archived={customer.archivedAt !== null}
+              activeSubscriptions={subscriptions.filter((s) => s.active).length}
+            />
+          </div>
         )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

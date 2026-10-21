@@ -53,7 +53,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
               <TableRow>
                 {AGE_BUCKETS.map((b) => <TableHead key={b.key}>{b.label}</TableHead>)}
                 <TableHead>Total offen</TableHead>
-                <TableHead>Guthaben</TableHead>
+                <TableHead title="Vom Kunden zu viel bezahlt">Zu viel bezahlt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -77,7 +77,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
               <TableRow>
                 <TableHead>Kunde</TableHead>
                 <TableHead>Offen</TableHead>
-                <TableHead>Guthaben</TableHead>
+                <TableHead title="Vom Kunden zu viel bezahlt">Zu viel bezahlt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -117,7 +117,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
                   <TableHead>Total</TableHead>
                   <TableHead>Bezahlt</TableHead>
                   <TableHead>Offen</TableHead>
-                  <TableHead>Guthaben</TableHead>
+                  <TableHead title="Vom Kunden zu viel bezahlt">Zu viel bezahlt</TableHead>
                   <TableHead>Alter</TableHead>
                 </TableRow>
               </TableHeader>

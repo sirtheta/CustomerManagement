@@ -116,7 +116,33 @@ async function InvoicesTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {invoices.length > 0 && (
+        // Phones get cards: amount and status stay visible without sideways scrolling
+        <ul className="space-y-3 md:hidden">
+          {invoices.map((inv) => (
+            <li key={inv.id} className="rounded-lg border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <Link href={`/invoices/${inv.id}`} className="font-medium hover:underline">
+                  {documentLabel(inv.documentNumber)}
+                  {inv.creditNoteForId !== null && (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                  )}
+                </Link>
+                <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>
+              </div>
+              <p className="mt-1 text-sm">{customerDisplayName(inv.customer)}</p>
+              <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
+                <span>
+                  {formatDate(inv.date)}
+                  {inv.creditNoteForId === null && ` · fällig ${formatDate(inv.dueDate)}`}
+                </span>
+                <span className="font-semibold text-foreground">{formatCurrency(inv.totalAmount.toNumber())}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className={invoices.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>

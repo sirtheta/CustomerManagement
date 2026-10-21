@@ -234,7 +234,7 @@ export async function uploadLogo(
 ): Promise<ActionState> {
   await requireAdmin();
   const settings = await prisma.applicationSettings.findFirst();
-  if (!settings) return { error: "Keine Einstellungen gefunden" };
+  if (!settings) return { error: "Bitte zuerst oben die Firmendaten speichern, dann gilt diese Einstellung." };
 
   const logoFile = formData.get("logo") as File | null;
   if (!logoFile || logoFile.size === 0) return { error: "Keine Datei ausgewählt" };
@@ -494,7 +494,7 @@ export async function setModule(key: string, enabled: boolean): Promise<ActionSt
   const moduleKey = key as ModuleKey;
 
   const settings = await prisma.applicationSettings.findFirst();
-  if (!settings) return { error: "Keine Einstellungen gefunden" };
+  if (!settings) return { error: "Bitte zuerst oben die Firmendaten speichern, dann gilt diese Einstellung." };
   if (settings[MODULE_FIELDS[moduleKey]] === enabled) return { success: true };
 
   if (!enabled) {
@@ -532,7 +532,7 @@ export async function setSetting(key: string, value: boolean): Promise<ActionSta
   const settingKey = key as ImmediateSettingKey;
 
   const settings = await prisma.applicationSettings.findFirst();
-  if (!settings) return { error: "Bitte zuerst die Einstellungen speichern." };
+  if (!settings) return { error: "Bitte zuerst oben die Firmendaten speichern, dann gilt diese Einstellung." };
   if (settings[settingKey] === value) return { success: true };
 
   await prisma.applicationSettings.update({

@@ -214,6 +214,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           >
             {stateLabels[invoice.state]}
           </Badge>
+          {creditedRappen > 0 && !isCreditNote && (
+            <span className="text-xs text-muted-foreground">inkl. Gutschrift {formatCurrency(creditedRappen / 100)}</span>
+          )}
           <Button variant="outline" size="sm" render={<Link href={backHref} />}>
             Zurück
           </Button>
@@ -349,7 +352,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                     <TableHead>Datum</TableHead>
                     <TableHead>Art</TableHead>
                     <TableHead>Empfänger</TableHead>
-                    <TableHead>Prüfsumme (SHA-256)</TableHead>
+                    <TableHead title="SHA-256-Prüfsumme der archivierten PDF-Datei">Prüfsumme</TableHead>
                     <TableHead>PDF</TableHead>
                   </TableRow>
                 </TableHeader>
