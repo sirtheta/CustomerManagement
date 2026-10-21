@@ -1,5 +1,6 @@
 "use server";
 
+import { parseDecimalInput } from "@/lib/decimal-input";
 import prisma from "@/lib/prisma";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { hasRole, requireAdmin, requireEditor } from "@/lib/permissions";
@@ -51,7 +52,7 @@ function parseExpenseForm(formData: FormData) {
   if (!description) fieldErrors.description = "Bezeichnung ist erforderlich.";
   if (!amountRaw) fieldErrors.amount = "Betrag ist erforderlich.";
 
-  const amount = parseFloat(amountRaw);
+  const amount = parseDecimalInput(amountRaw);
   if (amountRaw && (isNaN(amount) || amount <= 0)) {
     fieldErrors.amount = "Betrag muss eine positive Zahl sein.";
   }

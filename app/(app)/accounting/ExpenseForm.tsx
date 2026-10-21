@@ -120,9 +120,8 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                 <Input
                   id="amount"
                   name="amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   required
                   defaultValue={v?.amount ?? expense?.amount ?? ""}
                   placeholder="0.00"

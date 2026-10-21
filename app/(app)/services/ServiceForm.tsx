@@ -126,9 +126,8 @@ export default function ServiceForm({ service, categories, unitOrder = UNIT_VALU
                 <Input
                   id="unitPrice"
                   name="unitPrice"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   required
                   defaultValue={service?.unitPrice ?? ""}
                   placeholder="0.00"
