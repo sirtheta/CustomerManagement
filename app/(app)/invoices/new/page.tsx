@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import InvoiceForm from "../InvoiceForm";
 import { auth } from "@/lib/auth";
@@ -14,7 +15,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-    const [customers, services, settings, templates, categories] = await Promise.all([
+    const [customers, services, settings, templates, categories, unitOrder] = await Promise.all([
     prisma.customer.findMany({
       where: defaultCustomerId !== undefined ? selectableCustomersWhere(defaultCustomerId) : { archivedAt: null },
       orderBy: { contactPerson: "asc" },
@@ -31,6 +32,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       items: t.items.map(i => ({ ...i, unitPrice: Number(i.unitPrice), quantity: Number(i.quantity), discountPercent: 0 })),
     }))),
       prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    loadUnitOrder(prisma),
   ]);
 
   return (
@@ -41,6 +43,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
       templates={templates}
       defaultCustomerId={defaultCustomerId}
         categories={categories}
+      unitOrder={unitOrder}
     />
   );
 }

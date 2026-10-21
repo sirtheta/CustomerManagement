@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import QuoteForm from "../QuoteForm";
 import { requireModule } from "@/lib/module-guard";
@@ -16,7 +17,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-    const [customers, services, settings, categories] = await Promise.all([
+    const [customers, services, settings, categories, unitOrder] = await Promise.all([
     prisma.customer.findMany({
       where: defaultCustomerId !== undefined ? selectableCustomersWhere(defaultCustomerId) : { archivedAt: null },
       orderBy: { contactPerson: "asc" },
@@ -26,6 +27,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
     ),
     prisma.applicationSettings.findFirst(),
       prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    loadUnitOrder(prisma),
   ]);
 
   return (
@@ -35,6 +37,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
       defaultQuoteValidityDays={settings?.defaultQuoteValidityDays ?? 30}
       defaultCustomerId={defaultCustomerId}
         categories={categories}
+      unitOrder={unitOrder}
     />
   );
 }
