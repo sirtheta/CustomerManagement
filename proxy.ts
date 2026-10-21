@@ -37,6 +37,11 @@ function isPublicAsset(pathname: string): boolean {
   return pathname === "/manifest.webmanifest" || pathname.startsWith("/icons/");
 }
 
+// The password reset pages are used by people who cannot log in, so they must be reachable without a session.
+function isPasswordResetPage(pathname: string): boolean {
+  return ["/forgot-password", "/reset-password"].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -59,11 +64,12 @@ export async function proxy(request: NextRequest) {
   if (!pathname.startsWith("/api/auth") && !pathname.startsWith("/api/external") && !isPublicAsset(pathname)) {
     const isLoggedIn = !!request.cookies.get(SESSION_COOKIE)?.value;
     const isLoginPage = pathname.startsWith("/login");
+    const isPublicAuthPage = isLoginPage || isPasswordResetPage(pathname);
 
     if (isLoggedIn && isLoginPage) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if (!isLoggedIn && !isLoginPage) {
+    if (!isLoggedIn && !isPublicAuthPage) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
