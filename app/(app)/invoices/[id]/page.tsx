@@ -29,6 +29,7 @@ import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
 import { billingEmail } from "@/lib/customer-billing";
 import { loadModules } from "@/lib/module-guard";
+import { mailNotConfiguredError } from "@/lib/smtp";
 import { customerDisplayName } from "@/lib/customer-display";
 import { invoiceMail } from "@/lib/mail-templates";
 import { generateInvoiceNumber } from "@/lib/document-number";
@@ -158,6 +159,19 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     }
   })();
 
+  // Shown above the send button and in its dialog, so nothing goes out by surprise.
+  const missingIban = !isCreditNote && !settings?.companyInfo.companyIBAN;
+  const zeroPriceItems = invoice.items.filter((item) => Number(item.unitPrice) === 0).map((item) => item.name.trim() || "ohne Bezeichnung");
+  const sendWarnings = [
+    ...(missingIban
+      ? ["Keine IBAN hinterlegt: Die Rechnung wird ohne QR-Einzahlungsschein versendet."]
+      : []),
+    ...(zeroPriceItems.length > 0
+      ? [`${zeroPriceItems.length === 1 ? "1 Position hat" : `${zeroPriceItems.length} Positionen haben`} den Preis 0.00 (${zeroPriceItems.join(", ")}).`]
+      : []),
+  ];
+  const sendBlockedReason = settings ? mailNotConfiguredError(settings) : null;
+
   return (
     <SendDialogProvider>
     <div className="space-y-4">
@@ -185,7 +199,10 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant={stateVariants[invoice.state]}>
+          <Badge
+            variant={stateVariants[invoice.state]}
+            title={invoice.state === "Draft" ? "Entwurf: noch nicht versendet, ohne Nummer, frei änderbar" : undefined}
+          >
             {stateLabels[invoice.state]}
           </Badge>
           <Button variant="outline" size="sm" render={<Link href={backHref} />}>
@@ -201,6 +218,19 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           )}
         </div>
       </div>
+
+      {canEdit && invoice.state === "Draft" && missingIban && (
+        <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          Keine IBAN hinterlegt: Die Rechnung wird ohne QR-Einzahlungsschein versendet.{" "}
+          <Link href="/settings" className="font-medium underline">IBAN in den Einstellungen erfassen</Link>
+        </div>
+      )}
+      {canEdit && invoice.state !== "Draft" && invoice.state !== "Canceled" && (
+        <p className="text-sm text-muted-foreground">
+          {isCreditNote ? "Versendete Gutschriften" : "Versendete Rechnungen"} sind gesperrt und lassen sich nicht mehr ändern.
+          {!isCreditNote && !fullyCredited && " Fehler korrigieren: «Gutschrift erstellen»."}
+        </p>
+      )}
 
       <Card>
         <CardHeader>
@@ -437,6 +467,8 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               defaultBody={defaultBody}
               isCreditNote={isCreditNote}
               expectedDocumentNumber={nextDocumentNumber}
+              warnings={invoice.state === "Draft" ? sendWarnings : []}
+              blockedReason={sendBlockedReason}
               variant={!isCreditNote && invoice.state === "Paid" ? "outline" : "default"}
             />
           )}

@@ -30,6 +30,10 @@ type Props = {
   expectedDocumentNumber?: string | null;
   /** "outline" when sending is not the next step (e.g. an invoice that is already paid). */
   variant?: "default" | "outline";
+  /** Things the sender should know before sending (missing IBAN, positions at 0.00). */
+  warnings?: string[];
+  /** Why sending cannot work at all (e.g. no SMTP); the send button stays disabled. */
+  blockedReason?: string | null;
 };
 
 const NUMBER_PLACEHOLDER = "{documentNumber}";
@@ -47,6 +51,8 @@ export default function SendInvoiceButton({
   isCreditNote = false,
   expectedDocumentNumber = null,
   variant = "default",
+  warnings = [],
+  blockedReason = null,
 }: Props) {
   const noun = isCreditNote ? "Gutschrift" : "Rechnung";
   // Shared with the page when it provides one (status confirmation → «Stattdessen senden»).
@@ -216,11 +222,34 @@ export default function SendInvoiceButton({
             </div>
           )}
 
+          {blockedReason && (
+            <p role="alert" className="text-sm text-destructive">
+              {blockedReason} Du kannst die Rechnung als PDF ansehen, ausdrucken und per Post schicken;
+              danach den Status auf «Versendet» setzen.
+            </p>
+          )}
+          {warnings.map((warning) => (
+            <p key={warning} role="alert" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+              {warning}
+              {warning.startsWith("Keine IBAN") && (
+                <>
+                  {" "}
+                  <a href="/settings" className="font-medium underline">IBAN erfassen</a>
+                </>
+              )}
+            </p>
+          ))}
+          {!documentNumber && (
+            <p className="text-xs text-muted-foreground">
+              Nach dem Senden ist die {noun} festgeschrieben und kann nicht mehr geändert werden.
+              {isCreditNote ? "" : " Korrekturen machst du mit einer Gutschrift."}
+            </p>
+          )}
           {state?.error && (
             <p className="text-sm text-destructive">{state.error}</p>
           )}
           <DialogFooter showCloseButton>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || Boolean(blockedReason)}>
               {isPending ? "Wird gesendet…" : "Senden"}
             </Button>
           </DialogFooter>
