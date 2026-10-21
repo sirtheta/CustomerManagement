@@ -9,6 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { parseDate, toDateString } from "@/lib/date";
 import { cn, formatDate } from "@/lib/utils";
 
+const YEARS_BACK = 10;
+const YEARS_AHEAD = 10;
+
 interface DatePickerInputProps {
   id?: string;
   name?: string;
@@ -44,6 +47,13 @@ export function DatePickerInput({
     onChange?.(str);
     setOpen(false);
   }
+
+  // The calendar's year dropdown otherwise ends with the current year, which blocks future dates
+  const thisYear = new Date().getFullYear();
+  const yearRange = {
+    start: Math.min(thisYear - YEARS_BACK, selectedDate?.getFullYear() ?? thisYear),
+    end: Math.max(thisYear + YEARS_AHEAD, selectedDate?.getFullYear() ?? thisYear),
+  };
 
   const displayText = selectedDate
     ? formatDate(selectedDate)
@@ -82,6 +92,8 @@ export function DatePickerInput({
             locale={de}
             captionLayout="dropdown"
             defaultMonth={selectedDate ?? new Date()}
+            startMonth={new Date(yearRange.start, 0)}
+            endMonth={new Date(yearRange.end, 11)}
           />
         </PopoverContent>
       </Popover>
