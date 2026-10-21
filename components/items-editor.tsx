@@ -44,6 +44,8 @@ type Props = {
   initialItems?: ItemData[];
   inputName?: string;
   showDiscount?: boolean;
+  /** Units in dropdown order (most used first); defaults to the fixed order. */
+  unitOrder?: readonly Unit[];
 };
 
 function emptyItem(): ItemData {
@@ -93,6 +95,7 @@ type SortableItemRowProps = {
   onPriceBlur: () => void;
   showDiscount: boolean;
   categories: Category[];
+  unitOrder: readonly Unit[];
 };
 
 function SortableItemRow({
@@ -109,6 +112,7 @@ function SortableItemRow({
   onPriceBlur,
   showDiscount,
   categories,
+  unitOrder,
 }: SortableItemRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -220,7 +224,7 @@ function SortableItemRow({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {UNIT_VALUES.map((u) => (
+              {unitOrder.map((u) => (
                 <SelectItem key={u} value={u}>
                   {UNIT_LABELS[u]}
                 </SelectItem>
@@ -314,6 +318,7 @@ export default function ItemsEditor({
   initialItems = [],
   inputName = "itemsJson",
   showDiscount = false,
+  unitOrder = UNIT_VALUES,
 }: Props) {
   // dnd-kit numbers its screen-reader ids with a global counter, which differs between server and client.
   const dndId = useId();
@@ -434,6 +439,7 @@ export default function ItemsEditor({
                 }}
                 showDiscount={showDiscount}
                 categories={categories}
+                unitOrder={unitOrder}
               />
             ))}
           </SortableContext>

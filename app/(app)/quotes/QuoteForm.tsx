@@ -10,7 +10,7 @@ import ItemsEditor, { type ItemData } from "@/components/items-editor";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { addDays, swissDateString } from "@/lib/date";
 import { createQuote, updateQuote, type QuoteFormState } from "./actions";
-import type { Category, Customer, Quote, Item, Service } from "@prisma/client";
+import type { Category, Customer, Quote, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
@@ -30,6 +30,7 @@ type Props = {
   quote?: SerializedQuote;
   defaultCustomerId?: number;
   from?: string;
+  unitOrder?: readonly Unit[];
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -54,6 +55,7 @@ export default function QuoteForm({
   quote,
   defaultCustomerId,
   from,
+  unitOrder,
 }: Props) {
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
@@ -169,7 +171,7 @@ export default function QuoteForm({
             <CardTitle>Positionen</CardTitle>
           </CardHeader>
           <CardContent>
-            <ItemsEditor services={services} categories={categories} initialItems={initialItems} showDiscount />
+            <ItemsEditor services={services} categories={categories} initialItems={initialItems} showDiscount unitOrder={unitOrder} />
           </CardContent>
         </Card>
 

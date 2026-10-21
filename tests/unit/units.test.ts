@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Unit } from "@prisma/client";
-import { UNIT_LABELS, UNIT_OPTIONS, UNIT_PDF_LABELS, UNIT_SHORT_LABELS, UNIT_VALUES } from "@/lib/units";
+import {
+  UNIT_LABELS,
+  UNIT_OPTIONS,
+  UNIT_PDF_LABELS,
+  UNIT_SHORT_LABELS,
+  UNIT_VALUES,
+  sortUnitsByUsage,
+} from "@/lib/units";
 import { itemDataSchema } from "@/components/items-editor-schema";
 
 describe("units", () => {
@@ -20,6 +27,13 @@ describe("units", () => {
     expect(UNIT_OPTIONS.map((o) => o.value)).toEqual([...UNIT_VALUES]);
     expect(UNIT_OPTIONS.find((o) => o.value === "SquareMeter")?.label).toBe("Quadratmeter");
     expect(UNIT_PDF_LABELS.SquareMeter).toBe("m²");
+  });
+
+  it("sorts units by usage and keeps the fixed order for ties", () => {
+    const sorted = sortUnitsByUsage(new Map<Unit, number>([["Liter", 5], ["Day", 2], ["Kilogram", 2]]));
+    expect(sorted.slice(0, 4)).toEqual(["Liter", "Day", "Kilogram", "Hour"]);
+    expect(sorted).toHaveLength(UNIT_VALUES.length);
+    expect(sortUnitsByUsage(new Map())).toEqual([...UNIT_VALUES]);
   });
 
   it("accepts the new units in an item", () => {

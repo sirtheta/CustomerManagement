@@ -14,14 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createService, updateService, type ServiceFormState } from "./actions";
-import { UNIT_OPTIONS } from "@/lib/units";
-import type { Category, Service } from "@prisma/client";
+import { UNIT_LABELS, UNIT_VALUES } from "@/lib/units";
+import type { Category, Service, Unit } from "@prisma/client";
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
 
 type Props = {
   service?: SerializedService;
   categories: Category[];
+  /** Units in dropdown order (most used first); defaults to the fixed order. */
+  unitOrder?: readonly Unit[];
 };
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -33,7 +35,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
-export default function ServiceForm({ service, categories }: Props) {
+export default function ServiceForm({ service, categories, unitOrder = UNIT_VALUES }: Props) {
   const action = service
     ? updateService.bind(null, service.id)
     : createService;
@@ -103,14 +105,14 @@ export default function ServiceForm({ service, categories }: Props) {
                   <SelectTrigger id="unit" className="w-full">
                     <SelectValue placeholder="Einheit wählen">
                       {(value: string | null) =>
-                        value ? (UNIT_OPTIONS.find((o) => o.value === value)?.label ?? value) : "Einheit wählen"
+                        value ? (UNIT_LABELS[value as Unit] ?? value) : "Einheit wählen"
                       }
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {UNIT_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {unitOrder.map((unit) => (
+                      <SelectItem key={unit} value={unit}>
+                        {UNIT_LABELS[unit]}
                       </SelectItem>
                     ))}
                   </SelectContent>

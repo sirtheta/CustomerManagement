@@ -59,6 +59,7 @@ type Props = {
   defaultCustomerId?: number;
   from?: string;
   creditNoteFor?: { id: number; documentNumber: string | null };
+  unitOrder?: readonly Unit[];
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -85,6 +86,7 @@ export default function InvoiceForm({
   defaultCustomerId,
   from,
   creditNoteFor,
+  unitOrder,
 }: Props) {
   const action = invoice
     ? updateInvoice.bind(null, invoice.id)
@@ -267,7 +269,7 @@ export default function InvoiceForm({
             </div>
           </CardHeader>
           <CardContent>
-            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor} />
+            <ItemsEditor key={templateKey} services={services} categories={categories} initialItems={currentItems} showDiscount={!creditNoteFor} unitOrder={unitOrder} />
           </CardContent>
         </Card>
 
