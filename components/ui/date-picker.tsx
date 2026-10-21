@@ -19,6 +19,8 @@ interface DatePickerInputProps {
   value?: string;
   onChange?: (value: string) => void;
   disabled?: boolean;
+  /** Shows a "Datum entfernen" button for optional dates. */
+  clearable?: boolean;
   "aria-label"?: string;
   className?: string;
 }
@@ -30,6 +32,7 @@ export function DatePickerInput({
   value,
   onChange,
   disabled,
+  clearable,
   "aria-label": ariaLabel,
   className,
 }: DatePickerInputProps) {
@@ -54,6 +57,12 @@ export function DatePickerInput({
     start: Math.min(thisYear - YEARS_BACK, selectedDate?.getFullYear() ?? thisYear),
     end: Math.max(thisYear + YEARS_AHEAD, selectedDate?.getFullYear() ?? thisYear),
   };
+
+  function handleClear() {
+    if (!isControlled) setInternalValue("");
+    onChange?.("");
+    setOpen(false);
+  }
 
   const displayText = selectedDate
     ? formatDate(selectedDate)
@@ -95,6 +104,13 @@ export function DatePickerInput({
             startMonth={new Date(yearRange.start, 0)}
             endMonth={new Date(yearRange.end, 11)}
           />
+          {clearable && currentValue && (
+            <div className="border-t p-2">
+              <Button type="button" variant="ghost" size="sm" className="w-full" onClick={handleClear}>
+                Datum entfernen
+              </Button>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </>

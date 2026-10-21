@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useActionToast } from "@/hooks/use-action-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -104,14 +105,10 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
                 <Label htmlFor="date">
                   Datum <span className="text-destructive">*</span>
                 </Label>
-                <Input
+                <DatePickerInput
                   id="date"
                   name="date"
-                  type="date"
-                  required
                   defaultValue={v?.date ?? expense?.date?.slice(0, 10) ?? ""}
-                  aria-invalid={!!fe.date}
-                  aria-describedby={fe.date ? "date-error" : undefined}
                 />
                 <FieldError id="date-error" message={fe.date} />
               </div>
@@ -195,20 +192,20 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
             {/* Hidden, not unmounted: the unused date still travels with the form and is not lost on save. */}
             <div className={paid ? "space-y-1.5 sm:max-w-[50%]" : "hidden"}>
               <Label htmlFor="paidDate">Bezahlt am</Label>
-              <Input
+              <DatePickerInput
                 id="paidDate"
                 name="paidDate"
-                type="date"
+                clearable
                 defaultValue={v?.paidDate ?? expense?.paidDate?.slice(0, 10) ?? ""}
               />
               <p className="text-xs text-muted-foreground">Leer = Datum der Ausgabe.</p>
             </div>
             <div className={paid ? "hidden" : "space-y-1.5 sm:max-w-[50%]"}>
               <Label htmlFor="dueDate">Fällig am</Label>
-              <Input
+              <DatePickerInput
                 id="dueDate"
                 name="dueDate"
-                type="date"
+                clearable
                 defaultValue={v?.dueDate ?? expense?.dueDate?.slice(0, 10) ?? ""}
               />
             </div>
