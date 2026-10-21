@@ -44,7 +44,7 @@ export function hasSmtpSettings(settings: Pick<ApplicationSettings, "smtpHost" |
 }
 
 export const SMTP_NOT_CONFIGURED_ERROR =
-  "E-Mail-Versand ist noch nicht eingerichtet (Einstellungen → E-Mail Versand). Die Rechnung wurde nicht versendet und hat keine Nummer erhalten.";
+  "E-Mail-Versand ist noch nicht eingerichtet (Einstellungen → E-Mail Versand). Es wurde nichts versendet und keine Nummer vergeben.";
 
 /** Error text when a customer mail cannot go out because SMTP is missing; null when sending can work. */
 export function mailNotConfiguredError(

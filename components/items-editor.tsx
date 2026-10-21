@@ -288,7 +288,7 @@ function SortableItemRow({
           </div>
         </div>
       </div>
-      {(!item.name.trim() || Number(item.unitPrice) === 0) && (
+      {(item.name.trim() ? Number(item.unitPrice) === 0 : Number(item.unitPrice) !== 0 || item.description.trim() !== "") && (
         <p className="text-xs text-amber-700 dark:text-amber-400" role="status">
           {!item.name.trim()
             ? "Bezeichnung fehlt: Ohne Bezeichnung lässt sich die Position nicht speichern."

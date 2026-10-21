@@ -81,7 +81,9 @@ export default function SettingsForm(props: Props) {
   };
   useActionToast(state, "Einstellungen gespeichert");
   // The IBAN error is also shown at the field, the toast alone is gone before it is read
-  const ibanError = state?.error?.startsWith("Ungültige IBAN") ? state.error : null;
+  // and goes away as soon as the field is edited.
+  const [editedIbanAfter, setEditedIbanAfter] = useState<ActionState | undefined>(undefined);
+  const ibanError = state?.error?.startsWith("Ungültige IBAN") && editedIbanAfter !== state ? state.error : null;
 
   // The form is dirty while its FormData differs from what it held when it was
   // mounted (a save or a discard remounts it through `key`).
@@ -223,6 +225,7 @@ export default function SettingsForm(props: Props) {
               defaultValue={props.companyIBAN}
               placeholder="CH93 0076 2011 6238 5295 7"
               className="font-mono"
+              onInput={() => setEditedIbanAfter(state)}
               aria-invalid={ibanError ? true : undefined}
               aria-describedby={ibanError ? "companyIBAN-error" : undefined}
             />

@@ -22,6 +22,7 @@ import {
   sendDocument,
 } from "@/lib/document-actions";
 import { requireModule } from "@/lib/module-guard";
+import { acquireSendLock, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 
 const log = logger.child({ module: "quotes" });
 
@@ -193,6 +194,13 @@ export async function sendQuote(
   return { success: true, _ts: Date.now() };
 }
 
+function findQuoteForConversion(quoteId: number) {
+  return prisma.quote.findUnique({
+    where: { id: quoteId },
+    include: { items: true, customer: { select: { paymentTermDays: true, archivedAt: true } } },
+  });
+}
+
 const ALREADY_CONVERTED_ERROR =
   "Diese Offerte wurde bereits in eine Rechnung umgewandelt.";
 
@@ -203,18 +211,30 @@ export async function convertQuoteToInvoice(
 ): Promise<{ error?: string }> {
   const session = await requireEditor();
   await requireModule("quotes");
-  const quote = await prisma.quote.findUnique({
-    where: { id: quoteId },
-    include: { items: true, customer: { select: { paymentTermDays: true, archivedAt: true } } },
-  });
+  const quote = await findQuoteForConversion(quoteId);
 
   if (!quote) return { error: "Offerte nicht gefunden." };
   // No new invoice for an archived customer; restoring the customer first is the way.
   if (quote.customer.archivedAt) return { error: CUSTOMER_ARCHIVED_ERROR };
 
-  if (!options.again && (await prisma.invoice.findFirst({ where: { sourceQuoteId: quoteId }, select: { id: true } }))) {
-    return { error: ALREADY_CONVERTED_ERROR };
+  // One conversion per quote at a time: a double click or a second tab must not pass the check together
+  const release = acquireSendLock(`quote-convert-${quoteId}`);
+  if (!release) return { error: SEND_IN_PROGRESS_ERROR };
+  try {
+    if (!options.again && (await prisma.invoice.findFirst({ where: { sourceQuoteId: quoteId }, select: { id: true } }))) {
+      return { error: ALREADY_CONVERTED_ERROR };
+    }
+    return await convertLocked(session, quote, quoteId);
+  } finally {
+    release();
   }
+}
+
+async function convertLocked(
+  session: Awaited<ReturnType<typeof requireEditor>>,
+  quote: NonNullable<Awaited<ReturnType<typeof findQuoteForConversion>>>,
+  quoteId: number
+): Promise<{ error?: string }> {
 
   const settings = await prisma.applicationSettings.findFirst();
   const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);

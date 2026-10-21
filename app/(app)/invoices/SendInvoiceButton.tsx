@@ -224,8 +224,9 @@ export default function SendInvoiceButton({
 
           {blockedReason && (
             <p role="alert" className="text-sm text-destructive">
-              {blockedReason} Du kannst die Rechnung als PDF ansehen, ausdrucken und per Post schicken;
-              danach den Status auf «Versendet» setzen.
+              {blockedReason}
+              {!isCreditNote &&
+                " Du kannst die Rechnung als PDF ansehen, ausdrucken und per Post schicken; danach den Status auf «Versendet» setzen."}
             </p>
           )}
           {warnings.map((warning) => (
