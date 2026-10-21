@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -137,12 +138,11 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="paymentDate">Datum</Label>
-            <Input
+            <DatePickerInput
               id="paymentDate"
-              type="date"
               className="w-40"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
             />
           </div>
           <Button disabled={isPending} onClick={() => submit(false)}>

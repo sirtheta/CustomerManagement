@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -38,7 +38,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
       <form className="flex flex-wrap items-end gap-3" method="get">
         <div className="space-y-1.5">
           <Label htmlFor="asOf">Stichtag</Label>
-          <Input id="asOf" name="asOf" type="date" defaultValue={asOfValue} className="w-40" />
+          <DatePickerInput id="asOf" name="asOf" defaultValue={asOfValue} className="w-40" />
         </div>
         <Button type="submit" variant="outline">Anzeigen</Button>
         <Button variant="ghost" render={<Link href={`?asOf=${lastYearEnd}`} />}>31.12. Vorjahr</Button>

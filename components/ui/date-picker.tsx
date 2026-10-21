@@ -9,6 +9,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { parseDate, toDateString } from "@/lib/date";
 import { cn, formatDate } from "@/lib/utils";
 
+const YEARS_BACK = 10;
+const YEARS_AHEAD = 10;
+
 interface DatePickerInputProps {
   id?: string;
   name?: string;
@@ -16,6 +19,8 @@ interface DatePickerInputProps {
   value?: string;
   onChange?: (value: string) => void;
   disabled?: boolean;
+  /** Shows a "Datum entfernen" button for optional dates. */
+  clearable?: boolean;
   "aria-label"?: string;
   className?: string;
 }
@@ -27,6 +32,7 @@ export function DatePickerInput({
   value,
   onChange,
   disabled,
+  clearable,
   "aria-label": ariaLabel,
   className,
 }: DatePickerInputProps) {
@@ -42,6 +48,19 @@ export function DatePickerInput({
     const str = toDateString(date);
     if (!isControlled) setInternalValue(str);
     onChange?.(str);
+    setOpen(false);
+  }
+
+  // The calendar's year dropdown otherwise ends with the current year, which blocks future dates
+  const thisYear = new Date().getFullYear();
+  const yearRange = {
+    start: Math.min(thisYear - YEARS_BACK, selectedDate?.getFullYear() ?? thisYear),
+    end: Math.max(thisYear + YEARS_AHEAD, selectedDate?.getFullYear() ?? thisYear),
+  };
+
+  function handleClear() {
+    if (!isControlled) setInternalValue("");
+    onChange?.("");
     setOpen(false);
   }
 
@@ -82,7 +101,16 @@ export function DatePickerInput({
             locale={de}
             captionLayout="dropdown"
             defaultMonth={selectedDate ?? new Date()}
+            startMonth={new Date(yearRange.start, 0)}
+            endMonth={new Date(yearRange.end, 11)}
           />
+          {clearable && currentValue && (
+            <div className="border-t p-2">
+              <Button type="button" variant="ghost" size="sm" className="w-full" onClick={handleClear}>
+                Datum entfernen
+              </Button>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </>
