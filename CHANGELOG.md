@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.4](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.3...customer-management-v1.8.4) (2026-10-21)
+
+
+### Bug Fixes
+
+* **categories:** allow deleting unused categories ([#165](https://github.com/sirtheta/CustomerManagement/issues/165)) ([6417102](https://github.com/sirtheta/CustomerManagement/commit/64171023c7e8f526ce9fb7a49435126168864bb1))
+* **units:** sort unit dropdowns by usage ([#167](https://github.com/sirtheta/CustomerManagement/issues/167)) ([97c6ff0](https://github.com/sirtheta/CustomerManagement/commit/97c6ff0f4d826877c95f90683a97be22c4709b32))
+* **units:** spell out liter instead of a lone «l» ([#168](https://github.com/sirtheta/CustomerManagement/issues/168)) ([615a443](https://github.com/sirtheta/CustomerManagement/commit/615a443df03b7d20aa4b5fce55cbc504c79b90d0))
+
 ## [1.8.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.2...customer-management-v1.8.3) (2026-10-21)
 
 
