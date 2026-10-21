@@ -157,6 +157,25 @@ describe("archived customers in Server Actions", () => {
     });
   });
 
+  describe("quote conversion", () => {
+    it("convertQuoteToInvoice links the draft to its quote and refuses a second conversion", async () => {
+      const quote = await db.prisma.quote.create({
+        data: { customerId: activeId, date: new Date(), validUntil: new Date(), totalAmount: 0, state: "Sent" },
+      });
+      const url = await redirectUrl(() => convertQuoteToInvoice(quote.id));
+      const first = await db.prisma.invoice.findUniqueOrThrow({ where: { id: Number(url.split("/").pop()) } });
+      expect(first.sourceQuoteId).toBe(quote.id);
+
+      expect(await convertQuoteToInvoice(quote.id)).toEqual({
+        error: "Diese Offerte wurde bereits in eine Rechnung umgewandelt.",
+      });
+      expect(await db.prisma.invoice.count({ where: { sourceQuoteId: quote.id } })).toBe(1);
+
+      await redirectUrl(() => convertQuoteToInvoice(quote.id, { again: true }));
+      expect(await db.prisma.invoice.count({ where: { sourceQuoteId: quote.id } })).toBe(2);
+    });
+  });
+
   describe("subscriptions", () => {
     function subscriptionForm() {
       const fd = new FormData();

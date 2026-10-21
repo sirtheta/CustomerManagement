@@ -55,7 +55,9 @@ model Invoice {
   state          InvoiceState     @default(Draft)
   paidDate       DateTime?
   creditNoteForId Int?
+  sourceQuoteId  Int?
   customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  sourceQuote    Quote?           @relation("QuoteInvoices", fields: [sourceQuoteId], references: [id], onDelete: SetNull)
   creditNoteFor  Invoice?         @relation("CreditNotes", fields: [creditNoteForId], references: [id], onDelete: Restrict)
   creditNotes    Invoice[]        @relation("CreditNotes")
   items           Item[]
@@ -73,6 +75,7 @@ model Invoice {
   @@index([dueDate])
   @@index([paidDate])
   @@index([creditNoteForId])
+  @@index([sourceQuoteId])
 }
 
 model Payment {
@@ -158,6 +161,7 @@ model Quote {
   items          Item[]
   sentLogs       QuoteSentLog[]
   tasks          Task[]
+  invoices       Invoice[]  @relation("QuoteInvoices")
 
   @@unique([documentNumber])
   @@index([customerId])

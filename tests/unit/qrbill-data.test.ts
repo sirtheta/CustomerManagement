@@ -186,6 +186,7 @@ describe("QRBill data preparation", () => {
         discountPercent: 0 as unknown as import("@prisma/client").Prisma.Decimal,
         customUserText: null,
         creditNoteForId: null,
+        sourceQuoteId: null,
         customer: {
           customerId: 1,
           company: validCustomer.company,

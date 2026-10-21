@@ -110,7 +110,7 @@ export default function SendInvoiceButton({
         render={
           <Button variant={variant} size="sm">
             <SendIcon className="size-4 mr-1.5" />
-            {noun} senden
+            {documentNumber ? `${noun} erneut senden` : `${noun} senden`}
           </Button>
         }
       />

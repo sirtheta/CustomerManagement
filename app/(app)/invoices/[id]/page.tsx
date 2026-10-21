@@ -83,6 +83,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         sentDocuments: { orderBy: { createdAt: "desc" } },
         payments: { orderBy: [{ date: "asc" }, { id: "asc" }] },
         creditNoteFor: { select: { id: true, documentNumber: true } },
+        sourceQuote: { select: { id: true, documentNumber: true } },
         pendingReminder: { select: { id: true, invoiceId: true, reminderLevel: true, snoozedUntil: true, createdAt: true } },
         creditNotes: {
           where: { state: { not: "Draft" } },
@@ -186,6 +187,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               Zu Rechnung{" "}
               <Link href={`/invoices/${invoice.creditNoteFor.id}`} className="hover:underline">
                 {documentLabel(invoice.creditNoteFor.documentNumber)}
+              </Link>
+            </p>
+          )}
+          {invoice.sourceQuote && (
+            <p className="text-sm text-gray-500">
+              Aus Offerte{" "}
+              <Link href={`/quotes/${invoice.sourceQuote.id}`} className="hover:underline">
+                {documentLabel(invoice.sourceQuote.documentNumber)}
               </Link>
             </p>
           )}
@@ -469,7 +478,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
               expectedDocumentNumber={nextDocumentNumber}
               warnings={invoice.state === "Draft" ? sendWarnings : []}
               blockedReason={sendBlockedReason}
-              variant={!isCreditNote && invoice.state === "Paid" ? "outline" : "default"}
+              variant={invoice.state === "Draft" ? "default" : "outline"}
             />
           )}
           {reminder.kind === "available" && pending && (
@@ -493,7 +502,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             variant="outline"
             render={<Link href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
           >
-            PDF herunterladen
+            PDF ansehen
           </Button>
         </div>
       </div>

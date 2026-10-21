@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import {
   Select,
   SelectContent,
@@ -26,16 +26,20 @@ type Props = {
 
 export default function QuoteStatusSelect({ quoteId, currentState }: Props) {
   const [isPending, startTransition] = useTransition();
+  // Controlled: the server state (e.g. «Versendet» after sending) must show up here too.
+  // The optimistic value snaps back to currentState once the transition ends.
+  const [shownState, setShownState] = useOptimistic(currentState);
 
   function handleChange(value: string | null) {
     if (!value) return;
     startTransition(async () => {
+      setShownState(value as QuoteState);
       await updateQuoteStatus(quoteId, value as QuoteState);
     });
   }
 
   return (
-    <Select defaultValue={currentState} onValueChange={handleChange} disabled={isPending}>
+    <Select value={shownState} onValueChange={handleChange} disabled={isPending}>
       <SelectTrigger className="w-40">
         <SelectValue>
           {(value: string | null) =>

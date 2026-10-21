@@ -193,7 +193,14 @@ export async function sendQuote(
   return { success: true, _ts: Date.now() };
 }
 
-export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: string }> {
+const ALREADY_CONVERTED_ERROR =
+  "Diese Offerte wurde bereits in eine Rechnung umgewandelt.";
+
+/** `again` is the explicit «Trotzdem eine weitere Rechnung erstellen» of the confirm dialog. */
+export async function convertQuoteToInvoice(
+  quoteId: number,
+  options: { again?: boolean } = {}
+): Promise<{ error?: string }> {
   const session = await requireEditor();
   await requireModule("quotes");
   const quote = await prisma.quote.findUnique({
@@ -204,6 +211,10 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
   if (!quote) return { error: "Offerte nicht gefunden." };
   // No new invoice for an archived customer; restoring the customer first is the way.
   if (quote.customer.archivedAt) return { error: CUSTOMER_ARCHIVED_ERROR };
+
+  if (!options.again && (await prisma.invoice.findFirst({ where: { sourceQuoteId: quoteId }, select: { id: true } }))) {
+    return { error: ALREADY_CONVERTED_ERROR };
+  }
 
   const settings = await prisma.applicationSettings.findFirst();
   const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);
@@ -227,6 +238,7 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
         totalAmount: quote.totalAmount,
         discountPercent: quote.discountPercent,
         state: "Draft",
+        sourceQuoteId: quoteId,
       },
     });
 
