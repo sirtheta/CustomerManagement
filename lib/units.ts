@@ -22,7 +22,7 @@ const UNIT_INFO: Record<Unit, UnitInfo> = {
   SquareMeter: { label: "Quadratmeter", short: "m²", pdf: "m²" },
   Kilometer: { label: "Kilometer", short: "km", pdf: "km" },
   Kilogram: { label: "Kilogramm", short: "kg", pdf: "kg" },
-  Liter: { label: "Liter", short: "l", pdf: "l" },
+  Liter: { label: "Liter", short: "Liter", pdf: "Liter" },
 };
 
 /**

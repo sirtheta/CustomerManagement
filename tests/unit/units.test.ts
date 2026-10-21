@@ -29,6 +29,11 @@ describe("units", () => {
     expect(UNIT_PDF_LABELS.SquareMeter).toBe("m²");
   });
 
+  it("spells out liter, because a lone «l» reads like «1» next to a quantity", () => {
+    expect(UNIT_SHORT_LABELS.Liter).toBe("Liter");
+    expect(UNIT_PDF_LABELS.Liter).toBe("Liter");
+  });
+
   it("sorts units by usage and keeps the fixed order for ties", () => {
     const sorted = sortUnitsByUsage(new Map<Unit, number>([["Liter", 5], ["Day", 2], ["Kilogram", 2]]));
     expect(sorted.slice(0, 4)).toEqual(["Liter", "Day", "Kilogram", "Hour"]);
