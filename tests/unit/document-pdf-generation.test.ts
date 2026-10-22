@@ -493,3 +493,54 @@ describe("generateQuotePdf", () => {
     expect(pageText[0]).toContain("Rabatt (10");
   });
 });
+
+describe("generateDocumentPdf window envelope", () => {
+  const MM = 72 / 25.4;
+
+  // Position (pt from the left / from the top) of the first text item containing `needle` on page 1.
+  async function positionOf(buf: Buffer, needle: string): Promise<{ x: number; top: number }> {
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), standardFontDataUrl }).promise;
+    const page = await doc.getPage(1);
+    const { height } = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const item = content.items.find((it) => "str" in it && it.str.includes(needle));
+    if (!item || !("transform" in item)) throw new Error(`"${needle}" not found`);
+    return { x: item.transform[4], top: height - item.transform[5] };
+  }
+
+  async function render(addressWindow: "none" | "left" | "right") {
+    return generateDocumentPdf(baseDoc(), company, "de-CH", { addressWindow });
+  }
+
+  it("pins the address 20 mm from the left for a left window", async () => {
+    const pos = await positionOf(await render("left"), "Muster AG");
+    expect(pos.x).toBeCloseTo(20 * MM, 0);
+    expect(pos.top).toBeGreaterThan(50 * MM);
+    expect(pos.top).toBeLessThan(60 * MM);
+  });
+
+  it("pins the address 118 mm from the left for a right window", async () => {
+    const pos = await positionOf(await render("right"), "Muster AG");
+    expect(pos.x).toBeCloseTo(118 * MM, 0);
+    expect(pos.top).toBeLessThan(60 * MM);
+  });
+
+  it("puts the sender opposite the window", async () => {
+    const right = await positionOf(await render("right"), "Firma AG");
+    const left = await positionOf(await render("left"), "Firma AG");
+    expect(right.x).toBeLessThan(118 * MM);
+    expect(left.x).toBeGreaterThanOrEqual(118 * MM);
+  });
+
+  it("keeps the legacy flow layout without a window", async () => {
+    const pos = await positionOf(await render("none"), "Muster AG");
+    expect(pos.x).toBeCloseTo(40, 0);
+  });
+
+  it("still renders a single page with title and total", async () => {
+    const { numPages, pageText } = await extractText(await render("right"));
+    expect(numPages).toBe(1);
+    expect(pageText[0]).toContain("Rechnung");
+    expect(pageText[0]).toContain("100.00");
+  });
+});

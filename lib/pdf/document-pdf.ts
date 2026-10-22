@@ -19,6 +19,14 @@ const log = logger.child({ module: "pdf" });
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 
+// Window envelope address field (Swiss letter layout, A4 folded for C5 or C6/5):
+// 50 mm from the top, 20 mm from the left or 118 mm from the left, 85 mm wide.
+const MM = 72 / 25.4;
+const WINDOW_TOP = 50 * MM;
+const WINDOW_LEFT_X = 20 * MM;
+const WINDOW_RIGHT_X = 118 * MM;
+const WINDOW_W = 85 * MM;
+
 const TEXT_COLOR = "#000000";
 
 // Document-type-agnostic shape consumed by the renderer. Invoice/quote wrappers
@@ -195,16 +203,6 @@ export async function generateDocumentPdf(
     const customer = doc.customer;
     let y = MARGIN;
 
-    // ── Logo ────────────────────────────────────────────────────────────
-    if (logoBuffer) {
-      const lx =
-        theme.logoPosition === "right" ? PAGE_W - MARGIN - theme.logoMaxSize : MARGIN;
-      pdf.image(logoBuffer, lx, y, { fit: [theme.logoMaxSize, theme.logoMaxSize] });
-    }
-
-    // ── Company info ─────────────────────────────────────────────────────
-    // Aligns opposite the logo so the two never collide.
-    const companyAlign = theme.logoPosition === "right" ? "left" : "right";
     const companyLines = [
       company.companyName,
       company.companyHolderName,
@@ -216,13 +214,6 @@ export async function generateDocumentPdf(
       theme.showEmail ? company.companyEmail : null,
     ].filter(Boolean) as string[];
 
-    pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
-    companyLines.forEach((line, i) => {
-      pdf.text(line, MARGIN, y + i * LINE_HEIGHT, { width: CONTENT_W, align: companyAlign });
-    });
-    y += Math.max(theme.logoMaxSize + 15, companyLines.length * LINE_HEIGHT + 15);
-
-    // ── Customer address ─────────────────────────────────────────────────
     // Invoices, credit notes and reminders go to the billing address; quotes always to the customer.
     const recipient = doc.kind === "quote" ? customerRecipient(customer) : billingRecipient(customer);
     const addrLines = [
@@ -234,11 +225,59 @@ export async function generateDocumentPdf(
       recipient.uid ? `UID: ${recipient.uid}` : null,
     ].filter(Boolean) as string[];
 
-    pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
-    addrLines.forEach((line, i) => {
-      pdf.text(line, MARGIN, y + i * LINE_HEIGHT);
-    });
-    y += addrLines.length * LINE_HEIGHT + 50;
+    if (theme.addressWindow === "none") {
+      // ── Logo ──────────────────────────────────────────────────────────
+      if (logoBuffer) {
+        const lx =
+          theme.logoPosition === "right" ? PAGE_W - MARGIN - theme.logoMaxSize : MARGIN;
+        pdf.image(logoBuffer, lx, y, { fit: [theme.logoMaxSize, theme.logoMaxSize] });
+      }
+
+      // ── Company info ──────────────────────────────────────────────────
+      // Aligns opposite the logo so the two never collide.
+      const companyAlign = theme.logoPosition === "right" ? "left" : "right";
+      pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
+      companyLines.forEach((line, i) => {
+        pdf.text(line, MARGIN, y + i * LINE_HEIGHT, { width: CONTENT_W, align: companyAlign });
+      });
+      y += Math.max(theme.logoMaxSize + 15, companyLines.length * LINE_HEIGHT + 15);
+
+      // ── Customer address ──────────────────────────────────────────────
+      pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+      addrLines.forEach((line, i) => {
+        pdf.text(line, MARGIN, y + i * LINE_HEIGHT);
+      });
+      y += addrLines.length * LINE_HEIGHT + 50;
+    } else {
+      // ── Window envelope: address pinned, logo and sender opposite ─────
+      // The address sits at a fixed spot (also with another margin), so it shows through
+      // the window of an A4 sheet folded in half or in thirds. Logo and sender stack in
+      // the other column; logoPosition does not apply here.
+      const addrOnRight = theme.addressWindow === "right";
+      const addrX = addrOnRight ? WINDOW_RIGHT_X : WINDOW_LEFT_X;
+      const addrW = addrOnRight ? PAGE_W - MARGIN - WINDOW_RIGHT_X : WINDOW_W;
+      const headX = addrOnRight ? MARGIN : WINDOW_RIGHT_X;
+      const headW = addrOnRight ? WINDOW_RIGHT_X - MARGIN - 20 : PAGE_W - MARGIN - WINDOW_RIGHT_X;
+
+      let headY = MARGIN;
+      if (logoBuffer) {
+        pdf.image(logoBuffer, headX, headY, { fit: [theme.logoMaxSize, theme.logoMaxSize] });
+        headY += theme.logoMaxSize + 10;
+      }
+      pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
+      companyLines.forEach((line, i) => {
+        pdf.text(line, headX, headY + i * LINE_HEIGHT, { width: headW, lineBreak: false });
+      });
+      headY += companyLines.length * LINE_HEIGHT;
+
+      pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+      let addrY = WINDOW_TOP;
+      for (const line of addrLines) {
+        pdf.text(line, addrX, addrY, { width: addrW });
+        addrY += pdf.heightOfString(line, { width: addrW }) + (LINE_HEIGHT - BASE);
+      }
+      y = Math.max(headY + 15, addrY) + 50;
+    }
 
     // ── Title ────────────────────────────────────────────────────────────
     pdf.font(BOLD).fontSize(TITLE).fillColor(ACCENT);

@@ -56,6 +56,19 @@ describe("resolveTheme", () => {
   });
 });
 
+describe("resolveTheme addressWindow", () => {
+  it("defaults to no window and accepts left/right", () => {
+    expect(DEFAULT_THEME.addressWindow).toBe("none");
+    expect(resolveTheme({ addressWindow: "left" }).addressWindow).toBe("left");
+    expect(resolveTheme({ addressWindow: "right" }).addressWindow).toBe("right");
+  });
+
+  it("falls back to none for unknown values", () => {
+    expect(resolveTheme({ addressWindow: "middle" }).addressWindow).toBe("none");
+    expect(resolveTheme({ addressWindow: 1 }).addressWindow).toBe("none");
+  });
+});
+
 describe("themeRevision", () => {
   it("is stable for equivalent themes and changes when the theme changes", () => {
     const a = themeRevision({ accentColor: "#3b82f6" });

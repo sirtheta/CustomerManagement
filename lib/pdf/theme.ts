@@ -16,6 +16,12 @@ export const PDF_FONTS = [
 ] as const;
 export type PdfFont = (typeof PDF_FONTS)[number];
 
+// Position of the recipient address for window envelopes. "none" keeps the
+// legacy flow layout; "left"/"right" pin the address to a fixed spot on the
+// first page, so it shows through the window of an A4 sheet folded for C5/C6/5.
+export const ADDRESS_WINDOWS = ["none", "left", "right"] as const;
+export type AddressWindow = (typeof ADDRESS_WINDOWS)[number];
+
 export type PdfTheme = {
   /** Hex color for title, rules and the total line. Default black = legacy look. */
   accentColor: string;
@@ -26,7 +32,9 @@ export type PdfTheme = {
   margin: number;
   /** Logo bounding box in pt. */
   logoMaxSize: number;
+  /** Ignored while `addressWindow` is set: logo and sender then sit opposite the window. */
   logoPosition: "left" | "right";
+  addressWindow: AddressWindow;
   /** Fill the items-table header row with the accent color (white text). */
   tableHeaderFill: boolean;
   showPhone: boolean;
@@ -44,6 +52,7 @@ export const DEFAULT_THEME: PdfTheme = {
   margin: 40,
   logoMaxSize: 90,
   logoPosition: "left",
+  addressWindow: "none",
   tableHeaderFill: false,
   showPhone: true,
   showEmail: true,
@@ -91,6 +100,9 @@ export function resolveTheme(raw: unknown): PdfTheme {
     margin: clampNum(t.margin, d.margin, BOUNDS.margin.min, BOUNDS.margin.max),
     logoMaxSize: clampNum(t.logoMaxSize, d.logoMaxSize, BOUNDS.logoMaxSize.min, BOUNDS.logoMaxSize.max),
     logoPosition: t.logoPosition === "right" ? "right" : "left",
+    addressWindow: ADDRESS_WINDOWS.includes(t.addressWindow as AddressWindow)
+      ? (t.addressWindow as AddressWindow)
+      : d.addressWindow,
     tableHeaderFill: boolOr(t.tableHeaderFill, d.tableHeaderFill),
     showPhone: boolOr(t.showPhone, d.showPhone),
     showEmail: boolOr(t.showEmail, d.showEmail),
