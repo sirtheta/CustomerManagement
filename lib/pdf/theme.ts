@@ -35,6 +35,8 @@ export type PdfTheme = {
   showFooter: boolean;
   closingSalutation: string;
   footerNote: string;
+  /** Quotes only: free text printed right above the closing salutation. */
+  quoteClosingText: string;
 };
 
 export const DEFAULT_THEME: PdfTheme = {
@@ -50,6 +52,7 @@ export const DEFAULT_THEME: PdfTheme = {
   showFooter: true,
   closingSalutation: "Freundliche Grüsse",
   footerNote: "",
+  quoteClosingText: "",
 };
 
 // Bounds keep a malformed/hostile theme from producing an unrenderable PDF.
@@ -61,6 +64,7 @@ const BOUNDS = {
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const MAX_TEXT = 200;
+const MAX_LONG_TEXT = 500;
 
 function clampNum(v: unknown, fallback: number, min: number, max: number): number {
   const n = typeof v === "number" ? v : Number(v);
@@ -72,9 +76,9 @@ function boolOr(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
 
-function textOr(v: unknown, fallback: string): string {
+function textOr(v: unknown, fallback: string, max = MAX_TEXT): string {
   if (typeof v !== "string") return fallback;
-  return v.slice(0, MAX_TEXT);
+  return v.slice(0, max);
 }
 
 /**
@@ -97,6 +101,7 @@ export function resolveTheme(raw: unknown): PdfTheme {
     showFooter: boolOr(t.showFooter, d.showFooter),
     closingSalutation: textOr(t.closingSalutation, d.closingSalutation),
     footerNote: textOr(t.footerNote, d.footerNote),
+    quoteClosingText: textOr(t.quoteClosingText, d.quoteClosingText, MAX_LONG_TEXT),
   };
 }
 

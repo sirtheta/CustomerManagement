@@ -49,6 +49,7 @@ describe("resolveTheme", () => {
   it("caps overly long text fields", () => {
     const long = "x".repeat(500);
     expect(resolveTheme({ footerNote: long }).footerNote.length).toBe(200);
+    expect(resolveTheme({ quoteClosingText: "x".repeat(900) }).quoteClosingText.length).toBe(500);
   });
 
   it("falls back to left for an invalid logo position", () => {
