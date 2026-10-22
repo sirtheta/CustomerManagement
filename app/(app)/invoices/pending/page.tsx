@@ -22,7 +22,7 @@ export default async function PendingEmailsPage() {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Ausstehende E-Mails</h1>
+          <h1 className="text-2xl font-semibold">Abo-Rechnungen freigeben</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Abo-Rechnungen prüfen und versenden
           </p>

@@ -44,7 +44,7 @@ function SubscriptionBlockers({ activeSubscriptions, pendingEmails }: Omit<Props
         <p>
           {pendingEmails === 1 ? "1 Abo-Rechnung wartet" : `${pendingEmails} Abo-Rechnungen warten`} auf Freigabe:{" "}
           <Link href="/invoices/pending" className="text-primary hover:underline">
-            unter «Ausstehende E-Mails» freigeben oder verwerfen
+            unter «Abo-Rechnungen freigeben» abarbeiten (freigeben oder verwerfen)
           </Link>
           .
         </p>
