@@ -69,3 +69,10 @@ describe("parseDocumentItems", () => {
     expect(() => parseDocumentItems(fd)).toThrow();
   });
 });
+
+describe("parseDocumentItems item names", () => {
+  it("rejects an item without a name and names its position", () => {
+    const fd = makeFormData(JSON.stringify([validItem, { ...validItem, name: "  " }]));
+    expect(() => parseDocumentItems(fd)).toThrow(/Position 2 hat keine Bezeichnung/);
+  });
+});

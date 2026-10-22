@@ -59,7 +59,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const [quote, settings] = await Promise.all([
     prisma.quote.findUnique({
       where: { id: quoteId },
-      include: { customer: true, items: true, sentLogs: { orderBy: { sentAt: "desc" } } },
+      include: {
+        customer: true,
+        items: true,
+        sentLogs: { orderBy: { sentAt: "desc" } },
+        invoices: { select: { id: true, documentNumber: true }, orderBy: { id: "asc" } },
+      },
     }),
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
   ]);
@@ -205,6 +210,21 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
         </Card>
       )}
 
+      {quote.invoices.length > 0 && (
+        <p className="text-sm">
+          Umgewandelt in Rechnung{quote.invoices.length > 1 ? "en" : ""}{" "}
+          {quote.invoices.map((invoice, i) => (
+            <span key={invoice.id}>
+              {i > 0 && ", "}
+              <Link href={`/invoices/${invoice.id}`} className="font-medium underline">
+                {documentLabel(invoice.documentNumber)}
+              </Link>
+            </span>
+          ))}{" "}
+          →
+        </p>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Status ändern</CardTitle>
@@ -226,12 +246,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
             expectedDocumentNumber={nextDocumentNumber}
             variant={quote.state === "Accepted" ? "outline" : "default"}
           />
-          <ConvertToInvoiceButton quoteId={quote.id} primary={quote.state === "Accepted"} />
+          <ConvertToInvoiceButton quoteId={quote.id} primary={quote.state === "Accepted" && quote.invoices.length === 0} alreadyConverted={quote.invoices.length > 0} />
           <Button
             variant="outline"
             render={<Link href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" />}
           >
-            PDF herunterladen
+            PDF ansehen
           </Button>
         </div>
       </div>

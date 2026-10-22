@@ -24,6 +24,7 @@ import type { ArchiveResult } from "@/lib/document-archive";
 import { CreditNoteError, assertCreditWithinOriginal } from "@/lib/credit-notes";
 import { syncInvoiceState } from "@/lib/payments";
 import { logAudit } from "@/lib/audit";
+import { mailNotConfiguredError } from "@/lib/smtp";
 import logger from "@/lib/logger";
 import { createQuoteFollowUp } from "@/lib/tasks";
 
@@ -200,6 +201,8 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
   });
   if (!quote) return { error: "Offerte nicht gefunden." };
   if (!isValidRecipient(input.to)) return { error: INVALID_RECIPIENT_ERROR };
+  const mailError = mailNotConfiguredError(settings);
+  if (mailError) return { error: mailError };
 
   let documentNumber: string;
   try {
@@ -280,6 +283,8 @@ async function sendInvoiceLocked(input: SendDocumentInput, settings: DispatchSet
   }
 
   // Checked before the number is assigned, so a refused send does not use one up.
+  const mailError = mailNotConfiguredError(settings);
+  if (mailError) return { error: mailError };
   if (invoice.items.length === 0) return { error: INVOICE_WITHOUT_ITEMS_ERROR };
   if (!isValidRecipient(input.to)) return { error: INVALID_RECIPIENT_ERROR };
 

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { Unit } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
+import { parseDecimalInput } from "@/lib/decimal-input";
 
 export type ServiceFormState = {
   error?: string;
@@ -30,9 +31,9 @@ export async function createService(
     return { error: "Bitte alle Pflichtfelder ausfüllen.", fieldErrors };
   }
 
-  const unitPrice = parseFloat(unitPriceRaw);
+  const unitPrice = parseDecimalInput(unitPriceRaw);
   if (isNaN(unitPrice) || unitPrice < 0) {
-    return { error: "Ungültiger Preis.", fieldErrors: { unitPrice: "Preis muss eine nicht-negative Zahl sein." } };
+    return { error: "Ungültiger Preis.", fieldErrors: { unitPrice: "Bitte einen Preis wie 85.50 oder 85,50 eingeben." } };
   }
 
   const categoryId =
@@ -73,9 +74,9 @@ export async function updateService(
     return { error: "Bitte alle Pflichtfelder ausfüllen.", fieldErrors };
   }
 
-  const unitPrice = parseFloat(unitPriceRaw);
+  const unitPrice = parseDecimalInput(unitPriceRaw);
   if (isNaN(unitPrice) || unitPrice < 0) {
-    return { error: "Ungültiger Preis.", fieldErrors: { unitPrice: "Preis muss eine nicht-negative Zahl sein." } };
+    return { error: "Ungültiger Preis.", fieldErrors: { unitPrice: "Bitte einen Preis wie 85.50 oder 85,50 eingeben." } };
   }
 
   const categoryId =

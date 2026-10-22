@@ -53,6 +53,8 @@ export type RenderDoc = {
   qr: QrBillData | null;
   /** True for an unnumbered draft: renders a diagonal "ENTWURF" watermark. */
   draft: boolean;
+  /** Draft only: a note near the end of the page, e.g. that the QR slip is added when sending. */
+  draftNote?: string;
   /** Reminder only: replaces the items table by label/amount rows (CHF). */
   amountLines?: { label: string; amount: number }[];
   /** Reminder only: one line printed under the document details, e.g. the days overdue. */
@@ -445,6 +447,15 @@ export async function generateDocumentPdf(
       if (theme.footerNote) {
         pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
         pdf.text(theme.footerNote, MARGIN, y, { width: CONTENT_W });
+      }
+    }
+
+    if (doc.draft && doc.draftNote) {
+      const noteY = pdf.y + 24;
+      if (noteY + LINE_HEIGHT < PAGE_H - MARGIN) {
+        pdf.font(FONT).fontSize(SMALL).fillColor("#888888");
+        pdf.text(doc.draftNote, MARGIN, noteY, { width: CONTENT_W });
+        pdf.fillColor(TEXT_COLOR);
       }
     }
 

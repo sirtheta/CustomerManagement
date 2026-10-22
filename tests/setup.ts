@@ -1,5 +1,8 @@
 import { vi } from "vitest";
 
+// Customer mails are suppressed in tests; sending checks SMTP settings first unless this is set.
+process.env.DISABLE_EMAIL = "true";
+
 // Prevent Next.js "use server" / "use client" from being processed
 // These directives are string literals in Node.js/Vitest – they're harmless no-ops.
 

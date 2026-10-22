@@ -69,7 +69,28 @@ async function CustomersTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {customers.length > 0 && (
+        // Phones get cards instead of a table that scrolls sideways (delete/archive stays in the table and on the customer page)
+        <ul className="space-y-3 md:hidden">
+          {customers.map((c) => (
+            <li key={c.customerId} className="rounded-lg border p-3">
+              <Link href={`/customers/${c.customerId}`} className="block hover:underline">
+                <span className="font-medium">{customerDisplayName(c)}</span>
+                {!c.contactInsteadOfCompany && c.company && (
+                  <span className="block text-xs text-gray-500">{c.contactPerson}</span>
+                )}
+              </Link>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {c.customerNumber != null && `Nr. ${c.customerNumber} · `}
+                {c.zipCode} {c.city}
+              </p>
+              <p className="break-all text-sm">{c.email}</p>
+              {c.phone && <p className="text-sm text-muted-foreground">{c.phone}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className={customers.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>

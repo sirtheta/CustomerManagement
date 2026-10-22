@@ -9,7 +9,7 @@ vi.mock("@/lib/prisma", () => ({
     task: { updateMany: vi.fn() },
     quoteSentLog: { create: vi.fn() },
     applicationSettings: { findFirst: vi.fn() },
-    invoice: { create: vi.fn() },
+    invoice: { create: vi.fn(), findFirst: vi.fn() },
   },
 }));
 vi.mock("@/lib/service-catalog", () => ({ saveItemsToCatalog: vi.fn() }));

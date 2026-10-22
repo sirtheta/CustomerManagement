@@ -8,6 +8,7 @@ import { InvoiceState } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
+import { DocumentItemsError } from "@/lib/document-items-error";
 import { loadTotalOptions } from "@/lib/total-options";
 import { assertCustomerActive } from "@/lib/customer-archive";
 import type { ActionState } from "@/hooks/use-action-toast";
@@ -64,7 +65,7 @@ export async function createInvoice(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ err }, "createInvoice: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   let newInvoiceId: number;
@@ -126,7 +127,7 @@ export async function updateInvoice(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ id, err }, "updateInvoice: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   let input = {

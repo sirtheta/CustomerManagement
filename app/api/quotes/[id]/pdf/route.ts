@@ -31,7 +31,10 @@ export async function GET(
   ]);
 
   if (!quote) return Response.json({ error: "Not Found" }, { status: 404 });
-  if (!settings) return Response.json({ error: "Company settings not configured" }, { status: 500 });
+  if (!settings) return new Response("Bitte zuerst die Firmendaten in den Einstellungen erfassen und speichern.", {
+      status: 409,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
 
   const filename = quote.documentNumber
     ? `offerte-${quote.documentNumber}.pdf`

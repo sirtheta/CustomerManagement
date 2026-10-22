@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { saveSettings, setSetting, testSmtpConnection, testEmailNotification, testTelegramNotification } from "./actions";
 import ImmediateCheckbox from "./ImmediateCheckbox";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
+import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES, countryName } from "@/lib/address";
 
@@ -79,6 +80,10 @@ export default function SettingsForm(props: Props) {
     startTransition(() => action(data));
   };
   useActionToast(state, "Einstellungen gespeichert");
+  // The IBAN error is also shown at the field, the toast alone is gone before it is read
+  // and goes away as soon as the field is edited.
+  const [editedIbanAfter, setEditedIbanAfter] = useState<ActionState | undefined>(undefined);
+  const ibanError = state?.error?.startsWith("Ungültige IBAN") && editedIbanAfter !== state ? state.error : null;
 
   // The form is dirty while its FormData differs from what it held when it was
   // mounted (a save or a discard remounts it through `key`).
@@ -141,6 +146,7 @@ export default function SettingsForm(props: Props) {
       key={`${state?._ts ?? 0}-${discardCount}`}
       ref={formRef}
       action={formAction}
+      onSubmit={submitKeepingInput(formAction)}
       onInput={checkDirty}
       className="space-y-6"
     >
@@ -212,14 +218,22 @@ export default function SettingsForm(props: Props) {
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="companyIBAN">IBAN (für Swiss QR-Bill)</Label>
+            <Label htmlFor="companyIBAN">IBAN (für den QR-Einzahlungsschein)</Label>
             <Input
               id="companyIBAN"
               name="companyIBAN"
               defaultValue={props.companyIBAN}
-              placeholder="CH00 0000 0000 0000 0000 0"
+              placeholder="CH93 0076 2011 6238 5295 7"
               className="font-mono"
+              onInput={() => setEditedIbanAfter(state)}
+              aria-invalid={ibanError ? true : undefined}
+              aria-describedby={ibanError ? "companyIBAN-error" : undefined}
             />
+            {ibanError && (
+              <p id="companyIBAN-error" role="alert" className="text-sm text-destructive">
+                {ibanError} Beispiel: CH93 0076 2011 6238 5295 7
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

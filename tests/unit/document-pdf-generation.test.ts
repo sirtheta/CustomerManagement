@@ -399,6 +399,17 @@ describe("generateInvoicePdf drafts", () => {
     expect(pageText[1]).toContain("Zahlteil");
   });
 
+  it("tells on the draft that the QR slip is added when sending", async () => {
+    const { pageText } = await extractText(await generateInvoicePdf(invoiceFor(null), settings));
+    expect(pageText.join(" ")).toContain("QR-Einzahlungsschein wird beim Senden angefügt");
+  });
+
+  it("tells on the draft that the QR slip is missing without an IBAN", async () => {
+    const noIban = { ...(settings as object), companyInfo: { ...(settings as { companyInfo: object }).companyInfo, companyIBAN: null } } as never;
+    const { pageText } = await extractText(await generateInvoicePdf(invoiceFor(null), noIban));
+    expect(pageText.join(" ")).toContain("keine IBAN hinterlegt");
+  });
+
   it("prints the stored total and a Rundung line when it differs from the items", async () => {
     // items add up to 100.00, the stored (5-Rappen rounded) total is 100.05
     const buf = await generateInvoicePdf(invoiceFor(null, { totalAmount: decimal(100.05) }), settings);

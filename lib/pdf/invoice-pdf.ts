@@ -66,6 +66,12 @@ export async function generateInvoicePdf(
     items: invoice.items,
     qr,
     draft,
+    draftNote:
+      draft && !isCreditNote
+        ? company.companyIBAN
+          ? "Hinweis (nur im Entwurf): Der QR-Einzahlungsschein wird beim Senden angefügt."
+          : "Hinweis (nur im Entwurf): Es fehlt ein QR-Einzahlungsschein, weil keine IBAN hinterlegt ist (Einstellungen)."
+        : undefined,
   };
 
   return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);

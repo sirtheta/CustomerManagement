@@ -14,6 +14,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatCurrency } from "@/lib/utils";
 import { UNIT_LABELS, UNIT_VALUES } from "@/lib/units";
+import { calculateInvoiceTotal, validateDiscountPercent } from "@/lib/calculations";
 import { GripVerticalIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type { Category, Service, Unit } from "@prisma/client";
 import {
@@ -46,6 +47,12 @@ type Props = {
   showDiscount?: boolean;
   /** Units in dropdown order (most used first); defaults to the fixed order. */
   unitOrder?: readonly Unit[];
+  /** Discount on the whole document (%); shown as subtotal / discount / total below the items. */
+  documentDiscountPercent?: number;
+  /** Mirrors Einstellungen -> Rechnungsbetrag auf 5 Rappen runden, so the total matches the stored one. */
+  roundTo5Rappen?: boolean;
+  /** Shown instead of an editable discount, e.g. the discount a credit note takes over. */
+  documentDiscountLabel?: string;
 };
 
 function emptyItem(): ItemData {
@@ -281,6 +288,13 @@ function SortableItemRow({
           </div>
         </div>
       </div>
+      {(item.name.trim() ? Number(item.unitPrice) === 0 : Number(item.unitPrice) !== 0 || item.description.trim() !== "") && (
+        <p className="text-xs text-amber-700 dark:text-amber-400" role="status">
+          {!item.name.trim()
+            ? "Bezeichnung fehlt: Ohne Bezeichnung lässt sich die Position nicht speichern."
+            : "Preis ist 0.00: Die Position erscheint kostenlos auf dem Dokument."}
+        </p>
+      )}
       {item.isCustom && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <label className="flex items-center gap-2 cursor-pointer">
@@ -319,6 +333,9 @@ export default function ItemsEditor({
   inputName = "itemsJson",
   showDiscount = false,
   unitOrder = UNIT_VALUES,
+  documentDiscountPercent = 0,
+  roundTo5Rappen = false,
+  documentDiscountLabel,
 }: Props) {
   // dnd-kit numbers its screen-reader ids with a global counter, which differs between server and client.
   const dndId = useId();
@@ -379,7 +396,21 @@ export default function ItemsEditor({
     setAddMode(null);
   }
 
-  const total = items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+  const subtotal = items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+  const discountPercent = validateDiscountPercent(documentDiscountPercent) ? documentDiscountPercent : 0;
+  let total: number;
+  try {
+    total = calculateInvoiceTotal(
+      items.map((item) => ({ quantity: Number(item.quantity), unitPrice: Number(item.unitPrice), discountPercent: Number(item.discountPercent) || 0 })),
+      discountPercent,
+      { roundTo5Rappen }
+    );
+  } catch {
+    // An item discount outside 0-100 % is rejected on save; keep the page alive until then
+    total = subtotal * (1 - discountPercent / 100);
+  }
+  const discountAmount = subtotal * (discountPercent / 100);
+  const rounding = Math.round((total - (subtotal - discountAmount)) * 100) / 100;
 
   return (
     <div className="space-y-3">
@@ -445,8 +476,19 @@ export default function ItemsEditor({
           </SortableContext>
         </DndContext>
         {items.length > 0 && (
-          <div className="text-right text-sm font-semibold pt-1 border-t">
-            Gesamt: {formatCurrency(total)}
+          <div className="text-right text-sm pt-1 border-t space-y-0.5">
+            {(discountPercent > 0 || rounding !== 0) && (
+              <div className="text-muted-foreground">Zwischensumme: {formatCurrency(subtotal)}</div>
+            )}
+            {discountPercent > 0 && (
+              <div className="text-muted-foreground">
+                {documentDiscountLabel ?? `Rabatt ${discountPercent} %`}: {formatCurrency(-discountAmount)}
+              </div>
+            )}
+            {rounding !== 0 && (
+              <div className="text-muted-foreground">Rundung: {formatCurrency(rounding)}</div>
+            )}
+            <div className="font-semibold">Gesamt: {formatCurrency(total)}</div>
           </div>
         )}
       </div>

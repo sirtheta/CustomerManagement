@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { entityLabel } from "@/lib/audit-labels";
 import { requireAdmin } from "@/lib/permissions";
 import {
   Table,
@@ -153,7 +154,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
               <TableHead>Zeitpunkt</TableHead>
               <TableHead>Benutzer</TableHead>
               <TableHead>Aktion</TableHead>
-              <TableHead>Entität</TableHead>
+              <TableHead>Bereich</TableHead>
               <TableHead>Referenz</TableHead>
             </TableRow>
           </TableHeader>
@@ -179,7 +180,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
                       {actionLabels[log.action] ?? log.action}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{log.entityType}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{entityLabel(log.entityType)}</TableCell>
                   <TableCell className="text-sm font-medium">{log.entityRef ?? "—"}</TableCell>
                 </TableRow>
               ))

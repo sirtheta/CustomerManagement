@@ -9,6 +9,7 @@ import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { type ItemData } from "@/components/items-editor-schema";
 import { parseDocumentItems } from "@/lib/form-parsers";
+import { DocumentItemsError } from "@/lib/document-items-error";
 import { loadTotalOptions } from "@/lib/total-options";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -21,6 +22,7 @@ import {
   sendDocument,
 } from "@/lib/document-actions";
 import { requireModule } from "@/lib/module-guard";
+import { acquireSendLock, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 
 const log = logger.child({ module: "quotes" });
 
@@ -55,7 +57,7 @@ export async function createQuote(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ err }, "createQuote: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   let newQuoteId: number;
@@ -111,7 +113,7 @@ export async function updateQuote(
     ({ items, totalAmount, discountPercent } = parseDocumentItems(formData, totalOptions));
   } catch (err) {
     log.error({ id, err }, "updateQuote: invalid items JSON");
-    return { error: "Ungültige Positionsdaten." };
+    return { error: err instanceof DocumentItemsError ? err.message : "Ungültige Positionsdaten." };
   }
 
   try {
@@ -192,17 +194,47 @@ export async function sendQuote(
   return { success: true, _ts: Date.now() };
 }
 
-export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: string }> {
-  const session = await requireEditor();
-  await requireModule("quotes");
-  const quote = await prisma.quote.findUnique({
+function findQuoteForConversion(quoteId: number) {
+  return prisma.quote.findUnique({
     where: { id: quoteId },
     include: { items: true, customer: { select: { paymentTermDays: true, archivedAt: true } } },
   });
+}
+
+const ALREADY_CONVERTED_ERROR =
+  "Diese Offerte wurde bereits in eine Rechnung umgewandelt.";
+
+/** `again` is the explicit «Trotzdem eine weitere Rechnung erstellen» of the confirm dialog. */
+export async function convertQuoteToInvoice(
+  quoteId: number,
+  options: { again?: boolean } = {}
+): Promise<{ error?: string }> {
+  const session = await requireEditor();
+  await requireModule("quotes");
+  const quote = await findQuoteForConversion(quoteId);
 
   if (!quote) return { error: "Offerte nicht gefunden." };
   // No new invoice for an archived customer; restoring the customer first is the way.
   if (quote.customer.archivedAt) return { error: CUSTOMER_ARCHIVED_ERROR };
+
+  // One conversion per quote at a time: a double click or a second tab must not pass the check together
+  const release = acquireSendLock(`quote-convert-${quoteId}`);
+  if (!release) return { error: SEND_IN_PROGRESS_ERROR };
+  try {
+    if (!options.again && (await prisma.invoice.findFirst({ where: { sourceQuoteId: quoteId }, select: { id: true } }))) {
+      return { error: ALREADY_CONVERTED_ERROR };
+    }
+    return await convertLocked(session, quote, quoteId);
+  } finally {
+    release();
+  }
+}
+
+async function convertLocked(
+  session: Awaited<ReturnType<typeof requireEditor>>,
+  quote: NonNullable<Awaited<ReturnType<typeof findQuoteForConversion>>>,
+  quoteId: number
+): Promise<{ error?: string }> {
 
   const settings = await prisma.applicationSettings.findFirst();
   const paymentTermDays = effectivePaymentTermDays(quote.customer, settings?.defaultPaymentTermDays ?? 30);
@@ -226,6 +258,7 @@ export async function convertQuoteToInvoice(quoteId: number): Promise<{ error?: 
         totalAmount: quote.totalAmount,
         discountPercent: quote.discountPercent,
         state: "Draft",
+        sourceQuoteId: quoteId,
       },
     });
 

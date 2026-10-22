@@ -9,6 +9,8 @@ import {
   createSmtpTransport,
   hasSmtpSettings,
   isEmailDisabled,
+  mailNotConfiguredError,
+  SMTP_NOT_CONFIGURED_ERROR,
   settingsSender,
 } from "@/lib/smtp";
 
@@ -26,7 +28,10 @@ function settings(overrides: Record<string, unknown> = {}) {
 }
 
 describe("smtp", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.DISABLE_EMAIL;
+  });
   afterEach(() => {
     delete process.env.DISABLE_EMAIL;
   });
@@ -73,5 +78,22 @@ describe("smtp", () => {
       '"Büro" <info@test.ch>'
     );
     expect(settingsSender(settings({ companyInfo: { companyName: "" } }))).toBe('"user@test.ch" <user@test.ch>');
+  });
+});
+
+describe("mailNotConfiguredError", () => {
+  afterEach(() => {
+    delete process.env.DISABLE_EMAIL;
+  });
+
+  it("reports missing SMTP settings before any number is assigned", () => {
+    delete process.env.DISABLE_EMAIL;
+    expect(mailNotConfiguredError({ smtpHost: null, smtpUser: null, smtpPassword: null })).toBe(SMTP_NOT_CONFIGURED_ERROR);
+    expect(mailNotConfiguredError({ smtpHost: "h", smtpUser: "u", smtpPassword: "p" })).toBeNull();
+  });
+
+  it("does not complain while mail is switched off on purpose", () => {
+    process.env.DISABLE_EMAIL = "true";
+    expect(mailNotConfiguredError({ smtpHost: null, smtpUser: null, smtpPassword: null })).toBeNull();
   });
 });

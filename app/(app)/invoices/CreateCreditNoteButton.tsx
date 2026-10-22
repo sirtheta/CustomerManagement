@@ -8,7 +8,7 @@ type Props = { invoiceId: number; paid?: number; remaining?: number };
 
 export default function CreateCreditNoteButton({ invoiceId, paid = 0, remaining = 0 }: Props) {
   const baseText =
-    "Es wird ein Gutschrift-Entwurf mit allen Positionen dieser Rechnung angelegt. Du kannst Positionen streichen oder anpassen, bevor du die Gutschrift versendest.";
+    "Eine Gutschrift nimmt eine Rechnung ganz oder teilweise zurück, z.B. bei Fehlern oder Preisnachlass. Es wird ein Gutschrift-Entwurf mit allen Positionen dieser Rechnung angelegt. Du kannst Positionen streichen oder anpassen, bevor du die Gutschrift versendest.";
   // Payments are never touched by a credit note; what exceeds the open remainder becomes an overpayment.
   const paymentHint =
     paid > 0

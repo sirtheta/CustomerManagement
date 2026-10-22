@@ -126,9 +126,8 @@ export default function ServiceForm({ service, categories, unitOrder = UNIT_VALU
                 <Input
                   id="unitPrice"
                   name="unitPrice"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   required
                   defaultValue={service?.unitPrice ?? ""}
                   placeholder="0.00"
@@ -139,7 +138,17 @@ export default function ServiceForm({ service, categories, unitOrder = UNIT_VALU
               </div>
             </div>
 
-            {categories.length > 0 && (
+            {categories.length === 0 ? (
+              <div className="space-y-1.5">
+                <Label>Kategorie</Label>
+                <p className="text-sm text-muted-foreground">
+                  Noch keine Kategorien.{" "}
+                  <Link href="/settings/categories" className="font-medium text-foreground underline">
+                    Kategorien verwalten →
+                  </Link>
+                </p>
+              </div>
+            ) : (
               <div className="space-y-1.5">
                 <Label htmlFor="categoryId">Kategorie</Label>
                 <Select

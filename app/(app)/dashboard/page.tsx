@@ -4,18 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { QuoteState } from "@prisma/client";
+import { QuoteState, UserRole } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
 import { customerDisplayName } from "@/lib/customer-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { loadModules } from "@/lib/module-guard";
-import { isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasSmtpSettings } from "@/lib/smtp";
+import { SetupChecklist } from "./SetupChecklist";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 
 export default async function DashboardPage() {
-  const canEdit = isEditorSession(await auth());
+  const session = await auth();
+  const canEdit = isEditorSession(session);
+  const isAdmin = session ? hasRole(session, [UserRole.Admin]) : false;
   const modules = await loadModules();
 
   const currentYear = new Date().getFullYear();
@@ -30,6 +34,8 @@ export default async function DashboardPage() {
     scheduledSubscriptionCount,
     scheduledSubscriptions,
     openTasks,
+    settings,
+    invoiceCount,
   ] = await Promise.all([
     prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
@@ -86,11 +92,40 @@ export default async function DashboardPage() {
           take: 5,
         })
       : [],
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
+    prisma.invoice.count(),
   ]);
+
+  const setupSteps = [
+    ...(isAdmin
+      ? [
+          {
+            label: "Firmendaten und IBAN erfassen",
+            hint: "Ohne IBAN haben Rechnungen keinen QR-Einzahlungsschein.",
+            href: "/settings",
+            done: Boolean(settings?.companyInfo.companyName && settings.companyInfo.companyIBAN),
+          },
+          {
+            label: "E-Mail-Versand einrichten",
+            hint: "Damit lassen sich Rechnungen direkt aus der App versenden.",
+            href: "/settings",
+            done: Boolean(settings && hasSmtpSettings(settings)),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          { label: "Ersten Kunden anlegen", href: "/customers/new", done: customerCount > 0 },
+          { label: "Erste Rechnung schreiben", href: "/invoices/new", done: invoiceCount > 0 },
+        ]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Dashboard</h1>
+
+      <SetupChecklist steps={setupSteps} />
 
       <AttentionBanners banners={attentionBanners(attention, modules, canEdit)} />
 

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Combobox } from "@base-ui/react/combobox"
 import type { Customer } from "@prisma/client"
 import {
@@ -48,7 +49,20 @@ export function CustomerCombobox({ id, name, customers, defaultValue, required, 
         <ComboboxClear />
         <ComboboxTrigger />
       </ComboboxInputGroup>
-      <ComboboxContent empty="Keine Kunden gefunden.">
+      <ComboboxContent
+        empty={
+          customers.length === 0 ? (
+            <>
+              Noch keine Kunden.{" "}
+              <Link href="/customers/new" className="font-medium text-foreground underline">
+                + Neuen Kunden anlegen
+              </Link>
+            </>
+          ) : (
+            "Keine Kunden gefunden."
+          )
+        }
+      >
         {(c: Customer) => (
           <ComboboxItem key={c.customerId} value={c}>
             <span className="min-w-0 flex-1 truncate">{customerDisplayName(c)}</span>

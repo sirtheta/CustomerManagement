@@ -314,6 +314,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   aria-invalid={!!fe.email}
                   aria-describedby={fe.email ? "email-error" : undefined}
                 />
+                <p className="text-xs text-muted-foreground">Wird für den Rechnungsversand gebraucht.</p>
                 <FieldError id="email-error" message={fe.email} />
               </div>
 
