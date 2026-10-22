@@ -75,7 +75,10 @@ export function buildBillingLines(
     return {
       key,
       name: service?.name ?? grouped[0].name.trim(),
-      description: [service?.description?.trim(), `Einsatztage: ${days.join(", ")}`].filter(Boolean).join("\n"),
+      description: [
+        service?.description?.trim(),
+        `${isTimeUnit(service?.unit ?? grouped[0].unit) ? "Einsatztage" : "Geliefert am"}: ${days.join(", ")}`,
+      ].filter(Boolean).join("\n"),
       unit: service?.unit ?? grouped[0].unit,
       quantity,
       unitPrice,

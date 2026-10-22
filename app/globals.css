@@ -322,3 +322,10 @@ body[data-save-bar] [data-sonner-toaster] {
   --offset-bottom: 7.5rem !important;
   --mobile-offset-bottom: 7.5rem !important;
 }
+/* Time pages on phones: lift toasts above the bottom tab bar (set in TimeTabBar). */
+@media (max-width: 1023px) {
+  body[data-tab-bar] [data-sonner-toaster] {
+    --offset-bottom: 5rem !important;
+    --mobile-offset-bottom: 5rem !important;
+  }
+}
