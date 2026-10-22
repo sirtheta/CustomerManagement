@@ -129,9 +129,7 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
             />
             Aktiv
           </label>
-          <Badge variant={category.isActive ? "default" : "outline"}>
-            {category.isActive ? "Aktiv" : "Inaktiv"}
-          </Badge>
+          {!category.isActive && <Badge variant="outline">Inaktiv</Badge>}
           <Button type="submit" variant="outline" size="sm" disabled={isPending}>
             {isPending ? "Speichern…" : "Speichern"}
           </Button>

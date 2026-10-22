@@ -36,6 +36,7 @@ export default async function DashboardPage() {
     openTasks,
     settings,
     invoiceCount,
+    draftCount,
   ] = await Promise.all([
     prisma.customer.count({ where: { archivedAt: null } }),
     sumOpenAmount(prisma),
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
       : [],
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
     prisma.invoice.count(),
+    prisma.invoice.count({ where: { state: "Draft", creditNoteForId: null } }),
   ]);
 
   const setupSteps = [
@@ -155,6 +157,11 @@ export default async function DashboardPage() {
               <p className="text-sm text-gray-500 mt-1">
                 {formatCurrency(openInvoices.amount)}
               </p>
+              {draftCount > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Entwürfe, noch nicht versendet: {draftCount}
+                </p>
+              )}
             </CardContent>
           </Card>
         </Link>

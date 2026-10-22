@@ -134,6 +134,12 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
               className="w-36"
               value={amount}
               onChange={(e) => { setAmount(e.target.value); setOverpaidBy(null); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isPending) {
+                  e.preventDefault();
+                  submit(false);
+                }
+              }}
             />
           </div>
           <div className="space-y-1.5">
