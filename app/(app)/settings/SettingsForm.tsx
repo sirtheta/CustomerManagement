@@ -235,6 +235,9 @@ export default function SettingsForm(props: Props) {
               </p>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Hinweis: Rechnungen und Offerten werden ohne MWST ausgewiesen. Für MWST-pflichtige Betriebe ist die App derzeit nicht geeignet.
+          </p>
         </CardContent>
       </Card>
 
@@ -248,10 +251,16 @@ export default function SettingsForm(props: Props) {
             <div className="space-y-1">
               <Label htmlFor="invoiceNumberPrefix">Rechnungspräfix</Label>
               <Input id="invoiceNumberPrefix" name="invoiceNumberPrefix" defaultValue={props.invoiceNumberPrefix} />
+              <p className="text-xs text-muted-foreground">
+                Beispiel: {props.invoiceNumberPrefix || "I-"}26100001 (Präfix + JJMM + laufende Nummer). Gilt auch für Gutschriften.
+              </p>
             </div>
             <div className={props.showQuotes ? "space-y-1" : "hidden"}>
               <Label htmlFor="quoteNumberPrefix">Offertenpräfix</Label>
               <Input id="quoteNumberPrefix" name="quoteNumberPrefix" defaultValue={props.quoteNumberPrefix} />
+              <p className="text-xs text-muted-foreground">
+                Beispiel: {props.quoteNumberPrefix || "Q-"}26100001 (Präfix + JJMM + laufende Nummer).
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -279,7 +288,7 @@ export default function SettingsForm(props: Props) {
           <div className={props.showReminders ? "space-y-4" : "hidden"}>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label htmlFor="reminderCooldownDays">Pause zwischen Mahnungen (Tage)</Label>
+              <Label htmlFor="reminderCooldownDays">Frist nach einer Mahnung (Tage)</Label>
               <Input
                 id="reminderCooldownDays"
                 name="reminderCooldownDays"
@@ -288,7 +297,7 @@ export default function SettingsForm(props: Props) {
                 defaultValue={props.reminderCooldownDays}
               />
               <p className="text-xs text-muted-foreground">
-                Zahlungsfrist auf dem Mahnbeleg. So lange bleibt eine versendete oder zurückgestellte Mahnung ausgeblendet, danach erscheint sie wieder unter «Mahnungen».
+                So viele Tage hat der Kunde nach einer Mahnung Zeit (steht als Zahlungsfrist auf dem Mahnbeleg). So lange bleibt eine versendete oder zurückgestellte Mahnung ausgeblendet; erst danach erscheint die Rechnung wieder unter «Mahnungen».
               </p>
             </div>
           </div>

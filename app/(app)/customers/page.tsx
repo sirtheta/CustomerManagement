@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FlashToast } from "@/components/flash-toast";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -149,7 +150,10 @@ async function CustomersTable({
                   <TableCell>{c.zipCode} {c.city}</TableCell>
                   <TableCell>{c.email}</TableCell>
                   <TableCell>{c.phone ?? "—"}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Button variant="outline" size="sm" className="mr-2" render={<Link href={`/customers/${c.customerId}`} />}>
+                      Öffnen
+                    </Button>
                     {/* With invoices or recorded work the button archives (Editor), otherwise it deletes (Admin only). */}
                     {(c._count.invoices > 0 || c._count.workEntries > 0 ? canEdit : canDelete) && (
                       <DeleteCustomerButton
@@ -246,6 +250,9 @@ export default async function CustomersPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{archivedOnly ? "Archivierte Kunden" : "Kunden"}</h1>
         <div className="flex items-center gap-2">

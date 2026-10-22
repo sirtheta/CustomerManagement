@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { ClockIcon, ListChecksIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,13 @@ const TABS = [
 /** Bottom tab bar of the time pages on phones; on larger screens the header navigation is used. */
 export function TimeTabBar() {
   const pathname = usePathname();
+  // globals.css lifts the toasts above the bar, so they do not cover the «Offen» tab.
+  useEffect(() => {
+    document.body.dataset.tabBar = "true";
+    return () => {
+      delete document.body.dataset.tabBar;
+    };
+  }, []);
   return (
     <nav aria-label="Zeiterfassung" className="fixed inset-x-0 bottom-0 z-20 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
       <div className="mx-auto flex max-w-xl">

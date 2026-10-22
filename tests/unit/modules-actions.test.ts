@@ -103,7 +103,7 @@ describe("setModule", () => {
     const result = await setModule("subscriptions", false);
 
     expect(result.error).toContain("2 Abo-Rechnung");
-    expect(result.error).toContain("Ausstehende E-Mails");
+    expect(result.error).toContain("Abo-Rechnungen freigeben");
     expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
   });
 

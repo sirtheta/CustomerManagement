@@ -106,7 +106,7 @@ export default async function RemindersPage({ searchParams }: Props) {
 
       {reminders.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          {term ? "Keine fälligen Mahnungen für diesen Suchbegriff." : "Keine ausstehenden Mahnungen."}
+          {term ? "Keine fälligen Mahnungen für diesen Suchbegriff." : "Keine ausstehenden Mahnungen. Eine Rechnung erscheint hier, sobald sie überfällig ist (die Prüfung läuft täglich)."}
         </p>
       ) : (
         <div className="space-y-4">

@@ -212,7 +212,7 @@ export async function createCustomer(
 
   await logAudit(session, "CREATE", "Customer", customer.customerId, result.data.contactPerson);
 
-  redirect("/customers");
+  redirect("/customers?flash=customer-created");
 }
 
 export async function updateCustomer(

@@ -37,7 +37,7 @@ const NAV_DEFINITION: NavDefinition[] = [
     access: "all",
     children: [
       { href: "/invoices", label: "Alle Rechnungen", access: "all" },
-      { href: "/invoices/pending", label: "Ausstehende E-Mails", access: "editor", module: "subscriptions", badge: "pendingEmails" },
+      { href: "/invoices/pending", label: "Abo-Rechnungen freigeben", access: "editor", module: "subscriptions", badge: "pendingEmails" },
       { href: "/invoices/reminders", label: "Mahnungen", access: "editor", module: "reminders", badge: "dueReminders" },
       { href: "/invoices/import", label: "Bankimport", access: "editor", module: "bankImport" },
       { href: "/subscriptions", label: "Abos", access: "all", module: "subscriptions" },

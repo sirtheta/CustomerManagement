@@ -444,7 +444,7 @@ const MODULE_BLOCKERS: Partial<Record<ModuleKey, () => Promise<string | null>>> 
     if (pendingEmails > 0) {
       const state =
         pendingEmails === 1 ? "Es wartet noch 1 Abo-Rechnung" : `Es warten noch ${pendingEmails} Abo-Rechnungen`;
-      return `${state} auf Freigabe. Bitte unter «Ausstehende E-Mails» freigeben oder verwerfen.`;
+      return `${state} auf Freigabe. Bitte unter «Abo-Rechnungen freigeben» abarbeiten (freigeben oder verwerfen).`;
     }
     return null;
   },

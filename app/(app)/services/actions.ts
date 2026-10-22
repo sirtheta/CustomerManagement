@@ -50,7 +50,7 @@ export async function createService(
     },
   });
 
-  redirect("/services");
+  redirect("/services?flash=service-created");
 }
 
 export async function updateService(
@@ -94,7 +94,7 @@ export async function updateService(
     },
   });
 
-  redirect("/services");
+  redirect("/services?flash=service-updated");
 }
 
 export async function deleteService(id: number): Promise<void> {

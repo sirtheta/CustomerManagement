@@ -31,7 +31,7 @@ export default async function SubscriptionsPage() {
         </div>
         {canEdit && (
           <Button variant="outline" render={<Link href="/invoices/pending" />}>
-            Ausstehende Abo-Rechnungen
+            Abo-Rechnungen freigeben
           </Button>
         )}
       </div>

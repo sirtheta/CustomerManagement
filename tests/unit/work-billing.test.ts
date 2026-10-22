@@ -32,6 +32,11 @@ describe("buildBillingLines", () => {
     expect(line.description).toBe("Einsatztage: 12.10., 20.10.");
   });
 
+  it("words the days of material as delivery days", () => {
+    const [line] = buildBillingLines([entry(1, "2026-10-12", 3, "Rindenmulch", "Piece", 2)], services);
+    expect(line.description).toBe("Geliefert am: 12.10.");
+  });
+
   it("puts the catalog description before the days", () => {
     const [line] = buildBillingLines([entry(1, "2026-10-12", 2, "Baggern", "Hour", 1)], services);
     expect(line.description).toBe("Inkl. Maschine\nEinsatztage: 12.10.");
