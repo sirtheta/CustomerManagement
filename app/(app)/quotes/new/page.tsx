@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import QuoteForm from "../QuoteForm";
+import { resolveTheme } from "@/lib/pdf/theme";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
@@ -39,6 +40,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
         categories={categories}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      defaultClosingText={resolveTheme(settings?.pdfTheme).quoteClosingText}
     />
   );
 }

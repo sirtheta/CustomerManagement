@@ -151,6 +151,7 @@ model Quote {
   customerId     Int
   documentNumber String?
   customUserText String?
+  closingText    String?
   date           DateTime
   version        Int        @default(1)
   totalAmount    Decimal
