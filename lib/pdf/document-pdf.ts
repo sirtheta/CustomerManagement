@@ -267,16 +267,17 @@ export async function generateDocumentPdf(
         headY += theme.logoMaxSize + 10;
       }
       pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
-      companyLines.forEach((line, i) => {
-        pdf.text(line, headX, headY + i * LINE_HEIGHT, { width: headW, lineBreak: false });
-      });
-      headY += companyLines.length * LINE_HEIGHT;
+      // Long lines wrap inside their column; a single line keeps the usual line height.
+      for (const line of companyLines) {
+        pdf.text(line, headX, headY, { width: headW });
+        headY += Math.max(LINE_HEIGHT, pdf.heightOfString(line, { width: headW }));
+      }
 
       pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
       let addrY = WINDOW_TOP;
       for (const line of addrLines) {
         pdf.text(line, addrX, addrY, { width: addrW });
-        addrY += pdf.heightOfString(line, { width: addrW }) + (LINE_HEIGHT - BASE);
+        addrY += Math.max(LINE_HEIGHT, pdf.heightOfString(line, { width: addrW }));
       }
       y = Math.max(headY + 15, addrY) + 50;
     }

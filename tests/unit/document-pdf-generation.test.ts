@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import path from "path";
+import sharp from "sharp";
 import { generateDocumentPdf, type RenderDoc, type RenderItem } from "@/lib/pdf/document-pdf";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateInvoicePdf, generateQuotePdf } from "@/lib/pdf/invoice-pdf";
@@ -549,6 +550,53 @@ describe("generateDocumentPdf window envelope", () => {
   it("keeps the legacy flow layout without a window", async () => {
     const pos = await positionOf(await render("none"), "Muster AG");
     expect(pos.x).toBeCloseTo(40, 0);
+    // legacy: address starts below the 90 pt logo box (40 + 90 + 15), then one text line down
+    expect(pos.top).toBeGreaterThan(150);
+    expect(pos.top).toBeLessThan(160);
+  });
+
+  it("keeps the address in place with a big logo and the widest margin", async () => {
+    const logo = await sharp({
+      create: { width: 400, height: 400, channels: 3, background: "#3366cc" },
+    })
+      .png()
+      .toBuffer();
+    for (const addressWindow of ["left", "right"] as const) {
+      const buf = await generateDocumentPdf(
+        baseDoc(),
+        { ...company, companyLogo: logo },
+        "de-CH",
+        { addressWindow, logoMaxSize: 160, margin: 70 }
+      );
+      const pos = await positionOf(buf, "Muster AG");
+      expect(pos.x).toBeCloseTo((addressWindow === "left" ? 20 : 118) * MM, 0);
+      expect(pos.top).toBeLessThan(60 * MM);
+      expect((await extractText(buf)).numPages).toBe(1);
+    }
+  });
+
+  it("wraps a very long sender name inside its column", async () => {
+    const longName = "Sehr Lange Treuhand und Beratungs Gesellschaft fuer Kleinunternehmen und Gewerbe AG";
+    for (const addressWindow of ["left", "right"] as const) {
+      const buf = await generateDocumentPdf(
+        baseDoc(),
+        { companyName: longName, companyHolderName: "Inhaber" },
+        "de-CH",
+        { addressWindow }
+      );
+      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), standardFontDataUrl }).promise;
+      const page = await doc.getPage(1);
+      const { width } = page.getViewport({ scale: 1 });
+      const items = (await page.getTextContent()).items.filter(
+        (it) => "str" in it && it.str.trim() && longName.includes(it.str.trim())
+      );
+      expect(items.length).toBeGreaterThan(1); // wrapped over several lines
+      for (const it of items) {
+        if (!("transform" in it)) continue;
+        if (addressWindow === "right") expect(it.transform[4] + it.width).toBeLessThanOrEqual(118 * MM);
+        else expect(it.transform[4] + it.width).toBeLessThanOrEqual(width);
+      }
+    }
   });
 
   it("still renders a single page with title and total", async () => {
