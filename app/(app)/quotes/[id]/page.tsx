@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { senderDisplayName } from "@/lib/sender-profile";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
       where: { id: quoteId },
       include: {
         customer: true,
+        senderProfile: { select: { name: true, companyName: true } },
         items: true,
         sentLogs: { orderBy: { sentAt: "desc" } },
         invoices: { select: { id: true, documentNumber: true }, orderBy: { id: "asc" } },
@@ -71,7 +73,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
 
   if (!quote) notFound();
 
-  const companyName = settings?.companyInfo.companyName ?? "";
+  const companyName = senderDisplayName(settings?.companyInfo ?? {}, quote.senderProfile);
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
   const { subject: defaultSubject, body: defaultBody } = quoteMail(quote, companyName);
 
@@ -137,6 +139,11 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
                 {formatCurrency(quote.totalAmount.toNumber())}
               </span>
             </div>
+            {quote.senderProfile && (
+              <div>
+                <span className="text-gray-500">Absender:</span> {quote.senderProfile.name}
+              </div>
+            )}
           </div>
           {quote.customUserText && (
             <div>

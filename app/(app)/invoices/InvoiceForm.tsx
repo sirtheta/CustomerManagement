@@ -21,6 +21,7 @@ import { customerDisplayName } from "@/lib/customer-display";
 import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
+import { SenderProfileSelect, type SenderProfileOption } from "@/components/sender-profile-select";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -61,6 +62,7 @@ type Props = {
   creditNoteFor?: { id: number; documentNumber: string | null };
   unitOrder?: readonly Unit[];
   roundTo5Rappen?: boolean;
+  senderProfiles?: SenderProfileOption[];
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -89,6 +91,7 @@ export default function InvoiceForm({
   creditNoteFor,
   unitOrder,
   roundTo5Rappen,
+  senderProfiles = [],
 }: Props) {
   const action = invoice
     ? updateInvoice.bind(null, invoice.id)
@@ -237,6 +240,11 @@ export default function InvoiceForm({
                 </div>
               )}
             </div>
+
+            {/* A credit note keeps the sender of its original invoice. */}
+            {!creditNoteFor && (
+              <SenderProfileSelect profiles={senderProfiles} value={invoice?.senderProfileId ?? null} />
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="customUserText">Zusatztext</Label>

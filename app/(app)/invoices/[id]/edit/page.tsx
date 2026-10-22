@@ -19,7 +19,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
-    const [invoice, services, settings, categories, unitOrder] = await Promise.all([
+    const [invoice, services, settings, categories, unitOrder, senderProfiles] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { items: true },
@@ -30,6 +30,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
     prisma.applicationSettings.findFirst(),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
+    prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   if (!invoice) notFound();
@@ -59,6 +60,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       creditNoteFor={original ?? undefined}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      senderProfiles={senderProfiles}
     />
   );
 }

@@ -75,6 +75,8 @@ export type DocumentInput = {
   totalAmount: number;
   discountPercent: number;
   items: ItemData[];
+  /** Selected sender profile; `null` = company data. On update, `undefined` leaves it unchanged. */
+  senderProfileId?: number | null;
 };
 
 export type CreateDocumentOptions = {
@@ -99,6 +101,7 @@ export async function createDocumentWithItems(
           dueDate: input.dueDate!,
           totalAmount: input.totalAmount,
           discountPercent: input.discountPercent,
+          senderProfileId: input.senderProfileId ?? null,
           state: "Draft",
         },
       });
@@ -113,6 +116,7 @@ export async function createDocumentWithItems(
           validUntil: input.validUntil!,
           totalAmount: input.totalAmount,
           discountPercent: input.discountPercent,
+          senderProfileId: input.senderProfileId ?? null,
           state: "Draft",
         },
       });
@@ -155,6 +159,7 @@ export async function updateDocumentWithItems(
           dueDate: input.dueDate!,
           totalAmount: input.totalAmount,
           discountPercent: input.discountPercent,
+          ...(input.senderProfileId !== undefined ? { senderProfileId: input.senderProfileId } : {}),
           version: { increment: 1 },
         },
       });
@@ -170,6 +175,7 @@ export async function updateDocumentWithItems(
           validUntil: input.validUntil!,
           totalAmount: input.totalAmount,
           discountPercent: input.discountPercent,
+          ...(input.senderProfileId !== undefined ? { senderProfileId: input.senderProfileId } : {}),
           version: { increment: 1 },
         },
       });
@@ -201,7 +207,7 @@ export async function sendDocument(input: SendDocumentInput): Promise<SendDocume
 
   const quote = await defaultPrisma.quote.findUnique({
     where: { id: input.id },
-    include: { customer: true, items: { orderBy: { id: "asc" } } },
+    include: { customer: true, senderProfile: true, items: { orderBy: { id: "asc" } } },
   });
   if (!quote) return { error: "Offerte nicht gefunden." };
   if (!isValidRecipient(input.to)) return { error: INVALID_RECIPIENT_ERROR };
@@ -274,6 +280,7 @@ async function sendInvoiceLocked(input: SendDocumentInput, settings: DispatchSet
     where: { id: input.id },
     include: {
       customer: true,
+      senderProfile: true,
       items: { orderBy: { id: "asc" } },
       creditNoteFor: { select: { documentNumber: true } },
     },

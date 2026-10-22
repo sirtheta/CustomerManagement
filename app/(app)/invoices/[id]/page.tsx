@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { senderDisplayName } from "@/lib/sender-profile";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
       where: { id: invoiceId },
       include: {
         customer: true,
+        senderProfile: { select: { name: true, companyName: true } },
         items: true,
         sentLogs: { orderBy: { sentAt: "desc" } },
         sentDocuments: { orderBy: { createdAt: "desc" } },
@@ -118,7 +120,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(invoice.documentNumber) }]
     : [{ label: "Rechnungen", href: "/invoices" }, { label: documentLabel(invoice.documentNumber) }];
 
-  const companyName = settings?.companyInfo.companyName ?? "";
+  const companyName = senderDisplayName(settings?.companyInfo ?? {}, invoice.senderProfile);
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
   const { subject: defaultSubject, body: defaultBody } = invoiceMail(invoice, settings, companyName);
 
@@ -266,6 +268,11 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                 {formatCurrency(invoice.totalAmount.toNumber())}
               </span>
             </div>
+            {invoice.senderProfile && (
+              <div>
+                <span className="text-gray-500">Absender:</span> {invoice.senderProfile.name}
+              </div>
+            )}
           </div>
           {invoice.customUserText && (
             <div>

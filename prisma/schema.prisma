@@ -56,6 +56,8 @@ model Invoice {
   paidDate       DateTime?
   creditNoteForId Int?
   sourceQuoteId  Int?
+  senderProfileId Int?
+  senderProfile  SenderProfile?   @relation(fields: [senderProfileId], references: [id], onDelete: Restrict)
   customer       Customer         @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
   sourceQuote    Quote?           @relation("QuoteInvoices", fields: [sourceQuoteId], references: [id], onDelete: SetNull)
   creditNoteFor  Invoice?         @relation("CreditNotes", fields: [creditNoteForId], references: [id], onDelete: Restrict)
@@ -158,6 +160,8 @@ model Quote {
   validUntil     DateTime
   discountPercent Decimal   @default(0)
   state          QuoteState @default(Draft)
+  senderProfileId Int?
+  senderProfile  SenderProfile? @relation(fields: [senderProfileId], references: [id], onDelete: Restrict)
   customer       Customer   @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
   items          Item[]
   sentLogs       QuoteSentLog[]
@@ -365,6 +369,23 @@ model CompanyInformation {
   companyIBAN          String?
   companyLogo          Bytes?
   settings             ApplicationSettings?
+}
+
+/// Additional sender next to the company data (which act as the first profile).
+/// Every empty field falls back to the company data, see lib/sender-profile.ts.
+model SenderProfile {
+  id                Int      @id @default(autoincrement())
+  name              String
+  companyName       String?
+  companyHolderName String?
+  companyEmail      String?
+  companyPhone      String?
+  logo              Bytes?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  invoices          Invoice[]
+  quotes            Quote[]
 }
 
 model ApplicationSettings {

@@ -1,5 +1,6 @@
 import type { SendMailOptions } from "nodemailer";
-import type { ApplicationSettings, CompanyInformation, Customer, Invoice, Quote } from "@prisma/client";
+import type { ApplicationSettings, CompanyInformation, Customer, Invoice, Quote, SenderProfile } from "@prisma/client";
+import { senderDisplayName } from "@/lib/sender-profile";
 import { billingEmail } from "@/lib/customer-billing";
 import { createSettingsTransport, isEmailDisabled, settingsSender } from "@/lib/smtp";
 import {
@@ -12,8 +13,8 @@ import {
 } from "@/lib/mail-templates";
 
 type FullSettings = ApplicationSettings & { companyInfo: CompanyInformation };
-type FullInvoice = Invoice & { customer: Customer };
-type FullQuote = Quote & { customer: Customer };
+type FullInvoice = Invoice & { customer: Customer; senderProfile?: SenderProfile | null };
+type FullQuote = Quote & { customer: Customer; senderProfile?: SenderProfile | null };
 
 /** Sends through the stored SMTP settings; does nothing while `DISABLE_EMAIL=true`. */
 async function sendWithSettings(settings: FullSettings, mail: Omit<SendMailOptions, "from">): Promise<void> {
@@ -39,7 +40,7 @@ export async function sendInvoiceEmail(
     isCreditNote,
     hasCustomText: Boolean(invoice.customUserText),
   });
-  const values = { ...invoicePlaceholders(invoice, settings.companyInfo.companyName || ""), documentNumber };
+  const values = { ...invoicePlaceholders(invoice, senderDisplayName(settings.companyInfo, invoice.senderProfile)), documentNumber };
 
   await sendWithSettings(settings, {
     to: overrides?.to ?? billingEmail(invoice.customer),
@@ -82,7 +83,7 @@ export async function sendQuoteEmail(
   const documentNumber = quote.documentNumber;
   if (!documentNumber) throw new Error("Offerte hat noch keine Nummer.");
 
-  const values = { ...quotePlaceholders(quote, settings.companyInfo.companyName || ""), documentNumber };
+  const values = { ...quotePlaceholders(quote, senderDisplayName(settings.companyInfo, quote.senderProfile)), documentNumber };
 
   await sendWithSettings(settings, {
     to: overrides?.to ?? quote.customer.email,

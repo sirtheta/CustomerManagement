@@ -64,7 +64,7 @@ async function sendLocked(input: {
     where: { id },
     include: {
       invoice: {
-        include: { customer: true, items: { orderBy: { id: "asc" } } },
+        include: { customer: true, senderProfile: true, items: { orderBy: { id: "asc" } } },
       },
     },
   });

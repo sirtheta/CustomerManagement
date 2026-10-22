@@ -63,6 +63,7 @@ export function createTestDatabase() {
     await p.invoice.deleteMany({ where: { creditNoteForId: { not: null } } });
     await p.invoice.deleteMany();
     await p.quote.deleteMany();
+    await p.senderProfile.deleteMany();
     await p.document.deleteMany();
     await p.service.deleteMany();
     await p.task.deleteMany();

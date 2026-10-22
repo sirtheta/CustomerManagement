@@ -18,7 +18,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-    const [customers, services, settings, categories, unitOrder] = await Promise.all([
+    const [customers, services, settings, categories, unitOrder, senderProfiles] = await Promise.all([
     prisma.customer.findMany({
       where: defaultCustomerId !== undefined ? selectableCustomersWhere(defaultCustomerId) : { archivedAt: null },
       orderBy: { contactPerson: "asc" },
@@ -29,6 +29,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
     prisma.applicationSettings.findFirst(),
       prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
+    prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -41,6 +42,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
       defaultClosingText={resolveTheme(settings?.pdfTheme).quoteClosingText}
+      senderProfiles={senderProfiles.filter((p) => p.isActive)}
     />
   );
 }

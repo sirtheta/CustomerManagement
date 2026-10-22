@@ -32,7 +32,7 @@ export async function GET(
     prisma.pendingReminder.findUnique({
       where: { id: reminderId },
       include: {
-        invoice: { include: { customer: true, items: { orderBy: { id: "asc" } } } },
+        invoice: { include: { customer: true, senderProfile: true, items: { orderBy: { id: "asc" } } } },
       },
     }),
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),

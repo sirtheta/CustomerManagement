@@ -12,6 +12,7 @@ import { addDays, swissDateString } from "@/lib/date";
 import { createQuote, updateQuote, type QuoteFormState } from "./actions";
 import type { Category, Customer, Quote, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
+import { SenderProfileSelect, type SenderProfileOption } from "@/components/sender-profile-select";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -33,6 +34,7 @@ type Props = {
   unitOrder?: readonly Unit[];
   roundTo5Rappen?: boolean;
   defaultClosingText?: string;
+  senderProfiles?: SenderProfileOption[];
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -60,6 +62,7 @@ export default function QuoteForm({
   unitOrder,
   roundTo5Rappen,
   defaultClosingText,
+  senderProfiles = [],
 }: Props) {
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
@@ -157,6 +160,8 @@ export default function QuoteForm({
                 />
               </div>
             </div>
+
+            <SenderProfileSelect profiles={senderProfiles} value={quote?.senderProfileId ?? null} />
 
             <div className="space-y-1.5">
               <Label htmlFor="customUserText">Zusatztext</Label>

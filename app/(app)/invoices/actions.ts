@@ -11,6 +11,7 @@ import { parseDocumentItems } from "@/lib/form-parsers";
 import { DocumentItemsError } from "@/lib/document-items-error";
 import { loadTotalOptions } from "@/lib/total-options";
 import { assertCustomerActive } from "@/lib/customer-archive";
+import { resolveSenderProfileId } from "@/lib/sender-profile";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
@@ -57,6 +58,9 @@ export async function createInvoice(
   const customerError = await assertCustomerActive(prisma, customerId);
   if (customerError) return { error: customerError };
 
+  const sender = await resolveSenderProfileId(prisma, formData.get("senderProfileId"));
+  if (sender.error !== undefined) return { error: sender.error };
+
   let items: ItemData[];
   let totalAmount: number;
   let discountPercent: number;
@@ -79,6 +83,7 @@ export async function createInvoice(
       totalAmount,
       discountPercent,
       items,
+      senderProfileId: sender.id,
     }));
   } catch (err) {
     log.error({ err }, "createInvoice failed");
@@ -98,7 +103,7 @@ export async function updateInvoice(
   const session = await requireEditor();
   const existing = await prisma.invoice.findUnique({
     where: { id },
-    select: { creditNoteForId: true, customerId: true },
+    select: { creditNoteForId: true, customerId: true, senderProfileId: true },
   });
   if (!existing) return { error: "Rechnung nicht gefunden." };
   const isCreditNote = existing.creditNoteForId != null;
@@ -118,6 +123,14 @@ export async function updateInvoice(
   // stay editable); moving the draft to an archived one is not.
   const customerError = await assertCustomerActive(prisma, customerId, existing.customerId);
   if (customerError) return { error: customerError };
+
+  // A credit note keeps the sender of its original; the form does not offer the choice.
+  let senderProfileId = existing.senderProfileId;
+  if (!isCreditNote) {
+    const sender = await resolveSenderProfileId(prisma, formData.get("senderProfileId"), existing.senderProfileId);
+    if (sender.error !== undefined) return { error: sender.error };
+    senderProfileId = sender.id;
+  }
 
   let items: ItemData[];
   let totalAmount: number;
@@ -139,6 +152,7 @@ export async function updateInvoice(
     totalAmount,
     discountPercent,
     items,
+    senderProfileId,
   };
   if (isCreditNote) {
     if (items.length === 0 || items.some((item) => item.quantity <= 0)) {

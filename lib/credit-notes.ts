@@ -64,6 +64,7 @@ export async function createCreditNoteDraft(
         dueDate: now,
         totalAmount: original.totalAmount.negated(),
         discountPercent: original.discountPercent,
+        senderProfileId: original.senderProfileId,
         state: "Draft",
         creditNoteForId: original.id,
       },

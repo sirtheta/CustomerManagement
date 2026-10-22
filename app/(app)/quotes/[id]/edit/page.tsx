@@ -20,7 +20,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);
 
-    const [quote, services, settings, categories, unitOrder] = await Promise.all([
+    const [quote, services, settings, categories, unitOrder, senderProfiles] = await Promise.all([
     prisma.quote.findUnique({
       where: { id: quoteId },
       include: { items: true },
@@ -31,6 +31,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
     prisma.applicationSettings.findFirst(),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
+    prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   if (!quote) notFound();
@@ -63,6 +64,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
         categories={categories}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      senderProfiles={senderProfiles}
     />
   );
 }

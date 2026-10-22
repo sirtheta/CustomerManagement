@@ -2,6 +2,7 @@
 
 import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import { assertCustomerActive, CUSTOMER_ARCHIVED_ERROR } from "@/lib/customer-archive";
+import { resolveSenderProfileId } from "@/lib/sender-profile";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
@@ -50,6 +51,9 @@ export async function createQuote(
   const customerError = await assertCustomerActive(prisma, customerId);
   if (customerError) return { error: customerError };
 
+  const sender = await resolveSenderProfileId(prisma, formData.get("senderProfileId"));
+  if (sender.error !== undefined) return { error: sender.error };
+
   let items: ItemData[];
   let totalAmount: number;
   let discountPercent: number;
@@ -73,6 +77,7 @@ export async function createQuote(
       totalAmount,
       discountPercent,
       items,
+      senderProfileId: sender.id,
     }));
   } catch (err) {
     log.error({ err }, "createQuote failed");
@@ -103,10 +108,12 @@ export async function updateQuote(
   const customerId = parseInt(customerIdRaw, 10);
   // Keeping the current customer is fine (drafts of customers archived later
   // stay editable); moving the quote to an archived one is not.
-  const existing = await prisma.quote.findUnique({ where: { id }, select: { customerId: true } });
+  const existing = await prisma.quote.findUnique({ where: { id }, select: { customerId: true, senderProfileId: true } });
   if (!existing) return { error: "Offerte nicht gefunden." };
   const customerError = await assertCustomerActive(prisma, customerId, existing.customerId);
   if (customerError) return { error: customerError };
+  const sender = await resolveSenderProfileId(prisma, formData.get("senderProfileId"), existing.senderProfileId);
+  if (sender.error !== undefined) return { error: sender.error };
 
   let items: ItemData[];
   let totalAmount: number;
@@ -130,6 +137,7 @@ export async function updateQuote(
       totalAmount,
       discountPercent,
       items,
+      senderProfileId: sender.id,
     });
   } catch (err) {
     log.error({ id, err }, "updateQuote failed");
@@ -261,6 +269,7 @@ async function convertLocked(
         dueDate,
         totalAmount: quote.totalAmount,
         discountPercent: quote.discountPercent,
+        senderProfileId: quote.senderProfileId,
         state: "Draft",
         sourceQuoteId: quoteId,
       },
