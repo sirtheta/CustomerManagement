@@ -54,7 +54,7 @@ function SnoozeButton({ cooldownDays, pending, onClick }: { cooldownDays: number
       onClick={onClick}
     >
       <ClockIcon className="size-4 mr-1.5" />
-      {pending ? "Wird zurückgestellt…" : `Zurückstellen (${cooldownDays} ${cooldownDays === 1 ? "Tag" : "Tage"})`}
+      {pending ? "Wird zurückgestellt…" : `${cooldownDays} ${cooldownDays === 1 ? "Tag" : "Tage"} später erinnern`}
     </Button>
   );
 }
@@ -157,7 +157,7 @@ export default function ReminderRow(props: Props) {
                 size="sm"
                 render={<a href={`/api/reminders/${props.reminderId}/pdf`} target="_blank" rel="noopener noreferrer" />}
               >
-                Mahnbeleg-Vorschau
+                Mahnung als PDF ansehen
               </Button>
             )}
             <Button
@@ -218,7 +218,7 @@ export default function ReminderRow(props: Props) {
             <SnoozeButton cooldownDays={cooldownDays} pending={dismissing} onClick={snooze} />
             <Button type="submit" size="sm" disabled={isPending}>
               <SendIcon className="size-4 mr-1.5" />
-              {isPending ? "Wird gesendet…" : "Mahnung senden"}
+              {isPending ? "Wird gesendet…" : `${levelLabel} senden`}
             </Button>
           </div>
         </form>
