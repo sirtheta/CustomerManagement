@@ -224,7 +224,18 @@ export default async function QuotesPage({ searchParams }: Props) {
             {quotes.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                  {term ? "Keine Offerten für diesen Suchbegriff." : "Keine Offerten vorhanden."}
+                  {term ? (
+                    "Keine Offerten für diesen Suchbegriff."
+                  ) : (
+                    <div className="space-y-3">
+                      <p>Noch keine Offerten erfasst.</p>
+                      {canEdit && (
+                        <Button size="sm" render={<Link href="/quotes/new" />}>
+                          Erste Offerte erstellen
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (

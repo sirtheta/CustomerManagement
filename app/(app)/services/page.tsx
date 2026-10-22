@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FlashToast } from "@/components/flash-toast";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,9 @@ export default async function ServicesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Leistungen</h1>
         {canEdit && <Button render={<Link href="/services/new" />}>Neue Leistung</Button>}
@@ -110,7 +114,18 @@ export default async function ServicesPage({ searchParams }: Props) {
             {services.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                  {term ? "Keine Leistungen für diesen Suchbegriff." : "Keine Leistungen vorhanden."}
+                  {term ? (
+                    "Keine Leistungen für diesen Suchbegriff."
+                  ) : (
+                    <div className="space-y-3">
+                      <p>Noch keine Leistungen erfasst.</p>
+                      {canEdit && (
+                        <Button size="sm" render={<Link href="/services/new" />}>
+                          Erste Leistung anlegen
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
