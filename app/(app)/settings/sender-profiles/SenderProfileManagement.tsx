@@ -144,7 +144,10 @@ function ProfileCard({ profile }: { profile: SenderProfileRow }) {
 
         <div className="text-xs text-muted-foreground">
           {profile.usageCount > 0 ? (
-            <span>Wird in {profile.usageCount} Dokument(en) verwendet und kann nicht gelöscht werden.</span>
+            <span>
+              Wird in {profile.usageCount} Dokument(en) verwendet und kann nicht gelöscht werden. Änderungen gelten
+              auch für Entwürfe und Offerten damit.
+            </span>
           ) : (
             <ConfirmDialog
               title="Profil löschen"

@@ -38,7 +38,7 @@ vi.mock("@/lib/logger", () => ({
 
 import { createInvoice, updateInvoice, createCreditNote } from "@/app/(app)/invoices/actions";
 import { createQuote, convertQuoteToInvoice } from "@/app/(app)/quotes/actions";
-import { deleteSenderProfile } from "@/app/(app)/settings/sender-profiles/actions";
+import { createSenderProfile, updateSenderProfile, deleteSenderProfile } from "@/app/(app)/settings/sender-profiles/actions";
 
 const session = { user: { id: "1", name: "Test", email: "test@example.com", role: "Admin" }, expires: "2099-01-01" } as Session;
 
@@ -140,6 +140,18 @@ describe("sender profiles against a real database", () => {
 
     const target = await redirectTarget(() => convertQuoteToInvoice(quoteId));
     expect(await invoiceProfile(idFrom(target))).toBe(erika);
+  });
+
+  it.each(["Editor", "Viewer"] as const)("refuses profile management for a %s", async (role) => {
+    holder.session = { ...session, user: { ...session.user, role } } as Session;
+    const fd = new FormData();
+    fd.set("name", "Neu");
+
+    await expect(createSenderProfile({}, fd)).rejects.toBeInstanceOf(RedirectSignal);
+    await expect(updateSenderProfile(erika, {}, fd)).rejects.toBeInstanceOf(RedirectSignal);
+    await expect(deleteSenderProfile(erika)).rejects.toBeInstanceOf(RedirectSignal);
+    expect(await db.prisma.senderProfile.count()).toBe(1);
+    expect((await db.prisma.senderProfile.findUniqueOrThrow({ where: { id: erika } })).name).toBe("Erika");
   });
 
   it("deletes an unused profile but keeps one that documents still use", async () => {

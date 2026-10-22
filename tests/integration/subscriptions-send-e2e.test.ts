@@ -85,6 +85,9 @@ describe("autoSend end to end", () => {
     expect(overrides?.body).toContain(formatCurrency(50));
     expect(overrides?.body).not.toContain("{totalAmount}");
     expect(overrides?.body).toContain(invoice.documentNumber!);
-    expect(overrides?.subject).not.toContain("{");
+    expect(overrides?.subject).not.toContain("{documentNumber}");
+    // {companyName} stays open in the queued text and is filled by sendInvoiceEmail with the
+    // sender profile's name (covered in email-send.test.ts), so a profile chosen on the draft applies.
+    expect(overrides?.subject).toContain("{companyName}");
   });
 });

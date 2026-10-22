@@ -28,6 +28,8 @@ export default async function SenderProfilesPage() {
         <p className="text-muted-foreground mt-1">
           Die Firmendaten und das Firmenlogo aus den Einstellungen sind das erste Profil. Ein weiteres Profil
           überschreibt nur, was dort ausgefüllt ist; alles andere (auch Adresse und IBAN) kommt aus den Firmendaten.
+          Änderungen wirken auch auf Entwürfe und Offerten, die das Profil schon verwenden. Versendete Rechnungen
+          bleiben unverändert (PDF-Archiv).
         </p>
       </div>
       <SenderProfileManagement profiles={rows} />
