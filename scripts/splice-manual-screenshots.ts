@@ -23,6 +23,8 @@ const ALT_MATCH: Record<string, string> = {
   invoices: "Rechnungsliste mit Status-Filtern",
   "invoice-new": "Neue Rechnung mit Positionen und Kunde",
   quotes: "Offertenliste mit Status Entwurf, Versendet, Angenommen",
+  "quote-new": "Neue Offerte mit Zusatztext und Schlusstext",
+  "quote-pdf": "Offerten-PDF mit Schlusstext über der Grussformel",
   services: "Leistungskatalog mit Einheit, Preis und Kategorie",
   analytics: "Auswertung mit Umsatzverlauf, Kategorien und Top-Kunden",
   accounting: "Buchhaltung mit Ausgaben und monatlicher Erfolgsrechnung",

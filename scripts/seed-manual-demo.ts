@@ -255,7 +255,12 @@ async function main() {
     },
   });
   await prisma.applicationSettings.create({
-    data: { companyInformationId: company.companyInformationId },
+    data: {
+      companyInformationId: company.companyInformationId,
+      pdfTheme: {
+        quoteClosingText: "Es würde uns freuen, diesen Auftrag für Sie durchführen zu können.",
+      },
+    },
   });
 
   console.log(
