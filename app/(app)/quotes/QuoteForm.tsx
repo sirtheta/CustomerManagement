@@ -32,6 +32,7 @@ type Props = {
   from?: string;
   unitOrder?: readonly Unit[];
   roundTo5Rappen?: boolean;
+  defaultClosingText?: string;
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -58,6 +59,7 @@ export default function QuoteForm({
   from,
   unitOrder,
   roundTo5Rappen,
+  defaultClosingText,
 }: Props) {
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
@@ -166,6 +168,22 @@ export default function QuoteForm({
                 placeholder="Optionaler Text für die Offerte…"
                 className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="closingText">Schlusstext</Label>
+              <textarea
+                id="closingText"
+                name="closingText"
+                defaultValue={quote ? (quote.closingText ?? "") : (defaultClosingText ?? "")}
+                rows={2}
+                maxLength={500}
+                placeholder="Optionaler Text am Ende der Offerte, vor der Grussformel…"
+                className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Vorschlag aus Einstellungen → Design, hier pro Offerte änderbar oder leer lassbar.
+              </p>
             </div>
           </CardContent>
         </Card>

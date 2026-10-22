@@ -42,6 +42,8 @@ export type RenderDoc = {
   dueLabel: string; // "Fälligkeit:" | "Gültig bis:"
   closingNoteLabel: string; // "Zahlbar bis:" | "Gültig bis:"
   customUserText: string | null;
+  /** Quotes only: free text printed right above the closing salutation. */
+  closingText?: string | null;
   discountPercent?: Numeric;
   totalAmount: number;
   customer: Pick<
@@ -459,10 +461,14 @@ export async function generateDocumentPdf(
     }
 
     // ── Payment note + optional closing block ────────────────────────────
+    const closingText = doc.kind === "quote" ? clean(doc.closingText) : "";
     const footerLines = theme.showFooter
       ? [theme.closingSalutation, company.companyHolderName, theme.footerNote].filter(Boolean).length
       : 0;
-    const CLOSING_H = LINE_HEIGHT + 20 + footerLines * (LINE_HEIGHT + 2) + 10;
+    const closingTextH = closingText
+      ? pdf.font(FONT).fontSize(BASE).heightOfString(closingText, { width: CONTENT_W }) + 16
+      : 0;
+    const CLOSING_H = LINE_HEIGHT + 20 + closingTextH + footerLines * (LINE_HEIGHT + 2) + 10;
     if (y + CLOSING_H > PAGE_H - MARGIN) {
       pdf.addPage();
       y = MARGIN;
@@ -472,6 +478,12 @@ export async function generateDocumentPdf(
     if (doc.dueDate !== null) {
       pdf.text(`${doc.closingNoteLabel} ${fmtDate(doc.dueDate, locale)}`, MARGIN, y);
       y += LINE_HEIGHT + 20;
+    }
+
+    if (closingText) {
+      pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
+      pdf.text(closingText, MARGIN, y, { width: CONTENT_W });
+      y += closingTextH;
     }
 
     if (theme.showFooter) {

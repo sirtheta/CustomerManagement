@@ -291,6 +291,18 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
               <CheckboxField label="E-Mail-Adresse anzeigen" checked={theme.showEmail} onChange={(v) => set("showEmail", v)} />
               <CheckboxField label="Grussformel-Block anzeigen" checked={theme.showFooter} onChange={(v) => set("showFooter", v)} />
             </div>
+            <Field label="Standard-Schlusstext Offerte (optional)">
+              <Textarea
+                value={theme.quoteClosingText}
+                onChange={(e) => set("quoteClosingText", e.target.value)}
+                rows={3}
+                maxLength={500}
+                placeholder="Es würde uns freuen, diesen Auftrag für Sie durchführen zu können."
+              />
+              <p className="text-xs text-muted-foreground">
+                Wird bei neuen Offerten vor der Grussformel vorausgefüllt und lässt sich pro Offerte ändern.
+              </p>
+            </Field>
             <Field label="Grussformel">
               <Input
                 value={theme.closingSalutation}

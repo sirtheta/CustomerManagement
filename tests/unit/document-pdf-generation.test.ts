@@ -427,10 +427,15 @@ describe("generateInvoicePdf drafts", () => {
 });
 
 describe("generateQuotePdf", () => {
-  it("renders the document-level discount stored on the quote", async () => {
-    const decimal = (n: number) => n as unknown as import("@prisma/client").Prisma.Decimal;
-    const buf = await generateQuotePdf(
-      {
+  const decimal = (n: number) => n as unknown as import("@prisma/client").Prisma.Decimal;
+  const quoteSettings = {
+    companyInfo: { companyName: "Firma AG", companyHolderName: "Inhaber" },
+    numberFormat: "de-CH",
+    pdfTheme: null,
+  } as never;
+  const quoteWith = (closingText: string | null) =>
+      ({
+        closingText,
         id: 1,
         customerId: 1,
         documentNumber: "O-26010001",
@@ -481,16 +486,25 @@ describe("generateQuotePdf", () => {
             categoryId: null,
           },
         ],
-      },
-      {
-        companyInfo: { companyName: "Firma AG", companyHolderName: "Inhaber" },
-        numberFormat: "de-CH",
-        pdfTheme: null,
-      } as never
-    );
+      }) as never;
+
+  it("renders the document-level discount stored on the quote", async () => {
+    const buf = await generateQuotePdf(quoteWith(null), quoteSettings);
     const { pageText } = await extractText(buf);
     expect(pageText[0]).toContain("Zwischensumme");
     expect(pageText[0]).toContain("Rabatt (10");
+  });
+
+  it("prints the closing text of the quote above the salutation", async () => {
+    const buf = await generateQuotePdf(quoteWith("Es würde uns freuen, diesen Auftrag durchzuführen."), quoteSettings);
+    const text = (await extractText(buf)).pageText[0];
+    expect(text).toContain("Es würde uns freuen");
+    expect(text.indexOf("Es würde uns freuen")).toBeLessThan(text.indexOf("Freundliche"));
+  });
+
+  it("prints no closing text when the quote has none", async () => {
+    const buf = await generateQuotePdf(quoteWith(null), quoteSettings);
+    expect((await extractText(buf)).pageText[0]).not.toContain("Es würde uns freuen");
   });
 });
 

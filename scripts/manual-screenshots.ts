@@ -21,7 +21,7 @@
  */
 import { chromium, type Page } from "@playwright/test";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
-import { mkdirSync, rmSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { createServer } from "net";
 import path from "path";
 
@@ -93,6 +93,27 @@ const SHOTS: Shot[] = [
   { name: "invoices", path: "/invoices", fullPage: true },
   { name: "invoice-new", path: "/invoices/new", fullPage: true },
   { name: "quotes", path: "/quotes", fullPage: true },
+  { name: "quote-new", path: "/quotes/new", fullPage: true },
+  {
+    // The live preview in the designer is a blob:// iframe that stays blank here,
+    // so render the quote PDF through the same endpoint and rasterise page 1.
+    name: "quote-pdf",
+    path: "/settings/design",
+    run: async (page) => {
+      const res = await page.request.post(`${BASE_URL}/api/settings/pdf-preview`, {
+        data: {
+          type: "quote",
+          theme: { quoteClosingText: "Es würde uns freuen, diesen Auftrag für Sie durchführen zu können." },
+        },
+      });
+      if (!res.ok()) throw new Error(`pdf-preview failed: ${res.status()}`);
+      const pdfPath = path.join(OUT_DIR, "quote-pdf.pdf");
+      writeFileSync(pdfPath, await res.body());
+      const out = spawnSync("pdftoppm", ["-png", "-r", "110", "-f", "1", "-l", "1", "-singlefile", pdfPath, path.join(OUT_DIR, "quote-pdf")]);
+      if (out.status !== 0) throw new Error("pdftoppm failed (poppler-utils needed)");
+      rmSync(pdfPath);
+    },
+  },
   { name: "services", path: "/services", fullPage: true },
   { name: "analytics", path: "/analytics", fullPage: true },
   { name: "accounting", path: "/accounting", fullPage: true },
@@ -104,7 +125,17 @@ const SHOTS: Shot[] = [
     // PDF viewer doesn't reliably render in Playwright — it just stays
     // blank (same limitation noted in marketing-screenshots.ts). Crop to
     // the left settings column instead of showing empty whitespace.
-    clip: { x: 0, y: 0, width: 1010, height: 900 },
+    run: async (page) => {
+      await page.goto(`${BASE_URL}/settings/design`);
+      await page.waitForLoadState("networkidle");
+      await hideDevIndicator(page);
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      await page.screenshot({
+        path: path.join(OUT_DIR, "settings-design.png"),
+        fullPage: true,
+        clip: { x: 0, y: 0, width: 720, height },
+      });
+    },
   },
   { name: "settings-categories", path: "/settings/categories", fullPage: true },
   { name: "settings-users", path: "/settings/users", fullPage: true },
@@ -238,7 +269,7 @@ async function main() {
   const server = await startServer();
 
   try {
-    const browser = await chromium.launch();
+    const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
     const context = await browser.newContext({ viewport: VIEWPORT, colorScheme: "light", deviceScaleFactor: 2 });
     const page = await context.newPage();
 
