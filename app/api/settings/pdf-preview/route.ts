@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
+import { resolveTheme } from "@/lib/pdf/theme";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import {
   generateDocumentPdf,
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
     dueLabel: type === "invoice" ? "Fälligkeit:" : "Gültig bis:",
     closingNoteLabel: type === "invoice" ? "Zahlbar bis:" : "Gültig bis:",
     customUserText: "Vielen Dank für Ihren Auftrag.",
+    closingText: type === "quote" ? resolveTheme(body.theme).quoteClosingText : null,
     totalAmount: SAMPLE_TOTAL,
     customer: SAMPLE_CUSTOMER,
     items: SAMPLE_ITEMS.map((i) => ({ ...i })),

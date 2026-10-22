@@ -144,6 +144,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
               <p className="mt-1 whitespace-pre-wrap">{quote.customUserText}</p>
             </div>
           )}
+          {quote.closingText && (
+            <div>
+              <span className="text-gray-500">Schlusstext:</span>
+              <p className="mt-1 whitespace-pre-wrap">{quote.closingText}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

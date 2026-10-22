@@ -35,7 +35,7 @@ export type PdfTheme = {
   showFooter: boolean;
   closingSalutation: string;
   footerNote: string;
-  /** Quotes only: free text printed right above the closing salutation. */
+  /** Default for the per-quote closing text; copied into each new quote, never read at render time. */
   quoteClosingText: string;
 };
 

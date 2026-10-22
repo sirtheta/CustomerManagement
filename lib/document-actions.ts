@@ -67,6 +67,8 @@ export type DocumentInput = {
   kind: DocumentKind;
   customerId: number;
   customUserText: string | null;
+  /** Quotes only: text above the salutation, stored per quote. */
+  closingText?: string | null;
   date: Date;
   dueDate?: Date;
   validUntil?: Date;
@@ -106,6 +108,7 @@ export async function createDocumentWithItems(
         data: {
           customerId: input.customerId,
           customUserText: input.customUserText,
+          closingText: input.closingText ?? null,
           date: input.date,
           validUntil: input.validUntil!,
           totalAmount: input.totalAmount,
@@ -162,6 +165,7 @@ export async function updateDocumentWithItems(
         data: {
           customerId: input.customerId,
           customUserText: input.customUserText,
+          closingText: input.closingText ?? null,
           date: input.date,
           validUntil: input.validUntil!,
           totalAmount: input.totalAmount,

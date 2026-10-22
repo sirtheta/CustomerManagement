@@ -38,6 +38,7 @@ export async function createQuote(
   await requireModule("quotes");
   const customerIdRaw = formData.get("customerId") as string;
   const customUserText = formData.get("customUserText") as string | null;
+  const closingText = (formData.get("closingText") as string | null)?.trim().slice(0, 500) ?? "";
   const dateRaw = formData.get("date") as string;
   const validUntilRaw = formData.get("validUntil") as string;
 
@@ -66,6 +67,7 @@ export async function createQuote(
       kind: "quote",
       customerId,
       customUserText: customUserText || null,
+      closingText: closingText || null,
       date: new Date(dateRaw),
       validUntil: new Date(validUntilRaw),
       totalAmount,
@@ -90,6 +92,7 @@ export async function updateQuote(
   await requireModule("quotes");
   const customerIdRaw = formData.get("customerId") as string;
   const customUserText = formData.get("customUserText") as string | null;
+  const closingText = (formData.get("closingText") as string | null)?.trim().slice(0, 500) ?? "";
   const dateRaw = formData.get("date") as string;
   const validUntilRaw = formData.get("validUntil") as string;
 
@@ -121,6 +124,7 @@ export async function updateQuote(
       kind: "quote",
       customerId,
       customUserText: customUserText || null,
+      closingText: closingText || null,
       date: new Date(dateRaw),
       validUntil: new Date(validUntilRaw),
       totalAmount,

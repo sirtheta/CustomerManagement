@@ -93,6 +93,7 @@ export async function generateQuotePdf(
     dueLabel: "Gültig bis:",
     closingNoteLabel: "Gültig bis:",
     customUserText: quote.customUserText,
+    closingText: quote.closingText,
     discountPercent: Number(quote.discountPercent ?? 0),
     totalAmount: Number(quote.totalAmount),
     customer: quote.customer,

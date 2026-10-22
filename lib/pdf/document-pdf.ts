@@ -34,6 +34,8 @@ export type RenderDoc = {
   dueLabel: string; // "Fälligkeit:" | "Gültig bis:"
   closingNoteLabel: string; // "Zahlbar bis:" | "Gültig bis:"
   customUserText: string | null;
+  /** Quotes only: free text printed right above the closing salutation. */
+  closingText?: string | null;
   discountPercent?: Numeric;
   totalAmount: number;
   customer: Pick<
@@ -420,7 +422,7 @@ export async function generateDocumentPdf(
     }
 
     // ── Payment note + optional closing block ────────────────────────────
-    const closingText = doc.kind === "quote" ? clean(theme.quoteClosingText) : "";
+    const closingText = doc.kind === "quote" ? clean(doc.closingText) : "";
     const footerLines = theme.showFooter
       ? [theme.closingSalutation, company.companyHolderName, theme.footerNote].filter(Boolean).length
       : 0;
