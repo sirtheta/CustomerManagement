@@ -10,7 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import { savePdfTheme } from "./actions";
-import { PDF_FONTS, type PdfFont, type PdfTheme } from "@/lib/pdf/theme";
+import { ADDRESS_WINDOWS, PDF_FONTS, type AddressWindow, type PdfFont, type PdfTheme } from "@/lib/pdf/theme";
+
+const WINDOW_LABELS: Record<AddressWindow, string> = {
+  none: "Kein Fenster",
+  left: "Fenster links",
+  right: "Fenster rechts",
+};
 
 const COLOR_PALETTE = [
   "#000000", "#64748b", "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16",
@@ -230,6 +236,31 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
                 onChange={(v) => set("logoMaxSize", v)}
               />
             </div>
+            <Field label="Fensterumschlag">
+              <Select
+                value={theme.addressWindow}
+                onValueChange={(v) => set("addressWindow", v as AddressWindow)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string | null) => WINDOW_LABELS[(value ?? "none") as AddressWindow]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ADDRESS_WINDOWS.map((w) => (
+                    <SelectItem key={w} value={w}>
+                      {WINDOW_LABELS[w]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {theme.addressWindow !== "none" && (
+                <p className="text-xs text-muted-foreground">
+                  Die Empfängeradresse steht fest an der Fensterposition. Ein Logo auf
+                  derselben Seite wird bei Bedarf verkleinert, damit es über dem Fenster bleibt.
+                </p>
+              )}
+            </Field>
             <Field label="Logo-Position">
               <Select
                 value={theme.logoPosition}
