@@ -35,6 +35,7 @@ type Props = {
   roundTo5Rappen?: boolean;
   defaultClosingText?: string;
   senderProfiles?: SenderProfileOption[];
+  firstSenderLabel?: string;
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -63,6 +64,7 @@ export default function QuoteForm({
   roundTo5Rappen,
   defaultClosingText,
   senderProfiles = [],
+  firstSenderLabel = "Standard (Firmendaten)",
 }: Props) {
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
@@ -161,7 +163,7 @@ export default function QuoteForm({
               </div>
             </div>
 
-            <SenderProfileSelect profiles={senderProfiles} value={quote?.senderProfileId ?? null} />
+            <SenderProfileSelect profiles={senderProfiles} firstLabel={firstSenderLabel} value={quote?.senderProfileId ?? null} />
 
             <div className="space-y-1.5">
               <Label htmlFor="customUserText">Zusatztext</Label>

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { firstProfileLabel } from "@/lib/sender-profile";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import QuoteForm from "../QuoteForm";
@@ -26,7 +27,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
-    prisma.applicationSettings.findFirst(),
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
       prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
     prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
@@ -42,6 +43,7 @@ export default async function NewQuotePage({ searchParams }: Props) {
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
       defaultClosingText={resolveTheme(settings?.pdfTheme).quoteClosingText}
+      firstSenderLabel={firstProfileLabel(settings?.companyInfo.companyName)}
       senderProfiles={senderProfiles.filter((p) => p.isActive)}
     />
   );

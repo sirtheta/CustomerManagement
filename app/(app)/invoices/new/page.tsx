@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { firstProfileLabel } from "@/lib/sender-profile";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import InvoiceForm from "../InvoiceForm";
@@ -23,7 +24,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
-    prisma.applicationSettings.findFirst(),
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
     prisma.invoiceTemplate.findMany({
       include: { items: { orderBy: { id: "asc" } } },
       orderBy: { name: "asc" },
@@ -46,6 +47,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
         categories={categories}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      firstSenderLabel={firstProfileLabel(settings?.companyInfo.companyName)}
       senderProfiles={senderProfiles.filter((p) => p.isActive)}
     />
   );

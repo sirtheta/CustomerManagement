@@ -63,6 +63,7 @@ type Props = {
   unitOrder?: readonly Unit[];
   roundTo5Rappen?: boolean;
   senderProfiles?: SenderProfileOption[];
+  firstSenderLabel?: string;
 };
 
 function toItemData(item: SerializedItem): ItemData {
@@ -92,6 +93,7 @@ export default function InvoiceForm({
   unitOrder,
   roundTo5Rappen,
   senderProfiles = [],
+  firstSenderLabel = "Standard (Firmendaten)",
 }: Props) {
   const action = invoice
     ? updateInvoice.bind(null, invoice.id)
@@ -243,7 +245,7 @@ export default function InvoiceForm({
 
             {/* A credit note keeps the sender of its original invoice. */}
             {!creditNoteFor && (
-              <SenderProfileSelect profiles={senderProfiles} value={invoice?.senderProfileId ?? null} />
+              <SenderProfileSelect profiles={senderProfiles} firstLabel={firstSenderLabel} value={invoice?.senderProfileId ?? null} />
             )}
 
             <div className="space-y-1.5">

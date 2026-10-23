@@ -1,13 +1,24 @@
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
-import { SenderProfileManagement, type SenderProfileRow } from "./SenderProfileManagement";
+import { SenderProfileManagement, type FirstProfile, type SenderProfileRow } from "./SenderProfileManagement";
 
 export default async function SenderProfilesPage() {
   await requireAdmin();
-  const profiles = await prisma.senderProfile.findMany({
-    orderBy: { name: "asc" },
-    include: { _count: { select: { invoices: true, quotes: true } } },
-  });
+  const [profiles, settings] = await Promise.all([
+    prisma.senderProfile.findMany({
+      orderBy: { id: "asc" },
+      include: { _count: { select: { invoices: true, quotes: true } } },
+    }),
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
+  ]);
+  const c = settings?.companyInfo;
+  const first: FirstProfile = {
+    companyName: c?.companyName ?? null,
+    companyHolderName: c?.companyHolderName ?? null,
+    companyEmail: c?.companyEmail ?? null,
+    companyPhone: c?.companyPhone ?? null,
+    hasLogo: !!c?.companyLogo,
+  };
   const rows: SenderProfileRow[] = profiles.map((p) => ({
     id: p.id,
     name: p.name,
@@ -26,13 +37,13 @@ export default async function SenderProfilesPage() {
       <div>
         <h1 className="text-2xl font-bold">Absender-Profile</h1>
         <p className="text-muted-foreground mt-1">
-          Die Firmendaten und das Firmenlogo aus den Einstellungen sind das erste Profil. Ein weiteres Profil
-          überschreibt nur, was dort ausgefüllt ist; alles andere (auch Adresse und IBAN) kommt aus den Firmendaten.
-          Änderungen wirken auch auf Entwürfe und Offerten, die das Profil schon verwenden. Versendete Rechnungen
+          Das erste Profil sind die Firmendaten mit Firmenlogo aus den Einstellungen (unten als Karte). Hier legen Sie
+          nur weitere Profile an: Sie überschreiben nur, was dort ausgefüllt ist; alles andere (auch Adresse und IBAN)
+          kommt aus den Firmendaten. Änderungen wirken auch auf Entwürfe und Offerten, die das Profil schon verwenden. Versendete Rechnungen
           bleiben unverändert (PDF-Archiv).
         </p>
       </div>
-      <SenderProfileManagement profiles={rows} />
+      <SenderProfileManagement first={first} profiles={rows} />
     </div>
   );
 }

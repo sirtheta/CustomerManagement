@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   applySenderProfile,
+  firstProfileLabel,
   resolveSenderProfileId,
   senderDisplayName,
   senderProfileCacheSuffix,
@@ -98,5 +99,13 @@ describe("resolveSenderProfileId", () => {
   it("refuses an inactive profile unless the document already uses it", async () => {
     expect(await resolveSenderProfileId(db({ isActive: false }), "3")).toEqual({ error: SENDER_PROFILE_INACTIVE_ERROR });
     expect(await resolveSenderProfileId(db({ isActive: false }), "3", 3)).toEqual({ id: 3 });
+  });
+});
+
+describe("firstProfileLabel", () => {
+  it("names the first profile after the company and falls back to a generic label", () => {
+    expect(firstProfileLabel("Muster GmbH")).toBe("Muster GmbH (Standard)");
+    expect(firstProfileLabel("  ")).toBe("Standard (Firmendaten)");
+    expect(firstProfileLabel(null)).toBe("Standard (Firmendaten)");
   });
 });

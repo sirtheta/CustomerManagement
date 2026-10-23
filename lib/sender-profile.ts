@@ -50,6 +50,12 @@ export function senderProfileCacheSuffix(profile: Pick<SenderProfile, "id" | "up
   return profile ? `-s${profile.id}-${profile.updatedAt.getTime()}` : "";
 }
 
+/** Label of the first profile (the company data) in the sender choice, named after the company when known. */
+export function firstProfileLabel(companyName: string | null | undefined): string {
+  const name = blankToNull(companyName);
+  return name ? `${name} (Standard)` : "Standard (Firmendaten)";
+}
+
 export const SENDER_PROFILE_NOT_FOUND_ERROR = "Das gewählte Absender-Profil existiert nicht mehr.";
 export const SENDER_PROFILE_INACTIVE_ERROR = "Das gewählte Absender-Profil ist inaktiv.";
 
