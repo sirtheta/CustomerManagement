@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.9.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.4...customer-management-v1.9.0) (2026-10-23)
+
+
+### Features
+
+* **invoices:** selectable sender profile with its own logo per document ([#174](https://github.com/sirtheta/CustomerManagement/issues/174)) ([4464002](https://github.com/sirtheta/CustomerManagement/commit/44640024e8e0cd39369fb11a4592dea3e29f1ec2))
+* **invoices:** warn about missing IBAN, SMTP and zero prices before sending and explain the lock ([eb75288](https://github.com/sirtheta/CustomerManagement/commit/eb752886a3dae66b0e1806b3b06d34e16b9b009f))
+* **pdf:** place recipient address for window envelopes ([#175](https://github.com/sirtheta/CustomerManagement/issues/175)) ([6ca5ac6](https://github.com/sirtheta/CustomerManagement/commit/6ca5ac63dd0aa99c992b90fe481ed72328b63993))
+* **quotes:** configurable closing text above the salutation ([#173](https://github.com/sirtheta/CustomerManagement/issues/173)) ([a71c2a2](https://github.com/sirtheta/CustomerManagement/commit/a71c2a2eb663e93c7899c4d3b4188d63eddf514d))
+* **quotes:** link invoices to their quote and ask before converting a quote twice ([da29d08](https://github.com/sirtheta/CustomerManagement/commit/da29d08cc402f151823bea8c9fe0c74850b2182a))
+* **ui:** empty states with create buttons for services and quotes, open button in customer list ([adc2dc9](https://github.com/sirtheta/CustomerManagement/commit/adc2dc933b534cb6bb55aab9efd060b558f3798b))
+* **ui:** toast after creating a customer or saving a service ([68c24f5](https://github.com/sirtheta/CustomerManagement/commit/68c24f593f22e898a8b676575f93a7e47abecd27))
+
+
+### Bug Fixes
+
+* address review findings (SMTP message wording, convert race, stale IBAN error, noisy item warnings) ([69a7918](https://github.com/sirtheta/CustomerManagement/commit/69a7918ef228e5debfcf9c00b67f5b40fe5c645c))
+* **documents:** reject positions without a name with a clear message ([a439409](https://github.com/sirtheta/CustomerManagement/commit/a439409ad0d0dc95827309d3407f42d2668037fe))
+* **forms:** accept comma in service price and expense amount instead of dropping it ([92de112](https://github.com/sirtheta/CustomerManagement/commit/92de1128851398411210e4069e9be2ccc6ba4314))
+* **invoices:** show subtotal, document discount and total in the items editor ([8288b98](https://github.com/sirtheta/CustomerManagement/commit/8288b985e886de2c0ffce8d675f67d93f08d285a))
+* **reminders:** level-specific send button and clearer reminder wording ([3006334](https://github.com/sirtheta/CustomerManagement/commit/30063344126370652eb34a42432192a44246803e))
+* resolve blocker, high and medium findings of the first-time-user UX review ([#170](https://github.com/sirtheta/CustomerManagement/issues/170)) ([e297736](https://github.com/sirtheta/CustomerManagement/commit/e2977368eff63a92c7db1cca5ab35d859a0ecb99))
+* **send:** check SMTP before a document number is assigned ([dfbaebf](https://github.com/sirtheta/CustomerManagement/commit/dfbaebf36c4007f6d60dd399d9813a4c27959d9f))
+* **settings:** keep entered company data when saving fails and show the IBAN error at the field ([092158a](https://github.com/sirtheta/CustomerManagement/commit/092158ab3c2cfb31671f752e39780794539139fd))
+* **settings:** number format examples, clearer reminder period label and VAT note ([566b1df](https://github.com/sirtheta/CustomerManagement/commit/566b1dfa7e81448c275e8556d610f15c5cd009c9))
+* **time:** lift toasts above the phone tab bar and word material days as delivery days ([29f9e78](https://github.com/sirtheta/CustomerManagement/commit/29f9e781d3c6128177ae6043c76f92da4de69d30))
+* **ui:** Enter records a payment, keep the logo fixed in the header, show drafts on the dashboard, drop duplicate category badge ([0174e78](https://github.com/sirtheta/CustomerManagement/commit/0174e78b8c587efe2424ce6acac970818e2c1521))
+* **ui:** mobile cards for lists, German wording, category hint, customer header actions ([7954647](https://github.com/sirtheta/CustomerManagement/commit/7954647f65d60b9c4b8dcd93d87fb00d73ce935a))
+* **ui:** one name for the subscription approval page ([8335065](https://github.com/sirtheta/CustomerManagement/commit/83350658ae5f608ef73c3aa264e8057938748c82))
+* **ui:** resolve low-severity findings of the first-time-user UX review ([#172](https://github.com/sirtheta/CustomerManagement/issues/172)) ([564790e](https://github.com/sirtheta/CustomerManagement/commit/564790e9832d7cbf8c4cc7b20fc890bf0b154e58))
+
 ## [1.8.4](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.3...customer-management-v1.8.4) (2026-10-21)
 
 
