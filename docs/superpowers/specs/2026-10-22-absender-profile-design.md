@@ -25,7 +25,7 @@ Eine Rechnung oder Offerte kann mit einem zweiten Absender erstellt werden, zum 
 
 ## Datenmodell
 
-`SenderProfile`: `id`, `name` (Bezeichnung in der Auswahl), `companyName?`, `companyHolderName?`, `companyEmail?`, `companyPhone?`, `logo?` (PNG, höchstens 300 px), `isActive`, `createdAt`, `updatedAt`. Rückrelationen `invoices`, `quotes`. Migration `20261022130000_add_sender_profiles`: neue Tabelle und zwei nullable Spalten mit Fremdschlüssel.
+`SenderProfile`: `id`, `name` (Bezeichnung in der Auswahl), `companyName?`, `companyHolderName?`, `companyEmail?`, `companyPhone?`, `logo?` (PNG, höchstens 300 px), `isActive`, `createdAt`, `updatedAt`. Rückrelationen `invoices`, `quotes`. Migration (zusammengefasst mit Offerten-Verknüpfung und Schlusstext in `20261023100000_sender_profiles_quote_link`): neue Tabelle und zwei nullable Spalten mit Fremdschlüssel.
 
 ## Umsetzung
 
