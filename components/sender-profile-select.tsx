@@ -22,7 +22,7 @@ export function SenderProfileSelect({ profiles, value, firstLabel }: Props) {
     <div className="space-y-1.5">
       <Label htmlFor="senderProfileId">Absender</Label>
       <Select name="senderProfileId" defaultValue={value?.toString() ?? ""}>
-        <SelectTrigger id="senderProfileId" className="w-full sm:w-72">
+        <SelectTrigger id="senderProfileId" className="w-full sm:w-96">
           <SelectValue>
             {(selected: string | null) =>
               selected ? (profiles.find((p) => p.id.toString() === selected)?.name ?? selected) : firstLabel
