@@ -540,11 +540,19 @@ describe("generateDocumentPdf window envelope", () => {
     expect(pos.top).toBeLessThan(60 * MM);
   });
 
-  it("puts the sender opposite the window", async () => {
-    const right = await positionOf(await render("right"), "Firma AG");
-    const left = await positionOf(await render("left"), "Firma AG");
-    expect(right.x).toBeLessThan(118 * MM);
-    expect(left.x).toBeGreaterThanOrEqual(118 * MM);
+  it("keeps logo position and sender side independent of the window", async () => {
+    for (const addressWindow of ["left", "right"] as const) {
+      const logoLeft = await generateDocumentPdf(baseDoc(), company, "de-CH", { addressWindow });
+      expect((await positionOf(logoLeft, "Firma AG")).x).toBeGreaterThanOrEqual(118 * MM);
+      const logoRight = await generateDocumentPdf(baseDoc(), company, "de-CH", {
+        addressWindow,
+        logoPosition: "right",
+      });
+      expect((await positionOf(logoRight, "Firma AG")).x).toBeLessThan(118 * MM);
+      // the address does not depend on the logo position
+      const addr = await positionOf(logoRight, "Muster AG");
+      expect(addr.x).toBeCloseTo((addressWindow === "left" ? 20 : 118) * MM, 0);
+    }
   });
 
   it("keeps the legacy flow layout without a window", async () => {
@@ -555,46 +563,137 @@ describe("generateDocumentPdf window envelope", () => {
     expect(pos.top).toBeLessThan(160);
   });
 
-  it("keeps the address in place with a big logo and the widest margin", async () => {
-    const logo = await sharp({
-      create: { width: 400, height: 400, channels: 3, background: "#3366cc" },
-    })
+  // Boxes (pt, origin top left) of all images on page 1, from the operator list.
+  async function imageBoxes(buf: Buffer) {
+    const { OPS } = pdfjsLib;
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), standardFontDataUrl }).promise;
+    const page = await doc.getPage(1);
+    const { height } = page.getViewport({ scale: 1 });
+    const { fnArray, argsArray } = await page.getOperatorList();
+    type M = number[];
+    const mul = (m1: M, m2: M): M => [
+      m1[0] * m2[0] + m1[2] * m2[1],
+      m1[1] * m2[0] + m1[3] * m2[1],
+      m1[0] * m2[2] + m1[2] * m2[3],
+      m1[1] * m2[2] + m1[3] * m2[3],
+      m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+      m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
+    ];
+    let ctm: M = [1, 0, 0, 1, 0, 0];
+    const stack: M[] = [];
+    const boxes: { x0: number; x1: number; top: number; bottom: number }[] = [];
+    fnArray.forEach((fn, i) => {
+      if (fn === OPS.save) stack.push(ctm);
+      else if (fn === OPS.restore) ctm = stack.pop() ?? ctm;
+      else if (fn === OPS.transform) ctm = mul(ctm, argsArray[i] as M);
+      else if (fn === OPS.paintImageXObject) {
+        const xs = [ctm[4], ctm[0] + ctm[4], ctm[2] + ctm[4], ctm[0] + ctm[2] + ctm[4]];
+        const ys = [ctm[5], ctm[1] + ctm[5], ctm[3] + ctm[5], ctm[1] + ctm[3] + ctm[5]];
+        boxes.push({
+          x0: Math.min(...xs),
+          x1: Math.max(...xs),
+          top: height - Math.max(...ys),
+          bottom: height - Math.min(...ys),
+        });
+      }
+    });
+    return boxes;
+  }
+
+  const bigLogo = () =>
+    sharp({ create: { width: 400, height: 400, channels: 3, background: "#3366cc" } })
       .png()
       .toBuffer();
-    for (const addressWindow of ["left", "right"] as const) {
-      const buf = await generateDocumentPdf(
-        baseDoc(),
-        { ...company, companyLogo: logo },
-        "de-CH",
-        { addressWindow, logoMaxSize: 160, margin: 70 }
-      );
+
+  it("shrinks a logo on the window's side so it stays above the window", async () => {
+    const logo = await bigLogo();
+    for (const [addressWindow, logoPosition] of [
+      ["left", "left"],
+      ["right", "right"],
+    ] as const) {
+      const buf = await generateDocumentPdf(baseDoc(), { ...company, companyLogo: logo }, "de-CH", {
+        addressWindow,
+        logoPosition,
+        logoMaxSize: 160,
+        margin: 70,
+      });
+      const [box] = await imageBoxes(buf);
+      expect(box.bottom).toBeLessThanOrEqual(50 * MM - 10 + 0.5);
+      expect(box.bottom - box.top).toBeGreaterThan(40);
       const pos = await positionOf(buf, "Muster AG");
       expect(pos.x).toBeCloseTo((addressWindow === "left" ? 20 : 118) * MM, 0);
-      expect(pos.top).toBeLessThan(60 * MM);
       expect((await extractText(buf)).numPages).toBe(1);
     }
+  });
+
+  it("keeps the full logo size on the side away from the window", async () => {
+    const logo = await bigLogo();
+    for (const [addressWindow, logoPosition] of [
+      ["left", "right"],
+      ["right", "left"],
+    ] as const) {
+      const buf = await generateDocumentPdf(baseDoc(), { ...company, companyLogo: logo }, "de-CH", {
+        addressWindow,
+        logoPosition,
+        logoMaxSize: 160,
+      });
+      const [box] = await imageBoxes(buf);
+      expect(box.bottom - box.top).toBeCloseTo(160, 0);
+    }
+  });
+
+  it("leaves out sender lines that would reach into the window", async () => {
+    // margin 70 leaves ~62 pt above the window, room for about five 12 pt lines
+    const full = {
+      companyName: "Firma AG",
+      companyHolderName: "Inhaber",
+      companyStreet: "Strasse",
+      companyHouseNumber: "5",
+      companyZip: "3000",
+      companyCity: "Bern",
+      companyCountry: "DE",
+      companyPhone: "031 000 00 00",
+      companyEmail: "a@b.ch",
+    };
+    const overlapping = await generateDocumentPdf(baseDoc(), full, "de-CH", {
+      addressWindow: "right",
+      margin: 70,
+    });
+    expect((await extractText(overlapping)).pageText[0]).not.toContain("a@b.ch");
+    // the other side has no window, so nothing is left out
+    const free = await generateDocumentPdf(baseDoc(), full, "de-CH", {
+      addressWindow: "left",
+      margin: 70,
+    });
+    expect((await extractText(free)).pageText[0]).toContain("a@b.ch");
   });
 
   it("wraps a very long sender name inside its column", async () => {
     const longName = "Sehr Lange Treuhand und Beratungs Gesellschaft fuer Kleinunternehmen und Gewerbe AG";
     for (const addressWindow of ["left", "right"] as const) {
-      const buf = await generateDocumentPdf(
-        baseDoc(),
-        { companyName: longName, companyHolderName: "Inhaber" },
-        "de-CH",
-        { addressWindow }
-      );
-      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), standardFontDataUrl }).promise;
-      const page = await doc.getPage(1);
-      const { width } = page.getViewport({ scale: 1 });
-      const items = (await page.getTextContent()).items.filter(
-        (it) => "str" in it && it.str.trim() && longName.includes(it.str.trim())
-      );
-      expect(items.length).toBeGreaterThan(1); // wrapped over several lines
-      for (const it of items) {
-        if (!("transform" in it)) continue;
-        if (addressWindow === "right") expect(it.transform[4] + it.width).toBeLessThanOrEqual(118 * MM);
-        else expect(it.transform[4] + it.width).toBeLessThanOrEqual(width);
+      for (const logoPosition of ["left", "right"] as const) {
+        const buf = await generateDocumentPdf(
+          baseDoc(),
+          { companyName: longName, companyHolderName: "Inhaber" },
+          "de-CH",
+          { addressWindow, logoPosition }
+        );
+        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), standardFontDataUrl }).promise;
+        const page = await doc.getPage(1);
+        const { width } = page.getViewport({ scale: 1 });
+        const items = (await page.getTextContent()).items.filter(
+          (it) => "str" in it && it.str.trim() && longName.includes(it.str.trim())
+        );
+        expect(items.length).toBeGreaterThan(1); // wrapped over several lines
+        for (const it of items) {
+          if (!("transform" in it)) continue;
+          if (logoPosition === "left") {
+            expect(it.transform[4]).toBeGreaterThanOrEqual(118 * MM - 0.5);
+            expect(it.transform[4] + it.width).toBeLessThanOrEqual(width - 40 + 0.5);
+          } else {
+            expect(it.transform[4] + it.width).toBeLessThanOrEqual(118 * MM - 20);
+          }
+        }
       }
     }
   });

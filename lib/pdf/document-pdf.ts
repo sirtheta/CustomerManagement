@@ -26,6 +26,8 @@ const WINDOW_TOP = 50 * MM;
 const WINDOW_LEFT_X = 20 * MM;
 const WINDOW_RIGHT_X = 118 * MM;
 const WINDOW_W = 85 * MM;
+// Clearance kept between logo/sender and the window on the window's side.
+const WINDOW_GAP = 10;
 
 const TEXT_COLOR = "#000000";
 
@@ -251,35 +253,53 @@ export async function generateDocumentPdf(
       });
       y += addrLines.length * LINE_HEIGHT + 50;
     } else {
-      // ── Window envelope: address pinned, logo and sender opposite ─────
+      // ── Window envelope: address pinned, logo and sender keep their sides ──
       // The address sits at a fixed spot (also with another margin), so it shows through
-      // the window of an A4 sheet folded in half or in thirds. Logo and sender stack in
-      // the other column; logoPosition does not apply here.
-      const addrOnRight = theme.addressWindow === "right";
-      const addrX = addrOnRight ? WINDOW_RIGHT_X : WINDOW_LEFT_X;
-      const addrW = addrOnRight ? PAGE_W - MARGIN - WINDOW_RIGHT_X : WINDOW_W;
-      const headX = addrOnRight ? MARGIN : WINDOW_RIGHT_X;
-      const headW = addrOnRight ? WINDOW_RIGHT_X - MARGIN - 20 : PAGE_W - MARGIN - WINDOW_RIGHT_X;
+      // the window of an A4 sheet folded in half or in thirds. Logo and sender stay where
+      // the logo position puts them (logo on one side, sender in the other column); only
+      // the one on the window's side has to end above the window.
+      const windowRight = theme.addressWindow === "right";
+      const logoRight = theme.logoPosition === "right";
+      const addrX = windowRight ? WINDOW_RIGHT_X : WINDOW_LEFT_X;
+      const addrW = windowRight ? PAGE_W - MARGIN - WINDOW_RIGHT_X : WINDOW_W;
+      const aboveWindow = WINDOW_TOP - WINDOW_GAP;
 
-      let headY = MARGIN;
+      // ── Logo ──────────────────────────────────────────────────────────
+      // Shrunk only if it would reach into the window.
+      const logoSize =
+        logoRight === windowRight
+          ? Math.min(theme.logoMaxSize, aboveWindow - MARGIN)
+          : theme.logoMaxSize;
       if (logoBuffer) {
-        pdf.image(logoBuffer, headX, headY, { fit: [theme.logoMaxSize, theme.logoMaxSize] });
-        headY += theme.logoMaxSize + 10;
-      }
-      pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
-      // Long lines wrap inside their column; a single line keeps the usual line height.
-      for (const line of companyLines) {
-        pdf.text(line, headX, headY, { width: headW });
-        headY += Math.max(LINE_HEIGHT, pdf.heightOfString(line, { width: headW }));
+        const lx = logoRight ? PAGE_W - MARGIN - logoSize : MARGIN;
+        pdf.image(logoBuffer, lx, y, { fit: [logoSize, logoSize] });
       }
 
+      // ── Company info ──────────────────────────────────────────────────
+      // A fixed column opposite the logo; long lines wrap inside it. On the window's
+      // side, lines that would no longer fit above the window are left out.
+      const senderRight = !logoRight;
+      const senderX = senderRight ? WINDOW_RIGHT_X : MARGIN;
+      const senderW = senderRight ? PAGE_W - MARGIN - WINDOW_RIGHT_X : WINDOW_RIGHT_X - 20 - MARGIN;
+      const senderLimit = senderRight === windowRight ? aboveWindow : Infinity;
+      let senderY = y;
+      pdf.font(FONT).fontSize(SMALL).fillColor(TEXT_COLOR);
+      for (const line of companyLines) {
+        const h = Math.max(LINE_HEIGHT, pdf.heightOfString(line, { width: senderW }));
+        if (senderY + h > senderLimit) break;
+        pdf.text(line, senderX, senderY, { width: senderW, align: senderRight ? "right" : "left" });
+        senderY += h;
+      }
+
+      // ── Customer address ──────────────────────────────────────────────
       pdf.font(FONT).fontSize(BASE).fillColor(TEXT_COLOR);
       let addrY = WINDOW_TOP;
       for (const line of addrLines) {
         pdf.text(line, addrX, addrY, { width: addrW });
         addrY += Math.max(LINE_HEIGHT, pdf.heightOfString(line, { width: addrW }));
       }
-      y = Math.max(headY + 15, addrY) + 50;
+      const headBottom = Math.max(logoBuffer ? y + logoSize : y, senderY);
+      y = Math.max(headBottom + 15, addrY) + 50;
     }
 
     // ── Title ────────────────────────────────────────────────────────────

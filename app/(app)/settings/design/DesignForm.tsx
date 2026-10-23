@@ -256,8 +256,8 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
               </Select>
               {theme.addressWindow !== "none" && (
                 <p className="text-xs text-muted-foreground">
-                  Die Empfängeradresse steht fest an der Fensterposition. Logo und Absender
-                  stehen auf der gegenüberliegenden Seite.
+                  Die Empfängeradresse steht fest an der Fensterposition. Ein Logo auf
+                  derselben Seite wird bei Bedarf verkleinert, damit es über dem Fenster bleibt.
                 </p>
               )}
             </Field>
@@ -265,7 +265,6 @@ export default function DesignForm({ initialTheme }: { initialTheme: PdfTheme })
               <Select
                 value={theme.logoPosition}
                 onValueChange={(v) => set("logoPosition", v as "left" | "right")}
-                disabled={theme.addressWindow !== "none"}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>

@@ -32,7 +32,6 @@ export type PdfTheme = {
   margin: number;
   /** Logo bounding box in pt. */
   logoMaxSize: number;
-  /** Ignored while `addressWindow` is set: logo and sender then sit opposite the window. */
   logoPosition: "left" | "right";
   addressWindow: AddressWindow;
   /** Fill the items-table header row with the accent color (white text). */
