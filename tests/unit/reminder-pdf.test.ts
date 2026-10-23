@@ -68,6 +68,18 @@ describe("generateReminderPdf", () => {
     }
   );
 
+  it("prints the invoice's sender profile in the header but keeps the company as QR creditor", async () => {
+    const withProfile = {
+      ...(invoice as object),
+      senderProfile: { companyName: "Atelier Erika", companyHolderName: null, companyEmail: null, companyPhone: null, logo: null },
+    } as never;
+    const { pageText } = await extractText(await generateReminderPdf(withProfile, settings, charges(2)));
+    expect(pageText[0]).toContain("Atelier Erika");
+    expect(pageText[0]).not.toContain("Firma AG");
+    expect(pageText[1]).toContain("Firma AG");
+    expect(pageText[1]).not.toContain("Atelier Erika");
+  });
+
   it("shows open amount, fee, interest and the total, and puts the total on the QR slip", async () => {
     const buf = await generateReminderPdf(invoice, settings, charges(2));
     const { numPages, pageText } = await extractText(buf);

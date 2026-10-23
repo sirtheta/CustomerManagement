@@ -383,6 +383,25 @@ describe("generateInvoicePdf drafts", () => {
     useHolderNameOnQR: false,
   } as never;
 
+  it("prints the selected sender profile instead of the company data, with the QR creditor unchanged", async () => {
+    const profile = { companyName: "Atelier Erika", companyHolderName: null, companyEmail: null, companyPhone: null, logo: null };
+    const buf = await generateInvoicePdf(invoiceFor("I-26010001", { senderProfile: profile }), settings);
+    const { pageText } = await extractText(buf);
+    expect(pageText[0]).toContain("Atelier Erika");
+    expect(pageText[0]).not.toContain("Firma AG");
+    // Holder name is not filled in the profile, so the company's one stays.
+    expect(pageText[0]).toContain("Inhaber");
+    // The QR creditor is the account holder, never the profile.
+    expect(pageText[1]).toContain("Firma AG");
+    expect(pageText[1]).not.toContain("Atelier Erika");
+  });
+
+  it("uses the company data when the profile is empty", async () => {
+    const profile = { companyName: null, companyHolderName: null, companyEmail: null, companyPhone: null, logo: null };
+    const { pageText } = await extractText(await generateInvoicePdf(invoiceFor(null, { senderProfile: profile }), settings));
+    expect(pageText[0]).toContain("Firma AG");
+  });
+
   it("renders an unnumbered invoice as watermarked draft without QR page", async () => {
     const buf = await generateInvoicePdf(invoiceFor(null), settings);
     const { numPages, pageText } = await extractText(buf);

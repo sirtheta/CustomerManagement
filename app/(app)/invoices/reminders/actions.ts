@@ -67,7 +67,7 @@ async function sendReminderLocked(input: {
     where: { id: reminderId },
     include: {
       invoice: {
-        include: { customer: true, items: { orderBy: { id: "asc" } } },
+        include: { customer: true, senderProfile: true, items: { orderBy: { id: "asc" } } },
       },
     },
   });

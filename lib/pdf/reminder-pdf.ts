@@ -2,6 +2,7 @@ import type { ApplicationSettings, CompanyInformation } from "@prisma/client";
 import { buildQrBillData } from "@/lib/pdf/qrbill-helpers";
 import { generateDocumentPdf, type RenderDoc } from "@/lib/pdf/document-pdf";
 import type { InvoiceWithDetails } from "@/lib/pdf/invoice-pdf";
+import { applySenderProfile } from "@/lib/sender-profile";
 import { reminderTitle, type ReminderCharges } from "@/lib/reminder-charges";
 
 type Settings = ApplicationSettings & { companyInfo: CompanyInformation };
@@ -74,5 +75,5 @@ export async function generateReminderPdf(
     draft: false,
   };
 
-  return generateDocumentPdf(doc, company, locale, settings.pdfTheme);
+  return generateDocumentPdf(doc, applySenderProfile(company, invoice.senderProfile), locale, settings.pdfTheme);
 }

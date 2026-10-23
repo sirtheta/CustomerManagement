@@ -187,6 +187,7 @@ describe("QRBill data preparation", () => {
         customUserText: null,
         creditNoteForId: null,
         sourceQuoteId: null,
+        senderProfileId: null,
         customer: {
           customerId: 1,
           company: validCustomer.company,

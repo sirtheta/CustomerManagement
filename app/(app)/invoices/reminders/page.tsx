@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { senderDisplayName } from "@/lib/sender-profile";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
@@ -49,7 +50,7 @@ export default async function RemindersPage({ searchParams }: Props) {
   const [reminders, snoozed, settings] = await Promise.all([
     prisma.pendingReminder.findMany({
       include: {
-        invoice: { include: { customer: true } },
+        invoice: { include: { customer: true, senderProfile: { select: { companyName: true } } } },
       },
       where: {
         AND: [snoozedFilter, ...(searchFilter ? [searchFilter] : [])],
@@ -66,7 +67,6 @@ export default async function RemindersPage({ searchParams }: Props) {
     prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
   ]);
 
-  const companyName = settings?.companyInfo.companyName ?? "";
   const cooldownDays = settings?.reminderCooldownDays ?? DEFAULT_REMINDER_COOLDOWN_DAYS;
   const lastSent = await latestSentReminders(prisma, reminders);
   // Open amount after payments and sent credit notes (not the invoice total).
@@ -134,7 +134,7 @@ export default async function RemindersPage({ searchParams }: Props) {
               level: r.reminderLevel,
               numberLabel: documentLabel(inv.documentNumber),
               contactPerson: c.contactPerson,
-              companyName,
+              companyName: senderDisplayName(settings?.companyInfo ?? {}, inv.senderProfile),
               dueDate: inv.dueDate,
               openAmount: remaining,
               charges,

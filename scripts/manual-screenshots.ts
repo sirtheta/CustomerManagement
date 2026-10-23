@@ -114,6 +114,20 @@ const SHOTS: Shot[] = [
       rmSync(pdfPath);
     },
   },
+  {
+    // Invoice 7 of the demo seed uses the second sender profile; rasterise page 1 of its PDF.
+    name: "invoice-pdf-sender",
+    path: "/invoices",
+    run: async (page) => {
+      const res = await page.request.get(`${BASE_URL}/api/invoices/7/pdf`);
+      if (!res.ok()) throw new Error(`invoice pdf failed: ${res.status()}`);
+      const pdfPath = path.join(OUT_DIR, "invoice-pdf-sender.pdf");
+      writeFileSync(pdfPath, await res.body());
+      const out = spawnSync("pdftoppm", ["-png", "-r", "110", "-f", "1", "-l", "1", "-singlefile", pdfPath, path.join(OUT_DIR, "invoice-pdf-sender")]);
+      if (out.status !== 0) throw new Error("pdftoppm failed (poppler-utils needed)");
+      rmSync(pdfPath);
+    },
+  },
   { name: "services", path: "/services", fullPage: true },
   { name: "analytics", path: "/analytics", fullPage: true },
   { name: "accounting", path: "/accounting", fullPage: true },
@@ -137,6 +151,7 @@ const SHOTS: Shot[] = [
       });
     },
   },
+  { name: "settings-sender-profiles", path: "/settings/sender-profiles", fullPage: true },
   { name: "settings-categories", path: "/settings/categories", fullPage: true },
   { name: "settings-users", path: "/settings/users", fullPage: true },
   { name: "settings-audit", path: "/settings/audit", fullPage: true },

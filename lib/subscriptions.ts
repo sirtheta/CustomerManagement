@@ -101,7 +101,6 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
 
   if (due.length === 0) return;
 
-  const companyName = settings?.companyInfo.companyName ?? "";
   // Subscription drafts carry no custom text.
   const mailTpl = invoiceMailTemplate(settings, { isCreditNote: false, hasCustomText: false });
   const defaultPaymentDays = settings?.defaultPaymentTermDays ?? 30;
@@ -148,9 +147,11 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
 
         const vars = {
           // The draft has no number yet, so {documentNumber} stays until the mail is approved.
-          ...invoicePlaceholders({ ...invoice, customer: sub.customer }, companyName),
-          // Kept as placeholder too: positions can be edited on the pending page; resolved at send time.
+          ...invoicePlaceholders({ ...invoice, customer: sub.customer }, ""),
+          // Kept as placeholders too, resolved at send time: positions can be edited on the pending
+          // page, and the sender profile can still be changed on the draft.
           totalAmount: undefined,
+          companyName: undefined,
         };
 
         const pendingEmail = await tx.pendingEmail.create({

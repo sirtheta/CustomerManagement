@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { firstProfileLabel } from "@/lib/sender-profile";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import InvoiceForm from "../InvoiceForm";
@@ -15,7 +16,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 
-    const [customers, services, settings, templates, categories, unitOrder] = await Promise.all([
+    const [customers, services, settings, templates, categories, unitOrder, senderProfiles] = await Promise.all([
     prisma.customer.findMany({
       where: defaultCustomerId !== undefined ? selectableCustomersWhere(defaultCustomerId) : { archivedAt: null },
       orderBy: { contactPerson: "asc" },
@@ -23,7 +24,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
-    prisma.applicationSettings.findFirst(),
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
     prisma.invoiceTemplate.findMany({
       include: { items: { orderBy: { id: "asc" } } },
       orderBy: { name: "asc" },
@@ -33,6 +34,7 @@ export default async function NewInvoicePage({ searchParams }: Props) {
     }))),
       prisma.category.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
+    prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -45,6 +47,8 @@ export default async function NewInvoicePage({ searchParams }: Props) {
         categories={categories}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      firstSenderLabel={firstProfileLabel(settings?.companyInfo.companyName)}
+      senderProfiles={senderProfiles.filter((p) => p.isActive)}
     />
   );
 }

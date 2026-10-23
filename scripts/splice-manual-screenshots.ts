@@ -25,6 +25,8 @@ const ALT_MATCH: Record<string, string> = {
   quotes: "Offertenliste mit Status Entwurf, Versendet, Angenommen",
   "quote-new": "Neue Offerte mit Zusatztext und Schlusstext",
   "quote-pdf": "Offerten-PDF mit Schlusstext über der Grussformel",
+  "invoice-pdf-sender": "Rechnungs-PDF mit dem Logo und den Kontaktdaten des zweiten Absenders",
+  "settings-sender-profiles": "Absender-Profile mit Logo, Kontaktdaten und Aktiv-Schalter",
   services: "Leistungskatalog mit Einheit, Preis und Kategorie",
   analytics: "Auswertung mit Umsatzverlauf, Kategorien und Top-Kunden",
   accounting: "Buchhaltung mit Ausgaben und monatlicher Erfolgsrechnung",

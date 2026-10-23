@@ -41,6 +41,9 @@ export default async function SettingsPage() {
           <Button variant="outline" size="sm" render={<Link href="/settings/categories" />}>
             Kategorien
           </Button>
+          <Button variant="outline" size="sm" render={<Link href="/settings/sender-profiles" />}>
+            Absender-Profile
+          </Button>
           <Button variant="outline" size="sm" render={<Link href="/settings/design" />}>
             Dokument-Design
           </Button>

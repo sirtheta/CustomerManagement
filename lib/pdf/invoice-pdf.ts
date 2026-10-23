@@ -8,17 +8,22 @@ import type {
   Customer,
   CompanyInformation,
   ApplicationSettings,
+  SenderProfile,
 } from "@prisma/client";
+import { applySenderProfile } from "@/lib/sender-profile";
 
 export type InvoiceWithDetails = Invoice & {
   customer: Customer;
   items: Item[];
   creditNoteFor?: { documentNumber: string | null } | null;
+  /** Selected sender profile; `null`/missing = the company data. Callers must include it. */
+  senderProfile?: SenderProfile | null;
 };
 
 export type QuoteWithDetails = Quote & {
   customer: Customer;
   items: Item[];
+  senderProfile?: SenderProfile | null;
 };
 
 type Settings = ApplicationSettings & {
@@ -30,6 +35,7 @@ export async function generateInvoicePdf(
   settings: Settings
 ): Promise<Buffer> {
   const company = settings.companyInfo;
+  const sender = applySenderProfile(company, invoice.senderProfile);
   const discountPercent = Number(invoice.discountPercent ?? 0);
   // The stored total is the single source of truth (payments, QR amount and open
   // items use it); recomputing here would ignore the 5-Rappen rounding setting
@@ -74,14 +80,14 @@ export async function generateInvoicePdf(
         : undefined,
   };
 
-  return generateDocumentPdf(doc, company, settings.numberFormat ?? "de-CH", settings.pdfTheme);
+  return generateDocumentPdf(doc, sender, settings.numberFormat ?? "de-CH", settings.pdfTheme);
 }
 
 export async function generateQuotePdf(
   quote: QuoteWithDetails,
   settings: Settings
 ): Promise<Buffer> {
-  const company = settings.companyInfo;
+  const company = applySenderProfile(settings.companyInfo, quote.senderProfile);
 
   const doc: RenderDoc = {
     kind: "quote",

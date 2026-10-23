@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { readCache, writeCache } from "@/lib/pdf/pdf-cache";
 import { themeRevision } from "@/lib/pdf/theme";
+import { senderProfileCacheSuffix } from "@/lib/sender-profile";
 import { NextRequest } from "next/server";
 
 export async function GET(
@@ -21,6 +22,7 @@ export async function GET(
       where: { id: invoiceId },
       include: {
         customer: true,
+        senderProfile: true,
         items: { orderBy: { id: "asc" } },
         creditNoteFor: { select: { documentNumber: true } },
       },
@@ -40,7 +42,7 @@ export async function GET(
   const filename = invoice.documentNumber
     ? `${prefix}-${invoice.documentNumber}.pdf`
     : `entwurf-${invoice.id}.pdf`;
-  const cacheKey = `inv-${invoiceId}-v${invoice.version}-n${invoice.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}`;
+  const cacheKey = `inv-${invoiceId}-v${invoice.version}-n${invoice.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}${senderProfileCacheSuffix(invoice.senderProfile)}`;
   const cached = await readCache(cacheKey);
 
   const headers = {

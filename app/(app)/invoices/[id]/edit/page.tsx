@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { firstProfileLabel } from "@/lib/sender-profile";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { notFound, redirect } from "next/navigation";
@@ -19,7 +20,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   const { from } = await searchParams;
   const invoiceId = parseInt(id, 10);
 
-    const [invoice, services, settings, categories, unitOrder] = await Promise.all([
+    const [invoice, services, settings, categories, unitOrder, senderProfiles] = await Promise.all([
     prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { items: true },
@@ -27,9 +28,10 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
     prisma.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }).then(rows =>
       rows.map(s => ({ ...s, unitPrice: Number(s.unitPrice) }))
     ),
-    prisma.applicationSettings.findFirst(),
+    prisma.applicationSettings.findFirst({ include: { companyInfo: true } }),
       prisma.category.findMany({ orderBy: { name: "asc" } }),
     loadUnitOrder(prisma),
+    prisma.senderProfile.findMany({ select: { id: true, name: true, isActive: true }, orderBy: { name: "asc" } }),
   ]);
 
   if (!invoice) notFound();
@@ -59,6 +61,8 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       creditNoteFor={original ?? undefined}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}
+      firstSenderLabel={firstProfileLabel(settings?.companyInfo.companyName)}
+      senderProfiles={senderProfiles}
     />
   );
 }

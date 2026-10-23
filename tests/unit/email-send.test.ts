@@ -91,6 +91,32 @@ describe("email.ts", () => {
       expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "andere@muster.ch" }));
     });
 
+    it("signs with the sender profile's company name and falls back to the company", async () => {
+      const withProfile = { ...makeInvoice(), senderProfile: { companyName: "Atelier Erika" } } as never;
+      await sendInvoiceEmail(withProfile, makeSettings(), Buffer.from("pdf"));
+      const mail = mockSendMail.mock.calls[0][0];
+      expect(mail.subject).toContain("Atelier Erika");
+      expect(mail.text).toContain("Atelier Erika");
+      expect(mail.text).not.toContain("Test AG");
+
+      mockSendMail.mockClear();
+      const emptyProfile = { ...makeInvoice(), senderProfile: { companyName: null } } as never;
+      await sendInvoiceEmail(emptyProfile, makeSettings(), Buffer.from("pdf"));
+      expect(mockSendMail.mock.calls[0][0].subject).toContain("Test AG");
+    });
+
+    it("fills a {companyName} left open in an edited text with the profile's name", async () => {
+      const withProfile = { ...makeInvoice(), senderProfile: { companyName: "Atelier Erika" } } as never;
+      await sendInvoiceEmail(withProfile, makeSettings(), Buffer.from("pdf"), { subject: "Rechnung – {companyName}", body: "Gruss {companyName}" });
+      expect(mockSendMail.mock.calls[0][0]).toMatchObject({ subject: "Rechnung – Atelier Erika", text: "Gruss Atelier Erika" });
+    });
+
+    it("signs a quote with the sender profile's company name", async () => {
+      const withProfile = { ...makeQuote(), senderProfile: { companyName: "Atelier Erika" } } as never;
+      await sendQuoteEmail(withProfile, makeSettings(), Buffer.from("pdf"));
+      expect(mockSendMail.mock.calls[0][0].text).toContain("Atelier Erika");
+    });
+
     it("falls back to the customer e-mail without a billing e-mail", async () => {
       await sendInvoiceEmail(makeInvoice(), makeSettings(), Buffer.from("pdf"));
       expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@muster.ch" }));

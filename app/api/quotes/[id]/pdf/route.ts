@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { generateQuotePdf } from "@/lib/pdf/invoice-pdf";
 import { readCache, writeCache } from "@/lib/pdf/pdf-cache";
 import { themeRevision } from "@/lib/pdf/theme";
+import { senderProfileCacheSuffix } from "@/lib/sender-profile";
 import { NextRequest } from "next/server";
 import { moduleDisabledResponse } from "@/lib/module-guard";
 
@@ -23,7 +24,7 @@ export async function GET(
   const [quote, settings] = await Promise.all([
     prisma.quote.findUnique({
       where: { id: quoteId },
-      include: { customer: true, items: { orderBy: { id: "asc" } } },
+      include: { customer: true, senderProfile: true, items: { orderBy: { id: "asc" } } },
     }),
     prisma.applicationSettings.findFirst({
       include: { companyInfo: true },
@@ -39,7 +40,7 @@ export async function GET(
   const filename = quote.documentNumber
     ? `offerte-${quote.documentNumber}.pdf`
     : `entwurf-${quote.id}.pdf`;
-  const cacheKey = `quote-${quoteId}-v${quote.version}-n${quote.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}`;
+  const cacheKey = `quote-${quoteId}-v${quote.version}-n${quote.documentNumber ?? "draft"}-t${themeRevision(settings.pdfTheme)}${senderProfileCacheSuffix(quote.senderProfile)}`;
   const cached = await readCache(cacheKey);
 
   const headers = {

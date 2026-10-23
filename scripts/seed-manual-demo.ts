@@ -16,6 +16,7 @@ import { PrismaClient, InvoiceState, QuoteState, Unit, UserRole } from "@prisma/
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { loadEnvConfig } from "@next/env";
 import { hash } from "bcryptjs";
+import sharp from "sharp";
 
 loadEnvConfig(process.cwd());
 
@@ -27,6 +28,15 @@ function createClient() {
 }
 
 const prisma = createClient();
+
+// Fictional logos drawn from plain shapes (no text, so no font is needed).
+async function demoLogo(kind: "company" | "second"): Promise<Buffer> {
+  const svg =
+    kind === "company"
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" rx="56" fill="#1d4ed8"/><circle cx="150" cy="150" r="78" fill="none" stroke="#fff" stroke-width="22"/><circle cx="150" cy="150" r="26" fill="#fff"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" rx="150" fill="#b45309"/><polygon points="150,64 236,214 64,214" fill="#fff"/><rect x="118" y="170" width="64" height="44" fill="#b45309"/></svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
 
 function daysFromNow(days: number): Date {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -123,14 +133,31 @@ async function main() {
   const today = new Date();
   const pastDate = (daysAgo: number) => new Date(today.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
-  const invoicePlans: { customer: (typeof customers)[number]; state: InvoiceState; daysAgo: number; dueInDays: number }[] = [
+  // Second sender next to the company data (first profile), e.g. the partner of the owner.
+  const secondSender = await prisma.senderProfile.create({
+    data: {
+      name: "Marco Keller (Webdesign)",
+      companyHolderName: "Marco Keller",
+      companyEmail: "marco@muster-digitalwerkstatt.ch",
+      logo: new Uint8Array(await demoLogo("second")),
+    },
+  });
+
+  const invoicePlans: {
+    customer: (typeof customers)[number];
+    state: InvoiceState;
+    daysAgo: number;
+    dueInDays: number;
+    senderProfileId?: number;
+  }[] = [
     { customer: customers[0], state: InvoiceState.Paid, daysAgo: 40, dueInDays: 30 },
     { customer: customers[1], state: InvoiceState.Sent, daysAgo: 5, dueInDays: 30 },
     { customer: customers[2], state: InvoiceState.Overdue, daysAgo: 60, dueInDays: 30 },
     { customer: customers[3], state: InvoiceState.Draft, daysAgo: 0, dueInDays: 30 },
     { customer: customers[4], state: InvoiceState.Canceled, daysAgo: 20, dueInDays: 30 },
     { customer: customers[6], state: InvoiceState.Paid, daysAgo: 90, dueInDays: 30 },
-    { customer: customers[7], state: InvoiceState.Sent, daysAgo: 2, dueInDays: 30 },
+    // The invoice shown in the manual with the second sender (invoice id 7, see manual-screenshots.ts).
+    { customer: customers[7], state: InvoiceState.Sent, daysAgo: 2, dueInDays: 30, senderProfileId: secondSender.id },
   ];
 
   let invoiceCounter = 1;
@@ -152,6 +179,7 @@ async function main() {
         dueDate,
         totalAmount,
         state: plan.state,
+        senderProfileId: plan.senderProfileId ?? null,
         paidDate,
         payments: paidDate
           ? { create: [{ date: paidDate, amount: totalAmount, source: "manual" }] }
@@ -252,6 +280,7 @@ async function main() {
       companyEmail: "info@muster-digitalwerkstatt.ch",
       companyPhone: "+41 44 500 12 34",
       companyIBAN: "CH9300762011623852957",
+      companyLogo: new Uint8Array(await demoLogo("company")),
     },
   });
   await prisma.applicationSettings.create({
