@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.0...customer-management-v1.9.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **deps:** upgrade Next.js to 16.4.3 for October 2026 security fixes ([#176](https://github.com/sirtheta/CustomerManagement/issues/176)) ([9c95f99](https://github.com/sirtheta/CustomerManagement/commit/9c95f991452bbb4c27eb99243d8e95ce9023d191))
+
 ## [1.9.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.8.4...customer-management-v1.9.0) (2026-10-23)
 
 
