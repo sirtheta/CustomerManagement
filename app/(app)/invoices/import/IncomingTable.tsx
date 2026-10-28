@@ -224,8 +224,9 @@ export function IncomingTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
+            {/* Phones: every row becomes a card (same markup, so the controls exist only once) */}
+            <Table className="max-md:block">
+              <TableHeader className="max-md:hidden">
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Datum</TableHead>
@@ -235,14 +236,14 @@ export function IncomingTable({
                   <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody className="max-md:block">
                 {rows.map((row) => {
                   const { transaction } = row;
                   const selection = selectionOf(row);
                   const label = transaction.counterparty ?? transaction.description;
                   return (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="align-top">
+                    <TableRow key={transaction.id} className="max-md:mb-3 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:gap-y-1 max-md:rounded-lg max-md:border max-md:p-3">
+                      <TableCell className="align-top max-md:order-1 max-md:p-0">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-input accent-primary"
@@ -252,18 +253,18 @@ export function IncomingTable({
                           onChange={(e) => update(row, { checked: e.target.checked })}
                         />
                       </TableCell>
-                      <TableCell className="whitespace-nowrap align-top">{formatDate(transaction.date)}</TableCell>
-                      <TableCell className="max-w-xs truncate align-top" title={transaction.description}>
+                      <TableCell className="whitespace-nowrap align-top max-md:order-2 max-md:p-0">{formatDate(transaction.date)}</TableCell>
+                      <TableCell className="max-w-xs truncate align-top max-md:order-4 max-md:w-full max-md:max-w-none max-md:overflow-visible max-md:whitespace-normal max-md:p-0" title={transaction.description}>
                         {transaction.description}
                         {transaction.counterparty && (
                           <span className="text-muted-foreground"> · {transaction.counterparty}</span>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap align-top">
+                      <TableCell className="whitespace-nowrap align-top max-md:order-3 max-md:ml-auto max-md:p-0">
                         {formatCurrency(transaction.amountCents / 100)}
                       </TableCell>
-                      <TableCell className="align-top">{renderAssignment(row)}</TableCell>
-                      <TableCell className="align-top">
+                      <TableCell className="align-top max-md:order-5 max-md:w-full max-md:p-0">{renderAssignment(row)}</TableCell>
+                      <TableCell className="align-top max-md:order-6 max-md:p-0">
                         <Button
                           variant="ghost"
                           size="sm"

@@ -328,7 +328,34 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <CardTitle>Versendete Dokumente</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Phones get cards instead of a five-column table */}
+            <ul className="space-y-3 md:hidden">
+              {invoice.sentDocuments.map((doc) => (
+                <li key={doc.id} className="rounded-lg border p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium">
+                      {doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : isCreditNote ? "Gutschrift" : "Rechnung"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{formatDate(doc.createdAt)}</span>
+                  </div>
+                  <p className="break-all text-sm">{doc.sentTo}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-muted-foreground" title={doc.sha256}>
+                      {doc.sha256.slice(0, 12)}…
+                    </span>
+                    <a
+                      href={`/api/invoices/${invoice.id}/archive/${doc.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary underline"
+                    >
+                      Öffnen
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>

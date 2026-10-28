@@ -50,7 +50,24 @@ export default async function ReceivablesPage({ searchParams }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Altersstruktur</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          {/* Phones: label/value pairs instead of a row with one column per age bucket */}
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm md:hidden">
+            {AGE_BUCKETS.map((b) => (
+              <div key={b.key} className="flex justify-between gap-2">
+                <dt className="text-muted-foreground">{b.label}</dt>
+                <dd>{formatCurrency(report.bucketTotals[b.key] / 100)}</dd>
+              </div>
+            ))}
+            <div className="flex justify-between gap-2 font-semibold">
+              <dt>Total offen</dt>
+              <dd>{formatCurrency(report.totalOpenRappen / 100)}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-muted-foreground">Zu viel bezahlt</dt>
+              <dd>{formatCurrency(report.totalCreditRappen / 100)}</dd>
+            </div>
+          </dl>
+          <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 {AGE_BUCKETS.map((b) => <TableHead key={b.key}>{b.label}</TableHead>)}
@@ -74,7 +91,20 @@ export default async function ReceivablesPage({ searchParams }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Pro Kunde</CardTitle></CardHeader>
         <CardContent>
-          <Table>
+          {report.byCustomer.length > 0 && (
+            <ul className="divide-y md:hidden">
+              {report.byCustomer.map((c) => (
+                <li key={c.customerId} className="py-2 text-sm">
+                  <Link href={`/customers/${c.customerId}`} className="font-medium underline">{c.customerName}</Link>
+                  <p className="text-muted-foreground">
+                    Offen {formatCurrency(c.openRappen / 100)}
+                    {c.creditRappen > 0 && ` · zu viel bezahlt ${formatCurrency(c.creditRappen / 100)}`}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Table className={report.byCustomer.length > 0 ? "max-md:hidden" : undefined}>
             <TableHeader>
               <TableRow>
                 <TableHead>Kunde</TableHead>
@@ -108,7 +138,36 @@ export default async function ReceivablesPage({ searchParams }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Rechnungen</CardTitle></CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {report.rows.length > 0 && (
+            <ul className="space-y-3 md:hidden">
+              {report.rows.map((r) => (
+                <li key={r.invoiceId} className="rounded-lg border p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/invoices/${r.invoiceId}`} className="font-medium underline">
+                      {documentLabel(r.documentNumber)}
+                    </Link>
+                    <span className="text-xs text-muted-foreground">
+                      {AGE_BUCKETS.find((b) => b.key === r.bucket)?.label ?? ""}
+                    </span>
+                  </div>
+                  <p className="text-sm">{r.customerName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(r.date)} · fällig {formatDate(r.dueDate)}
+                  </p>
+                  <p className="text-sm">
+                    Total {formatCurrency(r.totalRappen / 100)} · bezahlt {formatCurrency(r.paidRappen / 100)}
+                  </p>
+                  {r.openRappen > 0 && (
+                    <p className="text-sm font-semibold">Offen {formatCurrency(r.openRappen / 100)}</p>
+                  )}
+                  {r.creditRappen > 0 && (
+                    <p className="text-sm text-muted-foreground">Zu viel bezahlt {formatCurrency(r.creditRappen / 100)}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={report.rows.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
             <Table>
               <TableHeader>
                 <TableRow>

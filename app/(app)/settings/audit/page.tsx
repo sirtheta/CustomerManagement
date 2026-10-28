@@ -143,7 +143,30 @@ export default async function AuditLogPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      {logs.length > 0 && (
+        // Phones get cards instead of a five-column table
+        <ul className="space-y-3 md:hidden">
+          {logs.map((log) => (
+            <li key={log.id} className="rounded-lg border p-3 space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <Badge variant={actionVariants[log.action] ?? "secondary"}>
+                  {actionLabels[log.action] ?? log.action}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(log.createdAt)} {formatTime(log.createdAt)}
+                </span>
+              </div>
+              <p className="text-sm">
+                <span className="text-muted-foreground">{entityLabel(log.entityType)}</span>
+                {log.entityRef && <span className="font-medium"> · {log.entityRef}</span>}
+              </p>
+              <p className="text-xs text-muted-foreground">{log.userName}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={logs.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>
