@@ -90,7 +90,33 @@ export default async function ServicesPage({ searchParams }: Props) {
         <SearchInput defaultValue={search ?? ""} placeholder="Leistung oder Kategorie suchen…" />
       </Suspense>
 
-      <div className="overflow-x-auto">
+      {services.length > 0 && (
+        // Phones get cards instead of a table that scrolls sideways
+        <ul className="space-y-3 md:hidden">
+          {services.map((s) => (
+            <li key={s.id} className="rounded-lg border p-3 space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium">{s.name}</span>
+                <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? "Aktiv" : "Inaktiv"}</Badge>
+              </div>
+              {s.description && <p className="text-xs text-gray-500">{s.description}</p>}
+              <p className="text-sm text-muted-foreground">
+                {s.category?.name ?? "Ohne Kategorie"} · {UNIT_LABELS[s.unit]}
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">{formatCurrency(s.unitPrice.toNumber())}</span>
+                {canEdit && (
+                  <Button variant="outline" size="sm" render={<Link href={`/services/${s.id}`} />}>
+                    Bearbeiten
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={services.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>

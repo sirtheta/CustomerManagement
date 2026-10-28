@@ -44,7 +44,34 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
         <CreateUserDialog />
       </div>
 
-      <div className="rounded-lg border overflow-hidden">
+      {/* Phones get cards instead of a table that scrolls sideways */}
+      <ul className="space-y-3 md:hidden">
+        {users.map((user) => (
+          <li key={user.id} className="rounded-lg border p-3 space-y-2">
+            <div>
+              <p className="font-medium">{user.name}</p>
+              <p className="break-all text-sm text-muted-foreground">{user.email}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <RoleBadge role={user.role} />
+              <Badge variant={user.isActive ? "default" : "outline"}>
+                {user.isActive ? "Aktiv" : "Inaktiv"}
+              </Badge>
+              <Badge variant={user.totpEnabled ? "secondary" : "outline"}>
+                {user.totpEnabled ? "TOTP aktiv" : "Kein TOTP"}
+              </Badge>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <EditUserDialog user={user} />
+              {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
+              <TotpSetupDialog user={user} />
+              <DeleteUserDialog user={user} />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden rounded-lg border overflow-hidden md:block">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
