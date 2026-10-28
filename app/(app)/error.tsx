@@ -20,7 +20,7 @@ export default function AppError({
       <div className="text-center space-y-2 max-w-sm">
         <h1 className="text-xl font-semibold">Etwas ist schiefgelaufen</h1>
         <p className="text-muted-foreground text-sm">
-          Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut oder kehren Sie zum Dashboard zurück.
+          Ein Fehler ist aufgetreten. Bitte versuche es erneut oder kehre zum Dashboard zurück.
         </p>
         {error.digest && (
           <p className="text-xs text-muted-foreground font-mono">

@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/utils";
 import { listOpenWork } from "@/lib/work-overview";
 import { formatQuantity } from "@/lib/work-entries";
 import { ChevronRightIcon } from "lucide-react";
+import { BackLink } from "@/components/back-link";
 
 export default async function OpenWorkPage() {
   await requireModule("timeTracking");
@@ -23,6 +24,7 @@ export default async function OpenWorkPage() {
 
   return (
     <div className="space-y-4">
+      <BackLink href="/time">Zeiterfassung</BackLink>
       <div>
         <h1 className="text-2xl font-semibold">Offene Erfassungen</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Erfasste Zeit und erfasstes Material, das noch nicht verrechnet ist.</p>

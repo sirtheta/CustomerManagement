@@ -142,7 +142,7 @@ export default function ServiceForm({ service, categories, unitOrder = UNIT_VALU
               <div className="space-y-1.5">
                 <Label>Kategorie</Label>
                 <p className="text-sm text-muted-foreground">
-                  Noch keine Kategorien.{" "}
+                  Noch keine Kategorien vorhanden.{" "}
                   <Link href="/settings/categories" className="font-medium text-foreground underline">
                     Kategorien verwalten →
                   </Link>

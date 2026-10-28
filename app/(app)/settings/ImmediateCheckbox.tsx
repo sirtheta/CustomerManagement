@@ -41,7 +41,7 @@ export default function ImmediateCheckbox({
         if (result.error) toast.error(result.error);
         else toast.success(successMessage);
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   };

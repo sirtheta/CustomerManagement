@@ -29,11 +29,12 @@ export default function TemplateEditForm({ templateId, name, initialItems, servi
 
   return (
     <form action={formAction} className="space-y-4">
+      <h1 className="text-2xl font-semibold">Vorlage bearbeiten</h1>
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
       <Card>
         <CardHeader>
-          <CardTitle>Vorlage bearbeiten</CardTitle>
+          <CardTitle>Vorlagendaten</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-1.5">

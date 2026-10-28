@@ -24,27 +24,9 @@ import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
+import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 
 const PAGE_SIZE = 25;
-
-const stateLabels: Record<QuoteState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
-
-const stateVariants: Record<
-  QuoteState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  Accepted: "outline",
-  Declined: "destructive",
-  Expired: "outline",
-};
 
 const filterOptions: { value: string; label: string }[] = [
   { value: "all", label: "Alle" },
@@ -201,7 +183,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                 <Link href={`/quotes/${q.id}`} className="font-medium hover:underline">
                   {documentLabel(q.documentNumber)}
                 </Link>
-                <Badge variant={stateVariants[q.state]}>{stateLabels[q.state]}</Badge>
+                <Badge variant={quoteStateVariants[q.state]}>{quoteStateLabels[q.state]}</Badge>
               </div>
               <Link href={`/customers/${q.customer.customerId}`} className="block text-sm hover:underline">
                 {customerDisplayName(q.customer)}
@@ -285,8 +267,8 @@ export default async function QuotesPage({ searchParams }: Props) {
                   <TableCell>{formatDate(q.validUntil)}</TableCell>
                   <TableCell>{formatCurrency(q.totalAmount.toNumber())}</TableCell>
                   <TableCell>
-                    <Badge variant={stateVariants[q.state]}>
-                      {stateLabels[q.state]}
+                    <Badge variant={quoteStateVariants[q.state]}>
+                      {quoteStateLabels[q.state]}
                     </Badge>
                   </TableCell>
                 </TableRow>

@@ -26,7 +26,7 @@ export default async function UsersPage() {
       <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-semibold">Benutzerverwaltung</h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-0.5">
           Benutzer anlegen, Rollen verwalten und TOTP konfigurieren.
         </p>
       </div>

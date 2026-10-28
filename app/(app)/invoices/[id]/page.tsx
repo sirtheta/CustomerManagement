@@ -20,7 +20,7 @@ import DeleteInvoiceButton from "../DeleteInvoiceButton";
 import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
 import CreateCreditNoteButton from "../CreateCreditNoteButton";
-import { UserRole, type InvoiceState } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
 import { toRappen } from "@/lib/calculations";
 import { auth } from "@/lib/auth";
@@ -36,27 +36,7 @@ import { invoiceMail } from "@/lib/mail-templates";
 import { generateInvoiceNumber } from "@/lib/document-number";
 import { isLastReminderLevelSent, latestSentReminders, reminderAvailability } from "@/lib/reminders";
 import { SendDialogProvider } from "../SendDialogContext";
-
-const stateLabels: Record<InvoiceState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
-
-const stateVariants: Record<
-  InvoiceState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  PartiallyPaid: "secondary",
-  Paid: "outline",
-  Overdue: "destructive",
-  Canceled: "outline",
-};
+import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -114,7 +94,6 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const fullyCredited = totalRappen > 0 && creditedRappen >= totalRappen;
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
-  const backHref = fromCustomer ? `/${fromCustomer}` : "/invoices";
   const customerName = customerDisplayName(invoice.customer);
   const breadcrumbItems = fromCustomer
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(invoice.documentNumber) }]
@@ -185,7 +164,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             {isCreditNote ? "Gutschrift " : ""}{documentLabel(invoice.documentNumber)}
           </h1>
           {invoice.creditNoteFor && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Zu Rechnung{" "}
               <Link href={`/invoices/${invoice.creditNoteFor.id}`} className="hover:underline">
                 {documentLabel(invoice.creditNoteFor.documentNumber)}
@@ -193,14 +172,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </p>
           )}
           {invoice.sourceQuote && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Aus Offerte{" "}
               <Link href={`/quotes/${invoice.sourceQuote.id}`} className="hover:underline">
                 {documentLabel(invoice.sourceQuote.documentNumber)}
               </Link>
             </p>
           )}
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             <Link
               href={`/customers/${invoice.customer.customerId}`}
               className="hover:underline"
@@ -211,17 +190,14 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
-            variant={stateVariants[invoice.state]}
+            variant={invoiceStateVariants[invoice.state]}
             title={invoice.state === "Draft" ? "Entwurf: noch nicht versendet, ohne Nummer, frei änderbar" : undefined}
           >
-            {stateLabels[invoice.state]}
+            {invoiceStateLabels[invoice.state]}
           </Badge>
           {creditedRappen > 0 && !isCreditNote && (
             <span className="text-xs text-muted-foreground">inkl. Gutschrift {formatCurrency(creditedRappen / 100)}</span>
           )}
-          <Button variant="outline" size="sm" render={<Link href={backHref} />}>
-            Zurück
-          </Button>
           {canEdit && invoice.state === "Draft" && (
             <Button
               size="sm"
@@ -253,30 +229,30 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         <CardContent className="space-y-3 text-sm">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <span className="text-gray-500">Datum:</span>{" "}
+              <span className="text-muted-foreground">Datum:</span>{" "}
               {formatDate(invoice.date)}
             </div>
             {!isCreditNote && (
               <div>
-                <span className="text-gray-500">Fällig am:</span>{" "}
+                <span className="text-muted-foreground">Fällig am:</span>{" "}
                 {formatDate(invoice.dueDate)}
               </div>
             )}
             <div>
-              <span className="text-gray-500">Betrag:</span>{" "}
+              <span className="text-muted-foreground">Betrag:</span>{" "}
               <span className="font-medium">
                 {formatCurrency(invoice.totalAmount.toNumber())}
               </span>
             </div>
             {invoice.senderProfile && (
               <div>
-                <span className="text-gray-500">Absender:</span> {invoice.senderProfile.name}
+                <span className="text-muted-foreground">Absender:</span> {invoice.senderProfile.name}
               </div>
             )}
           </div>
           {invoice.customUserText && (
             <div>
-              <span className="text-gray-500">Zusatztext:</span>
+              <span className="text-muted-foreground">Zusatztext:</span>
               <p className="mt-1 whitespace-pre-wrap">{invoice.customUserText}</p>
             </div>
           )}
@@ -331,12 +307,12 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">
                         {formatDate(log.sentAt)}{" "}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           {formatTime(log.sentAt)}
                         </span>
                       </TableCell>
                       <TableCell>{log.sentTo}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{log.subject}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{log.subject}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -352,7 +328,34 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             <CardTitle>Versendete Dokumente</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Phones get cards instead of a five-column table */}
+            <ul className="space-y-3 md:hidden">
+              {invoice.sentDocuments.map((doc) => (
+                <li key={doc.id} className="rounded-lg border p-3 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-medium">
+                      {doc.kind === "Reminder" ? reminderTitle(doc.reminderLevel ?? 1) : isCreditNote ? "Gutschrift" : "Rechnung"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{formatDate(doc.createdAt)}</span>
+                  </div>
+                  <p className="break-all text-sm">{doc.sentTo}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-muted-foreground" title={doc.sha256}>
+                      {doc.sha256.slice(0, 12)}…
+                    </span>
+                    <a
+                      href={`/api/invoices/${invoice.id}/archive/${doc.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary underline"
+                    >
+                      Öffnen
+                    </a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>

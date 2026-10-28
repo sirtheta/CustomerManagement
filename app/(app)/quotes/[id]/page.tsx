@@ -19,32 +19,16 @@ import QuoteStatusSelect from "../QuoteStatusSelect";
 import DeleteQuoteButton from "../DeleteQuoteButton";
 import ConvertToInvoiceButton from "../ConvertToInvoiceButton";
 import SendQuoteButton from "../SendQuoteButton";
-import type { QuoteState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
 import { quoteMail } from "@/lib/mail-templates";
 import { generateQuoteNumber } from "@/lib/document-number";
-
-const stateLabels: Record<QuoteState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
-
-const stateVariants: Record<
-  QuoteState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  Accepted: "outline",
-  Declined: "destructive",
-  Expired: "outline",
-};
+import { auth } from "@/lib/auth";
+import { UserRole } from "@prisma/client";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -53,6 +37,9 @@ type Props = {
 
 export default async function QuoteDetailPage({ params, searchParams }: Props) {
   await requireModule("quotes");
+  const session = await auth();
+  const canEdit = isEditorSession(session);
+  const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
   const { id } = await params;
   const { from } = await searchParams;
   const quoteId = parseInt(id, 10);
@@ -78,10 +65,9 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const { subject: defaultSubject, body: defaultBody } = quoteMail(quote, companyName);
 
   // Read-only preview for the send dialog; the real number is assigned when sending.
-  const nextDocumentNumber = quote.documentNumber ? null : await generateQuoteNumber();
+  const nextDocumentNumber = canEdit && !quote.documentNumber ? await generateQuoteNumber() : null;
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
-  const backHref = fromCustomer ? `/${fromCustomer}` : "/quotes";
   const customerName = customerDisplayName(quote.customer);
   const breadcrumbItems = fromCustomer
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(quote.documentNumber) }]
@@ -93,7 +79,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">{documentLabel(quote.documentNumber)}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             <Link
               href={`/customers/${quote.customer.customerId}`}
               className="hover:underline"
@@ -103,19 +89,18 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant={stateVariants[quote.state]}>
-            {stateLabels[quote.state]}
+          <Badge variant={quoteStateVariants[quote.state]}>
+            {quoteStateLabels[quote.state]}
           </Badge>
-          <Button variant="outline" size="sm" render={<Link href={backHref} />}>
-            Zurück
-          </Button>
-          <Button
-            size="sm"
-            variant={quote.state === "Accepted" ? "outline" : "default"}
-            render={<Link href={`/quotes/${quote.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
-          >
-            Bearbeiten
-          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant={quote.state === "Accepted" ? "outline" : "default"}
+              render={<Link href={`/quotes/${quote.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
+            >
+              Bearbeiten
+            </Button>
+          )}
         </div>
       </div>
 
@@ -126,34 +111,34 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
         <CardContent className="space-y-3 text-sm">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <span className="text-gray-500">Datum:</span>{" "}
+              <span className="text-muted-foreground">Datum:</span>{" "}
               {formatDate(quote.date)}
             </div>
             <div>
-              <span className="text-gray-500">Gültig bis:</span>{" "}
+              <span className="text-muted-foreground">Gültig bis:</span>{" "}
               {formatDate(quote.validUntil)}
             </div>
             <div>
-              <span className="text-gray-500">Betrag:</span>{" "}
+              <span className="text-muted-foreground">Betrag:</span>{" "}
               <span className="font-medium">
                 {formatCurrency(quote.totalAmount.toNumber())}
               </span>
             </div>
             {quote.senderProfile && (
               <div>
-                <span className="text-gray-500">Absender:</span> {quote.senderProfile.name}
+                <span className="text-muted-foreground">Absender:</span> {quote.senderProfile.name}
               </div>
             )}
           </div>
           {quote.customUserText && (
             <div>
-              <span className="text-gray-500">Zusatztext:</span>
+              <span className="text-muted-foreground">Zusatztext:</span>
               <p className="mt-1 whitespace-pre-wrap">{quote.customUserText}</p>
             </div>
           )}
           {quote.closingText && (
             <div>
-              <span className="text-gray-500">Schlusstext:</span>
+              <span className="text-muted-foreground">Schlusstext:</span>
               <p className="mt-1 whitespace-pre-wrap">{quote.closingText}</p>
             </div>
           )}
@@ -208,12 +193,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">
                         {formatDate(log.sentAt)}{" "}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           {formatTime(log.sentAt)}
                         </span>
                       </TableCell>
                       <TableCell>{log.sentTo}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{log.subject}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{log.subject}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -238,28 +223,34 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
         </p>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Status ändern</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <QuoteStatusSelect quoteId={quote.id} currentState={quote.state} />
-        </CardContent>
-      </Card>
+      {canEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Status ändern</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <QuoteStatusSelect quoteId={quote.id} currentState={quote.state} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <DeleteQuoteButton quoteId={quote.id} />
+        {canDelete ? <DeleteQuoteButton quoteId={quote.id} /> : <span />}
         <div className="flex items-center gap-2 flex-wrap">
-          <SendQuoteButton
-            quoteId={quote.id}
-            customerEmail={quote.customer.email}
-            documentNumber={quote.documentNumber}
-            defaultSubject={defaultSubject}
-            defaultBody={defaultBody}
-            expectedDocumentNumber={nextDocumentNumber}
-            variant={quote.state === "Accepted" ? "outline" : "default"}
-          />
-          <ConvertToInvoiceButton quoteId={quote.id} primary={quote.state === "Accepted" && quote.invoices.length === 0} alreadyConverted={quote.invoices.length > 0} />
+          {canEdit && (
+            <SendQuoteButton
+              quoteId={quote.id}
+              customerEmail={quote.customer.email}
+              documentNumber={quote.documentNumber}
+              defaultSubject={defaultSubject}
+              defaultBody={defaultBody}
+              expectedDocumentNumber={nextDocumentNumber}
+              variant={quote.state === "Accepted" ? "outline" : "default"}
+            />
+          )}
+          {canEdit && (
+            <ConvertToInvoiceButton quoteId={quote.id} primary={quote.state === "Accepted" && quote.invoices.length === 0} alreadyConverted={quote.invoices.length > 0} />
+          )}
           <Button
             variant="outline"
             render={<Link href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" />}

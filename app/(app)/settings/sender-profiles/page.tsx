@@ -38,9 +38,9 @@ export default async function SenderProfilesPage() {
       <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-semibold">Absender-Profile</h1>
-        <p className="text-muted-foreground mt-1">
-          Das erste Profil sind die Firmendaten mit Firmenlogo aus den Einstellungen (unten als Karte). Hier legen Sie
-          nur weitere Profile an: Sie überschreiben nur, was dort ausgefüllt ist; alles andere (auch Adresse und IBAN)
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Das erste Profil sind die Firmendaten mit Firmenlogo aus den Einstellungen (unten als Karte). Hier legst du
+          nur weitere Profile an: Ein Profil überschreibt nur, was darin ausgefüllt ist; alles andere (auch Adresse und IBAN)
           kommt aus den Firmendaten. Änderungen wirken auch auf Entwürfe und Offerten, die das Profil schon verwenden. Versendete Rechnungen
           bleiben unverändert (PDF-Archiv).
         </p>

@@ -94,7 +94,7 @@ export default function LoginPage() {
             )}
             {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? (totpStep ? "Anmelden..." : "Prüfen...") : totpStep ? "Anmelden" : "Weiter"}
+              {pending ? (totpStep ? "Anmelden…" : "Prüfen…") : totpStep ? "Anmelden" : "Weiter"}
             </Button>
             {totpStep && (
               <Button

@@ -23,7 +23,7 @@ export type ItemViewData = {
 
 export default function ItemsView({ items }: { items: ItemViewData[] }) {
   if (items.length === 0) {
-    return <p className="text-center text-gray-400 py-6">Keine Positionen.</p>;
+    return <p className="text-center text-muted-foreground py-6">Noch keine Positionen vorhanden.</p>;
   }
 
   return (
@@ -43,7 +43,7 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
             </span>
             <p className="font-medium text-sm">{item.name}</p>
             {item.description && (
-              <p className="text-sm text-gray-500 whitespace-pre-wrap">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                 {item.description}
               </p>
             )}
@@ -81,7 +81,7 @@ export default function ItemsView({ items }: { items: ItemViewData[] }) {
             {items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
-                <TableCell className="text-gray-500">
+                <TableCell className="text-muted-foreground">
                   {item.description ?? "—"}
                 </TableCell>
                 <TableCell>{UNIT_LABELS[item.unit]}</TableCell>

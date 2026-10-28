@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Unit } from "@prisma/client";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { parseDecimalInput } from "@/lib/decimal-input";
+import { logAudit } from "@/lib/audit";
 
 export type ServiceFormState = {
   error?: string;
@@ -15,7 +16,7 @@ export async function createService(
   _prev: ServiceFormState,
   formData: FormData
 ): Promise<ServiceFormState> {
-  await requireEditor();
+  const session = await requireEditor();
   const name = formData.get("name") as string;
   const description = formData.get("description") as string | null;
   const unit = formData.get("unit") as Unit;
@@ -39,7 +40,7 @@ export async function createService(
   const categoryId =
     categoryIdRaw && categoryIdRaw !== "" ? parseInt(categoryIdRaw, 10) : null;
 
-  await prisma.service.create({
+  const service = await prisma.service.create({
     data: {
       name,
       description: description || null,
@@ -50,6 +51,7 @@ export async function createService(
     },
   });
 
+  await logAudit(session, "CREATE", "Service", service.id, service.name);
   redirect("/services?flash=service-created");
 }
 
@@ -58,7 +60,7 @@ export async function updateService(
   _prev: ServiceFormState,
   formData: FormData
 ): Promise<ServiceFormState> {
-  await requireEditor();
+  const session = await requireEditor();
   const name = formData.get("name") as string;
   const description = formData.get("description") as string | null;
   const unit = formData.get("unit") as Unit;
@@ -94,11 +96,16 @@ export async function updateService(
     },
   });
 
+  await logAudit(session, "UPDATE", "Service", id, name);
   redirect("/services?flash=service-updated");
 }
 
 export async function deleteService(id: number): Promise<void> {
-  await requireAdmin();
+  const session = await requireAdmin();
+  const service = await prisma.service.findUnique({ where: { id }, select: { name: true } });
+  // WorkEntry.service is SET NULL: open entries stay but lose their catalog price, so the audit entry records how many.
+  const openWorkEntries = await prisma.workEntry.count({ where: { serviceId: id, invoiceId: null } });
   await prisma.service.delete({ where: { id } });
+  await logAudit(session, "DELETE", "Service", id, service?.name, openWorkEntries > 0 ? { openWorkEntries } : undefined);
   redirect("/services?flash=service-deleted");
 }

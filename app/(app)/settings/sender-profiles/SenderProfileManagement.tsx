@@ -222,7 +222,7 @@ function FirstProfileCard({ first }: { first: FirstProfile }) {
           <p className="text-sm">{lines.length > 0 ? lines.join(" · ") : "Noch keine Firmendaten erfasst."}</p>
         </div>
         <p className="text-xs text-muted-foreground">
-          Gilt, wenn bei einem Dokument kein anderer Absender gewählt ist. Name, Kontaktdaten und Logo ändern Sie in den{" "}
+          Gilt, wenn bei einem Dokument kein anderer Absender gewählt ist. Name, Kontaktdaten und Logo änderst du in den{" "}
           <Link href="/settings" className="underline">
             Einstellungen
           </Link>

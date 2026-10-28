@@ -135,7 +135,7 @@ export default async function DashboardPage() {
         <Link href="/customers" className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Kunden
               </CardTitle>
             </CardHeader>
@@ -148,17 +148,17 @@ export default async function DashboardPage() {
         <Link href="/invoices" className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Offene Rechnungen
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">{openInvoices.count}</p>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {formatCurrency(openInvoices.amount)}
               </p>
               {draftCount > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Entwürfe, noch nicht versendet: {draftCount}
                 </p>
               )}
@@ -170,7 +170,7 @@ export default async function DashboardPage() {
           <Link href="/quotes" className="h-full">
             <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   Offene Offerten
                 </CardTitle>
               </CardHeader>
@@ -184,7 +184,7 @@ export default async function DashboardPage() {
         <Link href={modules.analytics ? "/analytics" : "/invoices"} className="h-full">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 Einnahmen {currentYear}
               </CardTitle>
             </CardHeader>
@@ -192,7 +192,7 @@ export default async function DashboardPage() {
               <p className="text-2xl 2xl:text-3xl font-bold break-words">
                 {formatCurrency(currentYearRevenue._sum.amount?.toNumber() ?? 0)}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Zahlungseingänge</p>
+              <p className="text-sm text-muted-foreground mt-1">Zahlungseingänge</p>
             </CardContent>
           </Card>
         </Link>
@@ -201,13 +201,13 @@ export default async function DashboardPage() {
           <Link href="/subscriptions" className="h-full">
             <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   Geplante Abos
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">{scheduledSubscriptionCount}</p>
-                <p className="text-sm text-gray-500 mt-1">Aktive Abos</p>
+                <p className="text-sm text-muted-foreground mt-1">Aktive Abos</p>
               </CardContent>
             </Card>
           </Link>
@@ -221,20 +221,20 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {openTasks.length === 0 ? (
-              <p className="text-sm text-gray-500">Keine offenen Aufgaben.</p>
+              <p className="text-sm text-muted-foreground">Keine offenen Aufgaben.</p>
             ) : (
               <ul className="divide-y">
                 {openTasks.map((task) => (
                   <li key={task.id} className="py-2 flex justify-between items-center gap-3">
                     <Link href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
                       <span className="font-medium">{task.title}</span>
-                      <span className="text-gray-500">
+                      <span className="text-muted-foreground">
                         {" · "}
                         {customerDisplayName(task.customer)}
                       </span>
                     </Link>
                     <span
-                      className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-gray-500"}`}
+                      className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-muted-foreground"}`}
                     >
                       {formatDate(task.dueDate)}
                     </span>
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {scheduledSubscriptions.length === 0 ? (
-              <p className="text-sm text-gray-500">Keine Abos geplant.</p>
+              <p className="text-sm text-muted-foreground">Keine Abos geplant.</p>
             ) : (
               <ul className="divide-y">
                 {scheduledSubscriptions.map((sub) => (
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
                     <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
                       {customerDisplayName(sub.customer)}
                     </Link>
-                    <span className="text-sm text-gray-500 whitespace-nowrap">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
                       {INTERVAL_LABELS[sub.interval]} · {formatDate(sub.nextInvoiceDate)}
                     </span>
                   </li>
@@ -281,7 +281,7 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentInvoices.length === 0 ? (
-            <p className="text-sm text-gray-500">Keine Rechnungen vorhanden.</p>
+            <p className="text-sm text-muted-foreground">Noch keine Rechnungen vorhanden.</p>
           ) : (
             <ul className="divide-y">
               {recentInvoices.map((inv) => (
@@ -294,9 +294,9 @@ export default async function DashboardPage() {
                       {documentLabel(inv.documentNumber)}
                     </Link>
                     {inv.creditNoteForId !== null && (
-                      <span className="ml-2 text-xs text-gray-500">Gutschrift</span>
+                      <span className="ml-2 text-xs text-muted-foreground">Gutschrift</span>
                     )}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {customerDisplayName(inv.customer)}
                     </p>
                   </div>

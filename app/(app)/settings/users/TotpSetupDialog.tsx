@@ -89,7 +89,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
                 disabled={isPending}
                 onClick={() => startTransition(async () => { await disableTotp(user.id); handleClose(); })}
               >
-                {isPending ? "Deaktivieren..." : "Deaktivieren"}
+                {isPending ? "Deaktivieren…" : "Deaktivieren"}
               </Button>
             </div>
           </div>
@@ -98,7 +98,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
             <p className="text-sm text-muted-foreground">QR-Code generieren und in Authenticator-App scannen.</p>
             {confirmError && <p className="text-sm text-red-600">{confirmError}</p>}
             <Button onClick={handleGenerate} disabled={isPending} className="w-full">
-              {isPending ? "Generieren..." : "QR-Code generieren"}
+              {isPending ? "Generieren…" : "QR-Code generieren"}
             </Button>
           </div>
         ) : (
@@ -130,7 +130,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
               {confirmError && <p className="text-sm text-red-600">{confirmError}</p>}
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setStep("generate")}>Zurück</Button>
-                <Button type="submit" disabled={isPending}>{isPending ? "Prüfen..." : "Bestätigen"}</Button>
+                <Button type="submit" disabled={isPending}>{isPending ? "Prüfen…" : "Bestätigen"}</Button>
               </div>
             </form>
           </div>

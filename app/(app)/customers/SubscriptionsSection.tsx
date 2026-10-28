@@ -254,7 +254,7 @@ function SubscriptionItem({
                 try {
                   await setSubscriptionActive(customerId, sub.id, !sub.active);
                 } catch {
-                  toast.error("Status konnte nicht geändert werden.");
+                  toast.error("Status konnte nicht geändert werden");
                 }
               })
             }

@@ -52,7 +52,7 @@ function ChainStatus({ chain }: { chain: ChainVerification }) {
         <p className="font-medium text-destructive">⚠ Das Protokoll wurde verändert</p>
         <p className="mt-1">{brokenReasons[chain.reason](chain.brokenAtId)}</p>
         <p className="mt-1">
-          Bitte sichern Sie sofort ein Datenbank-Backup und informieren Sie Ihren Administrator.
+          Bitte sichere sofort ein Datenbank-Backup und informiere deinen Administrator.
         </p>
       </div>
     );
@@ -143,7 +143,30 @@ export default async function AuditLogPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      {logs.length > 0 && (
+        // Phones get cards instead of a five-column table
+        <ul className="space-y-3 md:hidden">
+          {logs.map((log) => (
+            <li key={log.id} className="rounded-lg border p-3 space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <Badge variant={actionVariants[log.action] ?? "secondary"}>
+                  {actionLabels[log.action] ?? log.action}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(log.createdAt)} {formatTime(log.createdAt)}
+                </span>
+              </div>
+              <p className="text-sm">
+                <span className="text-muted-foreground">{entityLabel(log.entityType)}</span>
+                {log.entityRef && <span className="font-medium"> · {log.entityRef}</span>}
+              </p>
+              <p className="text-xs text-muted-foreground">{log.userName}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={logs.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -158,7 +181,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
             {logs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  Noch keine Aktivitäten aufgezeichnet.
+                  Noch keine Aktivitäten vorhanden.
                 </TableCell>
               </TableRow>
             ) : (

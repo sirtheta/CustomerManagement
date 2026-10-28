@@ -45,7 +45,7 @@ export function ResetPasswordDialog({ user }: { user: User }) {
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Abbrechen</Button>
-            <Button type="submit" disabled={pending}>{pending ? "Speichern..." : "Speichern"}</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Speichern…" : "Speichern"}</Button>
           </div>
         </form>
         <div className="border-t pt-4 space-y-2">
@@ -55,7 +55,7 @@ export function ResetPasswordDialog({ user }: { user: User }) {
           {inviteState.error && <p className="text-sm text-red-600">{inviteState.error}</p>}
           <form action={inviteAction}>
             <Button type="submit" variant="outline" className="w-full" disabled={invitePending}>
-              {invitePending ? "Wird gesendet..." : "Passwort-Link senden"}
+              {invitePending ? "Wird gesendet…" : "Passwort-Link senden"}
             </Button>
           </form>
         </div>

@@ -45,7 +45,7 @@ export default async function TemplateEditPage({ params }: Props) {
     <div className="max-w-3xl space-y-4">
       <Breadcrumb
         items={[
-          { label: "Vorlagen", href: "/invoices/templates" },
+          { label: "Rechnungsvorlagen", href: "/invoices/templates" },
           { label: template.name },
         ]}
       />

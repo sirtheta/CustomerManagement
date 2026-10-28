@@ -20,7 +20,7 @@ export default async function CategoriesPage() {
       <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-semibold">Kategorien</h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-0.5">
           Kategorien für Rechnungspositionen, Leistungen und Ausgaben verwalten.
         </p>
       </div>

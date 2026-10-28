@@ -29,6 +29,18 @@ type Props = {
   searchParams: Promise<{ year?: string }>;
 };
 
+type ExpenseRow = { paidDate: string | null; dueDate: string | null };
+
+function ExpenseStatus({ exp, today }: { exp: ExpenseRow; today: string }) {
+  if (exp.paidDate) return <Badge variant="secondary">Bezahlt</Badge>;
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <Badge variant={exp.dueDate && exp.dueDate.slice(0, 10) < today ? "destructive" : "outline"}>Offen</Badge>
+      {exp.dueDate && <span className="text-xs text-muted-foreground">fällig {formatDate(exp.dueDate)}</span>}
+    </div>
+  );
+}
+
 export default async function AccountingPage({ searchParams }: Props) {
   await requireEditor();
   await requireModule("accounting");
@@ -174,7 +186,41 @@ export default async function AccountingPage({ searchParams }: Props) {
             )}
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {expenses.length > 0 && (
+              // Phones get cards instead of a table with eight columns
+              <ul className="space-y-3 md:hidden">
+                {expenses.map((exp) => (
+                  <li key={exp.id} className="rounded-lg border p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium">{exp.description}</span>
+                      <span className="font-semibold">{formatCurrency(exp.amount)}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(exp.date)}
+                      {exp.supplier && ` · ${exp.supplier}`}
+                      {exp.categoryName && ` · ${exp.categoryName}`}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <ExpenseStatus exp={exp} today={today} />
+                        {exp.receiptCount > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {exp.receiptCount} Beleg{exp.receiptCount === 1 ? "" : "e"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="outline" size="sm" render={<Link href={`/accounting/${exp.id}`} />}>
+                          Bearbeiten
+                        </Button>
+                        <DeleteExpenseButton expenseId={exp.id} size="sm" />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={expenses.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -191,7 +237,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                 <TableBody>
                   {expenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         Noch keine Ausgaben vorhanden.
                       </TableCell>
                     </TableRow>
@@ -204,26 +250,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                         <TableCell>{exp.categoryName ?? "—"}</TableCell>
                         <TableCell>{formatCurrency(exp.amount)}</TableCell>
                         <TableCell>
-                          {exp.paidDate ? (
-                            <Badge variant="secondary">Bezahlt</Badge>
-                          ) : (
-                            <div className="flex flex-col items-start gap-0.5">
-                              <Badge
-                                variant={
-                                  exp.dueDate && exp.dueDate.slice(0, 10) < today
-                                    ? "destructive"
-                                    : "outline"
-                                }
-                              >
-                                Offen
-                              </Badge>
-                              {exp.dueDate && (
-                                <span className="text-xs text-muted-foreground">
-                                  fällig {formatDate(exp.dueDate)}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <ExpenseStatus exp={exp} today={today} />
                         </TableCell>
                         <TableCell>{exp.receiptCount > 0 ? exp.receiptCount : "—"}</TableCell>
                         <TableCell>
@@ -265,7 +292,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                 <TableBody>
                   {payments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-gray-500 py-8">
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         Noch keine Zahlungseingänge vorhanden.
                       </TableCell>
                     </TableRow>
