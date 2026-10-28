@@ -52,7 +52,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         if (result.error) toast.error(result.error);
         else {
           const count = result.expenseCount ?? 0;
-          toast.success(`${count} Ausgabe${count === 1 ? "" : "n"} übernommen.`);
+          toast.success(`${count} Ausgabe${count === 1 ? "" : "n"} übernommen`);
         }
       } catch {
         toast.error("Speichern fehlgeschlagen");
@@ -69,7 +69,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
       if (result.error) return { error: result.error };
       ignoredCount += result.ignoredCount ?? 0;
     }
-    toast.success(`${ignoredCount} Abbuchung${ignoredCount === 1 ? "" : "en"} ignoriert.`);
+    toast.success(`${ignoredCount} Abbuchung${ignoredCount === 1 ? "" : "en"} ignoriert`);
     return {};
   }
 
@@ -99,22 +99,26 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
             onChange={(e) => update(row, { checked: e.target.checked })}
           />
         </TableCell>
-        <TableCell className="whitespace-nowrap max-md:order-2 max-md:p-0">{formatDate(transaction.date)}</TableCell>
+        <TableCell className="whitespace-nowrap max-md:order-2 max-md:p-0">
+          <span className="sr-only md:hidden">Datum: </span>
+          {formatDate(transaction.date)}
+        </TableCell>
         <TableCell className="max-w-xs truncate max-md:order-4 max-md:w-full max-md:max-w-none max-md:overflow-visible max-md:whitespace-normal max-md:p-0" title={transaction.description}>
           {transaction.counterparty && <span className="font-medium">{transaction.counterparty} · </span>}
           {transaction.description}
         </TableCell>
         <TableCell className="whitespace-nowrap max-md:order-3 max-md:ml-auto max-md:p-0">
+          <span className="sr-only md:hidden">Betrag: </span>
           {formatCurrency(Math.abs(transaction.amountCents) / 100)}
         </TableCell>
-        <TableCell className="max-md:order-5 max-md:w-full max-md:p-0">
+        <TableCell className="max-md:order-5 max-md:w-full max-md:whitespace-normal max-md:p-0">
           <Select
             value={selection.categoryId ? String(selection.categoryId) : NO_CATEGORY}
             onValueChange={(value) =>
               update(row, { categoryId: !value || value === NO_CATEGORY ? null : Number(value) })
             }
           >
-            <SelectTrigger className="w-48 max-md:w-full">
+            <SelectTrigger className="w-48 max-md:w-full" aria-label={`Kategorie für ${label}`}>
               <SelectValue placeholder="Kategorie">
                 {(value: string | null) =>
                   !value || value === NO_CATEGORY
@@ -167,7 +171,8 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         <div className="overflow-x-auto">
           <Table className="max-md:block">
             {header}
-            <TableBody className="max-md:block">{visible.map(renderRow)}</TableBody>
+            {/* TableBody drops the border of the last row, which would leave the last card without a frame */}
+            <TableBody className="max-md:block max-md:[&_tr:last-child]:border">{visible.map(renderRow)}</TableBody>
           </Table>
         </div>
       )}
@@ -180,7 +185,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
           <div className="overflow-x-auto mt-2 opacity-70">
             <Table className="max-md:block">
               {header}
-              <TableBody className="max-md:block">{previouslyIgnored.map(renderRow)}</TableBody>
+              <TableBody className="max-md:block max-md:[&_tr:last-child]:border">{previouslyIgnored.map(renderRow)}</TableBody>
             </Table>
           </div>
         </details>
