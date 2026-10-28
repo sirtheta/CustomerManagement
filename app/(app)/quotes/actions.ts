@@ -159,10 +159,12 @@ export async function updateQuoteStatus(
   const current = await prisma.quote.findUnique({ where: { id }, select: { state: true, documentNumber: true },
   });
   if (!current) return;
+  let documentNumber = current.documentNumber;
   if (!current.documentNumber && (state === "Sent" || state === "Accepted")) {
-    await assignDocumentNumber("quote", id, { actor: session });
+    documentNumber = await assignDocumentNumber("quote", id, { actor: session });
   }
   await prisma.quote.update({ where: { id }, data: { state } });
+  await logAudit(session, "STATUS", "Quote", id, documentNumber ?? undefined, { from: current.state, to: state });
 }
 
 export async function deleteQuote(id: number): Promise<{ error?: string }> {

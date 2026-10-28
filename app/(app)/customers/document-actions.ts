@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { matchesMagicBytes } from "@/lib/file-validation";
+import { logAudit } from "@/lib/audit";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -35,7 +36,7 @@ export async function uploadDocument(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireEditor();
+  const session = await requireEditor();
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "Keine Datei ausgewählt" };
 
@@ -52,7 +53,7 @@ export async function uploadDocument(
   if (!matchesMagicBytes(ext, bytes))
     return { error: `Dateiinhalt entspricht nicht dem Dateityp ${ext}` };
 
-  await prisma.document.create({
+  const document = await prisma.document.create({
     data: {
       customerId,
       name: file.name,
@@ -61,7 +62,9 @@ export async function uploadDocument(
       content: bytes,
       note: "",
     },
+    select: { documentId: true },
   });
+  await logAudit(session, "CREATE", "CustomerDocument", document.documentId, file.name, { customerId });
 
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
@@ -71,8 +74,9 @@ export async function deleteDocument(
   customerId: number,
   documentId: number
 ): Promise<void> {
-  await requireAdmin();
-  await prisma.document.delete({ where: { documentId } });
+  const session = await requireAdmin();
+  const document = await prisma.document.delete({ where: { documentId }, select: { name: true } });
+  await logAudit(session, "DELETE", "CustomerDocument", documentId, document.name, { customerId });
   revalidatePath(`/customers/${customerId}`);
 }
 
@@ -82,12 +86,15 @@ export async function updateDocumentNote(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireEditor();
+  const session = await requireEditor();
   const note = (formData.get("note") as string) ?? "";
-  await prisma.document.update({
+  const document = await prisma.document.update({
     where: { documentId },
     data: { note },
+    select: { name: true },
   });
+  // The note text itself stays out of the audit log
+  await logAudit(session, "UPDATE", "CustomerDocument", documentId, document.name, { customerId, note: "geändert" });
   revalidatePath(`/customers/${customerId}`);
   return { success: true, _ts: Date.now() };
 }

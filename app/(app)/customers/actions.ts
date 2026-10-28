@@ -10,6 +10,7 @@ import { z } from "zod";
 import { ADDRESS_LIMITS, isCountryCode } from "@/lib/address";
 import { isValidUid, normalizeUid } from "@/lib/customer-uid";
 import { nextCustomerNumber } from "@/lib/customer-number";
+import { customerDisplayName } from "@/lib/customer-display";
 
 export type CustomerFormState = {
   error?: string;
@@ -247,12 +248,16 @@ export async function deleteCustomer(id: number, fromArchive = false): Promise<{
   if (workEntryCount > 0) {
     return { error: "Der Kunde hat erfasste Leistungen und kann nicht gelöscht werden. Bitte archivieren." };
   }
+  const customer = await prisma.customer.findUnique({
+    where: { customerId: id },
+    select: { company: true, contactPerson: true, contactInsteadOfCompany: true },
+  });
   // The quotes cascade with the customer, but Item.quote is SET NULL: delete their items first or they stay as orphans.
   await prisma.$transaction([
     prisma.item.deleteMany({ where: { quote: { customerId: id } } }),
     prisma.customer.delete({ where: { customerId: id } }),
   ]);
-  await logAudit(session, "DELETE", "Customer", id);
+  await logAudit(session, "DELETE", "Customer", id, customer ? customerDisplayName(customer) : undefined);
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   redirect(fromArchive ? "/customers?archived=true&flash=customer-deleted" : "/customers?flash=customer-deleted");
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import { senderDisplayName } from "@/lib/sender-profile";
 import { notFound } from "next/navigation";
@@ -37,6 +38,7 @@ import { generateInvoiceNumber } from "@/lib/document-number";
 import { isLastReminderLevelSent, latestSentReminders, reminderAvailability } from "@/lib/reminders";
 import { SendDialogProvider } from "../SendDialogContext";
 import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
+import { FlashToast } from "@/components/flash-toast";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -157,6 +159,9 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   return (
     <SendDialogProvider>
     <div className="space-y-4">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <Breadcrumb items={breadcrumbItems} />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
