@@ -9,6 +9,11 @@ const FLASH_MESSAGES: Record<string, string> = {
   "customer-created": "Kunde angelegt",
   "service-created": "Leistung angelegt",
   "service-updated": "Leistung gespeichert",
+  "service-deleted": "Leistung gelöscht",
+  "customer-deleted": "Kunde gelöscht",
+  "invoice-deleted": "Rechnung gelöscht",
+  "credit-note-deleted": "Gutschrift gelöscht",
+  "quote-deleted": "Offerte gelöscht",
 };
 
 /** Shows the toast named in `?flash=` once and removes the parameter from the URL. */

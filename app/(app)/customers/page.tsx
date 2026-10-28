@@ -121,9 +121,11 @@ async function CustomersTable({
                 <TableCell colSpan={6} className="text-center py-12">
                   {term ? (
                     <p className="text-muted-foreground">Keine Kunden für diesen Suchbegriff.</p>
+                  ) : archivedOnly ? (
+                    <p className="text-muted-foreground">Noch keine archivierten Kunden vorhanden.</p>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-muted-foreground">Noch keine Kunden erfasst.</p>
+                      <p className="text-muted-foreground">Noch keine Kunden vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/customers/new" />}>
                           Ersten Kunden erstellen

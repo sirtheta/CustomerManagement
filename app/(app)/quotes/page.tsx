@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FlashToast } from "@/components/flash-toast";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -155,6 +156,9 @@ export default async function QuotesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">Offerten</h1>
         <div className="flex items-center gap-2 flex-wrap">
@@ -246,12 +250,12 @@ export default async function QuotesPage({ searchParams }: Props) {
           <TableBody>
             {quotes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                  {term ? (
-                    "Keine Offerten für diesen Suchbegriff."
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  {term || customerFilter || activeFilter !== "all" || dateFrom || dateTo ? (
+                    "Keine Offerten für diese Filterkriterien."
                   ) : (
                     <div className="space-y-3">
-                      <p>Noch keine Offerten erfasst.</p>
+                      <p>Noch keine Offerten vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/quotes/new" />}>
                           Erste Offerte erstellen

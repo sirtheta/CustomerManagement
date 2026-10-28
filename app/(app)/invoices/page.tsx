@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FlashToast } from "@/components/flash-toast";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ async function InvoicesTable({
                     <p className="text-muted-foreground">Keine Rechnungen für diese Filterkriterien.</p>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-muted-foreground">Noch keine Rechnungen erfasst.</p>
+                      <p className="text-muted-foreground">Noch keine Rechnungen vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/invoices/new" />}>
                           Erste Rechnung erstellen
@@ -334,6 +335,9 @@ export default async function InvoicesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">Rechnungen</h1>
         <div className="flex items-center gap-2 flex-wrap">

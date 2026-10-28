@@ -100,5 +100,5 @@ export async function updateService(
 export async function deleteService(id: number): Promise<void> {
   await requireAdmin();
   await prisma.service.delete({ where: { id } });
-  redirect("/services");
+  redirect("/services?flash=service-deleted");
 }

@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 import { hasRole, requireEditor } from "@/lib/permissions";
 import DeleteTemplateButton from "./DeleteTemplateButton";
 import ItemsView from "@/components/items-view";
+import { BackLink } from "@/components/back-link";
 
 export default async function TemplatesPage() {
   const session = await requireEditor();
@@ -18,16 +19,12 @@ export default async function TemplatesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Rechnungsvorlagen</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Gespeicherte Positionsvorlagen für schnelle Rechnungserstellung
-          </p>
-        </div>
-        <Button variant="outline" size="sm" render={<Link href="/invoices" />}>
-          ← Rechnungen
-        </Button>
+      <BackLink href="/invoices">Rechnungen</BackLink>
+      <div>
+        <h1 className="text-2xl font-semibold">Rechnungsvorlagen</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Gespeicherte Positionsvorlagen für schnelle Rechnungserstellung
+        </p>
       </div>
 
       {templates.length === 0 ? (

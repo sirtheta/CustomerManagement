@@ -99,9 +99,9 @@ export default async function ServicesPage({ searchParams }: Props) {
                 <span className="font-medium">{s.name}</span>
                 <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? "Aktiv" : "Inaktiv"}</Badge>
               </div>
-              {s.description && <p className="text-xs text-gray-500">{s.description}</p>}
+              {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
               <p className="text-sm text-muted-foreground">
-                {s.category?.name ?? "Ohne Kategorie"} · {UNIT_LABELS[s.unit]}
+                {s.category?.name ?? "—"} · {UNIT_LABELS[s.unit]}
               </p>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold">{formatCurrency(s.unitPrice.toNumber())}</span>
@@ -139,12 +139,12 @@ export default async function ServicesPage({ searchParams }: Props) {
           <TableBody>
             {services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   {term ? (
                     "Keine Leistungen für diesen Suchbegriff."
                   ) : (
                     <div className="space-y-3">
-                      <p>Noch keine Leistungen erfasst.</p>
+                      <p>Noch keine Leistungen vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/services/new" />}>
                           Erste Leistung anlegen
@@ -160,7 +160,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                   <TableCell>
                     <div className="font-medium">{s.name}</div>
                     {s.description && (
-                      <div className="text-xs text-gray-500">{s.description}</div>
+                      <div className="text-xs text-muted-foreground">{s.description}</div>
                     )}
                   </TableCell>
                   <TableCell>{s.category?.name ?? "—"}</TableCell>
@@ -172,13 +172,15 @@ export default async function ServicesPage({ searchParams }: Props) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      render={<Link href={`/services/${s.id}`} />}
-                    >
-                      Bearbeiten
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        render={<Link href={`/services/${s.id}`} />}
+                      >
+                        Bearbeiten
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

@@ -56,7 +56,7 @@ describe("deleteCustomer (real database)", () => {
     await quoteWithItem(customer.customerId, "Weg");
     await quoteWithItem(other.customerId, "Bleibt");
 
-    await expect(deleteCustomer(customer.customerId)).rejects.toThrow("redirect /customers");
+    await expect(deleteCustomer(customer.customerId)).rejects.toThrow("redirect /customers?flash=customer-deleted");
 
     expect(await db.prisma.customer.findUnique({ where: { customerId: customer.customerId } })).toBeNull();
     expect(await db.prisma.quote.count({ where: { customerId: customer.customerId } })).toBe(0);

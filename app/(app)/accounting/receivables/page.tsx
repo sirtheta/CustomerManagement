@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { documentLabel } from "@/lib/document-display";
 import { AGE_BUCKETS, fetchReceivables } from "@/lib/receivables";
 import { requireModule } from "@/lib/module-guard";
+import { BackLink } from "@/components/back-link";
 
 type Props = { searchParams: Promise<{ asOf?: string }> };
 
@@ -33,6 +34,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
+      <BackLink href="/accounting">Buchhaltung</BackLink>
       <h1 className="text-2xl font-semibold">Offene Posten</h1>
 
       <form className="flex flex-wrap items-end gap-3" method="get">

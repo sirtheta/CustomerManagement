@@ -37,7 +37,7 @@ export default async function SenderProfilesPage() {
     <div className="space-y-6">
       <SettingsBackLink />
       <div>
-        <h1 className="text-2xl font-bold">Absender-Profile</h1>
+        <h1 className="text-2xl font-semibold">Absender-Profile</h1>
         <p className="text-muted-foreground mt-1">
           Das erste Profil sind die Firmendaten mit Firmenlogo aus den Einstellungen (unten als Karte). Hier legen Sie
           nur weitere Profile an: Sie überschreiben nur, was dort ausgefüllt ist; alles andere (auch Adresse und IBAN)

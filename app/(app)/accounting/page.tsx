@@ -192,7 +192,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                   {expenses.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-gray-500 py-8">
-                        Keine Ausgaben vorhanden.
+                        Noch keine Ausgaben vorhanden.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -266,7 +266,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                   {payments.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-gray-500 py-8">
-                        Keine Zahlungseingänge vorhanden.
+                        Noch keine Zahlungseingänge vorhanden.
                       </TableCell>
                     </TableRow>
                   ) : (
