@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
-import Link from "next/link";
 import { verifyAuditChain, type ChainVerification } from "@/lib/audit-chain";
 import { formatDate, formatTime } from "@/lib/utils";
 import { SettingsBackLink } from "@/components/settings-back-link";
@@ -130,9 +129,6 @@ export default async function AuditLogPage({ searchParams }: Props) {
           <h1 className="text-2xl font-semibold">Aktivitätsprotokoll</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Alle Änderungen in der Anwendung</p>
         </div>
-        <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Einstellungen
-        </Link>
       </div>
 
       {chainError && (

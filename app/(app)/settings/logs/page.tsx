@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/permissions";
 import { listLogFiles } from "@/lib/logs";
 import { listBackups, type BackupFileInfo } from "@/lib/backup";
@@ -54,9 +53,6 @@ export default async function LogsPage() {
             Anwendungs-Logs und Datenbank-Backups zum Herunterladen.
           </p>
         </div>
-        <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Einstellungen
-        </Link>
       </div>
 
       <div className="overflow-x-auto">
