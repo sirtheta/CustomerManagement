@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.9.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.1...customer-management-v1.9.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* address re-review findings (gating, audit, phone cards, consistency) ([#188](https://github.com/sirtheta/CustomerManagement/issues/188)) ([de3d0d9](https://github.com/sirtheta/CustomerManagement/commit/de3d0d961091398d29952df325b7dcae7624c073))
+* role gating, service audit and remaining UI inconsistencies (B1–B18) ([#186](https://github.com/sirtheta/CustomerManagement/issues/186)) ([bf7b85e](https://github.com/sirtheta/CustomerManagement/commit/bf7b85e00852ef3938e2a7b51ce1c2f2cd75c0b1))
+* **settings:** add the same back link to all settings subpages ([#184](https://github.com/sirtheta/CustomerManagement/issues/184)) ([f89e738](https://github.com/sirtheta/CustomerManagement/commit/f89e73874ea5bf40dbfc4a0492d644135bd08e10))
+* **ui:** show cards instead of sideways-scrolling tables on phones ([#182](https://github.com/sirtheta/CustomerManagement/issues/182)) ([237914e](https://github.com/sirtheta/CustomerManagement/commit/237914ee8884d78a60b0b1a085689b18adb8f32e))
+* **ui:** unify back links, titles, tables, empty states and delete feedback ([#185](https://github.com/sirtheta/CustomerManagement/issues/185)) ([945212a](https://github.com/sirtheta/CustomerManagement/commit/945212acb3dee5a3ea7dfac7923a68656b09728a))
+* use formatDate on the subscriptions page and return to the archive after deleting ([#187](https://github.com/sirtheta/CustomerManagement/issues/187)) ([172ee79](https://github.com/sirtheta/CustomerManagement/commit/172ee79cd299955e83d2a937e5b15ea27b3e1f72))
+
 ## [1.9.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.0...customer-management-v1.9.1) (2026-10-24)
 
 
