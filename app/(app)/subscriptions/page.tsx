@@ -36,7 +36,37 @@ export default async function SubscriptionsPage() {
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      {rows.length > 0 && (
+        // Phones get cards instead of a table that scrolls sideways
+        <ul className="space-y-3 md:hidden">
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              className={`rounded-lg border p-3 space-y-2 ${row.active ? "" : "text-muted-foreground"}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <Link href={`/customers/${row.customerId}`} className="font-medium hover:underline">
+                  {row.customerName}
+                </Link>
+                {row.active ? <Badge variant="outline">Aktiv</Badge> : <Badge variant="secondary">Pausiert</Badge>}
+              </div>
+              <p className="text-sm">
+                {INTERVAL_LABELS[row.interval]} · nächste Rechnung {formatDay(row.nextInvoiceDate)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {row.templateId == null ? <Badge variant="destructive">Vorlage fehlt</Badge> : row.templateName}
+                {" · "}
+                {row.autoSend ? "Automatisch" : "Nach Prüfung"}
+              </p>
+              {canEdit && (
+                <SubscriptionRowActions customerId={row.customerId} subscriptionId={row.id} active={row.active} />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={rows.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>
