@@ -139,12 +139,12 @@ export default async function ServicesPage({ searchParams }: Props) {
           <TableBody>
             {services.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   {term ? (
                     "Keine Leistungen für diesen Suchbegriff."
                   ) : (
                     <div className="space-y-3">
-                      <p>Noch keine Leistungen erfasst.</p>
+                      <p>Noch keine Leistungen vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/services/new" />}>
                           Erste Leistung anlegen

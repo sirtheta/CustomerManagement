@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2 } from "lucide-react";
 import { createCategory, deleteCategory, updateCategory, type CategoryFormState } from "./actions";
 import type { Category } from "@prisma/client";
@@ -115,8 +116,8 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
   );
 
   return (
-    <tr className="border-t">
-      <td className="px-4 py-3" colSpan={4}>
+    <TableRow>
+      <TableCell className="px-4 py-3" colSpan={4}>
         <form action={formAction} className="flex items-center gap-3 flex-wrap">
           <Input name="name" defaultValue={category.name} required className="w-56" />
           <ColorSwatchPicker name="colorHex" defaultValue={category.colorHex ?? DEFAULT_COLOR} />
@@ -152,8 +153,8 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
             </ConfirmDialog>
           )}
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -170,28 +171,28 @@ export function CategoryManagement({ categories }: { categories: CategoryRowData
       </Card>
 
       <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium" colSpan={4}>
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="px-4" colSpan={4}>
                 {categories.length === 1 ? "1 Kategorie" : `${categories.length} Kategorien`}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {categories.length === 0 ? (
-              <tr>
-                <td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
-                  Keine Kategorien vorhanden.
-                </td>
-              </tr>
+              <TableRow>
+                <TableCell className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
+                  Noch keine Kategorien vorhanden.
+                </TableCell>
+              </TableRow>
             ) : (
               categories.map((category) => (
                 <CategoryRow key={category.categoryId} category={category} />
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

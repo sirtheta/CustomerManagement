@@ -183,7 +183,7 @@ export async function deleteQuote(id: number): Promise<{ error?: string }> {
   }
   await logAudit(session, "DELETE", "Quote", id, q?.documentNumber ?? undefined);
   revalidatePath("/quotes");
-  redirect("/quotes");
+  redirect("/quotes?flash=quote-deleted");
 }
 
 export async function sendQuote(

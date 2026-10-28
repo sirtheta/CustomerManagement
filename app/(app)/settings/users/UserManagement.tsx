@@ -2,6 +2,7 @@
 
 import { UserRole } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateUserDialog } from "./CreateUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
@@ -72,45 +73,45 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
       </ul>
 
       <div className="hidden rounded-lg border overflow-hidden md:block">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium">Name</th>
-              <th className="text-left px-4 py-3 font-medium">E-Mail</th>
-              <th className="text-left px-4 py-3 font-medium">Rolle</th>
-              <th className="text-left px-4 py-3 font-medium">Status</th>
-              <th className="text-left px-4 py-3 font-medium">TOTP</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="px-4">Name</TableHead>
+              <TableHead className="px-4">E-Mail</TableHead>
+              <TableHead className="px-4">Rolle</TableHead>
+              <TableHead className="px-4">Status</TableHead>
+              <TableHead className="px-4">TOTP</TableHead>
+              <TableHead className="px-4" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {users.map((user) => (
-              <tr key={user.id} className="border-t">
-                <td className="px-4 py-3 font-medium">{user.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
-                <td className="px-4 py-3"><RoleBadge role={user.role} /></td>
-                <td className="px-4 py-3">
+              <TableRow key={user.id}>
+                <TableCell className="px-4 py-3 font-medium">{user.name}</TableCell>
+                <TableCell className="px-4 py-3 text-muted-foreground">{user.email}</TableCell>
+                <TableCell className="px-4 py-3"><RoleBadge role={user.role} /></TableCell>
+                <TableCell className="px-4 py-3">
                   <Badge variant={user.isActive ? "default" : "outline"}>
                     {user.isActive ? "Aktiv" : "Inaktiv"}
                   </Badge>
-                </td>
-                <td className="px-4 py-3">
+                </TableCell>
+                <TableCell className="px-4 py-3">
                   <Badge variant={user.totpEnabled ? "secondary" : "outline"}>
                     {user.totpEnabled ? "Aktiv" : "—"}
                   </Badge>
-                </td>
-                <td className="px-4 py-3">
+                </TableCell>
+                <TableCell className="px-4 py-3">
                   <div className="flex gap-1.5 flex-wrap justify-end">
                     <EditUserDialog user={user} />
                     {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
                     <TotpSetupDialog user={user} />
                     <DeleteUserDialog user={user} />
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

@@ -253,7 +253,7 @@ export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   ]);
   await logAudit(session, "DELETE", "Customer", id);
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/customers");
+  redirect("/customers?flash=customer-deleted");
 }
 
 export async function archiveCustomer(id: number): Promise<{ error?: string }> {

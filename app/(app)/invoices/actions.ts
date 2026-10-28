@@ -324,7 +324,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   await logAudit(session, "DELETE", "Invoice", id);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/invoices");
+  redirect("/invoices?flash=invoice-deleted");
 }
 
 export async function createCreditNote(invoiceId: number): Promise<{ error?: string }> {

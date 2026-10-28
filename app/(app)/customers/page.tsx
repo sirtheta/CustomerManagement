@@ -123,7 +123,7 @@ async function CustomersTable({
                     <p className="text-muted-foreground">Keine Kunden für diesen Suchbegriff.</p>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-muted-foreground">Noch keine Kunden erfasst.</p>
+                      <p className="text-muted-foreground">Noch keine Kunden vorhanden.</p>
                       {canEdit && (
                         <Button size="sm" render={<Link href="/customers/new" />}>
                           Ersten Kunden erstellen
