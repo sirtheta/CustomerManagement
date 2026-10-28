@@ -45,7 +45,7 @@ export default function DeleteCustomerButton({
       description="Soll dieser Kunde wirklich gelöscht werden?"
       confirmLabel="Löschen"
       triggerSize={size}
-      onConfirm={() => deleteCustomer(customerId)}
+      onConfirm={() => deleteCustomer(customerId, archived)}
     >
       Löschen
     </ConfirmDialog>

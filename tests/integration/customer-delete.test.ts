@@ -50,6 +50,16 @@ describe("deleteCustomer (real database)", () => {
       },
     });
 
+  it("returns to the archive when the customer is deleted from there", async () => {
+    const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+
+    await expect(deleteCustomer(customer.customerId, true)).rejects.toThrow(
+      "redirect /customers?archived=true&flash=customer-deleted"
+    );
+
+    expect(await db.prisma.customer.findUnique({ where: { customerId: customer.customerId } })).toBeNull();
+  });
+
   it("deletes the quotes' items with the customer and keeps the items of other customers", async () => {
     const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
     const other = await db.prisma.customer.create({ data: { ...createValidTestCustomer(), contactPerson: "Anderer" } });
