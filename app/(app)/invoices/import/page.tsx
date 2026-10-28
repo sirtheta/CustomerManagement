@@ -1,4 +1,6 @@
-import { requireEditor } from "@/lib/permissions";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { loadImportOverview } from "@/lib/import/queries";
 import { ImportWizard } from "./ImportWizard";
 import { IncomingTable } from "./IncomingTable";
@@ -8,8 +10,8 @@ import { loadModules, requireModule } from "@/lib/module-guard";
 import { BackLink } from "@/components/back-link";
 
 export default async function InvoicesImportPage() {
-  await requireEditor();
   await requireModule("bankImport");
+  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const overview = await loadImportOverview();
   const modules = await loadModules();
 
