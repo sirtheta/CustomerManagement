@@ -14,6 +14,7 @@ import { Pagination } from "@/components/ui/pagination";
 import Link from "next/link";
 import { verifyAuditChain, type ChainVerification } from "@/lib/audit-chain";
 import { formatDate, formatTime } from "@/lib/utils";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 const PAGE_SIZE = 50;
 
@@ -123,6 +124,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-4">
+      <SettingsBackLink />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Aktivitätsprotokoll</h1>

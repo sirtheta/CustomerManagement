@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 const log = logger.child({ module: "backup" });
 
@@ -45,6 +46,7 @@ export default async function LogsPage() {
 
   return (
     <div className="space-y-4">
+      <SettingsBackLink />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
