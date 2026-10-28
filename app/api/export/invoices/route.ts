@@ -5,17 +5,9 @@ import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { InvoiceState, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { documentLabel } from "@/lib/document-display";
+import { invoiceStateLabels } from "@/lib/document-states";
 import { customerDisplayName } from "@/lib/customer-display";
 import { invoiceStateFilter } from "@/lib/reminders";
-
-const stateLabels: Record<string, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
 
 const querySchema = z.object({
   state: z.nativeEnum(InvoiceState).optional(),
@@ -65,7 +57,7 @@ export async function GET(request: Request) {
     inv.creditNoteForId != null ? "" : inv.dueDate.toLocaleDateString("de-CH"),
     customerDisplayName(inv.customer),
     inv.totalAmount.toNumber().toFixed(2),
-    stateLabels[inv.state] ?? inv.state,
+    invoiceStateLabels[inv.state],
     inv.creditNoteFor ? documentLabel(inv.creditNoteFor.documentNumber) : "",
   ]);
 

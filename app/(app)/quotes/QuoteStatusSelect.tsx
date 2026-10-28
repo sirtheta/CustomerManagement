@@ -10,14 +10,9 @@ import {
 } from "@/components/ui/select";
 import { updateQuoteStatus } from "./actions";
 import type { QuoteState } from "@prisma/client";
+import { quoteStateLabels } from "@/lib/document-states";
 
-const stateOptions: { value: QuoteState; label: string }[] = [
-  { value: "Draft", label: "Entwurf" },
-  { value: "Sent", label: "Versendet" },
-  { value: "Accepted", label: "Angenommen" },
-  { value: "Declined", label: "Abgelehnt" },
-  { value: "Expired", label: "Abgelaufen" },
-];
+const STATE_ORDER: QuoteState[] = ["Draft", "Sent", "Accepted", "Declined", "Expired"];
 
 type Props = {
   quoteId: number;
@@ -43,14 +38,14 @@ export default function QuoteStatusSelect({ quoteId, currentState }: Props) {
       <SelectTrigger className="w-40">
         <SelectValue>
           {(value: string | null) =>
-            value ? (stateOptions.find((o) => o.value === value)?.label ?? value) : "Status wählen"
+            value ? (quoteStateLabels[value as QuoteState] ?? value) : "Status wählen"
           }
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {stateOptions.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
-            {opt.label}
+        {STATE_ORDER.map((state) => (
+          <SelectItem key={state} value={state}>
+            {quoteStateLabels[state]}
           </SelectItem>
         ))}
       </SelectContent>

@@ -5,16 +5,9 @@ import { buildCsv, csvResponse } from "@/lib/csv-export";
 import { QuoteState, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { documentLabel } from "@/lib/document-display";
+import { quoteStateLabels } from "@/lib/document-states";
 import { customerDisplayName } from "@/lib/customer-display";
 import { moduleDisabledResponse } from "@/lib/module-guard";
-
-const stateLabels: Record<string, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
 
 const querySchema = z.object({
   state: z.nativeEnum(QuoteState).optional(),
@@ -66,7 +59,7 @@ export async function GET(request: Request) {
     q.validUntil.toLocaleDateString("de-CH"),
     customerDisplayName(q.customer),
     q.totalAmount.toNumber().toFixed(2),
-    stateLabels[q.state] ?? q.state,
+    quoteStateLabels[q.state],
   ]);
 
   const today = new Date().toISOString().slice(0, 10);

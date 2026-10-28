@@ -35,12 +35,10 @@ const PAGE_SIZE = 25;
 
 const filterOptions: { value: string; label: string }[] = [
   { value: "all", label: "Alle" },
-  { value: "Draft", label: "Entwurf" },
-  { value: "Sent", label: "Versendet" },
-  { value: "PartiallyPaid", label: "Teilbezahlt" },
-  { value: "Paid", label: "Bezahlt" },
-  { value: "Overdue", label: "Überfällig" },
-  { value: "Canceled", label: "Storniert" },
+  ...(["Draft", "Sent", "PartiallyPaid", "Paid", "Overdue", "Canceled"] as const).map((state) => ({
+    value: state,
+    label: invoiceStateLabels[state],
+  })),
 ];
 
 type SortField = "documentNumber" | "date" | "dueDate" | "totalAmount" | "state";
