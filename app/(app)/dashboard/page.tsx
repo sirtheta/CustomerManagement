@@ -234,7 +234,7 @@ export default async function DashboardPage() {
                       </span>
                     </Link>
                     <span
-                      className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-red-600 font-medium" : "text-muted-foreground"}`}
+                      className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-destructive font-medium" : "text-muted-foreground"}`}
                     >
                       {formatDate(task.dueDate)}
                     </span>

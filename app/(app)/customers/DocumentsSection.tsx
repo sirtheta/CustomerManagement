@@ -95,7 +95,7 @@ function UploadForm({ customerId }: { customerId: number }) {
         const fd = new FormData();
         fd.append("file", file);
         const result = await uploadDocument(customerId, {}, fd);
-        if (result.success) toast.success(`"${file.name}" hochgeladen`);
+        if (result.success) toast.success(`«${file.name}» hochgeladen`);
         else if (result.error) toast.error(result.error);
       }
     });
@@ -208,7 +208,10 @@ export default function DocumentsSection({ customerId, documents, canEdit, canDe
                         confirmLabel="Löschen"
                         triggerVariant="ghost"
                         triggerSize="sm"
-                        onConfirm={() => deleteDocument(customerId, doc.documentId)}
+                        onConfirm={async () => {
+                          await deleteDocument(customerId, doc.documentId);
+                          toast.success("Dokument gelöscht");
+                        }}
                       >
                         Löschen
                       </ConfirmDialog>

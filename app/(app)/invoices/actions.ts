@@ -224,7 +224,7 @@ export async function updateInvoiceStatus(
   // PartiallyPaid results from payments only. Leaving Paid/PartiallyPaid
   // works by deleting the payments, so state and payments never disagree.
   if (state === "PartiallyPaid") {
-    return { error: "„Teilbezahlt“ ergibt sich aus den erfassten Zahlungen." };
+    return { error: "«Teilbezahlt» ergibt sich aus den erfassten Zahlungen." };
   }
   const hasPayments = (await prisma.payment.count({ where: { invoiceId: id } })) > 0;
   if (hasPayments && state !== "Paid") {

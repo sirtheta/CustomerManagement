@@ -39,7 +39,10 @@ export default function SubscriptionRowActions({ customerId, subscriptionId, act
         description="Soll dieses Abo wirklich gelöscht werden? Bereits erstellte Rechnungen bleiben erhalten."
         confirmLabel="Löschen"
         triggerSize="sm"
-        onConfirm={() => deleteSubscription(customerId, subscriptionId)}
+        onConfirm={async () => {
+          await deleteSubscription(customerId, subscriptionId);
+          toast.success("Abo gelöscht");
+        }}
       >
         Löschen
       </ConfirmDialog>

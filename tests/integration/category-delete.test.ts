@@ -31,7 +31,7 @@ vi.mock("@/lib/logger", () => ({
 import { deleteCategory } from "@/app/(app)/settings/categories/actions";
 import { loadCategoryUsageTotals } from "@/lib/category-usage";
 
-const USED_ERROR = "Die Kategorie wird noch verwendet und kann nicht gelöscht werden. Setzen Sie sie auf inaktiv.";
+const USED_ERROR = "Die Kategorie wird noch verwendet und kann nicht gelöscht werden. Setze sie auf inaktiv.";
 
 describe("deleteCategory (real database)", () => {
   const db = createTestDatabase();

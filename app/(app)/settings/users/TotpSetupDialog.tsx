@@ -96,7 +96,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
         ) : step === "generate" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">QR-Code generieren und in Authenticator-App scannen.</p>
-            {confirmError && <p className="text-sm text-red-600">{confirmError}</p>}
+            {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
             <Button onClick={handleGenerate} disabled={isPending} className="w-full">
               {isPending ? "Generieren…" : "QR-Code generieren"}
             </Button>
@@ -127,7 +127,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
                 placeholder="123456"
                 autoFocus
               />
-              {confirmError && <p className="text-sm text-red-600">{confirmError}</p>}
+              {confirmError && <p className="text-sm text-destructive">{confirmError}</p>}
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setStep("generate")}>Zurück</Button>
                 <Button type="submit" disabled={isPending}>{isPending ? "Prüfen…" : "Bestätigen"}</Button>

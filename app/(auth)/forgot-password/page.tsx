@@ -12,7 +12,7 @@ export default function ForgotPasswordPage() {
   const [state, formAction, pending] = useActionState(requestPasswordResetAction, undefined);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Passwort vergessen</CardTitle>
@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
                 <Label htmlFor="email">E-Mail</Label>
                 <Input id="email" name="email" type="email" autoComplete="email" required />
               </div>
-              {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+              {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
               <Button type="submit" className="w-full" disabled={pending}>
                 {pending ? "Wird gesendet…" : "Link anfordern"}
               </Button>

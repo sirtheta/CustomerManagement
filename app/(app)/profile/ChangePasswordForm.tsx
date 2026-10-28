@@ -39,7 +39,7 @@ export function ChangePasswordForm() {
             <Label htmlFor="confirmPassword">Neues Passwort wiederholen</Label>
             <PasswordInput id="confirmPassword" name="confirmPassword" required minLength={8} autoComplete="new-password" />
           </div>
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={pending}>
               {pending ? "Speichern…" : "Passwort ändern"}

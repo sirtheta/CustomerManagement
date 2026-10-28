@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,7 +151,10 @@ function NoteItem({
               confirmLabel="Löschen"
               triggerVariant="ghost"
               triggerSize="sm"
-              onConfirm={() => deleteNote(customerId, note.noteId)}
+              onConfirm={async () => {
+                await deleteNote(customerId, note.noteId);
+                toast.success("Notiz gelöscht");
+              }}
             >
               Löschen
             </ConfirmDialog>
