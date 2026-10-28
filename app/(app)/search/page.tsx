@@ -67,8 +67,8 @@ export default async function SearchPage({ searchParams }: Props) {
       {term && (
         <p className="text-sm text-muted-foreground">
           {totalResults === 0
-            ? `Keine Ergebnisse für „${term}".`
-            : `${totalResults} Ergebnis${totalResults !== 1 ? "se" : ""} für „${term}"`}
+            ? `Keine Ergebnisse für «${term}».`
+            : `${totalResults} Ergebnis${totalResults !== 1 ? "se" : ""} für «${term}»`}
         </p>
       )}
 

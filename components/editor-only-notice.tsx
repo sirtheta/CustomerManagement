@@ -17,8 +17,8 @@ export function EditorOnlyNotice({ backHref = "/dashboard", backLabel = "Zum Das
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Diese Seite ist nur für Bearbeiter. Mit der Rolle «Leser» können Sie Daten ansehen, aber nichts
-          anlegen, ändern oder versenden. Wenden Sie sich an einen Administrator, wenn Sie mehr Rechte brauchen.
+          Diese Seite ist nur für Bearbeiter. Mit der Rolle «Leser» kannst du Daten ansehen, aber nichts
+          anlegen, ändern oder versenden. Wende dich an einen Administrator, wenn du mehr Rechte brauchst.
         </p>
         <Button variant="outline" size="sm" render={<Link href={backHref} />}>
           {backLabel}

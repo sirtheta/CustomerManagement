@@ -40,7 +40,7 @@ function fileLabel(ext: string): { label: string; color: string } {
     case ".bmp":  return { label: "IMG",  color: "text-blue-500" };
     case ".docx": return { label: "DOC",  color: "text-green-600" };
     case ".txt":
-    case ".md":   return { label: "TXT",  color: "text-gray-500" };
+    case ".md":   return { label: "TXT",  color: "text-muted-foreground" };
     case ".xlsx": return { label: "XLS",  color: "text-emerald-600" };
     case ".pptx": return { label: "PPT",  color: "text-orange-500" };
     case ".zip":

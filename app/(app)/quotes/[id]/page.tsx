@@ -87,7 +87,6 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const nextDocumentNumber = canEdit && !quote.documentNumber ? await generateQuoteNumber() : null;
 
   const fromCustomer = from?.startsWith("customers/") ? from : null;
-  const backHref = fromCustomer ? `/${fromCustomer}` : "/quotes";
   const customerName = customerDisplayName(quote.customer);
   const breadcrumbItems = fromCustomer
     ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(quote.documentNumber) }]
@@ -99,7 +98,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">{documentLabel(quote.documentNumber)}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             <Link
               href={`/customers/${quote.customer.customerId}`}
               className="hover:underline"
@@ -112,9 +111,6 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           <Badge variant={stateVariants[quote.state]}>
             {stateLabels[quote.state]}
           </Badge>
-          <Button variant="outline" size="sm" render={<Link href={backHref} />}>
-            Zurück
-          </Button>
           {canEdit && (
             <Button
               size="sm"
@@ -134,34 +130,34 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
         <CardContent className="space-y-3 text-sm">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <span className="text-gray-500">Datum:</span>{" "}
+              <span className="text-muted-foreground">Datum:</span>{" "}
               {formatDate(quote.date)}
             </div>
             <div>
-              <span className="text-gray-500">Gültig bis:</span>{" "}
+              <span className="text-muted-foreground">Gültig bis:</span>{" "}
               {formatDate(quote.validUntil)}
             </div>
             <div>
-              <span className="text-gray-500">Betrag:</span>{" "}
+              <span className="text-muted-foreground">Betrag:</span>{" "}
               <span className="font-medium">
                 {formatCurrency(quote.totalAmount.toNumber())}
               </span>
             </div>
             {quote.senderProfile && (
               <div>
-                <span className="text-gray-500">Absender:</span> {quote.senderProfile.name}
+                <span className="text-muted-foreground">Absender:</span> {quote.senderProfile.name}
               </div>
             )}
           </div>
           {quote.customUserText && (
             <div>
-              <span className="text-gray-500">Zusatztext:</span>
+              <span className="text-muted-foreground">Zusatztext:</span>
               <p className="mt-1 whitespace-pre-wrap">{quote.customUserText}</p>
             </div>
           )}
           {quote.closingText && (
             <div>
-              <span className="text-gray-500">Schlusstext:</span>
+              <span className="text-muted-foreground">Schlusstext:</span>
               <p className="mt-1 whitespace-pre-wrap">{quote.closingText}</p>
             </div>
           )}
@@ -216,12 +212,12 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
                     <TableRow key={log.id}>
                       <TableCell className="whitespace-nowrap">
                         {formatDate(log.sentAt)}{" "}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           {formatTime(log.sentAt)}
                         </span>
                       </TableCell>
                       <TableCell>{log.sentTo}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{log.subject}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{log.subject}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

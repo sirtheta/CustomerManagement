@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { DatePickerInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
@@ -98,18 +99,17 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
                 <TableCell>{SOURCE_LABELS[p.source] ?? p.source}</TableCell>
                 {canEdit && (
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={isPending}
-                      onClick={() => {
-                        if (window.confirm("Zahlung wirklich löschen?")) {
-                          run(() => deletePaymentAction(p.id));
-                        }
-                      }}
+                    <ConfirmDialog
+                      title="Zahlung löschen"
+                      description={`Soll die Zahlung vom ${formatDate(p.date)} über ${formatCurrency(p.amount)} wirklich gelöscht werden?`}
+                      confirmLabel="Löschen"
+                      triggerVariant="ghost"
+                      triggerSize="sm"
+                      triggerDisabled={isPending}
+                      onConfirm={() => deletePaymentAction(p.id)}
                     >
                       Löschen
-                    </Button>
+                    </ConfirmDialog>
                   </TableCell>
                 )}
               </TableRow>

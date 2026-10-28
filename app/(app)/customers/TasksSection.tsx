@@ -122,7 +122,7 @@ function TaskItem({ customerId, task, canEdit }: { customerId: number; task: Tas
             try {
               await setTaskDone(customerId, task.id, done);
             } catch {
-              toast.error("Aufgabe konnte nicht geändert werden.");
+              toast.error("Aufgabe konnte nicht geändert werden");
             }
           });
         }}

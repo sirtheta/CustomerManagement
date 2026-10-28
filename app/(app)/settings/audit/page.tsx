@@ -52,7 +52,7 @@ function ChainStatus({ chain }: { chain: ChainVerification }) {
         <p className="font-medium text-destructive">⚠ Das Protokoll wurde verändert</p>
         <p className="mt-1">{brokenReasons[chain.reason](chain.brokenAtId)}</p>
         <p className="mt-1">
-          Bitte sichern Sie sofort ein Datenbank-Backup und informieren Sie Ihren Administrator.
+          Bitte sichere sofort ein Datenbank-Backup und informiere deinen Administrator.
         </p>
       </div>
     );

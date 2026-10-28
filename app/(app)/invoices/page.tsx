@@ -131,7 +131,9 @@ async function InvoicesTable({
                 </Link>
                 <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>
               </div>
-              <p className="mt-1 text-sm">{customerDisplayName(inv.customer)}</p>
+              <Link href={`/customers/${inv.customer.customerId}`} className="mt-1 block text-sm hover:underline">
+                {customerDisplayName(inv.customer)}
+              </Link>
               <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
                 <span>
                   {formatDate(inv.date)}

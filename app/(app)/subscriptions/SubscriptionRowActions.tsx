@@ -27,7 +27,7 @@ export default function SubscriptionRowActions({ customerId, subscriptionId, act
             try {
               await setSubscriptionActive(customerId, subscriptionId, !active);
             } catch {
-              toast.error("Status konnte nicht geändert werden.");
+              toast.error("Status konnte nicht geändert werden");
             }
           })
         }

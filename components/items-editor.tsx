@@ -417,7 +417,7 @@ export default function ItemsEditor({
       {/* Card layout for all screen sizes */}
       <div className="space-y-3">
         {items.length === 0 && (
-          <p className="text-center text-gray-400 py-6 italic text-sm">
+          <p className="text-center text-muted-foreground py-6 italic text-sm">
             Noch keine Positionen hinzugefügt.
           </p>
         )}

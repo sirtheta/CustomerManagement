@@ -19,7 +19,7 @@ export default function GlobalError({
       <div className="text-center space-y-4 max-w-sm">
         <h1 className="text-2xl font-semibold">Fehler aufgetreten</h1>
         <p className="text-muted-foreground text-sm">
-          Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.
+          Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.
         </p>
         {error.digest && (
           <p className="text-xs text-muted-foreground font-mono">

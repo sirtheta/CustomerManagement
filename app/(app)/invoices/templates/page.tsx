@@ -42,7 +42,7 @@ export default async function TemplatesPage() {
                     {tpl.items.length} Position{tpl.items.length !== 1 ? "en" : ""}
                   </span>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     render={<Link href={`/invoices/templates/${tpl.id}`} />}
                   >

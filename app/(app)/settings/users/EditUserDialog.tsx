@@ -86,7 +86,7 @@ export function EditUserDialog({ user }: { user: User }) {
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Abbrechen</Button>
-            <Button type="submit" disabled={pending}>{pending ? "Speichern..." : "Speichern"}</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Speichern…" : "Speichern"}</Button>
           </div>
         </form>
       </DialogContent>

@@ -78,7 +78,7 @@ async function CustomersTable({
               <Link href={`/customers/${c.customerId}`} className="block hover:underline">
                 <span className="font-medium">{customerDisplayName(c)}</span>
                 {!c.contactInsteadOfCompany && c.company && (
-                  <span className="block text-xs text-gray-500">{c.contactPerson}</span>
+                  <span className="block text-xs text-muted-foreground">{c.contactPerson}</span>
                 )}
               </Link>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -145,7 +145,7 @@ async function CustomersTable({
                         {customerDisplayName(c)}
                       </div>
                       {!c.contactInsteadOfCompany && c.company && (
-                        <div className="text-xs text-gray-500">{c.contactPerson}</div>
+                        <div className="text-xs text-muted-foreground">{c.contactPerson}</div>
                       )}
                     </Link>
                   </TableCell>
@@ -255,7 +255,7 @@ export default async function CustomersPage({ searchParams }: Props) {
       <Suspense fallback={null}>
         <FlashToast />
       </Suspense>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">{archivedOnly ? "Archivierte Kunden" : "Kunden"}</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" render={<Link href={archivedOnly ? "/customers" : "/customers?archived=true"} />}>

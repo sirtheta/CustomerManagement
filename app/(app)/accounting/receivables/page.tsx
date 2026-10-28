@@ -85,7 +85,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
             <TableBody>
               {report.byCustomer.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-gray-500 py-8">
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                     Keine offenen Posten zum Stichtag.
                   </TableCell>
                 </TableRow>

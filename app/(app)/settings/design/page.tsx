@@ -12,10 +12,12 @@ export default async function DesignSettingsPage() {
   return (
     <div className="space-y-6">
       <SettingsBackLink />
-      <h1 className="text-2xl font-semibold">Dokument-Design</h1>
-      <p className="text-sm text-muted-foreground max-w-2xl">
-        Passe das Aussehen deiner Rechnungs- und Offerten-PDFs an.
-      </p>
+      <div>
+        <h1 className="text-2xl font-semibold">Dokument-Design</h1>
+        <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">
+          Passe das Aussehen deiner Rechnungs- und Offerten-PDFs an.
+        </p>
+      </div>
 
       <DesignForm initialTheme={theme} />
     </div>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import SubscriptionRowActions from "./SubscriptionRowActions";
+import { BackLink } from "@/components/back-link";
 
 function formatDay(day: string): string {
   const [year, month, date] = day.split("-");
@@ -22,6 +23,7 @@ export default async function SubscriptionsPage() {
 
   return (
     <div className="space-y-4">
+      <BackLink href="/invoices">Rechnungen</BackLink>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Abos</h1>

@@ -42,7 +42,7 @@ export function ChangePasswordForm() {
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={pending}>
-              {pending ? "Speichern..." : "Passwort ändern"}
+              {pending ? "Speichern…" : "Passwort ändern"}
             </Button>
           </div>
         </form>

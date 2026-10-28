@@ -30,8 +30,8 @@ const STATE_BADGE: Partial<Record<InvoiceState, string>> = {
   Sent: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   PartiallyPaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   Overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  Canceled: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  Draft: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  Canceled: "bg-gray-100 text-muted-foreground dark:bg-gray-800 dark:text-muted-foreground",
+  Draft: "bg-gray-100 text-muted-foreground dark:bg-gray-800 dark:text-muted-foreground",
 };
 
 type Props = {

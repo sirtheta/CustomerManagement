@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
               </div>
               {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
               <Button type="submit" className="w-full" disabled={pending}>
-                {pending ? "Wird gesendet..." : "Link anfordern"}
+                {pending ? "Wird gesendet…" : "Link anfordern"}
               </Button>
               <Link
                 href="/login"

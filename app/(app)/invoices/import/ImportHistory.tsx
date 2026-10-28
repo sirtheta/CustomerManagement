@@ -14,7 +14,7 @@ export function ImportHistory({ imports }: { imports: ImportOverview["imports"] 
 
   async function undo(id: number): Promise<{ error?: string }> {
     const result = await undoStatementImport(id);
-    if (!result.error) toast.success("Import rückgängig gemacht.");
+    if (!result.error) toast.success("Import rückgängig gemacht");
     return result;
   }
 

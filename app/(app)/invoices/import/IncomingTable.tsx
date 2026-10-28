@@ -103,7 +103,7 @@ export function IncomingTable({
           toast.success(`${count} Zahlung${count === 1 ? "" : "en"} verbucht.`);
         }
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   }
@@ -113,9 +113,9 @@ export function IncomingTable({
       try {
         const result = await reopenTransactions([id]);
         if (result.error) toast.error(result.error);
-        else if (result.reopenedCount) toast.success("Eingang wieder geöffnet.");
+        else if (result.reopenedCount) toast.success("Eingang wieder geöffnet");
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   }
@@ -126,13 +126,13 @@ export function IncomingTable({
         const result = await ignoreTransactions([id]);
         if (result.error) toast.error(result.error);
         else if (result.ignoredCount) {
-          toast.success("Eingang ignoriert.", {
+          toast.success("Eingang ignoriert", {
             description: "Er steht unten unter «Ignoriert» und lässt sich dort wieder öffnen.",
             action: { label: "Rückgängig", onClick: () => reopen(id) },
           });
         }
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   }

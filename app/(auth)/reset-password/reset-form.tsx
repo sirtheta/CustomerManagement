@@ -51,7 +51,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             </div>
             {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Wird gespeichert..." : "Passwort ändern"}
+              {pending ? "Wird gespeichert…" : "Passwort ändern"}
             </Button>
           </form>
         )}

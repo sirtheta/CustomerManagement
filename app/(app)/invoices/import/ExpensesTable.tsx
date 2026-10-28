@@ -55,7 +55,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
           toast.success(`${count} Ausgabe${count === 1 ? "" : "n"} übernommen.`);
         }
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   }
@@ -79,7 +79,7 @@ export function ExpensesTable({ rows, categories }: { rows: Row[]; categories: C
         const result = await ignoreTransactions([id]);
         if (result.error) toast.error(result.error);
       } catch {
-        toast.error("Speichern fehlgeschlagen.");
+        toast.error("Speichern fehlgeschlagen");
       }
     });
   }

@@ -81,7 +81,7 @@ export default async function ServicesPage({ searchParams }: Props) {
       <Suspense fallback={null}>
         <FlashToast />
       </Suspense>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <h1 className="text-2xl font-semibold">Leistungen</h1>
         {canEdit && <Button render={<Link href="/services/new" />}>Neue Leistung</Button>}
       </div>
@@ -174,7 +174,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                   <TableCell>
                     {canEdit && (
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         render={<Link href={`/services/${s.id}`} />}
                       >

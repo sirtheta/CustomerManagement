@@ -97,7 +97,7 @@ export function GlobalSearchDropdown({
         </div>
       ) : total === 0 ? (
         <p className="px-2.5 py-2.5 text-sm text-muted-foreground">
-          Keine Treffer für „{term}&quot;
+          Keine Treffer für «{term}»
         </p>
       ) : (
         <>
