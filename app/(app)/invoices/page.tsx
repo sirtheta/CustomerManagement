@@ -29,26 +29,9 @@ import { isEditorSession } from "@/lib/permissions";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 import { customerDisplayName } from "@/lib/customer-display";
+import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
 
 const PAGE_SIZE = 25;
-
-const stateLabels: Record<InvoiceState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
-
-const stateVariants: Record<InvoiceState, "default" | "secondary" | "destructive" | "outline"> = {
-  Draft: "secondary",
-  Sent: "default",
-  PartiallyPaid: "secondary",
-  Paid: "outline",
-  Overdue: "destructive",
-  Canceled: "outline",
-};
 
 const filterOptions: { value: string; label: string }[] = [
   { value: "all", label: "Alle" },
@@ -129,7 +112,7 @@ async function InvoicesTable({
                     <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
                   )}
                 </Link>
-                <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>
+                <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
               </div>
               <Link href={`/customers/${inv.customer.customerId}`} className="mt-1 block text-sm hover:underline">
                 {customerDisplayName(inv.customer)}
@@ -215,7 +198,7 @@ async function InvoicesTable({
                   <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
                   <TableCell>{formatCurrency(inv.totalAmount.toNumber())}</TableCell>
                   <TableCell>
-                    <Badge variant={stateVariants[inv.state]}>{stateLabels[inv.state]}</Badge>
+                    <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
                   </TableCell>
                 </TableRow>
               ))

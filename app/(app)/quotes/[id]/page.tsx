@@ -19,7 +19,6 @@ import QuoteStatusSelect from "../QuoteStatusSelect";
 import DeleteQuoteButton from "../DeleteQuoteButton";
 import ConvertToInvoiceButton from "../ConvertToInvoiceButton";
 import SendQuoteButton from "../SendQuoteButton";
-import type { QuoteState } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
@@ -29,25 +28,7 @@ import { generateQuoteNumber } from "@/lib/document-number";
 import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { hasRole, isEditorSession } from "@/lib/permissions";
-
-const stateLabels: Record<QuoteState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
-
-const stateVariants: Record<
-  QuoteState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  Accepted: "outline",
-  Declined: "destructive",
-  Expired: "outline",
-};
+import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -108,8 +89,8 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant={stateVariants[quote.state]}>
-            {stateLabels[quote.state]}
+          <Badge variant={quoteStateVariants[quote.state]}>
+            {quoteStateLabels[quote.state]}
           </Badge>
           {canEdit && (
             <Button

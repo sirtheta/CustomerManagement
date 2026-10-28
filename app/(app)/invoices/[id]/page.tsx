@@ -20,7 +20,7 @@ import DeleteInvoiceButton from "../DeleteInvoiceButton";
 import SendInvoiceButton from "../SendInvoiceButton";
 import SaveAsTemplateButton from "../SaveAsTemplateButton";
 import CreateCreditNoteButton from "../CreateCreditNoteButton";
-import { UserRole, type InvoiceState } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
 import { toRappen } from "@/lib/calculations";
 import { auth } from "@/lib/auth";
@@ -36,27 +36,7 @@ import { invoiceMail } from "@/lib/mail-templates";
 import { generateInvoiceNumber } from "@/lib/document-number";
 import { isLastReminderLevelSent, latestSentReminders, reminderAvailability } from "@/lib/reminders";
 import { SendDialogProvider } from "../SendDialogContext";
-
-const stateLabels: Record<InvoiceState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
-
-const stateVariants: Record<
-  InvoiceState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  PartiallyPaid: "secondary",
-  Paid: "outline",
-  Overdue: "destructive",
-  Canceled: "outline",
-};
+import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -210,10 +190,10 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge
-            variant={stateVariants[invoice.state]}
+            variant={invoiceStateVariants[invoice.state]}
             title={invoice.state === "Draft" ? "Entwurf: noch nicht versendet, ohne Nummer, frei änderbar" : undefined}
           >
-            {stateLabels[invoice.state]}
+            {invoiceStateLabels[invoice.state]}
           </Badge>
           {creditedRappen > 0 && !isCreditNote && (
             <span className="text-xs text-muted-foreground">inkl. Gutschrift {formatCurrency(creditedRappen / 100)}</span>

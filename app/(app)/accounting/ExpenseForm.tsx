@@ -161,7 +161,7 @@ export default function ExpenseForm({ expense, categories, receipts = [], canDel
             )}
             {categories.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                Keine Kategorien vorhanden.{" "}
+                Noch keine Kategorien vorhanden.{" "}
                 <Link href="/settings/categories" className="underline">
                   Kategorien verwalten
                 </Link>

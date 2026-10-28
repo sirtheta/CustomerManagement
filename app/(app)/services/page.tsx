@@ -19,6 +19,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
+import { activeBadge } from "@/lib/document-states";
 
 const PAGE_SIZE = 25;
 
@@ -97,7 +98,7 @@ export default async function ServicesPage({ searchParams }: Props) {
             <li key={s.id} className="rounded-lg border p-3 space-y-1">
               <div className="flex items-start justify-between gap-2">
                 <span className="font-medium">{s.name}</span>
-                <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? "Aktiv" : "Inaktiv"}</Badge>
+                <Badge variant={activeBadge(s.isActive).variant}>{activeBadge(s.isActive).label}</Badge>
               </div>
               {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
               <p className="text-sm text-muted-foreground">
@@ -167,9 +168,7 @@ export default async function ServicesPage({ searchParams }: Props) {
                   <TableCell>{UNIT_LABELS[s.unit]}</TableCell>
                   <TableCell>{formatCurrency(s.unitPrice.toNumber())}</TableCell>
                   <TableCell>
-                    <Badge variant={s.isActive ? "default" : "secondary"}>
-                      {s.isActive ? "Aktiv" : "Inaktiv"}
-                    </Badge>
+                    <Badge variant={activeBadge(s.isActive).variant}>{activeBadge(s.isActive).label}</Badge>
                   </TableCell>
                   <TableCell>
                     {canEdit && (

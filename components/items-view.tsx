@@ -23,7 +23,7 @@ export type ItemViewData = {
 
 export default function ItemsView({ items }: { items: ItemViewData[] }) {
   if (items.length === 0) {
-    return <p className="text-center text-muted-foreground py-6">Keine Positionen.</p>;
+    return <p className="text-center text-muted-foreground py-6">Noch keine Positionen vorhanden.</p>;
   }
 
   return (

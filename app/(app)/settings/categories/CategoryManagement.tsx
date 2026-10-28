@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trash2 } from "lucide-react";
 import { createCategory, deleteCategory, updateCategory, type CategoryFormState } from "./actions";
 import type { Category } from "@prisma/client";
+import { activeBadge } from "@/lib/document-states";
 
 export type CategoryRowData = Category & { usageCount: number };
 
@@ -130,7 +131,7 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
             />
             Aktiv
           </label>
-          {!category.isActive && <Badge variant="outline">Inaktiv</Badge>}
+          {!category.isActive && <Badge variant={activeBadge(false).variant}>{activeBadge(false).label}</Badge>}
           <Button type="submit" variant="outline" size="sm" disabled={isPending}>
             {isPending ? "Speichern…" : "Speichern"}
           </Button>

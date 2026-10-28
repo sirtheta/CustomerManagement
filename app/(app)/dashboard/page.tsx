@@ -281,7 +281,7 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentInvoices.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Rechnungen vorhanden.</p>
+            <p className="text-sm text-muted-foreground">Noch keine Rechnungen vorhanden.</p>
           ) : (
             <ul className="divide-y">
               {recentInvoices.map((inv) => (

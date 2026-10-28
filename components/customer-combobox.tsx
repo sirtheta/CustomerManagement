@@ -53,7 +53,7 @@ export function CustomerCombobox({ id, name, customers, defaultValue, required, 
         empty={
           customers.length === 0 ? (
             <>
-              Noch keine Kunden.{" "}
+              Noch keine Kunden vorhanden.{" "}
               <Link href="/customers/new" className="font-medium text-foreground underline">
                 + Neuen Kunden anlegen
               </Link>

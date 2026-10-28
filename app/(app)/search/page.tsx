@@ -5,42 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { GlobalSearch } from "@/components/global-search";
 import { customerDisplayName, EMPTY_SEARCH_RESULTS, searchGlobal } from "@/lib/search";
-import type { InvoiceState, QuoteState } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
-
-const invoiceStateLabels: Record<InvoiceState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
-
-const invoiceStateVariants: Record<InvoiceState, "default" | "secondary" | "destructive" | "outline"> = {
-  Draft: "secondary",
-  Sent: "default",
-  PartiallyPaid: "secondary",
-  Paid: "outline",
-  Overdue: "destructive",
-  Canceled: "outline",
-};
-
-const quoteStateLabels: Record<QuoteState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
-
-const quoteStateVariants: Record<QuoteState, "default" | "secondary" | "destructive" | "outline"> = {
-  Draft: "secondary",
-  Sent: "default",
-  Accepted: "outline",
-  Declined: "destructive",
-  Expired: "outline",
-};
+import { invoiceStateLabels, invoiceStateVariants, quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 
 type Props = {
   searchParams: Promise<{ q?: string }>;

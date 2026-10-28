@@ -9,7 +9,7 @@ import { undoStatementImport } from "./actions";
 
 export function ImportHistory({ imports }: { imports: ImportOverview["imports"] }) {
   if (imports.length === 0) {
-    return <p className="text-sm text-muted-foreground py-4">Noch keine Importe.</p>;
+    return <p className="text-sm text-muted-foreground py-4">Noch keine Importe vorhanden.</p>;
   }
 
   async function undo(id: number): Promise<{ error?: string }> {

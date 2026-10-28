@@ -8,6 +8,7 @@ import { EditUserDialog } from "./EditUserDialog";
 import { ResetPasswordDialog } from "./ResetPasswordDialog";
 import { TotpSetupDialog } from "./TotpSetupDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
+import { activeBadge } from "@/lib/document-states";
 
 type User = {
   id: number;
@@ -55,9 +56,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
             </div>
             <div className="flex flex-wrap gap-1.5">
               <RoleBadge role={user.role} />
-              <Badge variant={user.isActive ? "default" : "outline"}>
-                {user.isActive ? "Aktiv" : "Inaktiv"}
-              </Badge>
+              <Badge variant={activeBadge(user.isActive).variant}>{activeBadge(user.isActive).label}</Badge>
               <Badge variant={user.totpEnabled ? "secondary" : "outline"}>
                 {user.totpEnabled ? "TOTP aktiv" : "Kein TOTP"}
               </Badge>
@@ -91,9 +90,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
                 <TableCell className="px-4 py-3 text-muted-foreground">{user.email}</TableCell>
                 <TableCell className="px-4 py-3"><RoleBadge role={user.role} /></TableCell>
                 <TableCell className="px-4 py-3">
-                  <Badge variant={user.isActive ? "default" : "outline"}>
-                    {user.isActive ? "Aktiv" : "Inaktiv"}
-                  </Badge>
+                  <Badge variant={activeBadge(user.isActive).variant}>{activeBadge(user.isActive).label}</Badge>
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <Badge variant={user.totpEnabled ? "secondary" : "outline"}>
