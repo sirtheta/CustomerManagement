@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
 import { loadCategoryUsageTotals } from "@/lib/category-usage";
 import { CategoryManagement } from "./CategoryManagement";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 export default async function CategoriesPage() {
   await requireAdmin();
@@ -16,6 +17,7 @@ export default async function CategoriesPage() {
 
   return (
     <div className="space-y-6">
+      <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-semibold">Kategorien</h1>
         <p className="text-muted-foreground mt-1">

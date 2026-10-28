@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireAdmin } from "@/lib/permissions";
 import { listLogFiles } from "@/lib/logs";
 import { listBackups, type BackupFileInfo } from "@/lib/backup";
@@ -13,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 const log = logger.child({ module: "backup" });
 
@@ -45,6 +45,7 @@ export default async function LogsPage() {
 
   return (
     <div className="space-y-4">
+      <SettingsBackLink />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
@@ -52,9 +53,6 @@ export default async function LogsPage() {
             Anwendungs-Logs und Datenbank-Backups zum Herunterladen.
           </p>
         </div>
-        <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Einstellungen
-        </Link>
       </div>
 
       <div className="overflow-x-auto">

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { requireAdmin } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import { UserManagement } from "./UserManagement";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 export default async function UsersPage() {
   await requireAdmin();
@@ -22,6 +23,7 @@ export default async function UsersPage() {
 
   return (
     <div className="space-y-6">
+      <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-semibold">Benutzerverwaltung</h1>
         <p className="text-muted-foreground mt-1">
