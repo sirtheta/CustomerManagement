@@ -234,7 +234,8 @@ export async function updateCustomer(
   redirect(`/customers/${id}`);
 }
 
-export async function deleteCustomer(id: number): Promise<{ error?: string }> {
+/** `fromArchive`: the customer was deleted from the archive, so the user returns to it instead of the active list. */
+export async function deleteCustomer(id: number, fromArchive = false): Promise<{ error?: string }> {
   const session = await requireAdmin();
   // Invoices are booking records: they stay, so the customer is archived instead.
   const invoiceCount = await prisma.invoice.count({ where: { customerId: id } });
@@ -253,7 +254,7 @@ export async function deleteCustomer(id: number): Promise<{ error?: string }> {
   ]);
   await logAudit(session, "DELETE", "Customer", id);
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/customers?flash=customer-deleted");
+  redirect(fromArchive ? "/customers?archived=true&flash=customer-deleted" : "/customers?flash=customer-deleted");
 }
 
 export async function archiveCustomer(id: number): Promise<{ error?: string }> {

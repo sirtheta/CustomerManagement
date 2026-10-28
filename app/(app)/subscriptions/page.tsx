@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { UserRole } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/module-guard";
+import { isEditorSession } from "@/lib/permissions";
+import { formatDate } from "@/lib/utils";
 import { listSubscriptionOverview } from "@/lib/subscription-overview";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { Badge } from "@/components/ui/badge";
@@ -12,15 +13,10 @@ import SubscriptionRowActions from "./SubscriptionRowActions";
 import { BackLink } from "@/components/back-link";
 import { activeBadge } from "@/lib/document-states";
 
-function formatDay(day: string): string {
-  const [year, month, date] = day.split("-");
-  return `${date}.${month}.${year}`;
-}
-
 export default async function SubscriptionsPage() {
   await requireModule("subscriptions");
   const [session, rows] = await Promise.all([auth(), listSubscriptionOverview(prisma)]);
-  const canEdit = session?.user.role === UserRole.Admin || session?.user.role === UserRole.Editor;
+  const canEdit = isEditorSession(session);
 
   return (
     <div className="space-y-4">
@@ -54,7 +50,7 @@ export default async function SubscriptionsPage() {
                 <Badge variant={activeBadge(row.active, "Pausiert").variant}>{activeBadge(row.active, "Pausiert").label}</Badge>
               </div>
               <p className="text-sm">
-                {INTERVAL_LABELS[row.interval]} · nächste Rechnung {formatDay(row.nextInvoiceDate)}
+                {INTERVAL_LABELS[row.interval]} · nächste Rechnung {formatDate(row.nextInvoiceDate)}
               </p>
               <p className="text-sm text-muted-foreground">
                 {row.templateId == null ? <Badge variant="destructive">Vorlage fehlt</Badge> : row.templateName}
@@ -98,7 +94,7 @@ export default async function SubscriptionsPage() {
                     </Link>
                   </TableCell>
                   <TableCell>{INTERVAL_LABELS[row.interval]}</TableCell>
-                  <TableCell className="whitespace-nowrap">{formatDay(row.nextInvoiceDate)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{formatDate(row.nextInvoiceDate)}</TableCell>
                   <TableCell>
                     {row.templateId == null ? (
                       <Badge variant="destructive">Vorlage fehlt</Badge>
