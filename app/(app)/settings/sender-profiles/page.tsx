@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
 import { SenderProfileManagement, type FirstProfile, type SenderProfileRow } from "./SenderProfileManagement";
+import { SettingsBackLink } from "@/components/settings-back-link";
 
 export default async function SenderProfilesPage() {
   await requireAdmin();
@@ -34,6 +35,7 @@ export default async function SenderProfilesPage() {
 
   return (
     <div className="space-y-6">
+      <SettingsBackLink />
       <div>
         <h1 className="text-2xl font-bold">Absender-Profile</h1>
         <p className="text-muted-foreground mt-1">
