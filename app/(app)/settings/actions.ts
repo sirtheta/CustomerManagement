@@ -232,7 +232,7 @@ export async function uploadLogo(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
-  await requireAdmin();
+  const session = await requireAdmin();
   const settings = await prisma.applicationSettings.findFirst();
   if (!settings) return { error: "Bitte zuerst oben die Firmendaten speichern, dann gilt diese Einstellung." };
 
@@ -250,6 +250,7 @@ export async function uploadLogo(
     where: { companyInformationId: settings.companyInformationId },
     data: { companyLogo: logoBytes },
   });
+  await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Logo", { logo: "hochgeladen" });
 
   revalidatePath("/settings");
   return { success: true, _ts: Date.now() };
@@ -297,13 +298,14 @@ export async function testSmtpConnection(
 }
 
 export async function removeLogo() {
-  await requireAdmin();
+  const session = await requireAdmin();
   const settings = await prisma.applicationSettings.findFirst();
   if (!settings) return;
   await prisma.companyInformation.update({
     where: { companyInformationId: settings.companyInformationId },
     data: { companyLogo: null },
   });
+  await logAudit(session, "UPDATE", "Settings", settings.applicationSettingsId, "Logo", { logo: "entfernt" });
   revalidatePath("/settings");
 }
 

@@ -99,7 +99,7 @@ export async function deleteSenderProfile(id: number): Promise<{ error?: string 
 
   // Deleting a used profile would change the look of drafts and quotes (re-rendered on every view).
   if (profile._count.invoices + profile._count.quotes > 0) {
-    return { error: "Das Profil wird noch verwendet und kann nicht gelöscht werden. Setzen Sie es auf inaktiv." };
+    return { error: "Das Profil wird noch verwendet und kann nicht gelöscht werden. Setze es auf inaktiv." };
   }
 
   await prisma.senderProfile.delete({ where: { id } });

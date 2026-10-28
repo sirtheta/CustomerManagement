@@ -19,7 +19,7 @@ export default function LoginPage() {
   const totpStep = !wentBack && !!state?.totpRequired;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Anmelden</CardTitle>
@@ -92,7 +92,7 @@ export default function LoginPage() {
                 </div>
               </>
             )}
-            {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+            {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? (totpStep ? "Anmelden…" : "Prüfen…") : totpStep ? "Anmelden" : "Weiter"}
             </Button>

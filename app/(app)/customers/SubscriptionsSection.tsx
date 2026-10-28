@@ -267,7 +267,10 @@ function SubscriptionItem({
             confirmLabel="Löschen"
             triggerVariant="ghost"
             triggerSize="sm"
-            onConfirm={() => deleteSubscription(customerId, sub.id)}
+            onConfirm={async () => {
+              await deleteSubscription(customerId, sub.id);
+              toast.success("Abo gelöscht");
+            }}
           >
             Löschen
           </ConfirmDialog>

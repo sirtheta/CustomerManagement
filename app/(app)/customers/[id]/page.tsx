@@ -24,53 +24,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { InvoiceState, QuoteState, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { auth } from "@/lib/auth";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import {
+  invoiceStateLabels,
+  invoiceStateVariants,
+  quoteStateLabels,
+  quoteStateVariants,
+} from "@/lib/document-states";
 import { decryptSecret } from "@/lib/crypto";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
-
-const invoiceStateLabels: Record<InvoiceState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-};
-
-const invoiceStateVariants: Record<
-  InvoiceState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  PartiallyPaid: "secondary",
-  Paid: "outline",
-  Overdue: "destructive",
-  Canceled: "outline",
-};
-
-const quoteStateLabels: Record<QuoteState, string> = {
-  Draft: "Entwurf",
-  Sent: "Versendet",
-  Accepted: "Angenommen",
-  Declined: "Abgelehnt",
-  Expired: "Abgelaufen",
-};
-
-const quoteStateVariants: Record<
-  QuoteState,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  Draft: "secondary",
-  Sent: "default",
-  Accepted: "outline",
-  Declined: "destructive",
-  Expired: "outline",
-};
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -83,8 +50,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   const customerId = parseInt(id, 10);
 
   const session = await auth();
-  const canEdit = session?.user.role === UserRole.Admin || session?.user.role === UserRole.Editor;
-  const canDelete = session?.user.role === UserRole.Admin;
+  const canEdit = isEditorSession(session);
+  const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
   const isEditing = edit === "true" && canEdit;
 
   const DETAIL_LIST_LIMIT = 25;
@@ -157,7 +124,14 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[{ label: "Kunden", href: "/customers" }, { label: customerName }]} />
+      <Breadcrumb
+        items={[
+          customer.archivedAt
+            ? { label: "Archivierte Kunden", href: "/customers?archived=true" }
+            : { label: "Kunden", href: "/customers" },
+          { label: customerName },
+        ]}
+      />
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold">{customerName}</h1>
@@ -254,7 +228,32 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
           )}
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {invoices.length > 0 && (
+            // Phones get cards: amount and status stay visible without sideways scrolling
+            <ul className="space-y-3 md:hidden">
+              {invoices.map((inv) => (
+                <li key={inv.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <Link href={`/invoices/${inv.id}?from=customers/${customerId}`} className="font-medium hover:underline">
+                      {documentLabel(inv.documentNumber)}
+                      {inv.creditNoteForId !== null && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                      )}
+                    </Link>
+                    <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
+                    <span>
+                      {formatDate(inv.date)}
+                      {inv.creditNoteForId === null && ` · fällig ${formatDate(inv.dueDate)}`}
+                    </span>
+                    <span className="font-semibold text-foreground">{formatCurrency(inv.totalAmount.toNumber())}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={invoices.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -328,7 +327,27 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
             )}
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {quotes.length > 0 && (
+              <ul className="space-y-3 md:hidden">
+                {quotes.map((q) => (
+                  <li key={q.id} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="font-medium hover:underline">
+                        {documentLabel(q.documentNumber)}
+                      </Link>
+                      <Badge variant={quoteStateVariants[q.state]}>{quoteStateLabels[q.state]}</Badge>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
+                      <span>
+                        {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
+                      </span>
+                      <span className="font-semibold text-foreground">{formatCurrency(q.totalAmount.toNumber())}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={quotes.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
               <Table>
                 <TableHeader>
                   <TableRow>

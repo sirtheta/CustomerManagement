@@ -3,6 +3,7 @@
 import { parseDecimalInput } from "@/lib/decimal-input";
 import prisma from "@/lib/prisma";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { redirect } from "next/navigation";
 import { hasRole, requireAdmin, requireEditor } from "@/lib/permissions";
 import { UserRole } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
@@ -150,9 +151,11 @@ export async function updateExpense(
 export async function deleteExpense(id: number): Promise<void> {
   const session = await requireAdmin();
   await requireModule("accounting");
-  const expense = await prisma.expense.findUnique({ where: { id }, select: { description: true } });
+  const expense = await prisma.expense.findUnique({ where: { id }, select: { description: true, date: true } });
   await prisma.expense.delete({ where: { id } });
   await logAudit(session, "DELETE", "Expense", id, expense?.description);
   revalidatePath("/accounting");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
+  // Also leaves the detail page of the deleted expense
+  redirect(expense ? `${listUrlFor(expense.date)}&flash=expense-deleted` : "/accounting?flash=expense-deleted");
 }

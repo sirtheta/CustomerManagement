@@ -15,6 +15,7 @@ import { resolveSenderProfileId } from "@/lib/sender-profile";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
+import { customerDisplayName } from "@/lib/customer-display";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { PaymentError, recordRemainingPayment, syncInvoiceState } from "@/lib/payments";
 import { toRappen } from "@/lib/calculations";
@@ -223,7 +224,7 @@ export async function updateInvoiceStatus(
   // PartiallyPaid results from payments only. Leaving Paid/PartiallyPaid
   // works by deleting the payments, so state and payments never disagree.
   if (state === "PartiallyPaid") {
-    return { error: "„Teilbezahlt“ ergibt sich aus den erfassten Zahlungen." };
+    return { error: "«Teilbezahlt» ergibt sich aus den erfassten Zahlungen." };
   }
   const hasPayments = (await prisma.payment.count({ where: { invoiceId: id } })) > 0;
   if (hasPayments && state !== "Paid") {
@@ -294,7 +295,12 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
   const inv = await prisma.invoice.findUnique({
     where: { id },
-    select: { documentNumber: true, state: true, creditNoteForId: true },
+    select: {
+      documentNumber: true,
+      state: true,
+      creditNoteForId: true,
+      customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
+    },
   });
   if (!inv) return { error: "Rechnung nicht gefunden." };
   if (inv.state !== "Draft") {
@@ -321,10 +327,18 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
     log.error({ id, err }, "deleteInvoice failed");
     return { error: "Rechnung konnte nicht gelöscht werden. Es bestehen noch verknüpfte Daten." };
   }
-  await logAudit(session, "DELETE", "Invoice", id);
+  // Only unnumbered drafts get here, so there is no number for entityRef; the customer identifies the draft.
+  await logAudit(session, "DELETE", "Invoice", id, undefined, {
+    customer: customerDisplayName(inv.customer),
+    ...(inv.creditNoteForId != null && { creditNoteFor: inv.creditNoteForId }),
+  });
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect(`/invoices?flash=${inv.creditNoteForId != null ? "credit-note-deleted" : "invoice-deleted"}`);
+  if (inv.creditNoteForId != null) {
+    revalidatePath(`/invoices/${inv.creditNoteForId}`);
+    redirect(`/invoices/${inv.creditNoteForId}?flash=credit-note-deleted`);
+  }
+  redirect("/invoices?flash=invoice-deleted");
 }
 
 export async function createCreditNote(invoiceId: number): Promise<{ error?: string }> {

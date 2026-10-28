@@ -84,6 +84,8 @@ export async function updateService(
   const categoryId =
     categoryIdRaw && categoryIdRaw !== "" ? parseInt(categoryIdRaw, 10) : null;
 
+  // Price and unit drive billing (time entries are priced from the catalog), so their changes are audited.
+  const before = await prisma.service.findUnique({ where: { id }, select: { unitPrice: true, unit: true } });
   await prisma.service.update({
     where: { id },
     data: {
@@ -96,7 +98,12 @@ export async function updateService(
     },
   });
 
-  await logAudit(session, "UPDATE", "Service", id, name);
+  const changes: Record<string, unknown> = {};
+  if (before && before.unitPrice.toNumber() !== unitPrice) {
+    changes.unitPrice = { from: before.unitPrice.toNumber(), to: unitPrice };
+  }
+  if (before && before.unit !== unit) changes.unit = { from: before.unit, to: unit };
+  await logAudit(session, "UPDATE", "Service", id, name, Object.keys(changes).length > 0 ? changes : undefined);
   redirect("/services?flash=service-updated");
 }
 

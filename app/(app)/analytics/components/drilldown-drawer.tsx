@@ -10,29 +10,13 @@ import {
 } from "../lib/analytics-queries";
 import { CloseDrawerButton } from "./close-drawer-button";
 import { InvoiceState } from "@prisma/client";
+import { Badge } from "@/components/ui/badge";
+import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
 
 const MONTH_NAMES = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
-
-const STATE_LABELS: Partial<Record<InvoiceState, string>> = {
-  Sent: "Versendet",
-  PartiallyPaid: "Teilbezahlt",
-  Paid: "Bezahlt",
-  Overdue: "Überfällig",
-  Canceled: "Storniert",
-  Draft: "Entwurf",
-};
-
-const STATE_BADGE: Partial<Record<InvoiceState, string>> = {
-  Paid: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  Sent: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  PartiallyPaid: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  Overdue: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  Canceled: "bg-gray-100 text-muted-foreground dark:bg-gray-800 dark:text-muted-foreground",
-  Draft: "bg-gray-100 text-muted-foreground dark:bg-gray-800 dark:text-muted-foreground",
-};
 
 type Props = {
   year: number;
@@ -119,7 +103,7 @@ async function InvoiceDrilldown({
     drillMonth !== undefined
       ? `${MONTH_NAMES[drillMonth]} ${year}`
       : drillStatus
-        ? STATE_LABELS[drillStatus as InvoiceState] ?? drillStatus
+        ? invoiceStateLabels[drillStatus as InvoiceState] ?? drillStatus
         : (resolvedCustomerName ?? `Kunde #${drillCustomer}`);
 
   const total = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
@@ -160,11 +144,9 @@ async function InvoiceDrilldown({
                   <Link href={`/invoices/${inv.id}`} className="font-mono text-xs text-primary hover:underline">
                     {inv.invoiceNumber}
                   </Link>
-                  <span
-                    className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium sm:hidden ${STATE_BADGE[inv.state] ?? ""}`}
-                  >
-                    {STATE_LABELS[inv.state] ?? inv.state}
-                  </span>
+                  <Badge variant={invoiceStateVariants[inv.state]} className="mt-1 sm:hidden">
+                    {invoiceStateLabels[inv.state]}
+                  </Badge>
                 </td>
                 <td className="px-2 sm:px-3 py-3">
                   {showCustomerCol ? (
@@ -180,9 +162,7 @@ async function InvoiceDrilldown({
                 </td>
                 <td className="px-3 py-3 text-left tabular-nums font-medium">{formatCurrency(inv.totalAmount)}</td>
                 <td className="px-3 sm:px-5 py-3 text-right hidden sm:table-cell">
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATE_BADGE[inv.state] ?? ""}`}>
-                    {STATE_LABELS[inv.state] ?? inv.state}
-                  </span>
+                  <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
                 </td>
               </tr>
             ))}

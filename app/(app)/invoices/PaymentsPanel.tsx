@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -106,7 +107,11 @@ export default function PaymentsPanel({ invoiceId, state, canEdit, summary, paym
                       triggerVariant="ghost"
                       triggerSize="sm"
                       triggerDisabled={isPending}
-                      onConfirm={() => deletePaymentAction(p.id)}
+                      onConfirm={async () => {
+                        const result = await deletePaymentAction(p.id);
+                        if (!result.error) toast.success("Zahlung gelöscht");
+                        return result;
+                      }}
                     >
                       Löschen
                     </ConfirmDialog>

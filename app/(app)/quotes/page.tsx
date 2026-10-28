@@ -30,11 +30,10 @@ const PAGE_SIZE = 25;
 
 const filterOptions: { value: string; label: string }[] = [
   { value: "all", label: "Alle" },
-  { value: "Draft", label: "Entwurf" },
-  { value: "Sent", label: "Versendet" },
-  { value: "Accepted", label: "Angenommen" },
-  { value: "Declined", label: "Abgelehnt" },
-  { value: "Expired", label: "Abgelaufen" },
+  ...(["Draft", "Sent", "Accepted", "Declined", "Expired"] as const).map((state) => ({
+    value: state,
+    label: quoteStateLabels[state],
+  })),
 ];
 
 type SortField = "documentNumber" | "date" | "validUntil" | "totalAmount" | "state";

@@ -66,7 +66,7 @@ export async function deleteCategory(id: number): Promise<{ error?: string }> {
   // shift past analytics to «Ohne Kategorie»; those stay on «Inaktiv».
   const usage = await countCategoryUsage(prisma, id);
   if (totalCategoryUsage(usage) > 0) {
-    return { error: "Die Kategorie wird noch verwendet und kann nicht gelöscht werden. Setzen Sie sie auf inaktiv." };
+    return { error: "Die Kategorie wird noch verwendet und kann nicht gelöscht werden. Setze sie auf inaktiv." };
   }
 
   try {

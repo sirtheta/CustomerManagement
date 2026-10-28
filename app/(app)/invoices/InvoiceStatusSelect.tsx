@@ -22,18 +22,13 @@ import { toast } from "sonner";
 import { updateInvoiceStatus } from "./actions";
 import { allowedInvoiceTargets, locksDraftWithoutMail } from "@/lib/state-manager";
 import type { InvoiceState } from "@prisma/client";
+import { invoiceStateLabels } from "@/lib/document-states";
 import { useSendDialog } from "./SendDialogContext";
 
-const stateOptions: { value: InvoiceState; label: string }[] = [
-  { value: "Draft", label: "Entwurf" },
-  { value: "Sent", label: "Versendet" },
-  { value: "PartiallyPaid", label: "Teilbezahlt" },
-  { value: "Paid", label: "Bezahlt" },
-  { value: "Overdue", label: "Überfällig" },
-  { value: "Canceled", label: "Storniert" },
-];
+/** Order of the dropdown; it only offers the targets allowedInvoiceTargets() permits (never Canceled). */
+const STATE_ORDER: InvoiceState[] = ["Draft", "Sent", "PartiallyPaid", "Paid", "Overdue", "Canceled"];
 
-const labelOf = (state: InvoiceState) => stateOptions.find((o) => o.value === state)?.label ?? state;
+const labelOf = (state: InvoiceState) => invoiceStateLabels[state] ?? state;
 
 type Props = {
   invoiceId: number;
@@ -91,11 +86,11 @@ export default function InvoiceStatusSelect({ invoiceId, currentState, nextDocum
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {stateOptions
-            .filter((opt) => allowedInvoiceTargets(currentState).includes(opt.value))
-            .map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+          {STATE_ORDER
+            .filter((state) => allowedInvoiceTargets(currentState).includes(state))
+            .map((state) => (
+              <SelectItem key={state} value={state}>
+                {invoiceStateLabels[state]}
               </SelectItem>
             ))}
         </SelectContent>

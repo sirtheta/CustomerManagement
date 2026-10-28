@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
-    customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn() },
+    customer: { create: vi.fn(), update: vi.fn(), delete: vi.fn(), aggregate: vi.fn(), findUnique: vi.fn() },
     invoice: { count: vi.fn() },
     workEntry: { count: vi.fn() },
     item: { deleteMany: vi.fn() },
@@ -227,15 +227,34 @@ describe("customer actions", () => {
     it("deletes a customer without invoices, writes audit log, and redirects", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.invoice.count).mockResolvedValue(0);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue({
+        company: "Muster AG",
+        contactPerson: "Anna Muster",
+        contactInsteadOfCompany: false,
+      } as never);
       vi.mocked(prisma.customer.delete).mockResolvedValue({} as never);
       vi.mocked(redirect).mockImplementation(() => {
-        throw new Error("REDIRECT:/customers");
+        throw new Error("REDIRECT");
       });
 
-      await expect(deleteCustomer(7)).rejects.toThrow("REDIRECT:/customers");
+      await expect(deleteCustomer(7)).rejects.toThrow("REDIRECT");
       expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { quote: { customerId: 7 } } });
       expect(prisma.customer.delete).toHaveBeenCalledWith({ where: { customerId: 7 } });
-      expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Customer", 7);
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Customer", 7, "Muster AG");
+      expect(redirect).toHaveBeenCalledWith("/customers?flash=customer-deleted");
+    });
+
+    it("returns to the archive after deleting from there", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.invoice.count).mockResolvedValue(0);
+      vi.mocked(prisma.customer.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.customer.delete).mockResolvedValue({} as never);
+      vi.mocked(redirect).mockImplementation(() => {
+        throw new Error("REDIRECT");
+      });
+
+      await expect(deleteCustomer(7, true)).rejects.toThrow("REDIRECT");
+      expect(redirect).toHaveBeenCalledWith("/customers?archived=true&flash=customer-deleted");
     });
   });
 

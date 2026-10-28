@@ -304,6 +304,19 @@ describe("invoice actions against a real database", () => {
       expect(await db.prisma.auditLog.count({ where: { action: "DELETE", entityType: "Invoice", entityId: draftId } })).toBe(1);
     });
 
+    it("deleteInvoice returns to the original invoice after deleting a credit note draft", async () => {
+      const originalId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await db.prisma.invoice.update({ where: { id: originalId }, data: { state: "Sent", documentNumber: "I-26060011" } });
+      const creditId = await idFromRedirect(() => createCreditNote(originalId));
+
+      await expectRedirect(() => deleteInvoice(creditId), `/invoices/${originalId}?flash=credit-note-deleted`);
+
+      expect(await db.prisma.invoice.findUnique({ where: { id: creditId } })).toBeNull();
+      expect(await db.prisma.invoice.findUnique({ where: { id: originalId } })).not.toBeNull();
+      const entry = await db.prisma.auditLog.findFirstOrThrow({ where: { action: "DELETE", entityType: "Invoice", entityId: creditId } });
+      expect(JSON.parse(entry.details ?? "{}")).toMatchObject({ customer: "Client AG", creditNoteFor: originalId });
+    });
+
     it("deleteInvoice refuses a sent invoice and keeps its items", async () => {
       const id = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
       await db.prisma.invoice.update({ where: { id }, data: { state: "Sent", documentNumber: "I-26060009" } });

@@ -285,13 +285,23 @@ describe("accounting actions", () => {
 
     it("deletes an expense and writes an audit log for Admin", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
-      vi.mocked(prisma.expense.findUnique).mockResolvedValue({ description: "Miete" } as never);
+      vi.mocked(prisma.expense.findUnique).mockResolvedValue({
+        description: "Miete",
+        date: new Date("2025-03-01T00:00:00Z"),
+      } as never);
       vi.mocked(prisma.expense.delete).mockResolvedValue({} as never);
+      vi.mocked(redirect).mockImplementation((url: string) => {
+        throw new Error(`REDIRECT:${url}`);
+      });
 
-      await deleteExpense(1);
+      // Leaves the detail page for the list of the expense's year, with a toast
+      await expect(deleteExpense(1)).rejects.toThrow("REDIRECT:/accounting?year=2025&flash=expense-deleted");
 
       expect(prisma.expense.delete).toHaveBeenCalledWith({ where: { id: 1 } });
       expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Expense", 1, "Miete");
+      expect(vi.mocked(logAudit).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(redirect).mock.invocationCallOrder[0],
+      );
     });
   });
 });

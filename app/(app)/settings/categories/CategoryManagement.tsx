@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -148,7 +149,11 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
               triggerVariant="ghost"
               triggerSize="sm"
               triggerClassName="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onConfirm={() => deleteCategory(category.categoryId)}
+              onConfirm={async () => {
+                const result = await deleteCategory(category.categoryId);
+                if (!result.error) toast.success("Kategorie gelöscht");
+                return result;
+              }}
             >
               <Trash2 /> Löschen
             </ConfirmDialog>

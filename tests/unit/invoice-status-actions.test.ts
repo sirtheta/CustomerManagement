@@ -350,6 +350,8 @@ describe("deleteInvoice", () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
       documentNumber: null,
       state: "Draft",
+      creditNoteForId: null,
+      customer: { company: "Muster AG", contactPerson: null, contactInsteadOfCompany: false },
     } as never);
     vi.mocked(prisma.invoice.delete).mockResolvedValue({} as never);
     vi.mocked(redirect).mockImplementation(() => {
@@ -359,7 +361,9 @@ describe("deleteInvoice", () => {
     await expect(deleteInvoice(1)).rejects.toThrow("REDIRECT:/invoices");
     expect(prisma.item.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 1 } });
     expect(prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Invoice", 1);
+    // A deletable draft has no number yet, so the customer identifies it in the audit entry
+    expect(logAudit).toHaveBeenCalledWith(adminSession, "DELETE", "Invoice", 1, undefined, { customer: "Muster AG" });
+    expect(redirect).toHaveBeenCalledWith("/invoices?flash=invoice-deleted");
   });
 
   it("returns an error instead of throwing when the delete fails", async () => {

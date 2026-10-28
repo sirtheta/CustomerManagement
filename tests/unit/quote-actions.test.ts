@@ -313,6 +313,7 @@ describe("quote actions", () => {
         where: { id: 3 },
         data: { state: "Accepted" },
       });
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Quote", 3, "O-1", { from: "Sent", to: "Accepted" });
     });
 
     it("does nothing when the quote does not exist", async () => {
@@ -334,6 +335,8 @@ describe("quote actions", () => {
         vi.mocked(prisma.quote.update).mock.invocationCallOrder[0]
       );
       expect(prisma.quote.update).toHaveBeenCalledWith({ where: { id: 3 }, data: { state } });
+      // The audit entry carries the number the status change just assigned
+      expect(logAudit).toHaveBeenCalledWith(editorSession, "STATUS", "Quote", 3, "O-26090001", { from: "Draft", to: state });
     });
 
     it.each([

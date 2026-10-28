@@ -42,7 +42,7 @@ export function ResetPasswordDialog({ user }: { user: User }) {
             <Label>Neues Passwort</Label>
             <PasswordInput name="password" required minLength={8} />
           </div>
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Abbrechen</Button>
             <Button type="submit" disabled={pending}>{pending ? "Speichern…" : "Speichern"}</Button>
@@ -52,7 +52,7 @@ export function ResetPasswordDialog({ user }: { user: User }) {
           <p className="text-sm text-muted-foreground">
             Alternativ kann {user.name} einen Link erhalten, um selbst ein neues Passwort zu setzen.
           </p>
-          {inviteState.error && <p className="text-sm text-red-600">{inviteState.error}</p>}
+          {inviteState.error && <p className="text-sm text-destructive">{inviteState.error}</p>}
           <form action={inviteAction}>
             <Button type="submit" variant="outline" className="w-full" disabled={invitePending}>
               {invitePending ? "Wird gesendet…" : "Passwort-Link senden"}

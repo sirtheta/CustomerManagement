@@ -49,7 +49,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
                 required
               />
             </div>
-            {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+            {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? "Wird gespeichert…" : "Passwort ändern"}
             </Button>

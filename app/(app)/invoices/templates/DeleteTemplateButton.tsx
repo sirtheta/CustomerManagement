@@ -3,6 +3,7 @@
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteTemplate } from "./actions";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DeleteTemplateButton({ templateId }: { templateId: number }) {
   return (
@@ -14,7 +15,11 @@ export default function DeleteTemplateButton({ templateId }: { templateId: numbe
       triggerSize="icon-sm"
       triggerClassName="text-destructive hover:text-destructive hover:bg-destructive/10"
       triggerAriaLabel="Vorlage löschen"
-      onConfirm={() => deleteTemplate(templateId)}
+      onConfirm={async () => {
+        const result = await deleteTemplate(templateId);
+        if (!result.error) toast.success("Vorlage gelöscht");
+        return result;
+      }}
     >
       <Trash2 />
     </ConfirmDialog>

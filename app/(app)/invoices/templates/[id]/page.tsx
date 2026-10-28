@@ -1,7 +1,9 @@
 import prisma from "@/lib/prisma";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { notFound } from "next/navigation";
-import { requireEditor } from "@/lib/permissions";
+import { auth } from "@/lib/auth";
+import { isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import TemplateEditForm from "./TemplateEditForm";
 import type { ItemData } from "@/components/items-editor-schema";
@@ -11,7 +13,7 @@ type Props = {
 };
 
 export default async function TemplateEditPage({ params }: Props) {
-  await requireEditor();
+  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const { id } = await params;
   const templateId = parseInt(id, 10);
 

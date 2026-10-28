@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +80,10 @@ function EditableContact({ customerId, contact }: { customerId: number; contact:
             confirmLabel="Löschen"
             triggerVariant="ghost"
             triggerSize="sm"
-            onConfirm={() => deleteContact(customerId, contact.contactId)}
+            onConfirm={async () => {
+              await deleteContact(customerId, contact.contactId);
+              toast.success("Kontakt gelöscht");
+            }}
           >
             Löschen
           </ConfirmDialog>

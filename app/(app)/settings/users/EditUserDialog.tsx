@@ -83,7 +83,7 @@ export function EditUserDialog({ user }: { user: User }) {
             />
             <Label htmlFor={`active-${user.id}`}>Aktiv</Label>
           </div>
-          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Abbrechen</Button>
             <Button type="submit" disabled={pending}>{pending ? "Speichern…" : "Speichern"}</Button>

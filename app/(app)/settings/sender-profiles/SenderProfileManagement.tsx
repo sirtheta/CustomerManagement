@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,7 +187,11 @@ function ProfileCard({ profile, first }: { profile: SenderProfileRow; first: Fir
               triggerVariant="ghost"
               triggerSize="sm"
               triggerClassName="text-destructive hover:text-destructive hover:bg-destructive/10"
-              onConfirm={() => deleteSenderProfile(profile.id)}
+              onConfirm={async () => {
+                const result = await deleteSenderProfile(profile.id);
+                if (!result.error) toast.success("Profil gelöscht");
+                return result;
+              }}
             >
               <Trash2 /> Löschen
             </ConfirmDialog>
