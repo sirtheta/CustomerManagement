@@ -14,6 +14,7 @@ const FLASH_MESSAGES: Record<string, string> = {
   "invoice-deleted": "Rechnung gelöscht",
   "credit-note-deleted": "Gutschrift gelöscht",
   "quote-deleted": "Offerte gelöscht",
+  "expense-deleted": "Ausgabe gelöscht",
 };
 
 /** Shows the toast named in `?flash=` once and removes the parameter from the URL. */

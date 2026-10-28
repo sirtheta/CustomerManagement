@@ -2,7 +2,9 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import ExpenseForm from "../ExpenseForm";
 import DeleteExpenseButton from "../DeleteExpenseButton";
-import { hasRole, requireEditor } from "@/lib/permissions";
+import { auth } from "@/lib/auth";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { UserRole } from "@prisma/client";
 import { requireModule } from "@/lib/module-guard";
 
@@ -11,8 +13,11 @@ type Props = {
 };
 
 export default async function EditExpensePage({ params }: Props) {
-  const session = await requireEditor();
   await requireModule("accounting");
+  const session = await auth();
+  if (!isEditorSession(session)) return <EditorOnlyNotice />;
+  // Deleting expenses and receipts requires an Admin
+  const isAdmin = session ? hasRole(session, [UserRole.Admin]) : false;
   const { id } = await params;
   const expenseId = parseInt(id, 10);
 
@@ -45,11 +50,13 @@ export default async function EditExpensePage({ params }: Props) {
         expense={serializedExpense}
         categories={categories}
         receipts={receipts}
-        canDeleteReceipts={hasRole(session, [UserRole.Admin])}
+        canDeleteReceipts={isAdmin}
       />
-      <div className="max-w-2xl flex justify-start">
-        <DeleteExpenseButton expenseId={expenseId} />
-      </div>
+      {isAdmin && (
+        <div className="max-w-2xl flex justify-start">
+          <DeleteExpenseButton expenseId={expenseId} />
+        </div>
+      )}
     </div>
   );
 }

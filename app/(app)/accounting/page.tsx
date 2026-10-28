@@ -1,6 +1,11 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { requireEditor } from "@/lib/permissions";
+import { Suspense } from "react";
+import { UserRole } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { hasRole, isEditorSession } from "@/lib/permissions";
+import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { FlashToast } from "@/components/flash-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FitText } from "@/components/ui/fit-text";
@@ -42,8 +47,11 @@ function ExpenseStatus({ exp, today }: { exp: ExpenseRow; today: string }) {
 }
 
 export default async function AccountingPage({ searchParams }: Props) {
-  await requireEditor();
   await requireModule("accounting");
+  const session = await auth();
+  if (!isEditorSession(session)) return <EditorOnlyNotice />;
+  // deleteExpense requires an Admin
+  const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
 
   const { year } = await searchParams;
   const parsedYear = year ? parseInt(year, 10) : NaN;
@@ -61,6 +69,9 @@ export default async function AccountingPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-semibold">Buchhaltung</h1>
         <div className="flex flex-wrap items-center gap-3">
@@ -213,7 +224,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                         <Button variant="outline" size="sm" render={<Link href={`/accounting/${exp.id}`} />}>
                           Bearbeiten
                         </Button>
-                        <DeleteExpenseButton expenseId={exp.id} size="sm" />
+                        {canDelete && <DeleteExpenseButton expenseId={exp.id} size="sm" />}
                       </div>
                     </div>
                   </li>
@@ -256,13 +267,13 @@ export default async function AccountingPage({ searchParams }: Props) {
                         <TableCell>
                           <div className="flex items-center gap-1 justify-end">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               render={<Link href={`/accounting/${exp.id}`} />}
                             >
                               Bearbeiten
                             </Button>
-                            <DeleteExpenseButton expenseId={exp.id} size="sm" />
+                            {canDelete && <DeleteExpenseButton expenseId={exp.id} size="sm" />}
                           </div>
                         </TableCell>
                       </TableRow>
