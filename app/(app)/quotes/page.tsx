@@ -188,7 +188,30 @@ export default async function QuotesPage({ searchParams }: Props) {
         <DateRangeFilter />
       </Suspense>
 
-      <div className="overflow-x-auto">
+      {quotes.length > 0 && (
+        // Phones get cards instead of a table that scrolls sideways
+        <ul className="space-y-3 md:hidden">
+          {quotes.map((q) => (
+            <li key={q.id} className="rounded-lg border p-3 space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <Link href={`/quotes/${q.id}`} className="font-medium hover:underline">
+                  {documentLabel(q.documentNumber)}
+                </Link>
+                <Badge variant={stateVariants[q.state]}>{stateLabels[q.state]}</Badge>
+              </div>
+              <Link href={`/customers/${q.customer.customerId}`} className="block text-sm hover:underline">
+                {customerDisplayName(q.customer)}
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
+              </p>
+              <p className="text-sm font-semibold">{formatCurrency(q.totalAmount.toNumber())}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={quotes.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
         <Table>
           <TableHeader>
             <TableRow>
