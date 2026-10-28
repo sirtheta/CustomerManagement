@@ -1,7 +1,5 @@
 import prisma from "@/lib/prisma";
 import { senderDisplayName } from "@/lib/sender-profile";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import ReminderRow from "./ReminderRow";
 import { ReminderHighlight } from "./ReminderHighlight";
@@ -18,6 +16,7 @@ import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { customerDisplayName } from "@/lib/customer-display";
 import { reminderMail } from "@/lib/mail-templates";
+import { BackLink } from "@/components/back-link";
 
 type Props = {
   searchParams: Promise<{ search?: string }>;
@@ -77,6 +76,7 @@ export default async function RemindersPage({ searchParams }: Props) {
 
   return (
     <div className="max-w-3xl space-y-4">
+      <BackLink href="/invoices">Rechnungen</BackLink>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Mahnungen</h1>
@@ -84,9 +84,6 @@ export default async function RemindersPage({ searchParams }: Props) {
             Überfällige Rechnungen prüfen und Mahnungen versenden
           </p>
         </div>
-        <Button variant="outline" size="sm" render={<Link href="/invoices" />}>
-          Zurück
-        </Button>
       </div>
 
       <Suspense fallback={<div className="h-9 rounded-lg border border-input bg-muted animate-pulse" />}>

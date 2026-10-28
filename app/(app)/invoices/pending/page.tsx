@@ -1,12 +1,11 @@
 import prisma from "@/lib/prisma";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import PendingEmailRow from "./PendingEmailRow";
 import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { customerDisplayName } from "@/lib/customer-display";
+import { BackLink } from "@/components/back-link";
 
 export default async function PendingEmailsPage() {
   await requireModule("subscriptions");
@@ -20,6 +19,7 @@ export default async function PendingEmailsPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
+      <BackLink href="/invoices">Rechnungen</BackLink>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Abo-Rechnungen freigeben</h1>
@@ -27,9 +27,6 @@ export default async function PendingEmailsPage() {
             Abo-Rechnungen prüfen und versenden
           </p>
         </div>
-        <Button variant="outline" size="sm" render={<Link href="/invoices" />}>
-          Zurück
-        </Button>
       </div>
 
       {pending.length === 0 ? (

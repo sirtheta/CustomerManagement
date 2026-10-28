@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { requireEditor } from "@/lib/permissions";
 import { loadImportOverview } from "@/lib/import/queries";
 import { ImportWizard } from "./ImportWizard";
@@ -7,6 +5,7 @@ import { IncomingTable } from "./IncomingTable";
 import { ExpensesTable } from "./ExpensesTable";
 import { ImportHistory } from "./ImportHistory";
 import { loadModules, requireModule } from "@/lib/module-guard";
+import { BackLink } from "@/components/back-link";
 
 export default async function InvoicesImportPage() {
   await requireEditor();
@@ -16,6 +15,7 @@ export default async function InvoicesImportPage() {
 
   return (
     <div className="max-w-5xl space-y-6">
+      <BackLink href="/invoices">Rechnungen</BackLink>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold">Bankimport</h1>
@@ -23,9 +23,6 @@ export default async function InvoicesImportPage() {
             Kontoauszug aus dem E-Banking (camt.053) hochladen, Zahlungseingänge Rechnungen zuordnen und Geschäftsausgaben übernehmen
           </p>
         </div>
-        <Button variant="outline" size="sm" render={<Link href="/invoices" />}>
-          Zurück
-        </Button>
       </div>
 
       <ImportWizard />

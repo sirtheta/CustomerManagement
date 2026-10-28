@@ -17,7 +17,7 @@ export default async function CategoriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Kategorien</h1>
+        <h1 className="text-2xl font-semibold">Kategorien</h1>
         <p className="text-muted-foreground mt-1">
           Kategorien für Rechnungspositionen, Leistungen und Ausgaben verwalten.
         </p>
