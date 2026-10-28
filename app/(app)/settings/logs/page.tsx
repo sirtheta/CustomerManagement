@@ -46,13 +46,11 @@ export default async function LogsPage() {
   return (
     <div className="space-y-4">
       <SettingsBackLink />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Anwendungs-Logs und Datenbank-Backups zum Herunterladen.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Logs &amp; Backups</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Anwendungs-Logs und Datenbank-Backups zum Herunterladen.
+        </p>
       </div>
 
       <div className="overflow-x-auto">

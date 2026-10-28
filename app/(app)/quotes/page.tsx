@@ -251,8 +251,8 @@ export default async function QuotesPage({ searchParams }: Props) {
             {quotes.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  {term ? (
-                    "Keine Offerten für diesen Suchbegriff."
+                  {term || customerFilter || activeFilter !== "all" || dateFrom || dateTo ? (
+                    "Keine Offerten für diese Filterkriterien."
                   ) : (
                     <div className="space-y-3">
                       <p>Noch keine Offerten vorhanden.</p>

@@ -1,11 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/module-guard";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
-import { Button } from "@/components/ui/button";
 import { customerDisplayName } from "@/lib/customer-display";
 import { CUSTOMER_ARCHIVED_ERROR } from "@/lib/customer-archive";
 import { loadTotalOptions } from "@/lib/total-options";
@@ -48,12 +46,7 @@ export default async function BillPage({ params }: { params: Promise<{ customerI
       </div>
       {customer.archivedAt && <p className="rounded-lg border p-3 text-sm text-destructive">{CUSTOMER_ARCHIVED_ERROR}</p>}
       {entries.length === 0 ? (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Für diesen Kunden gibt es keine offenen Einträge.</p>
-          <Button variant="outline" size="sm" render={<Link href="/time/open" />}>
-            Zu den offenen Erfassungen
-          </Button>
-        </div>
+        <p className="text-sm text-muted-foreground">Für diesen Kunden gibt es keine offenen Einträge.</p>
       ) : (
         <BillForm
           customerId={customerId}

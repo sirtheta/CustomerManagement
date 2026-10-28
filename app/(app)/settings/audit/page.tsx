@@ -124,11 +124,9 @@ export default async function AuditLogPage({ searchParams }: Props) {
   return (
     <div className="space-y-4">
       <SettingsBackLink />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Aktivitätsprotokoll</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Alle Änderungen in der Anwendung</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Aktivitätsprotokoll</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Alle Änderungen in der Anwendung</p>
       </div>
 
       {chainError && (

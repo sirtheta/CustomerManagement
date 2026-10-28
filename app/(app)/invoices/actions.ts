@@ -294,7 +294,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
   const inv = await prisma.invoice.findUnique({
     where: { id },
-    select: { documentNumber: true, state: true },
+    select: { documentNumber: true, state: true, creditNoteForId: true },
   });
   if (!inv) return { error: "Rechnung nicht gefunden." };
   if (inv.state !== "Draft") {
@@ -324,7 +324,7 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   await logAudit(session, "DELETE", "Invoice", id);
   revalidatePath("/invoices");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  redirect("/invoices?flash=invoice-deleted");
+  redirect(`/invoices?flash=${inv.creditNoteForId != null ? "credit-note-deleted" : "invoice-deleted"}`);
 }
 
 export async function createCreditNote(invoiceId: number): Promise<{ error?: string }> {

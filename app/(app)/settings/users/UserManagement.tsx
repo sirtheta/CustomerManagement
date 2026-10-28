@@ -97,7 +97,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <Badge variant={user.totpEnabled ? "secondary" : "outline"}>
-                    {user.totpEnabled ? "Aktiv" : "—"}
+                    {user.totpEnabled ? "Aktiv" : "Aus"}
                   </Badge>
                 </TableCell>
                 <TableCell className="px-4 py-3">

@@ -12,6 +12,7 @@ const FLASH_MESSAGES: Record<string, string> = {
   "service-deleted": "Leistung gelöscht",
   "customer-deleted": "Kunde gelöscht",
   "invoice-deleted": "Rechnung gelöscht",
+  "credit-note-deleted": "Gutschrift gelöscht",
   "quote-deleted": "Offerte gelöscht",
 };
 

@@ -77,13 +77,11 @@ export default async function RemindersPage({ searchParams }: Props) {
   return (
     <div className="max-w-3xl space-y-4">
       <BackLink href="/invoices">Rechnungen</BackLink>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Mahnungen</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Überfällige Rechnungen prüfen und Mahnungen versenden
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Mahnungen</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Überfällige Rechnungen prüfen und Mahnungen versenden
+        </p>
       </div>
 
       <Suspense fallback={<div className="h-9 rounded-lg border border-input bg-muted animate-pulse" />}>

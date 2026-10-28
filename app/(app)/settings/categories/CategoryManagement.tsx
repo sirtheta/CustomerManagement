@@ -117,7 +117,7 @@ function CategoryRow({ category }: { category: CategoryRowData }) {
 
   return (
     <TableRow>
-      <TableCell className="px-4 py-3" colSpan={4}>
+      <TableCell className="px-4 py-3 whitespace-normal" colSpan={4}>
         <form action={formAction} className="flex items-center gap-3 flex-wrap">
           <Input name="name" defaultValue={category.name} required className="w-56" />
           <ColorSwatchPicker name="colorHex" defaultValue={category.colorHex ?? DEFAULT_COLOR} />

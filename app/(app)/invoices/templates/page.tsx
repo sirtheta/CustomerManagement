@@ -20,13 +20,11 @@ export default async function TemplatesPage() {
   return (
     <div className="space-y-4">
       <BackLink href="/invoices">Rechnungen</BackLink>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Rechnungsvorlagen</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Gespeicherte Positionsvorlagen für schnelle Rechnungserstellung
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Rechnungsvorlagen</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Gespeicherte Positionsvorlagen für schnelle Rechnungserstellung
+        </p>
       </div>
 
       {templates.length === 0 ? (

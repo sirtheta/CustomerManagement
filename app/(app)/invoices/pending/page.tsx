@@ -20,18 +20,16 @@ export default async function PendingEmailsPage() {
   return (
     <div className="max-w-3xl space-y-4">
       <BackLink href="/invoices">Rechnungen</BackLink>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Abo-Rechnungen freigeben</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Abo-Rechnungen prüfen und versenden
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Abo-Rechnungen freigeben</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Abo-Rechnungen prüfen und versenden
+        </p>
       </div>
 
       {pending.length === 0 ? (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          Keine ausstehenden E-Mails.
+          Keine Abo-Rechnungen zur Freigabe.
         </p>
       ) : (
         <div className="space-y-4">
