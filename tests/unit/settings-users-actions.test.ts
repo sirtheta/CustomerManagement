@@ -226,11 +226,21 @@ describe("settings/users actions", () => {
       vi.mocked(prisma.user.count).mockResolvedValue(0);
 
       const result = await updateUser(
-        1,
+        2,
         {},
         form({ name: "Admin", role: "Editor", isActive: "true" })
       );
       expect(result.error).toContain("mindestens ein aktiver Admin");
+    });
+
+    it("refuses demoting or deactivating the own account", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+
+      const demote = await updateUser(1, {}, form({ name: "Admin", role: "Editor", isActive: "true" }));
+      expect(demote.error).toContain("eigenes Konto");
+      const deactivate = await updateUser(1, {}, form({ name: "Admin", role: "Admin", isActive: "false" }));
+      expect(deactivate.error).toContain("eigenes Konto");
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
 
     it("updates user, logs audit, and revalidates", async () => {
@@ -339,6 +349,14 @@ describe("settings/users actions", () => {
   });
 
   describe("deleteUser", () => {
+    it("refuses to delete the own account", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+
+      const result = await deleteUser(1);
+      expect(result.error).toContain("eigenes Konto");
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+    });
+
     it("returns last-admin guard error when deleting last admin", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
@@ -348,7 +366,7 @@ describe("settings/users actions", () => {
       } as never);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
 
-      const result = await deleteUser(1);
+      const result = await deleteUser(2);
       expect(result.error).toContain("mindestens ein aktiver Admin");
       expect(prisma.user.delete).not.toHaveBeenCalled();
     });

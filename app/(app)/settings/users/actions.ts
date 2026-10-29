@@ -124,6 +124,10 @@ export async function updateUser(
 
   if (!name || !role) return { error: "Name und Rolle sind Pflicht." };
 
+  if (String(session.user.id) === String(id) && (role !== UserRole.Admin || !isActive)) {
+    return { error: "Du kannst dein eigenes Konto nicht deaktivieren oder herabstufen." };
+  }
+
   const guardError = await guardLastAdmin(id, role, isActive);
   if (guardError) return { error: guardError };
 
@@ -160,6 +164,9 @@ export async function resetPassword(
 export async function deleteUser(id: number): Promise<{ error?: string }> {
   const session = await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
+  if (String(session.user.id) === String(id)) {
+    return { error: "Du kannst dein eigenes Konto nicht löschen." };
+  }
   const guardError = await guardLastAdmin(id, undefined, undefined, true);
   if (guardError) return { error: guardError };
   const user = await prisma.user.delete({ where: { id } });
