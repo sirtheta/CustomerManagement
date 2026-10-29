@@ -65,7 +65,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
               <EditUserDialog user={user} />
               {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
               <TotpSetupDialog user={user} />
-              <DeleteUserDialog user={user} />
+              {user.id !== currentUserId && <DeleteUserDialog user={user} />}
             </div>
           </li>
         ))}
@@ -102,7 +102,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
                     <EditUserDialog user={user} />
                     {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
                     <TotpSetupDialog user={user} />
-                    <DeleteUserDialog user={user} />
+                    {user.id !== currentUserId && <DeleteUserDialog user={user} />}
                   </div>
                 </TableCell>
               </TableRow>
