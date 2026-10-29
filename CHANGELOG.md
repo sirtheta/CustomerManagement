@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.2...customer-management-v1.9.3) (2026-10-29)
+
+
+### Bug Fixes
+
+* **users:** protect the own admin account from delete, deactivate and demote ([#189](https://github.com/sirtheta/CustomerManagement/issues/189)) ([7e2dc9a](https://github.com/sirtheta/CustomerManagement/commit/7e2dc9ab8ca95073df4e33fc71d637e25d323af4))
+
 ## [1.9.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.1...customer-management-v1.9.2) (2026-10-28)
 
 
