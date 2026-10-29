@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   Viewer: "Leser",
 };
 
-export function EditUserDialog({ user }: { user: User }) {
+export function EditUserDialog({ user, isSelf = false }: { user: User; isSelf?: boolean }) {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>(user.role);
   const [isActive, setIsActive] = useState(user.isActive);
@@ -62,7 +62,7 @@ export function EditUserDialog({ user }: { user: User }) {
           </div>
           <div className="space-y-2">
             <Label>Rolle</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+            <Select value={role} onValueChange={(v) => setRole(v as UserRole)} disabled={isSelf}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -80,9 +80,15 @@ export function EditUserDialog({ user }: { user: User }) {
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
               className="size-4"
+              disabled={isSelf}
             />
             <Label htmlFor={`active-${user.id}`}>Aktiv</Label>
           </div>
+          {isSelf && (
+            <p className="text-sm text-muted-foreground">
+              Rolle und Status des eigenen Kontos können nicht geändert werden.
+            </p>
+          )}
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Abbrechen</Button>

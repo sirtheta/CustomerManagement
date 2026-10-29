@@ -226,11 +226,21 @@ describe("settings/users actions", () => {
       vi.mocked(prisma.user.count).mockResolvedValue(0);
 
       const result = await updateUser(
-        1,
+        2,
         {},
         form({ name: "Admin", role: "Editor", isActive: "true" })
       );
       expect(result.error).toContain("mindestens ein aktiver Admin");
+    });
+
+    it("refuses demoting or deactivating the own account", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+
+      const demote = await updateUser(1, {}, form({ name: "Admin", role: "Editor", isActive: "true" }));
+      expect(demote.error).toContain("eigenes Konto");
+      const deactivate = await updateUser(1, {}, form({ name: "Admin", role: "Admin", isActive: "false" }));
+      expect(deactivate.error).toContain("eigenes Konto");
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
 
     it("updates user, logs audit, and revalidates", async () => {

@@ -62,7 +62,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
               </Badge>
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              <EditUserDialog user={user} />
+              <EditUserDialog user={user} isSelf={user.id === currentUserId} />
               {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
               <TotpSetupDialog user={user} />
               {user.id !== currentUserId && <DeleteUserDialog user={user} />}
@@ -99,7 +99,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
                 </TableCell>
                 <TableCell className="px-4 py-3">
                   <div className="flex gap-1.5 flex-wrap justify-end">
-                    <EditUserDialog user={user} />
+                    <EditUserDialog user={user} isSelf={user.id === currentUserId} />
                     {user.id !== currentUserId && <ResetPasswordDialog user={user} />}
                     <TotpSetupDialog user={user} />
                     {user.id !== currentUserId && <DeleteUserDialog user={user} />}

@@ -124,6 +124,10 @@ export async function updateUser(
 
   if (!name || !role) return { error: "Name und Rolle sind Pflicht." };
 
+  if (String(session.user.id) === String(id) && (role !== UserRole.Admin || !isActive)) {
+    return { error: "Du kannst dein eigenes Konto nicht deaktivieren oder herabstufen." };
+  }
+
   const guardError = await guardLastAdmin(id, role, isActive);
   if (guardError) return { error: guardError };
 
