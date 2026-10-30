@@ -15,6 +15,7 @@ import { validateIban } from "@/lib/iban";
 import { ADDRESS_LIMITS, CREDITOR_COUNTRIES } from "@/lib/address";
 import { DEFAULT_PREFIXES } from "@/lib/document-number";
 import { APP_NAME } from "@/lib/app-name";
+import { holderNameOnQrBlocker, holderNameOnQrForced } from "@/lib/company-completeness";
 
 const log = logger.child({ module: "settings" });
 
@@ -29,6 +30,13 @@ export async function saveSettings(
   const settings = await prisma.applicationSettings.findFirst({
     include: { companyInfo: true },
   });
+
+  if (settings?.useHolderNameOnQR && !String(formData.get("companyHolderName") ?? "").trim()) {
+    return {
+      error:
+        "Der Inhabername wird auf der QR-Rechnung verwendet. Zuerst «Inhabername auf QR-Rechnung verwenden» ausschalten, dann kann das Feld geleert werden.",
+    };
+  }
 
   let companyIBAN: string | null = null;
   const ibanRaw = ((formData.get("companyIBAN") as string) ?? "").trim();
@@ -533,9 +541,16 @@ export async function setSetting(key: string, value: boolean): Promise<ActionSta
   if (!Object.hasOwn(IMMEDIATE_SETTINGS, key)) return { error: "Unbekannte Einstellung." };
   const settingKey = key as ImmediateSettingKey;
 
-  const settings = await prisma.applicationSettings.findFirst();
+  const settings = await prisma.applicationSettings.findFirst({ include: { companyInfo: true } });
   if (!settings) return { error: "Bitte zuerst oben die Firmendaten speichern, dann gilt diese Einstellung." };
   if (settings[settingKey] === value) return { success: true };
+  if (settingKey === "useHolderNameOnQR") {
+    if (!value && holderNameOnQrForced(settings.companyInfo)) {
+      return { error: "Ohne Firmenname wird immer der Inhabername verwendet." };
+    }
+    const blocker = value ? holderNameOnQrBlocker(settings.companyInfo) : null;
+    if (blocker) return { error: blocker };
+  }
 
   await prisma.applicationSettings.update({
     where: { applicationSettingsId: settings.applicationSettingsId },

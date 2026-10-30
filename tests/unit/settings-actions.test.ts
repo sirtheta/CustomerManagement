@@ -337,6 +337,20 @@ describe("settings actions", () => {
       expect(logAudit).not.toHaveBeenCalled();
     });
 
+    it("refuses to empty the holder name while it is printed on the QR bill", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+        applicationSettingsId: 1,
+        companyInformationId: 2,
+        useHolderNameOnQR: true,
+      } as never);
+
+      const result = await saveSettings({}, form({ companyHolderName: "  " }));
+
+      expect(result.error).toContain("Inhabername auf QR-Rechnung verwenden");
+      expect(prisma.companyInformation.update).not.toHaveBeenCalled();
+    });
+
     it("rejects negative reminder fees and an interest rate outside 0-100", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(null);

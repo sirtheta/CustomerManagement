@@ -11,6 +11,8 @@ type Props = {
   description?: ReactNode;
   checked: boolean;
   save: (next: boolean) => Promise<ActionState>;
+  /** Blocks the checkbox, e.g. while the data it depends on is missing. */
+  disabled?: boolean;
   successMessage?: string;
   labelClassName?: string;
 };
@@ -27,6 +29,7 @@ export default function ImmediateCheckbox({
   description,
   checked,
   save,
+  disabled = false,
   successMessage = "Gespeichert",
   labelClassName = "cursor-pointer font-medium",
 }: Props) {
@@ -52,7 +55,7 @@ export default function ImmediateCheckbox({
         type="checkbox"
         id={id}
         checked={value}
-        disabled={pending}
+        disabled={pending || disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5 h-4 w-4 accent-primary"
       />

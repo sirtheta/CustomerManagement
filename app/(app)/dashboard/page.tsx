@@ -13,6 +13,7 @@ import { loadModules } from "@/lib/module-guard";
 import { hasRole, isEditorSession } from "@/lib/permissions";
 import { hasSmtpSettings } from "@/lib/smtp";
 import { SetupChecklist } from "./SetupChecklist";
+import { missingCompanyFields } from "@/lib/company-completeness";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 
@@ -98,14 +99,18 @@ export default async function DashboardPage() {
     prisma.invoice.count({ where: { state: "Draft", creditNoteForId: null } }),
   ]);
 
+  const missingCompanyData = missingCompanyFields(settings?.companyInfo);
+
   const setupSteps = [
     ...(isAdmin
       ? [
           {
             label: "Firmendaten und IBAN erfassen",
-            hint: "Ohne IBAN haben Rechnungen keinen QR-Einzahlungsschein.",
+            hint: missingCompanyData.length
+              ? `Es fehlt noch: ${missingCompanyData.join(", ")}. Ohne IBAN haben Rechnungen keinen QR-Einzahlungsschein.`
+              : undefined,
             href: "/settings",
-            done: Boolean(settings?.companyInfo.companyName && settings.companyInfo.companyIBAN),
+            done: missingCompanyData.length === 0,
           },
           {
             label: "E-Mail-Versand einrichten",

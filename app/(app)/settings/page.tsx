@@ -7,6 +7,7 @@ import DevToolsCard from "./DevToolsCard";
 import ModulesCard from "./ModulesCard";
 import { modulesFromSettings } from "@/lib/modules";
 import { DEFAULT_PREFIXES } from "@/lib/document-number";
+import { holderNameOnQrBlocker, holderNameOnQrForced } from "@/lib/company-completeness";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/permissions";
@@ -84,6 +85,8 @@ export default async function SettingsPage() {
           invoiceNumberPrefix={s?.invoiceNumberPrefix ?? DEFAULT_PREFIXES.invoice}
           quoteNumberPrefix={s?.quoteNumberPrefix ?? DEFAULT_PREFIXES.quote}
           useHolderNameOnQR={s?.useHolderNameOnQR ?? false}
+          holderNameOnQrBlocker={holderNameOnQrBlocker(c)}
+          holderNameOnQrForced={holderNameOnQrForced(c)}
           roundTotalTo5Rappen={s?.roundTotalTo5Rappen ?? false}
           smtpHost={s?.smtpHost ?? ""}
           smtpPort={s?.smtpPort ?? 587}
