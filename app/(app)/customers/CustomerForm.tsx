@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createCustomer, updateCustomer, type CustomerFormState } from "./actions";
 import type { Customer } from "@prisma/client";
+import SalutationFields from "./SalutationFields";
+import { buildSalutation } from "@/lib/salutation";
 import { ADDRESS_LIMITS, COUNTRIES, countryName, formatCityLine, formatStreetLine } from "@/lib/address";
 
 type Props = {
@@ -86,6 +88,10 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
             <div>
               <dt className="text-muted-foreground">Kontaktperson</dt>
               <dd className="font-medium">{customer.contactPerson}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Briefanrede</dt>
+              <dd className="font-medium">{buildSalutation(customer)}</dd>
             </div>
             <div className="sm:col-span-2">
               <dt className="text-muted-foreground">Adresse</dt>
@@ -207,6 +213,14 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <FieldError id="contactPerson-error" message={fe.contactPerson} />
               </div>
             </div>
+
+            <SalutationFields
+              title={String(val("title", customer?.title))}
+              salutationKind={String(val("salutationKind", customer?.salutationKind))}
+              salutationText={String(val("salutationText", customer?.salutationText))}
+              contactPerson={String(val("contactPerson", customer?.contactPerson))}
+              fieldErrors={fe}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5 sm:col-span-2">

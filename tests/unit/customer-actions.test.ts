@@ -456,6 +456,31 @@ describe("customer actions", () => {
       );
     });
 
+    it("stores title, salutation kind and free text; text only for custom", async () => {
+      await create({ title: "Frau", salutationKind: "custom", salutationText: "Hoi Anna" });
+      expect(prisma.customer.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: "Frau", salutationKind: "custom", salutationText: "Hoi Anna" }),
+        })
+      );
+      await create({ title: "none", salutationKind: "formal", salutationText: "stale" });
+      expect(prisma.customer.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: null, salutationKind: "formal", salutationText: null }),
+        })
+      );
+      await create({ salutationKind: "hello" });
+      expect(prisma.customer.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ salutationKind: null }) })
+      );
+    });
+
+    it("rejects an unknown salutation kind or title and an overlong free text", async () => {
+      expect((await create({ salutationKind: "nope" })).fieldErrors?.salutationKind).toBeDefined();
+      expect((await create({ title: "Dr" })).fieldErrors?.title).toBeDefined();
+      expect((await create({ salutationKind: "custom", salutationText: "x".repeat(101) })).fieldErrors?.salutationText).toBeDefined();
+    });
+
     it("update never changes the customer number", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       await updateCustomer(3, {}, form({ ...VALID_FIELDS, customerNumber: "9" }));

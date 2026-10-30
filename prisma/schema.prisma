@@ -9,7 +9,10 @@ datasource db {
 model Customer {
   customerId              Int        @id @default(autoincrement())
   company                 String?
+  title                   String?
   contactPerson           String
+  salutationKind          String?
+  salutationText          String?
   street                  String
   houseNumber             String?
   city                    String

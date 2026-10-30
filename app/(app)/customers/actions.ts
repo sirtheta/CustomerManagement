@@ -8,6 +8,7 @@ import { ANALYTICS_CACHE_TAG } from "@/lib/cache-tags";
 import { logAudit } from "@/lib/audit";
 import { z } from "zod";
 import { ADDRESS_LIMITS, isCountryCode } from "@/lib/address";
+import { SALUTATION_KINDS, SALUTATION_TEXT_MAX, TITLE_VALUES } from "@/lib/salutation";
 import { isValidUid, normalizeUid } from "@/lib/customer-uid";
 import { nextCustomerNumber } from "@/lib/customer-number";
 import { customerDisplayName } from "@/lib/customer-display";
@@ -25,7 +26,10 @@ const optionalText = (max: number, label: string) =>
 const customerSchema = z
   .object({
     company: z.string().nullable(),
+    title: z.enum(TITLE_VALUES, "Ungültige Anrede.").nullable(),
     contactPerson: z.string().min(1, "Kontaktperson ist erforderlich."),
+    salutationKind: z.enum(SALUTATION_KINDS, "Ungültige Briefanrede.").nullable(),
+    salutationText: optionalText(SALUTATION_TEXT_MAX, "Briefanrede"),
     street: z
       .string()
       .min(1, "Strasse ist erforderlich.")
@@ -95,7 +99,10 @@ function text(formData: FormData, key: string): string | null {
 function readCustomerForm(formData: FormData) {
   return {
     company: (formData.get("company") as string) || null,
+    title: text(formData, "title") === "none" ? null : text(formData, "title"),
     contactPerson: (formData.get("contactPerson") as string) || "",
+    salutationKind: text(formData, "salutationKind"),
+    salutationText: text(formData, "salutationText"),
     street: ((formData.get("street") as string) || "").trim(),
     houseNumber: text(formData, "houseNumber"),
     city: ((formData.get("city") as string) || "").trim(),
@@ -160,7 +167,11 @@ function customerData(d: ParsedCustomer, formData: FormData) {
   const hasBilling = Boolean(d.billingStreet && d.billingZipCode && d.billingCity);
   return {
     company: d.company || null,
+    title: d.title,
     contactPerson: d.contactPerson,
+    // "hello" is the default and stored as null; the free text only counts for "custom".
+    salutationKind: d.salutationKind === "hello" ? null : d.salutationKind,
+    salutationText: d.salutationKind === "custom" ? d.salutationText : null,
     street: d.street,
     houseNumber: d.houseNumber,
     city: d.city,
