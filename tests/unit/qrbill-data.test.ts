@@ -191,7 +191,10 @@ describe("QRBill data preparation", () => {
         customer: {
           customerId: 1,
           company: validCustomer.company,
+          title: null,
           contactPerson: validCustomer.contactPerson,
+          salutationKind: null,
+          salutationText: null,
           street: validCustomer.street,
           houseNumber: validCustomer.houseNumber,
           country: "CH",

@@ -201,3 +201,35 @@ describe("reminderMail", () => {
     expect(body).not.toContain("\nBetrag:");
   });
 });
+
+describe("salutation placeholder", () => {
+  it("starts the default invoice mail with the chosen salutation", () => {
+    const mail = invoiceMail(
+      {
+        documentNumber: "I-1",
+        totalAmount: { toNumber: () => 10 },
+        date: new Date("2026-01-01"),
+        dueDate: new Date("2026-01-31"),
+        customUserText: null,
+        creditNoteForId: null,
+        customer: { ...customer, title: "Frau", salutationKind: "formal" },
+      },
+      null,
+      "Firma"
+    );
+    expect(mail.body).toMatch(/^Sehr geehrte Frau Muster\n\n/);
+  });
+
+  it("starts a reminder with the given salutation", () => {
+    const mail = reminderMail({
+      level: 1,
+      numberLabel: "I-1",
+      contactPerson: "Max Muster",
+      salutation: "Sehr geehrte Damen und Herren",
+      companyName: "Firma",
+      dueDate: new Date("2026-01-31"),
+      openAmount: 10,
+    });
+    expect(mail.body).toMatch(/^Sehr geehrte Damen und Herren\n\n/);
+  });
+});

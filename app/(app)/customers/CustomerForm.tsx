@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createCustomer, updateCustomer, type CustomerFormState } from "./actions";
 import type { Customer } from "@prisma/client";
+import SalutationFields from "./SalutationFields";
+import { buildSalutation } from "@/lib/salutation";
 import { ADDRESS_LIMITS, COUNTRIES, countryName, formatCityLine, formatStreetLine } from "@/lib/address";
 
 type Props = {
@@ -52,6 +54,9 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
   const val = (name: string, fallback: string | number | null | undefined) =>
     submitted ? (submitted[name] ?? "") : (fallback ?? "");
 
+  // The salutation preview follows the contact person while it is typed.
+  const [contactPerson, setContactPerson] = useState(String(val("contactPerson", customer?.contactPerson)));
+
   // "Weitere Angaben" stays open when it holds values or errors, and keeps what the user chose across the
   // remount after a failed save (the state lives above the keyed form).
   const [moreOpen, setMoreOpen] = useState<boolean | null>(null);
@@ -86,6 +91,10 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
             <div>
               <dt className="text-muted-foreground">Kontaktperson</dt>
               <dd className="font-medium">{customer.contactPerson}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Briefanrede</dt>
+              <dd className="font-medium">{buildSalutation(customer)}</dd>
             </div>
             <div className="sm:col-span-2">
               <dt className="text-muted-foreground">Adresse</dt>
@@ -200,6 +209,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   name="contactPerson"
                   required
                   defaultValue={val("contactPerson", customer?.contactPerson)}
+                  onChange={(e) => setContactPerson(e.target.value)}
                   placeholder="Max Muster"
                   aria-invalid={!!fe.contactPerson}
                   aria-describedby={fe.contactPerson ? "contactPerson-error" : undefined}
@@ -207,6 +217,14 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                 <FieldError id="contactPerson-error" message={fe.contactPerson} />
               </div>
             </div>
+
+            <SalutationFields
+              title={String(val("title", customer?.title))}
+              salutationKind={String(val("salutationKind", customer?.salutationKind))}
+              salutationText={String(val("salutationText", customer?.salutationText))}
+              contactPerson={contactPerson}
+              fieldErrors={fe}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5 sm:col-span-2">

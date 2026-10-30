@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { customerDisplayName, type CustomerNameFields } from "@/lib/customer-display";
+import { buildSalutation, type SalutationFields } from "@/lib/salutation";
 import { MAX_REMINDER_LEVEL, reminderTitle } from "@/lib/reminder-charges";
 
 /**
@@ -11,6 +12,7 @@ import { MAX_REMINDER_LEVEL, reminderTitle } from "@/lib/reminder-charges";
 export type PlaceholderKey =
   | "documentNumber"
   | "contactPerson"
+  | "salutation"
   | "customerName"
   | "companyName"
   | "totalAmount"
@@ -46,7 +48,7 @@ export function fillTotalAmount(text: string, formattedTotal: string): string {
 
 type Amount = { toNumber(): number };
 
-type MailCustomer = CustomerNameFields & { contactPerson: string };
+type MailCustomer = CustomerNameFields & Omit<SalutationFields, "contactPerson"> & { contactPerson: string };
 
 export type InvoiceMailSource = {
   documentNumber: string | null;
@@ -71,6 +73,7 @@ export function invoicePlaceholders(invoice: InvoiceMailSource, companyName: str
   return {
     documentNumber: invoice.documentNumber ?? undefined,
     contactPerson: invoice.customer.contactPerson,
+    salutation: buildSalutation(invoice.customer),
     customerName: customerDisplayName(invoice.customer),
     companyName,
     totalAmount: formatCurrency(Math.abs(invoice.totalAmount.toNumber())),
@@ -84,6 +87,7 @@ export function quotePlaceholders(quote: QuoteMailSource, companyName: string): 
   return {
     documentNumber: quote.documentNumber ?? undefined,
     contactPerson: quote.customer.contactPerson,
+    salutation: buildSalutation(quote.customer),
     customerName: customerDisplayName(quote.customer),
     companyName,
     totalAmount: formatCurrency(quote.totalAmount.toNumber()),
@@ -106,15 +110,15 @@ export const DEFAULT_CREDIT_NOTE_SUBJECT = "Gutschrift Nr. {documentNumber} – 
 export const DEFAULT_QUOTE_SUBJECT = "Offerte Nr. {documentNumber} – {companyName}";
 
 export function defaultInvoiceBody(hasCustomText: boolean): string {
-  return `Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Zahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}`;
+  return `{salutation}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Zahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}`;
 }
 
 // Credit notes have no due date and no custom text.
 export const DEFAULT_CREDIT_NOTE_BODY =
-  "Guten Tag {contactPerson}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}";
+  "{salutation}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}";
 
 export function defaultQuoteBody(hasCustomText: boolean): string {
-  return `Guten Tag {contactPerson}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Gültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}`;
+  return `{salutation}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Gültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}`;
 }
 
 type InvoiceTemplateSettings = {
@@ -202,6 +206,8 @@ export function reminderMail(params: {
   /** Display label of the invoice number (`documentLabel`, "Entwurf" without one). */
   numberLabel: string;
   contactPerson: string;
+  /** Letter salutation of the customer; without it the default "Guten Tag <contactPerson>" is used. */
+  salutation?: string;
   companyName: string;
   dueDate: Date;
   openAmount: number;
@@ -213,7 +219,7 @@ export function reminderMail(params: {
     creditedRappen?: number;
   } | null;
 }): MailTemplate {
-  const { level, numberLabel, contactPerson, companyName, dueDate, openAmount, charges } = params;
+  const { level, numberLabel, contactPerson, salutation, companyName, dueDate, openAmount, charges } = params;
   const text = REMINDER_TEXTS[Math.min(Math.max(level, 1), MAX_REMINDER_LEVEL)];
   // After a partial payment or credit note only the remainder is requested; say so.
   const received = (charges?.paidRappen ?? 0) > 0 || (charges?.creditedRappen ?? 0) > 0;
@@ -227,11 +233,12 @@ export function reminderMail(params: {
   const values: PlaceholderValues = {
     documentNumber: numberLabel,
     contactPerson,
+    salutation: salutation ?? buildSalutation({ contactPerson }),
     companyName,
     totalAmount: formatCurrency(openAmount),
     dueDate: formatDate(dueDate),
   };
   const subject = `${reminderTitle(level)}${text.subjectSuffix}: Rechnung {documentNumber} – {companyName}`;
-  const body = `Guten Tag {contactPerson}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\n${amountLine}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
+  const body = `{salutation}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\n${amountLine}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
   return { subject: fillPlaceholders(subject, values), body: fillPlaceholders(body, values) };
 }

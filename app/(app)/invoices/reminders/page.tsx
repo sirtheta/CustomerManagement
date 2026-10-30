@@ -14,6 +14,7 @@ import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { buildSalutation } from "@/lib/salutation";
 import { customerDisplayName } from "@/lib/customer-display";
 import { reminderMail } from "@/lib/mail-templates";
 import { BackLink } from "@/components/back-link";
@@ -129,6 +130,7 @@ export default async function RemindersPage({ searchParams }: Props) {
               level: r.reminderLevel,
               numberLabel: documentLabel(inv.documentNumber),
               contactPerson: c.contactPerson,
+              salutation: buildSalutation(c),
               companyName: senderDisplayName(settings?.companyInfo ?? {}, inv.senderProfile),
               dueDate: inv.dueDate,
               openAmount: remaining,

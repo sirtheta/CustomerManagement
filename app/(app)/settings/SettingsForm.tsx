@@ -434,12 +434,12 @@ export default function SettingsForm(props: Props) {
               id="emailBodyTemplate"
               name="emailBodyTemplate"
               rows={6}
-              placeholder={"Guten Tag {contactPerson}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber}.\n\nMit freundlichen Grüssen\n{companyName}"}
+              placeholder={"{salutation}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber}.\n\nMit freundlichen Grüssen\n{companyName}"}
               defaultValue={props.emailBodyTemplate}
               className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-y"
             />
             <p className="text-xs text-muted-foreground">
-              Platzhalter: {"{documentNumber}"} (Rechnungsnummer), {"{contactPerson}"} (Ansprechperson), {"{customerName}"} (Kundenname),
+              Platzhalter: {"{documentNumber}"} (Rechnungsnummer), {"{salutation}"} (Briefanrede des Kunden, z. B. «Guten Tag Anna Muster»), {"{contactPerson}"} (Ansprechperson), {"{customerName}"} (Kundenname),
               {" "}{"{companyName}"} (deine Firma), {"{totalAmount}"} (Gesamtbetrag), {"{date}"} (Rechnungsdatum), {"{dueDate}"} (Fälligkeitsdatum),
               {" "}{"{customUserText}"} (Zusatztext)
             </p>
