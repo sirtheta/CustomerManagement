@@ -251,7 +251,21 @@ describe("pauseAllSubscriptions", () => {
 });
 
 describe("setSetting", () => {
-  const stored = { applicationSettingsId: 1, useHolderNameOnQR: false, roundTotalTo5Rappen: false, notifyOverdueEnabled: false, notifyPendingEnabled: false };
+  const stored = {
+    applicationSettingsId: 1,
+    useHolderNameOnQR: false,
+    roundTotalTo5Rappen: false,
+    notifyOverdueEnabled: false,
+    notifyPendingEnabled: false,
+    companyInfo: {
+      companyName: "Muster AG",
+      companyHolderName: "Hans Muster",
+      companyIBAN: "CH9300762011623852957",
+      companyStreet: "Bahnhofstrasse",
+      companyZip: "8001",
+      companyCity: "Zürich",
+    },
+  };
 
   beforeEach(() => {
     vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue(stored as never);
@@ -276,6 +290,42 @@ describe("setSetting", () => {
     }
     expect(prisma.applicationSettings.update).toHaveBeenCalledTimes(3);
     expect(logAudit).not.toHaveBeenCalled();
+  });
+
+  it("refuses the holder name on the QR bill while the holder name or the account data is missing", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+      ...stored,
+      companyInfo: { ...stored.companyInfo, companyHolderName: null, companyIBAN: "" },
+    } as never);
+
+    const result = await setSetting("useHolderNameOnQR", true);
+
+    expect(result.error).toContain("Inhaber / Name, IBAN");
+    expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+  });
+
+  it("always lets the holder name on the QR bill be switched off", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+      ...stored,
+      useHolderNameOnQR: true,
+      companyInfo: { ...stored.companyInfo, companyHolderName: null },
+    } as never);
+
+    expect((await setSetting("useHolderNameOnQR", false)).success).toBe(true);
+    expect(prisma.applicationSettings.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the holder name on the QR bill switched on while there is no company name", async () => {
+    vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({
+      ...stored,
+      useHolderNameOnQR: true,
+      companyInfo: { ...stored.companyInfo, companyName: null },
+    } as never);
+
+    const result = await setSetting("useHolderNameOnQR", false);
+
+    expect(result.error).toBe("Ohne Firmenname wird immer der Inhabername verwendet.");
+    expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
   });
 
   it("does nothing when the value is unchanged", async () => {

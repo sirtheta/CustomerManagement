@@ -41,6 +41,10 @@ type Props = {
   invoiceNumberPrefix: string;
   quoteNumberPrefix: string;
   useHolderNameOnQR: boolean;
+  /** Why the holder-name switch cannot be turned on yet (from the stored company data), null if it can. */
+  holderNameOnQrBlocker: string | null;
+  /** No stored company name: the holder name is the only creditor, so the switch is fixed to on. */
+  holderNameOnQrForced: boolean;
   roundTotalTo5Rappen: boolean;
   smtpHost: string;
   smtpPort: number;
@@ -341,12 +345,27 @@ export default function SettingsForm(props: Props) {
               id="useHolderNameOnQR"
               label="Inhabername auf QR-Rechnung verwenden"
               description={
-                <>
-                  Aktivieren um «{props.companyHolderName || "Inhabername"}» statt «
-                  {props.companyName || "Firmenname"}» als Gläubiger zu drucken.
-                </>
+                props.holderNameOnQrForced ? (
+                  <>
+                    Ohne Firmenname wird immer «{props.companyHolderName || "Inhabername"}» als Gläubiger gedruckt.
+                    {props.holderNameOnQrBlocker && (
+                      <span className="block text-amber-700 dark:text-amber-500">{props.holderNameOnQrBlocker}</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    Aktivieren um «{props.companyHolderName || "Inhabername"}» statt «
+                    {props.companyName || "Firmenname"}» als Gläubiger zu drucken.
+                    {props.holderNameOnQrBlocker && (
+                      <span className="block text-amber-700 dark:text-amber-500">{props.holderNameOnQrBlocker}</span>
+                    )}
+                  </>
+                )
               }
-              checked={props.useHolderNameOnQR}
+              checked={props.useHolderNameOnQR || props.holderNameOnQrForced}
+              disabled={
+                props.holderNameOnQrForced || (!props.useHolderNameOnQR && !!props.holderNameOnQrBlocker)
+              }
               save={(next) => setSetting("useHolderNameOnQR", next)}
             />
           </div>
