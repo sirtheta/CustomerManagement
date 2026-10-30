@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import pkg from "../package.json";
+import { GITHUB_REPO } from "@/lib/release-links";
 
 type UpdateCheckResult = {
   currentVersion: string;
@@ -20,7 +21,7 @@ type UpdateCheckResult = {
 const getLatestReleaseTag = unstable_cache(
   async (): Promise<string | null> => {
     const res = await fetch(
-      "https://api.github.com/repos/sirtheta/customermanagement/releases/latest",
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
       { headers: { Accept: "application/vnd.github+json" } }
     );
     if (!res.ok) return null;

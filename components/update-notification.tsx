@@ -1,4 +1,5 @@
 import { checkForUpdate } from "@/lib/check-update";
+import { RELEASES_URL } from "@/lib/release-links";
 
 export async function UpdateNotification() {
   const result = await checkForUpdate();
@@ -16,7 +17,7 @@ export async function UpdateNotification() {
           </span>
         </span>
         <a
-          href="https://github.com/sirtheta/customermanagement/releases"
+          href={RELEASES_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 dark:text-blue-400 hover:underline shrink-0 font-medium"
