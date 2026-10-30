@@ -72,7 +72,7 @@ const SHOTS: Shot[] = [
     run: async (page) => {
       await openDemoCustomer(page);
       await page.getByText("Bearbeiten", { exact: true }).click();
-      const form = page.locator("form", { has: page.locator('input[name="customerNumber"]') });
+      const form = page.locator("form", { has: page.locator("input#customerNumber") });
       await form.waitFor();
       // The section is collapsed unless the customer already has data in it.
       const details = form.locator("details");

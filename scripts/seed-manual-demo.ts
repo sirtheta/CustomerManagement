@@ -84,6 +84,8 @@ async function main() {
     {
       company: "Bergland Bäckerei AG", contactPerson: "Fritz Amrein", street: "Dorfstrasse", houseNumber: "12", city: "Interlaken", zipCode: "3800", email: "info@bergland-baeckerei.ch", phone: "+41 33 822 14 50",
       customerNumber: 1001,
+      title: "Herr",
+      salutationKind: "formal",
       uid: "CHE-116.281.710",
       paymentTermDays: 10,
       billingName: "Bergland Bäckerei AG, Buchhaltung",
