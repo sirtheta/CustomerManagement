@@ -54,6 +54,9 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
   const val = (name: string, fallback: string | number | null | undefined) =>
     submitted ? (submitted[name] ?? "") : (fallback ?? "");
 
+  // The salutation preview follows the contact person while it is typed.
+  const [contactPerson, setContactPerson] = useState(String(val("contactPerson", customer?.contactPerson)));
+
   // "Weitere Angaben" stays open when it holds values or errors, and keeps what the user chose across the
   // remount after a failed save (the state lives above the keyed form).
   const [moreOpen, setMoreOpen] = useState<boolean | null>(null);
@@ -206,6 +209,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
                   name="contactPerson"
                   required
                   defaultValue={val("contactPerson", customer?.contactPerson)}
+                  onChange={(e) => setContactPerson(e.target.value)}
                   placeholder="Max Muster"
                   aria-invalid={!!fe.contactPerson}
                   aria-describedby={fe.contactPerson ? "contactPerson-error" : undefined}
@@ -218,7 +222,7 @@ export default function CustomerForm({ customer, readOnly = false, cancelHref = 
               title={String(val("title", customer?.title))}
               salutationKind={String(val("salutationKind", customer?.salutationKind))}
               salutationText={String(val("salutationText", customer?.salutationText))}
-              contactPerson={String(val("contactPerson", customer?.contactPerson))}
+              contactPerson={contactPerson}
               fieldErrors={fe}
             />
 

@@ -13,7 +13,6 @@ describe("buildSalutation", () => {
   it("builds the informal form with the first name and the gender from the title", () => {
     expect(buildSalutation({ ...base, salutationKind: "dear", title: "Frau" })).toBe("Liebe Anna");
     expect(buildSalutation({ contactPerson: "Max Muster", salutationKind: "dear", title: "Herr" })).toBe("Lieber Max");
-    expect(buildSalutation({ ...base, salutationKind: "dear" })).toBe("Liebe(r) Anna");
   });
 
   it("builds the formal forms with title and surname", () => {
@@ -25,6 +24,7 @@ describe("buildSalutation", () => {
   });
 
   it("falls back to the default when a form needs a title and none is set", () => {
+    expect(buildSalutation({ ...base, salutationKind: "dear" })).toBe("Guten Tag Anna Muster");
     expect(buildSalutation({ ...base, salutationKind: "formal" })).toBe("Guten Tag Anna Muster");
     expect(buildSalutation({ ...base, salutationKind: "dearFormal" })).toBe("Guten Tag Anna Muster");
   });

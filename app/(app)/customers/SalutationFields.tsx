@@ -74,6 +74,8 @@ export default function SalutationFields({ title, salutationKind, salutationText
         </Select>
       </div>
 
+      {kind !== "custom" && text && <input type="hidden" name="salutationText" value={text} />}
+
       {kind === "custom" && (
         <div className="space-y-1.5 sm:col-span-3">
           <Label htmlFor="salutationText">Eigene Briefanrede</Label>

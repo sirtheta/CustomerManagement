@@ -23,7 +23,7 @@ export const SALUTATION_LABELS: Record<SalutationKind, string> = {
 };
 
 /** Kinds that need Herr/Frau to pick the right form; without a title they fall back to the default. */
-export const SALUTATION_KINDS_NEEDING_TITLE: readonly SalutationKind[] = ["dearFormal", "formal"];
+export const SALUTATION_KINDS_NEEDING_TITLE: readonly SalutationKind[] = ["dear", "dearFormal", "formal"];
 
 export type SalutationFields = {
   contactPerson: string;
@@ -54,8 +54,8 @@ export function buildSalutation(c: SalutationFields): string {
 
   switch (isSalutationKind(c.salutationKind) ? c.salutationKind : "hello") {
     case "dear":
-      if (!first) return fallback;
-      return `${title === "Herr" ? "Lieber" : title === "Frau" ? "Liebe" : "Liebe(r)"} ${first}`;
+      if (!title || !first) return fallback;
+      return `${title === "Herr" ? "Lieber" : "Liebe"} ${first}`;
     case "dearFormal":
       if (!title || !last) return fallback;
       return `${title === "Herr" ? "Lieber" : "Liebe"} ${title} ${last}`;
