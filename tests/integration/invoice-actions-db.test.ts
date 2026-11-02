@@ -289,6 +289,52 @@ describe("invoice actions against a real database", () => {
     });
   });
 
+  describe("return to the page the document was opened from", () => {
+    function withFromField(fd: FormData, from: string) {
+      fd.set("from", from);
+      return fd;
+    }
+
+    it("updateInvoice goes back to the subscription approval page", async () => {
+      const id = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [])));
+      await expectRedirect(
+        () => updateInvoice(id, {}, withFromField(invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }]), "invoices/pending")),
+        "/invoices/pending"
+      );
+      expect((await total(id)).items).toHaveLength(1);
+    });
+
+    it("updateInvoice keeps a customer origin and drops unknown ones", async () => {
+      const id = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await expectRedirect(
+        () => updateInvoice(id, {}, withFromField(invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }]), "customers/5")),
+        `/invoices/${id}?from=customers/5`
+      );
+      await expectRedirect(
+        () => updateInvoice(id, {}, withFromField(invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }]), "https://evil.example")),
+        `/invoices/${id}`
+      );
+    });
+
+    it("deleteInvoice and createCreditNote keep the customer origin", async () => {
+      const draftId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await expectRedirect(() => deleteInvoice(draftId, "customers/5"), "/customers/5?flash=invoice-deleted");
+
+      const originalId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await db.prisma.invoice.update({ where: { id: originalId }, data: { state: "Sent", documentNumber: "I-26060012" } });
+      let creditUrl = "";
+      await expect(createCreditNote(originalId, "customers/5")).rejects.toSatisfy((err: unknown) => {
+        creditUrl = err instanceof RedirectSignal ? err.url : "";
+        return /^\/invoices\/\d+\/edit\?from=customers\/5$/.test(creditUrl);
+      });
+      const creditId = Number(creditUrl.match(/\/invoices\/(\d+)/)![1]);
+      await expectRedirect(
+        () => deleteInvoice(creditId, "customers/5"),
+        `/invoices/${originalId}?flash=credit-note-deleted&from=customers/5`
+      );
+    });
+  });
+
   describe("deleting drafts removes their items", () => {
     it("deleteInvoice deletes the draft's items and keeps the items of other documents", async () => {
       const draftId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }, { unitPrice: 20, quantity: 2 }])));

@@ -163,7 +163,7 @@ export default function ReminderRow(props: Props) {
             <Button
               variant="outline"
               size="sm"
-              render={<Link href={`/invoices/${props.invoiceId}`} />}
+              render={<Link href={`/invoices/${props.invoiceId}?from=invoices/reminders`} />}
             >
               Rechnung anzeigen
             </Button>

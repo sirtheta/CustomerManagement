@@ -12,6 +12,8 @@ import { approvePendingEmail, discardPendingEmail, type ApproveResult } from "./
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
+import ItemsView, { type ItemViewData } from "@/components/items-view";
+import { formatCurrency } from "@/lib/utils";
 
 type Props = {
   id: number;
@@ -19,6 +21,8 @@ type Props = {
   documentNumber: string | null;
   customerName: string;
   totalAmount: number;
+  discountPercent: number;
+  items: ItemViewData[];
   to: string;
   subject: string;
   body: string;
@@ -58,7 +62,7 @@ export default function PendingEmailRow(props: Props) {
           <Button
             variant="outline"
             size="sm"
-            render={<Link href={`/invoices/${props.invoiceId}/edit`} />}
+            render={<Link href={`/invoices/${props.invoiceId}/edit?from=invoices/pending`} />}
           >
             <PencilIcon className="size-3.5 mr-1.5" />
             Positionen bearbeiten
@@ -71,7 +75,20 @@ export default function PendingEmailRow(props: Props) {
           </div>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {props.items.length > 0 && (
+          <div>
+            <ItemsView items={props.items} />
+            <div className="flex justify-end mt-3">
+              <div className="text-right text-sm space-y-1">
+                {props.discountPercent > 0 && (
+                  <p className="text-muted-foreground">Gesamtrabatt: {props.discountPercent}%</p>
+                )}
+                <p className="font-semibold">Total: {formatCurrency(props.totalAmount)}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <form action={formAction} onSubmit={submitKeepingInput(formAction)} className="space-y-3">
           <input type="hidden" name="id" value={props.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

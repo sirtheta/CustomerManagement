@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -38,6 +39,7 @@ import { decryptSecret } from "@/lib/crypto";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
+import { FlashToast } from "@/components/flash-toast";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -124,6 +126,10 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
 
   return (
     <div className="space-y-6">
+      {/* Deleting a draft opened from this page comes back with ?flash= */}
+      <Suspense fallback={null}>
+        <FlashToast />
+      </Suspense>
       <Breadcrumb
         items={[
           customer.archivedAt

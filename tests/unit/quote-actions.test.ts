@@ -278,7 +278,7 @@ describe("quote actions", () => {
       expect(redirect).toHaveBeenCalledWith("/quotes/2?from=customers/42");
     });
 
-    it("omits ?from= when from does not start with 'customers/'", async () => {
+    it("omits ?from= for an unknown origin", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(parseDocumentItems).mockReturnValue({ items: [], totalAmount: 0, discountPercent: 0 });
       vi.mocked(prisma.$transaction).mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));

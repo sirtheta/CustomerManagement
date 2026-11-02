@@ -4,9 +4,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatCurrency } from "@/lib/utils";
 import { createCreditNote } from "./actions";
 
-type Props = { invoiceId: number; paid?: number; remaining?: number };
+type Props = { invoiceId: number; paid?: number; remaining?: number; from?: string | null };
 
-export default function CreateCreditNoteButton({ invoiceId, paid = 0, remaining = 0 }: Props) {
+export default function CreateCreditNoteButton({ invoiceId, paid = 0, remaining = 0, from }: Props) {
   const baseText =
     "Eine Gutschrift nimmt eine Rechnung ganz oder teilweise zurück, z.B. bei Fehlern oder Preisnachlass. Es wird ein Gutschrift-Entwurf mit allen Positionen dieser Rechnung angelegt. Du kannst Positionen streichen oder anpassen, bevor du die Gutschrift versendest.";
   // Payments are never touched by a credit note; what exceeds the open remainder becomes an overpayment.
@@ -21,7 +21,7 @@ export default function CreateCreditNoteButton({ invoiceId, paid = 0, remaining 
       confirmLabel="Gutschrift erstellen"
       confirmVariant="default"
       triggerVariant="outline"
-      onConfirm={() => createCreditNote(invoiceId)}
+      onConfirm={() => createCreditNote(invoiceId, from)}
     >
       Gutschrift erstellen
     </ConfirmDialog>

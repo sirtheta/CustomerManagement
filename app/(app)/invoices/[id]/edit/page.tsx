@@ -8,6 +8,7 @@ import { serializeInvoiceForForm } from "@/lib/invoice-form";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { parseFrom, withFrom } from "@/lib/return-to";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -35,7 +36,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
   ]);
 
   if (!invoice) notFound();
-  if (invoice.state !== "Draft") redirect(`/invoices/${invoice.id}`);
+  if (invoice.state !== "Draft") redirect(withFrom(`/invoices/${invoice.id}`, parseFrom(from)));
 
   const customers = await prisma.customer.findMany({
     where: selectableCustomersWhere(invoice.customerId),
@@ -56,7 +57,7 @@ export default async function EditInvoicePage({ params, searchParams }: Props) {
       customers={customers}
       services={services}
       defaultPaymentTermDays={settings?.defaultPaymentTermDays ?? 30}
-      from={from?.startsWith("customers/") ? from : undefined}
+      from={parseFrom(from) ?? undefined}
         categories={categories}
       creditNoteFor={original ?? undefined}
       unitOrder={unitOrder}
