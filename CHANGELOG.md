@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.3...customer-management-v1.10.0) (2026-10-30)
+
+
+### Features
+
+* **customers:** letter salutation per customer ([#191](https://github.com/sirtheta/CustomerManagement/issues/191)) ([3468f35](https://github.com/sirtheta/CustomerManagement/commit/3468f358ae9b73043bd5e5feef247526911c80be))
+* **settings:** check optional company data and tie the QR holder name to it ([#193](https://github.com/sirtheta/CustomerManagement/issues/193)) ([9e0b8f9](https://github.com/sirtheta/CustomerManagement/commit/9e0b8f99be539c646b6a03201ab1e45732f21a2a))
+* **settings:** link version to its changelog ([df3e448](https://github.com/sirtheta/CustomerManagement/commit/df3e448a96a0fdcd875e235da70285c341b98431))
+
 ## [1.9.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.2...customer-management-v1.9.3) (2026-10-29)
 
 
