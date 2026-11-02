@@ -8,6 +8,7 @@ import { requireModule } from "@/lib/module-guard";
 import { auth } from "@/lib/auth";
 import { isEditorSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
+import { parseFrom } from "@/lib/return-to";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -61,7 +62,7 @@ export default async function EditQuotePage({ params, searchParams }: Props) {
       customers={customers}
       services={services}
       defaultQuoteValidityDays={settings?.defaultQuoteValidityDays ?? 30}
-      from={from?.startsWith("customers/") ? from : undefined}
+      from={parseFrom(from) ?? undefined}
         categories={categories}
       unitOrder={unitOrder}
       roundTo5Rappen={settings?.roundTotalTo5Rappen ?? false}

@@ -145,7 +145,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
               {report.rows.map((r) => (
                 <li key={r.invoiceId} className="rounded-lg border p-3 space-y-1">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/invoices/${r.invoiceId}`} className="font-medium underline">
+                    <Link href={`/invoices/${r.invoiceId}?from=accounting/receivables`} className="font-medium underline">
                       {documentLabel(r.documentNumber)}
                     </Link>
                     <span className="text-xs text-muted-foreground">
@@ -188,7 +188,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
                 {report.rows.map((r) => (
                   <TableRow key={r.invoiceId}>
                     <TableCell>
-                      <Link href={`/invoices/${r.invoiceId}`} className="underline">
+                      <Link href={`/invoices/${r.invoiceId}?from=accounting/receivables`} className="underline">
                         {documentLabel(r.documentNumber)}
                       </Link>
                     </TableCell>

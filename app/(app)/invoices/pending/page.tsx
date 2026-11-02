@@ -12,7 +12,7 @@ export default async function PendingEmailsPage() {
   if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const pending = await prisma.pendingEmail.findMany({
     include: {
-      invoice: { include: { customer: true } },
+      invoice: { include: { customer: true, items: { orderBy: { id: "asc" } } } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -44,6 +44,17 @@ export default async function PendingEmailsPage() {
                 documentNumber={p.invoice.documentNumber}
                 customerName={customerName}
                 totalAmount={p.invoice.totalAmount.toNumber()}
+                discountPercent={p.invoice.discountPercent.toNumber()}
+                items={p.invoice.items.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  description: item.description,
+                  unit: item.unit,
+                  quantity: item.quantity.toNumber(),
+                  unitPrice: item.unitPrice.toNumber(),
+                  totalAmount: item.totalAmount.toNumber(),
+                  discountPercent: item.discountPercent.toNumber(),
+                }))}
                 to={p.to}
                 subject={p.subject}
                 body={p.body}

@@ -21,6 +21,7 @@ import { PaymentError, recordRemainingPayment, syncInvoiceState } from "@/lib/pa
 import { toRappen } from "@/lib/calculations";
 import { canTransitionInvoice } from "@/lib/state-manager";
 import { swissToday } from "@/lib/date";
+import { afterDeleteHref, afterEditHref, parseFrom, withFrom } from "@/lib/return-to";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
@@ -200,10 +201,9 @@ export async function updateInvoice(
   await logAudit(session, "UPDATE", "Invoice", id);
   revalidatePath("/accounting/receivables");
   revalidatePath("/dashboard");
+  revalidatePath("/invoices/pending");
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
-  const from = formData.get("from") as string | null;
-  const fromCustomer = from?.startsWith("customers/") ? from : null;
-  redirect(`/invoices/${id}${fromCustomer ? `?from=${fromCustomer}` : ""}`);
+  redirect(afterEditHref(`/invoices/${id}`, parseFrom(formData.get("from"))));
 }
 
 export async function updateInvoiceStatus(
@@ -291,7 +291,7 @@ export async function updateInvoiceStatus(
   return {};
 }
 
-export async function deleteInvoice(id: number): Promise<{ error?: string }> {
+export async function deleteInvoice(id: number, from?: string | null): Promise<{ error?: string }> {
   const session = await requireAdmin();
   const inv = await prisma.invoice.findUnique({
     where: { id },
@@ -336,12 +336,12 @@ export async function deleteInvoice(id: number): Promise<{ error?: string }> {
   revalidateTag(ANALYTICS_CACHE_TAG, { expire: 0 });
   if (inv.creditNoteForId != null) {
     revalidatePath(`/invoices/${inv.creditNoteForId}`);
-    redirect(`/invoices/${inv.creditNoteForId}?flash=credit-note-deleted`);
+    redirect(withFrom(`/invoices/${inv.creditNoteForId}?flash=credit-note-deleted`, parseFrom(from)));
   }
-  redirect("/invoices?flash=invoice-deleted");
+  redirect(afterDeleteHref("/invoices", "invoice-deleted", parseFrom(from)));
 }
 
-export async function createCreditNote(invoiceId: number): Promise<{ error?: string }> {
+export async function createCreditNote(invoiceId: number, from?: string | null): Promise<{ error?: string }> {
   const session = await requireEditor();
   let creditId: number;
   try {
@@ -354,7 +354,7 @@ export async function createCreditNote(invoiceId: number): Promise<{ error?: str
   await logAudit(session, "CREATE", "Invoice", creditId, undefined, { creditNoteFor: invoiceId });
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath("/invoices");
-  redirect(`/invoices/${creditId}/edit`);
+  redirect(withFrom(`/invoices/${creditId}/edit`, parseFrom(from)));
 }
 
 export async function sendInvoice(

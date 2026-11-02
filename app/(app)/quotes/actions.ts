@@ -23,6 +23,7 @@ import {
   sendDocument,
 } from "@/lib/document-actions";
 import { requireModule } from "@/lib/module-guard";
+import { afterDeleteHref, afterEditHref, parseFrom } from "@/lib/return-to";
 import { acquireSendLock, SEND_IN_PROGRESS_ERROR } from "@/lib/send-lock";
 
 const log = logger.child({ module: "quotes" });
@@ -145,9 +146,7 @@ export async function updateQuote(
   }
 
   await logAudit(session, "UPDATE", "Quote", id);
-  const from = formData.get("from") as string | null;
-  const fromCustomer = from?.startsWith("customers/") ? from : null;
-  redirect(`/quotes/${id}${fromCustomer ? `?from=${fromCustomer}` : ""}`);
+  redirect(afterEditHref(`/quotes/${id}`, parseFrom(formData.get("from"))));
 }
 
 export async function updateQuoteStatus(
@@ -167,7 +166,7 @@ export async function updateQuoteStatus(
   await logAudit(session, "STATUS", "Quote", id, documentNumber ?? undefined, { from: current.state, to: state });
 }
 
-export async function deleteQuote(id: number): Promise<{ error?: string }> {
+export async function deleteQuote(id: number, from?: string | null): Promise<{ error?: string }> {
   const session = await requireAdmin();
   await requireModule("quotes");
   const q = await prisma.quote.findUnique({ where: { id }, select: { documentNumber: true } });
@@ -185,7 +184,7 @@ export async function deleteQuote(id: number): Promise<{ error?: string }> {
   }
   await logAudit(session, "DELETE", "Quote", id, q?.documentNumber ?? undefined);
   revalidatePath("/quotes");
-  redirect("/quotes?flash=quote-deleted");
+  redirect(afterDeleteHref("/quotes", "quote-deleted", parseFrom(from)));
 }
 
 export async function sendQuote(

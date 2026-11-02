@@ -22,6 +22,7 @@ import { createInvoice, updateInvoice, type InvoiceFormState } from "./actions";
 import type { Category, Customer, Invoice, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
 import { SenderProfileSelect, type SenderProfileOption } from "@/components/sender-profile-select";
+import { afterEditHref } from "@/lib/return-to";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -100,7 +101,7 @@ export default function InvoiceForm({
     : createInvoice;
 
   const cancelHref = invoice
-    ? `/invoices/${invoice.id}${from ? `?from=${from}` : ""}`
+    ? afterEditHref(`/invoices/${invoice.id}`, from ?? null)
     : "/invoices";
 
   const [state, formAction, isPending] = useActionState<InvoiceFormState, FormData>(

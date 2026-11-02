@@ -29,6 +29,7 @@ import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
 import { hasRole, isEditorSession } from "@/lib/permissions";
 import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
+import { fromCrumbs, parseFrom, withFrom } from "@/lib/return-to";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -67,11 +68,11 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   // Read-only preview for the send dialog; the real number is assigned when sending.
   const nextDocumentNumber = canEdit && !quote.documentNumber ? await generateQuoteNumber() : null;
 
-  const fromCustomer = from?.startsWith("customers/") ? from : null;
-  const customerName = customerDisplayName(quote.customer);
-  const breadcrumbItems = fromCustomer
-    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(quote.documentNumber) }]
-    : [{ label: "Offerten", href: "/quotes" }, { label: documentLabel(quote.documentNumber) }];
+  const returnFrom = parseFrom(from);
+  const breadcrumbItems = [
+    ...fromCrumbs(returnFrom, customerDisplayName(quote.customer), { label: "Offerten", href: "/quotes" }),
+    { label: documentLabel(quote.documentNumber) },
+  ];
 
   return (
     <div className="space-y-4">
@@ -96,7 +97,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
             <Button
               size="sm"
               variant={quote.state === "Accepted" ? "outline" : "default"}
-              render={<Link href={`/quotes/${quote.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
+              render={<Link href={withFrom(`/quotes/${quote.id}/edit`, returnFrom)} />}
             >
               Bearbeiten
             </Button>
@@ -235,7 +236,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
       )}
 
       <div className="flex justify-between items-center flex-wrap gap-2">
-        {canDelete ? <DeleteQuoteButton quoteId={quote.id} /> : <span />}
+        {canDelete ? <DeleteQuoteButton quoteId={quote.id} from={returnFrom} /> : <span />}
         <div className="flex items-center gap-2 flex-wrap">
           {canEdit && (
             <SendQuoteButton

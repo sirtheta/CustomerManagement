@@ -39,6 +39,7 @@ import { isLastReminderLevelSent, latestSentReminders, reminderAvailability } fr
 import { SendDialogProvider } from "../SendDialogContext";
 import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
 import { FlashToast } from "@/components/flash-toast";
+import { fromCrumbs, parseFrom, withFrom } from "@/lib/return-to";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -95,11 +96,11 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   // The server refuses further credit notes once the sent ones cover the total.
   const fullyCredited = totalRappen > 0 && creditedRappen >= totalRappen;
 
-  const fromCustomer = from?.startsWith("customers/") ? from : null;
-  const customerName = customerDisplayName(invoice.customer);
-  const breadcrumbItems = fromCustomer
-    ? [{ label: "Kunden", href: "/customers" }, { label: customerName, href: `/${fromCustomer}` }, { label: documentLabel(invoice.documentNumber) }]
-    : [{ label: "Rechnungen", href: "/invoices" }, { label: documentLabel(invoice.documentNumber) }];
+  const returnFrom = parseFrom(from);
+  const breadcrumbItems = [
+    ...fromCrumbs(returnFrom, customerDisplayName(invoice.customer), { label: "Rechnungen", href: "/invoices" }),
+    { label: documentLabel(invoice.documentNumber) },
+  ];
 
   const companyName = senderDisplayName(settings?.companyInfo ?? {}, invoice.senderProfile);
   // Drafts have no number yet: the placeholder stays so it is filled in when sent.
@@ -206,7 +207,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           {canEdit && invoice.state === "Draft" && (
             <Button
               size="sm"
-              render={<Link href={`/invoices/${invoice.id}/edit${fromCustomer ? `?from=${fromCustomer}` : ""}`} />}
+              render={<Link href={withFrom(`/invoices/${invoice.id}/edit`, returnFrom)} />}
             >
               Bearbeiten
             </Button>
@@ -479,7 +480,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
 
       <div className="flex justify-between items-center flex-wrap gap-2">
         {canDelete && invoice.state === "Draft" && invoice.documentNumber === null ? (
-          <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} />
+          <DeleteInvoiceButton invoiceId={invoice.id} isCreditNote={isCreditNote} from={returnFrom} />
         ) : (
           <span />
         )}
@@ -513,7 +514,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
             </Button>
           )}
           {canEdit && !isCreditNote && invoice.state !== "Draft" && invoice.state !== "Canceled" && !fullyCredited && (
-            <CreateCreditNoteButton invoiceId={invoice.id} paid={summary.paid} remaining={summary.remaining} />
+            <CreateCreditNoteButton invoiceId={invoice.id} paid={summary.paid} remaining={summary.remaining} from={returnFrom} />
           )}
           {canEdit && !isCreditNote && <SaveAsTemplateButton invoiceId={invoice.id} />}
           <Button

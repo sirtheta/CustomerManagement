@@ -13,6 +13,7 @@ import { createQuote, updateQuote, type QuoteFormState } from "./actions";
 import type { Category, Customer, Quote, Item, Service, Unit } from "@prisma/client";
 import { documentLabel } from "@/lib/document-display";
 import { SenderProfileSelect, type SenderProfileOption } from "@/components/sender-profile-select";
+import { afterEditHref } from "@/lib/return-to";
 
 type SerializedItem = Omit<Item, "unitPrice" | "quantity" | "discountPercent" | "totalAmount"> & {
   unitPrice: number; quantity: number; discountPercent: number; totalAmount: number;
@@ -69,7 +70,7 @@ export default function QuoteForm({
   const action = quote ? updateQuote.bind(null, quote.id) : createQuote;
 
   const cancelHref = quote
-    ? `/quotes/${quote.id}${from ? `?from=${from}` : ""}`
+    ? afterEditHref(`/quotes/${quote.id}`, from ?? null)
     : "/quotes";
 
   const [state, formAction, isPending] = useActionState<QuoteFormState, FormData>(
