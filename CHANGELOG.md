@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.0...customer-management-v1.10.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **invoices:** return to the page a document was opened from ([#199](https://github.com/sirtheta/CustomerManagement/issues/199)) ([c9180b0](https://github.com/sirtheta/CustomerManagement/commit/c9180b093b7cba8de077fa4a71caa3d5c1740a93))
+* **subscriptions:** allow viewing the PDF before sending a subscription invoice ([#201](https://github.com/sirtheta/CustomerManagement/issues/201)) ([565382b](https://github.com/sirtheta/CustomerManagement/commit/565382bc0b589519aad415b3338a4cdccd7b3928))
+
 ## [1.10.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.9.3...customer-management-v1.10.0) (2026-10-30)
 
 
