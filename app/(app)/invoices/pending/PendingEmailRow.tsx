@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { approvePendingEmail, discardPendingEmail, type ApproveResult } from "./actions";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
-import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon } from "lucide-react";
+import { SendIcon, Trash2Icon, TriangleAlertIcon, PencilIcon, FileTextIcon } from "lucide-react";
 import { documentLabel } from "@/lib/document-display";
 import ItemsView, { type ItemViewData } from "@/components/items-view";
 import { formatCurrency } from "@/lib/utils";
@@ -139,10 +139,21 @@ export default function PendingEmailRow(props: Props) {
               <Trash2Icon className="size-4 mr-1.5" />
               Verwerfen
             </ConfirmDialog>
-            <Button type="submit" size="sm" disabled={isPending || isEmpty}>
-              <SendIcon className="size-4 mr-1.5" />
-              {isPending ? "Wird gesendet…" : "Senden"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                render={<a href={`/api/invoices/${props.invoiceId}/pdf`} target="_blank" rel="noopener noreferrer" />}
+              >
+                <FileTextIcon className="size-4 mr-1.5" />
+                PDF ansehen
+              </Button>
+              <Button type="submit" size="sm" disabled={isPending || isEmpty}>
+                <SendIcon className="size-4 mr-1.5" />
+                {isPending ? "Wird gesendet…" : "Senden"}
+              </Button>
+            </div>
           </div>
         </form>
       </CardContent>
