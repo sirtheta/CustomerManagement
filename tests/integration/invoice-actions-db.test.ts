@@ -333,6 +333,26 @@ describe("invoice actions against a real database", () => {
         `/invoices/${originalId}?flash=credit-note-deleted&from=customers/5`
       );
     });
+
+    it("createCreditNote does not carry the approval page over to the credit note", async () => {
+      const originalId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+      await db.prisma.invoice.update({ where: { id: originalId }, data: { state: "Sent", documentNumber: "I-26060013" } });
+      for (const from of ["invoices/pending", "https://evil.example"]) {
+        let creditUrl = "";
+        await expect(createCreditNote(originalId, from)).rejects.toSatisfy((err: unknown) => {
+          creditUrl = err instanceof RedirectSignal ? err.url : "";
+          return /^\/invoices\/\d+\/edit$/.test(creditUrl);
+        });
+        await db.prisma.invoice.delete({ where: { id: Number(creditUrl.match(/\/invoices\/(\d+)/)![1]) } });
+      }
+    });
+
+    it("deleteInvoice only returns to customer pages, otherwise to the list", async () => {
+      for (const from of ["invoices/pending", "accounting/receivables", "https://evil.example"]) {
+        const draftId = await idFromRedirect(() => createInvoice({}, invoiceForm(customerId, [{ unitPrice: 10, quantity: 1 }])));
+        await expectRedirect(() => deleteInvoice(draftId, from), "/invoices?flash=invoice-deleted");
+      }
+    });
   });
 
   describe("deleting drafts removes their items", () => {

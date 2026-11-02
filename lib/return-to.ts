@@ -35,6 +35,11 @@ export function withFrom(path: string, from: string | null | undefined): string 
   return `${path}${path.includes("?") ? "&" : "?"}from=${from}`;
 }
 
+/** `from` handed on to a different document (new credit note): origins that open straight into the edit form stay behind. */
+export function forwardFrom(from: string | null): string | null {
+  return from && !FIXED_TARGETS[from]?.editReturnsHere ? from : null;
+}
+
 /** Leading breadcrumbs for a document page; `fallback` is the document list. */
 export function fromCrumbs(
   from: string | null,
@@ -53,7 +58,10 @@ export function afterEditHref(documentPath: string, from: string | null): string
   return withFrom(documentPath, from);
 }
 
-/** Target after deleting a document: the page it was opened from, else the list (with flash). */
+/**
+ * Target after deleting a document: the customer page it was opened from, else the list (with flash).
+ * The overview pages don't show the flash and don't list drafts, so they are not a delete target.
+ */
 export function afterDeleteHref(listPath: string, flash: string, from: string | null): string {
-  return from ? `/${from}?flash=${flash}` : `${listPath}?flash=${flash}`;
+  return from && CUSTOMER_FROM.test(from) ? `/${from}?flash=${flash}` : `${listPath}?flash=${flash}`;
 }
