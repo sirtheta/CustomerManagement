@@ -21,7 +21,7 @@ import { PaymentError, recordRemainingPayment, syncInvoiceState } from "@/lib/pa
 import { toRappen } from "@/lib/calculations";
 import { canTransitionInvoice } from "@/lib/state-manager";
 import { swissToday } from "@/lib/date";
-import { afterDeleteHref, afterEditHref, parseFrom, withFrom } from "@/lib/return-to";
+import { afterDeleteHref, afterEditHref, forwardFrom, parseFrom, withFrom } from "@/lib/return-to";
 import {
   createDocumentWithItems,
   updateDocumentWithItems,
@@ -354,7 +354,7 @@ export async function createCreditNote(invoiceId: number, from?: string | null):
   await logAudit(session, "CREATE", "Invoice", creditId, undefined, { creditNoteFor: invoiceId });
   revalidatePath(`/invoices/${invoiceId}`);
   revalidatePath("/invoices");
-  redirect(withFrom(`/invoices/${creditId}/edit`, parseFrom(from)));
+  redirect(withFrom(`/invoices/${creditId}/edit`, forwardFrom(parseFrom(from))));
 }
 
 export async function sendInvoice(
