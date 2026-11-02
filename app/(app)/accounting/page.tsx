@@ -152,7 +152,29 @@ export default async function AccountingPage({ searchParams }: Props) {
           <CardTitle className="text-base">Monatsübersicht {statement.selectedYear}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {/* Phones: one line per month, so the result column is never cut off */}
+          <ul className="divide-y md:hidden">
+            {statement.monthlyResults.map((m) => (
+              <li key={m.monthIndex} className="py-2 space-y-0.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium">{m.month}</span>
+                  <span
+                    className={cn(
+                      "font-medium tabular-nums",
+                      m.net > 0 && "text-green-600 dark:text-green-400",
+                      m.net < 0 && "text-destructive",
+                    )}
+                  >
+                    {formatCurrency(m.net)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  Einnahmen {formatCurrency(m.income)} · Ausgaben {formatCurrency(m.expenses)}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
