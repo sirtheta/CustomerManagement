@@ -290,7 +290,25 @@ export default async function AccountingPage({ searchParams }: Props) {
             <CardTitle className="text-base">Zahlungseingänge {statement.selectedYear}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {payments.length > 0 && (
+              // Phones get cards: customer names make the table scroll sideways
+              <ul className="space-y-3 md:hidden">
+                {payments.map((inv) => (
+                  <li key={inv.id} className="rounded-lg border p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/invoices/${inv.invoiceId}`} className="font-medium underline">
+                        {documentLabel(inv.documentNumber)}
+                      </Link>
+                      <span className="font-semibold">{formatCurrency(inv.amount)}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(inv.paidDate)} · {inv.customerName}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={payments.length > 0 ? "hidden overflow-x-auto md:block" : "overflow-x-auto"}>
               <Table>
                 <TableHeader>
                   <TableRow>
