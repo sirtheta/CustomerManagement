@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.1...customer-management-v1.10.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **accounting:** make the income statement usable on phones ([#203](https://github.com/sirtheta/CustomerManagement/issues/203)) ([fd5c915](https://github.com/sirtheta/CustomerManagement/commit/fd5c915762a30052e669e0eec9b35f5deba5fed8))
+* **invoices:** keep the approval page origin off credit notes and delete redirects ([#202](https://github.com/sirtheta/CustomerManagement/issues/202)) ([0b19b8a](https://github.com/sirtheta/CustomerManagement/commit/0b19b8a979f00678cabdfb26e6f4a6e1f09ed487))
+
 ## [1.10.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.0...customer-management-v1.10.1) (2026-11-02)
 
 
