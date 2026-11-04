@@ -307,7 +307,7 @@ export default async function AccountingPage({ searchParams }: Props) {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Zahlungseingänge {statement.selectedYear}</CardTitle>
           </CardHeader>
@@ -337,7 +337,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                     <TableHead>Bezahlt am</TableHead>
                     <TableHead>Rechnung</TableHead>
                     <TableHead>Kunde</TableHead>
-                    <TableHead>Betrag</TableHead>
+                    <TableHead className="text-right">Betrag</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -357,7 +357,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                           </Link>
                         </TableCell>
                         <TableCell>{inv.customerName}</TableCell>
-                        <TableCell>{formatCurrency(inv.amount)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(inv.amount)}</TableCell>
                       </TableRow>
                     ))
                   )}
