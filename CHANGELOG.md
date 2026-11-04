@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.2...customer-management-v1.10.3) (2026-11-04)
+
+
+### Bug Fixes
+
+* **accounting:** show payments card at full width ([#205](https://github.com/sirtheta/CustomerManagement/issues/205)) ([269743e](https://github.com/sirtheta/CustomerManagement/commit/269743e3e2a86d35b009588dfb5bf38751bfaf52))
+
 ## [1.10.2](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.1...customer-management-v1.10.2) (2026-11-02)
 
 
