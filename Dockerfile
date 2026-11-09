@@ -54,9 +54,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # handler sole control of the shutdown sequence.
 ENV NEXT_MANUAL_SIG_HANDLE=true
 
-# Runtime libs only (no -dev headers needed at runtime)
+# Runtime libs only (no -dev headers needed at runtime). ghostscript compresses
+# uploaded PDFs (lib/file-compression.ts); without it they are stored as received.
 RUN apk upgrade --no-cache \
- && apk add --no-cache libc6-compat vips
+ && apk add --no-cache libc6-compat vips ghostscript
 
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs

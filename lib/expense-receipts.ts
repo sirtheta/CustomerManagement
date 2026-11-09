@@ -1,4 +1,5 @@
 import { matchesMagicBytes } from "@/lib/file-validation";
+import { compressUpload } from "@/lib/file-compression";
 
 export const MAX_RECEIPT_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -40,10 +41,11 @@ export async function readReceipts(
     if (!RECEIPT_MIME_TYPES[ext])
       return { error: `Dateityp nicht erlaubt (nur PDF, JPG, PNG): ${entry.name}` };
 
-    const content = new Uint8Array(await entry.arrayBuffer());
-    if (!matchesMagicBytes(ext, content))
+    const raw = new Uint8Array(await entry.arrayBuffer());
+    if (!matchesMagicBytes(ext, raw))
       return { error: `Dateiinhalt entspricht nicht dem Dateityp ${ext}: ${entry.name}` };
 
+    const content = (await compressUpload(ext, raw)) as Uint8Array<ArrayBuffer>;
     receipts.push({ name: entry.name, fileType: ext, size: content.length, content });
   }
   return { receipts };
