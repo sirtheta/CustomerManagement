@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { requireAdmin, requireEditor } from "@/lib/permissions";
 import { matchesMagicBytes } from "@/lib/file-validation";
+import { compressUpload } from "@/lib/file-compression";
 import { logAudit } from "@/lib/audit";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -47,11 +48,12 @@ export async function uploadDocument(
   if (!ALLOWED_TYPES[ext])
     return { error: `Dateityp nicht erlaubt: ${ext || file.name}` };
 
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
+  const raw = new Uint8Array(await file.arrayBuffer());
 
-  if (!matchesMagicBytes(ext, bytes))
+  if (!matchesMagicBytes(ext, raw))
     return { error: `Dateiinhalt entspricht nicht dem Dateityp ${ext}` };
+
+  const bytes = (await compressUpload(ext, raw)) as Uint8Array<ArrayBuffer>;
 
   const document = await prisma.document.create({
     data: {
