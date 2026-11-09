@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.4](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.3...customer-management-v1.10.4) (2026-11-09)
+
+
+### Bug Fixes
+
+* **documents:** compress uploaded PDFs and images ([#215](https://github.com/sirtheta/CustomerManagement/issues/215)) ([45d497d](https://github.com/sirtheta/CustomerManagement/commit/45d497df3a6636efe8a0b44d164eea8f6e3aaac8))
+
 ## [1.10.3](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.2...customer-management-v1.10.3) (2026-11-04)
 
 
