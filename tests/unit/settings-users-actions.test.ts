@@ -512,6 +512,46 @@ describe("settings/users actions", () => {
     });
   });
 
+  describe("reset links and 2FA changes", () => {
+    beforeEach(() => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "user@test.ch" } as never);
+    });
+
+    it("disableTotp deletes outstanding password-reset links", async () => {
+      await disableTotp(7);
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 7 } });
+    });
+
+    it("generateTotpSetup deletes outstanding password-reset links", async () => {
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
+      await generateTotpSetup(4);
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 4 } });
+    });
+
+    it("confirmTotpSetup deletes outstanding password-reset links", async () => {
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 6,
+        totpSecret: "enc:MOCKSECRET",
+        email: "user@test.ch",
+      } as never);
+      mockOtp.verifySync.mockReturnValueOnce({ valid: true, timeStep: 1 });
+      await confirmTotpSetup(6, "123456");
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 6 } });
+    });
+
+    it("confirmTotpSetup keeps reset links when the code is wrong", async () => {
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 6,
+        totpSecret: "enc:MOCKSECRET",
+        email: "user@test.ch",
+      } as never);
+      mockOtp.verifySync.mockReturnValueOnce({ valid: false });
+      await confirmTotpSetup(6, "000000");
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("confirmTotpSetup session revocation", () => {
     async function confirm(userId: number) {
       vi.mocked(auth).mockResolvedValue(adminSession);

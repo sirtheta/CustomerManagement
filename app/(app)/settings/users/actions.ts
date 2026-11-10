@@ -201,6 +201,8 @@ export async function generateTotpSetup(
     where: { id: userId },
     data: { totpSecret: encryptSecret(secret), totpEnabled: false },
   });
+  // A reset link issued before the 2FA change must not outlive it.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   return { secret, qrCodeDataUrl, otpauthUrl };
 }
 
@@ -228,6 +230,8 @@ export async function confirmTotpSetup(
       ...("timeStep" in result && typeof result.timeStep === "number" ? { totpLastStep: result.timeStep } : {}),
     },
   });
+  // A reset link issued before the 2FA change must not outlive it.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-enabled" });
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now(), backupCodes };
@@ -259,6 +263,8 @@ export async function disableTotp(userId: number): Promise<{ error: string } | v
     where: { id: userId },
     data: { totpEnabled: false, totpSecret: null, sessionEpoch: { increment: 1 } },
   });
+  // A reset link issued before the 2FA change must not outlive it.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-disabled" });
   revalidatePath("/settings/users");
 }
