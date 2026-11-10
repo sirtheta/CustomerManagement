@@ -2,8 +2,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import ExpenseForm from "../ExpenseForm";
 import DeleteExpenseButton from "../DeleteExpenseButton";
-import { auth } from "@/lib/auth";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { UserRole } from "@prisma/client";
 import { requireModule } from "@/lib/module-guard";
@@ -14,7 +13,7 @@ type Props = {
 
 export default async function EditExpensePage({ params }: Props) {
   await requireModule("accounting");
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
   // Deleting expenses and receipts requires an Admin
   const isAdmin = session ? hasRole(session, [UserRole.Admin]) : false;

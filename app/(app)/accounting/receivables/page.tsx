@@ -1,7 +1,6 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,7 @@ function parseAsOf(raw: string | undefined): Date {
 
 export default async function ReceivablesPage({ searchParams }: Props) {
   await requireModule("accounting");
-  if (!isEditorSession(await auth())) return <EditorOnlyNotice />;
+  if (!isEditorSession(await requireSession())) return <EditorOnlyNotice />;
   const { asOf: asOfParam } = await searchParams;
   const asOf = parseAsOf(asOfParam);
   const asOfValue = asOf.toISOString().slice(0, 10);

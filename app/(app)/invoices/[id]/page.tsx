@@ -24,8 +24,7 @@ import CreateCreditNoteButton from "../CreateCreditNoteButton";
 import { UserRole } from "@prisma/client";
 import PaymentsPanel from "../PaymentsPanel";
 import { toRappen } from "@/lib/calculations";
-import { auth } from "@/lib/auth";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { documentLabel } from "@/lib/document-display";
 import { reminderTitle } from "@/lib/reminder-charges";
@@ -52,7 +51,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
   const invoiceId = parseInt(id, 10);
 
   const modules = await loadModules();
-  const session = await auth();
+  const session = await requireSession();
   // Viewers only read: every action below is hidden for them (the actions check the role too).
   const canEdit = isEditorSession(session);
   const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;

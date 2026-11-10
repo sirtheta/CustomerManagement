@@ -27,8 +27,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { UserRole } from "@prisma/client";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { auth } from "@/lib/auth";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import {
   invoiceStateLabels,
   invoiceStateVariants,
@@ -51,7 +50,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
   const { edit } = await searchParams;
   const customerId = parseInt(id, 10);
 
-  const session = await auth();
+  const session = await requireSession();
   const canEdit = isEditorSession(session);
   const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
   const isEditing = edit === "true" && canEdit;

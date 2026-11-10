@@ -61,3 +61,22 @@ describe("isEditorSession", () => {
     expect(isEditorSession(null)).toBe(false);
   });
 });
+
+describe("requireSession", () => {
+  it("returns the session when signed in", async () => {
+    const { auth } = await import("@/lib/auth");
+    const { requireSession } = await import("@/lib/permissions");
+    const s = session(UserRole.Viewer);
+    vi.mocked(auth).mockResolvedValueOnce(s as never);
+    await expect(requireSession()).resolves.toBe(s);
+  });
+
+  it("redirects to /login without a session", async () => {
+    const { auth } = await import("@/lib/auth");
+    const { redirect } = await import("next/navigation");
+    const { requireSession } = await import("@/lib/permissions");
+    vi.mocked(auth).mockResolvedValueOnce(null as never);
+    await requireSession();
+    expect(redirect).toHaveBeenCalledWith("/login");
+  });
+});

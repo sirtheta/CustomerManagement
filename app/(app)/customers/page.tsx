@@ -20,8 +20,7 @@ import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
 import { loadModules } from "@/lib/module-guard";
 
@@ -215,7 +214,7 @@ export default async function CustomersPage({ searchParams }: Props) {
   // Old link of the subscription filter, which now has its own overview.
   if (subscription === "true") redirect("/subscriptions");
 
-  const session = await auth();
+  const session = await requireSession();
   const canEdit = isEditorSession(session);
   const canDelete = session?.user.role === UserRole.Admin;
 

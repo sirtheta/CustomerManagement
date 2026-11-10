@@ -3,8 +3,7 @@ import { firstProfileLabel } from "@/lib/sender-profile";
 import { loadUnitOrder } from "@/lib/unit-usage";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import InvoiceForm from "../InvoiceForm";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 
 type Props = {
@@ -12,7 +11,7 @@ type Props = {
 };
 
 export default async function NewInvoicePage({ searchParams }: Props) {
-  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
+  if (!isEditorSession(await requireSession())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const { customerId } = await searchParams;
   const defaultCustomerId = customerId ? parseInt(customerId, 10) || undefined : undefined;
 

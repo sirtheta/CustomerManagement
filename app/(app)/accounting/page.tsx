@@ -2,8 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Suspense } from "react";
 import { UserRole } from "@prisma/client";
-import { auth } from "@/lib/auth";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { FlashToast } from "@/components/flash-toast";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ function ExpenseStatus({ exp, today }: { exp: ExpenseRow; today: string }) {
 
 export default async function AccountingPage({ searchParams }: Props) {
   await requireModule("accounting");
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
   // deleteExpense requires an Admin
   const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
