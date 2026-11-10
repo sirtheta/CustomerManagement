@@ -16,9 +16,11 @@ function LoginNotice() {
   const text =
     notice === "password-changed"
       ? "Passwort geändert. Bitte melde dich mit dem neuen Passwort neu an."
-      : notice === "session-ended"
-        ? "Deine Sitzung wurde beendet. Bitte melde dich erneut an."
-        : null;
+      : notice === "totp-enabled"
+        ? "Zwei-Faktor-Authentifizierung aktiviert. Bitte melde dich mit dem zweiten Faktor neu an."
+        : notice === "session-ended"
+          ? "Deine Sitzung wurde beendet. Bitte melde dich erneut an."
+          : null;
   if (!text) return null;
   return (
     <p role="status" className="mb-4 text-sm text-muted-foreground text-center">

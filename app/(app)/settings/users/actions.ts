@@ -3,6 +3,7 @@
 import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
+import { signOut } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import { OTP } from "otplib";
@@ -207,7 +208,7 @@ export async function generateTotpSetup(
 export async function confirmTotpSetup(
   userId: number,
   token: string
-): Promise<ActionState & { backupCodes?: string[] }> {
+): Promise<ActionState & { backupCodes?: string[]; endsOwnSession?: boolean }> {
   const session = await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -215,22 +216,40 @@ export async function confirmTotpSetup(
   const result = otp.verifySync({ token, secret: decryptSecret(user.totpSecret) });
   if (!result.valid) return { error: "Falscher Code. Bitte erneut versuchen." };
   const backupCodes = generateBackupCodes();
+  // Re-keying the second factor is what people do after a suspected session
+  // theft, so it ends the user's sessions. For the admin's own account that
+  // happens in finishOwnTotpSetup, after they have seen the one-time backup
+  // codes: a bump here plus revalidatePath re-renders the page, the layout
+  // sees the epoch mismatch and redirects before the codes are ever shown.
+  const ownAccount = String(session.user.id) === String(userId);
   await prisma.user.update({
     where: { id: userId },
     data: {
       totpEnabled: true,
       totpBackupCodes: JSON.stringify(hashBackupCodes(backupCodes)),
-      // Re-keying the second factor is what people do after a suspected
-      // session theft, so it ends every existing session, the admin's own
-      // included (they log in again with the new factor).
-      sessionEpoch: { increment: 1 },
+      ...(ownAccount ? {} : { sessionEpoch: { increment: 1 } }),
       // The confirmation code must not be accepted again as a login code.
       ...("timeStep" in result && typeof result.timeStep === "number" ? { totpLastStep: result.timeStep } : {}),
     },
   });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-enabled" });
+  if (ownAccount) return { success: true, _ts: Date.now(), backupCodes, endsOwnSession: true };
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now(), backupCodes };
+}
+
+/**
+ * Second half of the admin's own 2FA setup: called once the backup codes have
+ * been saved. Ends every session of the own account (a hijacked one included)
+ * and signs out; the redirect propagates by throwing.
+ */
+export async function finishOwnTotpSetup(): Promise<void> {
+  const session = await requireAdmin();
+  await prisma.user.update({
+    where: { id: Number(session.user.id) },
+    data: { sessionEpoch: { increment: 1 } },
+  });
+  await signOut({ redirectTo: "/login?notice=totp-enabled" });
 }
 
 /**

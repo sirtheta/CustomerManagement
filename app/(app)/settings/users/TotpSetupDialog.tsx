@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { generateTotpSetup, confirmTotpSetup, disableTotp } from "./actions";
+import { generateTotpSetup, confirmTotpSetup, disableTotp, finishOwnTotpSetup } from "./actions";
 
 type User = { id: number; name: string; totpEnabled: boolean };
 
@@ -15,9 +15,18 @@ export function TotpSetupDialog({ user }: { user: User }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  // Own account: the sessions end only after the backup codes were saved (finishOwnTotpSetup).
+  const [endsOwnSession, setEndsOwnSession] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function handleClose() {
+    if (step === "backup" && endsOwnSession) {
+      // Signs out and redirects to /login; the dialog goes away with the page.
+      startTransition(async () => {
+        await finishOwnTotpSetup();
+      });
+      return;
+    }
     setOpen(false);
     setStep("generate");
     setQrCode(null);
@@ -50,6 +59,7 @@ export function TotpSetupDialog({ user }: { user: User }) {
         setConfirmError(result.error);
       } else if (result.backupCodes) {
         setBackupCodes(result.backupCodes);
+        setEndsOwnSession(result.endsOwnSession === true);
         setStep("backup");
       }
     });
@@ -73,13 +83,15 @@ export function TotpSetupDialog({ user }: { user: User }) {
               Diese Codes jetzt sicher aufbewahren — sie werden nur einmal angezeigt. Jeder Code kann einmalig statt des Authenticator-Codes verwendet werden.
             </p>
             <p className="text-sm text-muted-foreground">
-              Bestehende Sitzungen dieses Benutzers wurden beendet. Bei deinem eigenen Konto meldest du dich danach neu an.
+              {endsOwnSession
+                ? "Nach dem Schliessen werden alle Sitzungen deines Kontos beendet und du meldest dich mit dem zweiten Faktor neu an."
+                : "Bestehende Sitzungen dieses Benutzers wurden beendet."}
             </p>
             <div className="grid grid-cols-2 gap-1.5 rounded-md border bg-muted p-3 font-mono text-sm">
               {backupCodes?.map((code) => <span key={code}>{code}</span>)}
             </div>
             <div className="flex justify-end">
-              <Button onClick={handleClose}>Codes gespeichert — schliessen</Button>
+              <Button onClick={handleClose} disabled={isPending}>Codes gespeichert — schliessen</Button>
             </div>
           </div>
         ) : user.totpEnabled ? (
