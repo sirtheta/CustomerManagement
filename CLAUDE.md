@@ -22,7 +22,7 @@ npm run db:seed             # faker data, dev only
 
 ### Auth & permissions
 - `lib/auth.ts`: NextAuth v5 Credentials + bcrypt, optional TOTP (`otplib`, backup codes JSON in `User.totpBackupCodes`), in-memory login rate limit, JWT 7 d, renewed every 24 h (`lib/config.ts`). `role` (`Admin|Editor|Viewer`) is in JWT and `session.user.role`
-- `lib/permissions.ts`: `requireAdmin()`/`requireEditor()` at top of Server Components/Actions (redirect). UI: `hasRole`, `isEditorSession`; editor-only pages render `<EditorOnlyNotice />`, editor-only buttons hidden for Viewers
+- `lib/permissions.ts`: `requireSession()`/`requireAdmin()`/`requireEditor()` at top of Server Components/Actions (redirect). **Every page under `app/(app)/` must call one before reading data** (layout/`proxy.ts` are not enough: Next can skip the layout, `proxy.ts` only checks the cookie; `tests/unit/page-auth-guard.test.ts` enforces it). `User.sessionEpoch` must be bumped on role/active change, password change and TOTP replace/disable (the JWT callback compares it); TOTP codes are single-use per time step (`User.totpLastStep`, `claimTotpStep`). Migration `3_user_totp_last_step` is named `3_` because legacy `2_add_password_reset_token` sorts last and rebuilds `User`: new `User` columns must sort after it UI: `hasRole`, `isEditorSession`; editor-only pages render `<EditorOnlyNotice />`, editor-only buttons hidden for Viewers
 
 ### Invoices, credit notes, customers
 - Invoice states `Draft → Sent → PartiallyPaid → Paid | Overdue | Canceled`; Quote `Draft → Sent → Accepted | Declined | Expired`
