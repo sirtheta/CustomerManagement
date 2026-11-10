@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.5](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.4...customer-management-v1.10.5) (2026-11-10)
+
+
+### Bug Fixes
+
+* **auth:** close the security-audit findings (sessions, TOTP, reset links, env, CSV, SMTP) ([#218](https://github.com/sirtheta/CustomerManagement/issues/218)) ([5cf2471](https://github.com/sirtheta/CustomerManagement/commit/5cf24712382893b94052fd336e697a6e9b67a9e2))
+
 ## [1.10.4](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.3...customer-management-v1.10.4) (2026-11-09)
 
 
