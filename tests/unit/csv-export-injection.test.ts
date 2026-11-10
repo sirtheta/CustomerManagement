@@ -42,6 +42,12 @@ describe("buildCsv – formula injection", () => {
     expect(cell(-12.5)).toBe("-12.5");
   });
 
+  // Swiss-German Excel splits on ";": an unquoted "Foo;=HYPERLINK(...)" would
+  // open as two cells, the second one a live formula.
+  it("quotes cells containing the semicolon list separator", () => {
+    expect(cell("Foo;=1+1")).toBe('"Foo;=1+1"');
+  });
+
   it("leaves ordinary text untouched", () => {
     expect(cell("Hans Müller")).toBe("Hans Müller");
     expect(cell("a=b")).toBe("a=b");

@@ -19,7 +19,9 @@ function neutralizeFormula(str: string): string {
 
 function escapeCell(value: unknown): string {
   const str = neutralizeFormula(value == null ? "" : String(value));
-  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+  // ";" is the list separator of Swiss-German Excel: an unquoted "Foo;=1+1"
+  // would open as two cells, the second one a formula, so it is quoted too.
+  if (/[,;"\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
