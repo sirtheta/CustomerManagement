@@ -25,26 +25,19 @@ describe("buildCsv – formula injection", () => {
     expect(cell('=A"B')).toBe(`"'=A""B"`);
   });
 
-  // International phone numbers start with "+". A value made only of digits and
-  // phone separators cannot hold a function, cell reference or DDE command (all
-  // need letters or | ! = " '), so it stays readable instead of getting an apostrophe.
-  it.each(["+41 79 123 45 67", "+41 (0)79 123 45 67", "+41-79-123.45.67", "+41/79/1234567"])(
-    "leaves the phone number %j untouched",
+  // Excel evaluates a leading "+" as a formula (+41-79-123-45-67 shows -273,
+  // +41791234567 becomes 4.18E+10), so phone numbers get the apostrophe too.
+  // Fidelity for non-spreadsheet consumers deliberately ranks behind that.
+  it.each(["+41 79 123 45 67", "+41791234567", "+41-79-123-45-67", "+41 (0)79 123 45 67"])(
+    "neutralizes the phone number %j",
     (value) => {
-      expect(cell(value)).toBe(value);
-    }
-  );
-
-  it.each(["+cmd|' /C calc'!A0", "+1+1", "+SUM(1,2)", "+41 79 =1", "+41\n=1", "+A1"])(
-    "still neutralizes the plus-prefixed non-phone value %j",
-    (value) => {
-      expect(cell(value).replace(/^"/, "").startsWith("'")).toBe(true);
+      expect(cell(value)).toBe(`'${value}`);
     }
   );
 
   it("leaves plain numbers, including negative amounts, untouched", () => {
     expect(cell("-100.00")).toBe("-100.00");
-    expect(cell("+5")).toBe("+5");
+    expect(cell("5")).toBe("5");
     expect(cell("-5")).toBe("-5");
     expect(cell(-12.5)).toBe("-12.5");
   });

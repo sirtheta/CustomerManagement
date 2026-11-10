@@ -1,13 +1,10 @@
-/** Plain (signed) numbers such as "-100.00": amounts must stay numeric. */
-const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
-
 /**
- * International phone numbers ("+41 79 123 45 67"): a leading plus followed by
- * digits and phone separators only. Such a value cannot hold a function, cell
- * reference or DDE command (those need letters or | ! = " '), so it is left
- * readable instead of getting an apostrophe.
+ * Negative amounts such as "-100.00" must stay numeric. A leading "+" is not
+ * exempt: Excel treats it as a formula, so "+41791234567" would turn into
+ * 4.18E+10 and "+41-79-123-45-67" into -273; those get the apostrophe, which
+ * deliberately ranks Excel safety above fidelity for other consumers.
  */
-const PHONE_NUMBER = /^\+[\d\s()./-]+$/;
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
 
 /**
  * Spreadsheets read a cell starting with = + - @ (or tab/CR) as a formula.
@@ -16,7 +13,7 @@ const PHONE_NUMBER = /^\+[\d\s()./-]+$/;
  * apostrophe, which spreadsheets display as plain text.
  */
 function neutralizeFormula(str: string): string {
-  if (/^[=+\-@\t\r]/.test(str) && !PLAIN_NUMBER.test(str) && !PHONE_NUMBER.test(str)) return `'${str}`;
+  if (/^[=+\-@\t\r]/.test(str) && !PLAIN_NUMBER.test(str)) return `'${str}`;
   return str;
 }
 
