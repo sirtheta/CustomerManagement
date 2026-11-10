@@ -2,13 +2,21 @@
 const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/;
 
 /**
+ * International phone numbers ("+41 79 123 45 67"): a leading plus followed by
+ * digits and phone separators only. Such a value cannot hold a function, cell
+ * reference or DDE command (those need letters or | ! = " '), so it is left
+ * readable instead of getting an apostrophe.
+ */
+const PHONE_NUMBER = /^\+[\d\s()./-]+$/;
+
+/**
  * Spreadsheets read a cell starting with = + - @ (or tab/CR) as a formula.
  * Exports carry user-entered text (names, notes, imported data) that the
  * accountant opens in Excel/LibreOffice, so such text gets a leading
  * apostrophe, which spreadsheets display as plain text.
  */
 function neutralizeFormula(str: string): string {
-  if (/^[=+\-@\t\r]/.test(str) && !PLAIN_NUMBER.test(str)) return `'${str}`;
+  if (/^[=+\-@\t\r]/.test(str) && !PLAIN_NUMBER.test(str) && !PHONE_NUMBER.test(str)) return `'${str}`;
   return str;
 }
 
