@@ -132,9 +132,10 @@ export async function updateUser(
   const guardError = await guardLastAdmin(id, role, isActive);
   if (guardError) return { error: guardError };
 
-  // The role lives in the JWT, and the jwt callback only compares sessionEpoch,
-  // so a role change or deactivation must bump it or the old sessions keep
-  // their previous privileges until they expire. A plain rename keeps them.
+  // The jwt callback reads role and isActive live, but a role change or
+  // deactivation still bumps sessionEpoch: it ends the user's sessions for
+  // good, so a later reactivation or promotion cannot revive an old token.
+  // A plain rename keeps them.
   const existing = await prisma.user.findUniqueOrThrow({ where: { id } });
   const revokeSessions = existing.role !== role || existing.isActive !== isActive;
   const user = await prisma.user.update({
