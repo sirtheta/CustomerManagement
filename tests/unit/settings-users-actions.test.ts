@@ -267,6 +267,38 @@ describe("settings/users actions", () => {
     });
   });
 
+  describe("updateUser session revocation", () => {
+    async function update(existing: { role: string; isActive: boolean }, fields: Record<string, string>) {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 2, ...existing } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "user@test.ch" } as never);
+      return updateUser(2, {}, form(fields));
+    }
+
+    it("bumps sessionEpoch when the role changes", async () => {
+      vi.mocked(prisma.user.count).mockResolvedValue(1); // another active admin exists
+      await update({ role: "Admin", isActive: true }, { name: "U", role: "Viewer", isActive: "true" });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { name: "U", role: "Viewer", isActive: true, sessionEpoch: { increment: 1 } },
+      });
+    });
+
+    it("bumps sessionEpoch when the user is deactivated", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "U", role: "Editor", isActive: "false" });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { name: "U", role: "Editor", isActive: false, sessionEpoch: { increment: 1 } },
+      });
+    });
+
+    it("keeps sessions when only the name changes", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "Neu", role: "Editor", isActive: "true" });
+      const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sessionEpoch");
+    });
+  });
+
   describe("resetPassword", () => {
     it("returns password policy error", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
@@ -410,6 +442,26 @@ describe("settings/users actions", () => {
         data: expect.objectContaining({ totpEnabled: false }),
       });
     });
+
+    it("bumps sessionEpoch when replacing another user's TOTP secret", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      await generateTotpSetup(4);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 4 },
+        data: expect.objectContaining({ sessionEpoch: { increment: 1 } }),
+      });
+    });
+
+    it("does not log the admin out of their own session mid-setup", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 1, email: "admin@test.ch" } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      await generateTotpSetup(1);
+      const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sessionEpoch");
+    });
   });
 
   describe("confirmTotpSetup", () => {
@@ -469,7 +521,7 @@ describe("settings/users actions", () => {
       await disableTotp(7);
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 7 },
-        data: { totpEnabled: false, totpSecret: null },
+        data: { totpEnabled: false, totpSecret: null, sessionEpoch: { increment: 1 } },
       });
       expect(logAudit).toHaveBeenCalledWith(
         adminSession,

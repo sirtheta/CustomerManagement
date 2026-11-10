@@ -95,11 +95,18 @@ describe("changeOwnPassword", () => {
     expect(result.success).toBe(true);
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 1 },
-      data: { passwordHash: "$2b$10$newhash" },
+      data: { passwordHash: "$2b$10$newhash", sessionEpoch: { increment: 1 } },
     });
     expect(logAudit).toHaveBeenCalledWith(
       session, "UPDATE", "User", 1, "user@example.com", { action: "password-changed" }
     );
+  });
+
+  it("bumps sessionEpoch so sessions issued before the change are revoked", async () => {
+    vi.mocked(compare).mockResolvedValue(true as never);
+    await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
+    const updateArg = vi.mocked(prisma.user.update).mock.calls[0][0];
+    expect(updateArg.data).toMatchObject({ sessionEpoch: { increment: 1 } });
   });
 
   it("never stores the plaintext password", async () => {

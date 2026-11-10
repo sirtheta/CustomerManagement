@@ -42,7 +42,12 @@ export async function changeOwnPassword(
   if (!valid) return { error: "Aktuelles Passwort ist falsch." };
 
   const passwordHash = await hash(newPassword, config.bcrypt.rounds);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  // sessionEpoch bump revokes every session issued under the old password
+  // (including a stolen one); this one has to log in again as well.
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, sessionEpoch: { increment: 1 } },
+  });
   resetRateLimit(rateLimitKey);
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "password-changed" });
   return { success: true, _ts: Date.now() };

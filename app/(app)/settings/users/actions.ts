@@ -131,7 +131,15 @@ export async function updateUser(
   const guardError = await guardLastAdmin(id, role, isActive);
   if (guardError) return { error: guardError };
 
-  const user = await prisma.user.update({ where: { id }, data: { name, role, isActive } });
+  // The role lives in the JWT, and the jwt callback only compares sessionEpoch,
+  // so a role change or deactivation must bump it or the old sessions keep
+  // their previous privileges until they expire. A plain rename keeps them.
+  const existing = await prisma.user.findUniqueOrThrow({ where: { id } });
+  const revokeSessions = existing.role !== role || existing.isActive !== isActive;
+  const user = await prisma.user.update({
+    where: { id },
+    data: { name, role, isActive, ...(revokeSessions ? { sessionEpoch: { increment: 1 } } : {}) },
+  });
   await logAudit(session, "UPDATE", "User", id, user.email, { name, role, isActive });
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now() };
@@ -178,16 +186,24 @@ export async function deleteUser(id: number): Promise<{ error?: string }> {
 export async function generateTotpSetup(
   userId: number
 ): Promise<{ secret: string; qrCodeDataUrl: string; otpauthUrl: string } | { error: string }> {
-  await requireAdmin();
+  const session = await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const secret = otp.generateSecret();
   const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(APP_NAME)}`;
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   // Store the pending secret temporarily in the user record (not yet enabled)
+  // Replacing the second factor revokes the user's existing sessions. Not for
+  // the admin's own account: that would end their session before they can
+  // confirm the setup (confirmTotpSetup requires a valid admin session).
+  const revokeSessions = String(session.user.id) !== String(userId);
   await prisma.user.update({
     where: { id: userId },
-    data: { totpSecret: encryptSecret(secret), totpEnabled: false },
+    data: {
+      totpSecret: encryptSecret(secret),
+      totpEnabled: false,
+      ...(revokeSessions ? { sessionEpoch: { increment: 1 } } : {}),
+    },
   });
   return { secret, qrCodeDataUrl, otpauthUrl };
 }
@@ -236,7 +252,7 @@ export async function disableTotp(userId: number): Promise<{ error: string } | v
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { totpEnabled: false, totpSecret: null },
+    data: { totpEnabled: false, totpSecret: null, sessionEpoch: { increment: 1 } },
   });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-disabled" });
   revalidatePath("/settings/users");
