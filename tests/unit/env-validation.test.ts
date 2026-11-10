@@ -23,8 +23,44 @@ describe("validateEnv", () => {
     expect(() => validateEnv()).toThrow("AUTH_SECRET must be set in production");
   });
 
-  it("passes in production when AUTH_SECRET is set", () => {
+  it("passes in production when AUTH_SECRET is long enough", () => {
+    process.env = { NODE_ENV: "production", AUTH_SECRET: "k3Jx9mQ2vLp7TnR4wY8zB1cD6fG0hA5s" };
+    expect(() => validateEnv()).not.toThrow();
+  });
+
+  it("throws in production when AUTH_SECRET is shorter than 32 characters", () => {
     process.env = { NODE_ENV: "production", AUTH_SECRET: "prod-secret-value" };
+    expect(() => validateEnv()).toThrow("at least 32 characters");
+  });
+
+  it("throws in production when AUTH_SECRET is the placeholder from .env.example", () => {
+    process.env = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "ersetzen-mit-zufaelligem-string-min-32-zeichen",
+    };
+    expect(() => validateEnv()).toThrow("placeholder");
+  });
+
+  it("throws in production when AUTH_URL is the placeholder from .env.example", () => {
+    process.env = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "k3Jx9mQ2vLp7TnR4wY8zB1cD6fG0hA5s",
+      AUTH_URL: "https://customers.deine-domain.ch",
+    };
+    expect(() => validateEnv()).toThrow("AUTH_URL");
+  });
+
+  it("passes in production with a real AUTH_URL", () => {
+    process.env = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "k3Jx9mQ2vLp7TnR4wY8zB1cD6fG0hA5s",
+      AUTH_URL: "https://kunden.example.ch",
+    };
+    expect(() => validateEnv()).not.toThrow();
+  });
+
+  it("does not enforce the length or placeholder rules in development", () => {
+    process.env = { NODE_ENV: "development", AUTH_SECRET: "ersetzen-mit-zufaelligem-string-min-32-zeichen" };
     expect(() => validateEnv()).not.toThrow();
   });
 
