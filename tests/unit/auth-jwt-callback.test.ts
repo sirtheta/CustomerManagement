@@ -31,18 +31,40 @@ describe("auth.ts – jwt callback session revocation", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("accepts a token whose epoch matches the stored epoch", async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 3 } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 3, isActive: true, role: "Admin" } as never);
     const token = { id: "1", role: "Admin", sessionEpoch: 3 };
     expect(await state.jwt!({ token })).toEqual(token);
   });
 
   it("rejects a token issued before the epoch was bumped", async () => {
-    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 4 } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 4, isActive: true, role: "Admin" } as never);
     expect(await state.jwt!({ token: { id: "1", role: "Admin", sessionEpoch: 3 } })).toBeNull();
   });
 
   it("rejects a token whose user no longer exists", async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
     expect(await state.jwt!({ token: { id: "1", sessionEpoch: 0 } })).toBeNull();
+  });
+
+  // Users deactivated or demoted before sessionEpoch was bumped on those
+  // changes never got a bump; the callback checks the live row too.
+  it("rejects a token of a deactivated user even though the epoch still matches", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 3, isActive: false, role: "Admin" } as never);
+    expect(await state.jwt!({ token: { id: "1", role: "Admin", sessionEpoch: 3 } })).toBeNull();
+  });
+
+  it("takes the role live from the database, not from the token", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 3, isActive: true, role: "Viewer" } as never);
+    const result = await state.jwt!({ token: { id: "1", role: "Admin", sessionEpoch: 3 } });
+    expect(result).toMatchObject({ id: "1", role: "Viewer" });
+  });
+
+  it("reads isActive and role in the same query as the epoch", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ sessionEpoch: 3, isActive: true, role: "Admin" } as never);
+    await state.jwt!({ token: { id: "1", role: "Admin", sessionEpoch: 3 } });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 1 },
+      select: { sessionEpoch: true, isActive: true, role: true },
+    });
   });
 });

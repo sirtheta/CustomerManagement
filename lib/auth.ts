@@ -160,12 +160,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!Number.isInteger(userId)) return null;
       const dbUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { sessionEpoch: true },
+        select: { sessionEpoch: true, isActive: true, role: true },
       });
       if (!dbUser) {
         log.info({ userId: token.id }, "session invalidated: user missing");
         return null;
       }
+      if (!dbUser.isActive) {
+        log.info({ userId: token.id }, "session invalidated: user deactivated");
+        return null;
+      }
+      // Role from the database, so a demotion applies to sessions already out there.
+      token.role = dbUser.role;
       const tokenEpoch = typeof token.sessionEpoch === "number" ? token.sessionEpoch : 0;
       if (tokenEpoch !== dbUser.sessionEpoch) {
         log.info({ userId: token.id }, "session invalidated: credentials changed");
