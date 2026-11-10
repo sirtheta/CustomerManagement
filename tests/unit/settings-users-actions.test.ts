@@ -512,7 +512,7 @@ describe("settings/users actions", () => {
     });
   });
 
-  describe("reset links and 2FA changes", () => {
+  describe("reset and invite links vs. 2FA changes", () => {
     beforeEach(() => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.user.update).mockResolvedValue({ email: "user@test.ch" } as never);
@@ -523,13 +523,17 @@ describe("settings/users actions", () => {
       expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 7 } });
     });
 
-    it("generateTotpSetup deletes outstanding password-reset links", async () => {
+    // Invitations use the same table: an invitee has no password of their own yet
+    // and needs the link. Opening or abandoning "QR-Code generieren" must not kill it.
+    it("generateTotpSetup keeps outstanding password-reset and invite links", async () => {
       vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
       await generateTotpSetup(4);
-      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 4 } });
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
     });
 
-    it("confirmTotpSetup deletes outstanding password-reset links", async () => {
+    // Activating 2FA only strengthens the login, so a not yet redeemed invitation
+    // of a user without a password of their own is left alone.
+    it("confirmTotpSetup keeps outstanding password-reset and invite links", async () => {
       vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
         id: 6,
         totpSecret: "enc:MOCKSECRET",
@@ -537,17 +541,6 @@ describe("settings/users actions", () => {
       } as never);
       mockOtp.verifySync.mockReturnValueOnce({ valid: true, timeStep: 1 });
       await confirmTotpSetup(6, "123456");
-      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 6 } });
-    });
-
-    it("confirmTotpSetup keeps reset links when the code is wrong", async () => {
-      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-        id: 6,
-        totpSecret: "enc:MOCKSECRET",
-        email: "user@test.ch",
-      } as never);
-      mockOtp.verifySync.mockReturnValueOnce({ valid: false });
-      await confirmTotpSetup(6, "000000");
       expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
     });
   });
