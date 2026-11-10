@@ -44,19 +44,29 @@ export function hasSmtpSettings(settings: Pick<ApplicationSettings, "smtpHost" |
 }
 
 /**
- * True when host and user still point at the stored SMTP account. The stored
- * password may only be reused (blank password field, test buttons) while this
- * holds; for a changed target the password has to be typed again, so it can
- * never be sent to a server the person did not enter it for.
+ * True when host, port and user still point at the stored SMTP account. The
+ * stored password may only be reused (blank password field, test buttons)
+ * while this holds; for a changed target the password has to be typed again,
+ * so it can never be sent to a server or port the person did not enter it
+ * for. A blank port means the default port.
  */
 export function isSameSmtpTarget(
-  stored: { smtpHost: string | null; smtpUser: string | null } | null | undefined,
+  stored: { smtpHost: string | null; smtpPort: number | null; smtpUser: string | null } | null | undefined,
   host: string | null | undefined,
-  user: string | null | undefined
+  user: string | null | undefined,
+  port: number | string | null | undefined
 ): boolean {
   if (!stored) return false;
   const norm = (v: string | null | undefined) => (v ?? "").trim();
-  return norm(stored.smtpHost).toLowerCase() === norm(host).toLowerCase() && norm(stored.smtpUser) === norm(user);
+  const effectivePort = (v: number | string | null | undefined) => {
+    const n = typeof v === "string" ? parseInt(v, 10) : v;
+    return typeof n === "number" && Number.isFinite(n) ? n : DEFAULT_SMTP_PORT;
+  };
+  return (
+    norm(stored.smtpHost).toLowerCase() === norm(host).toLowerCase() &&
+    norm(stored.smtpUser) === norm(user) &&
+    effectivePort(stored.smtpPort) === effectivePort(port)
+  );
 }
 
 export const SMTP_PASSWORD_REENTER_ERROR =

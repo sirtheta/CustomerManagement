@@ -141,7 +141,7 @@ export async function saveSettings(
   const smtpHostInput = ((formData.get("smtpHost") as string) || "").trim() || null;
   const smtpUserInput = ((formData.get("smtpUser") as string) || "").trim() || null;
   const typedSmtpPassword = formData.get("smtpPassword") as string;
-  const smtpTargetKept = isSameSmtpTarget(settings, smtpHostInput, smtpUserInput);
+  const smtpTargetKept = isSameSmtpTarget(settings, smtpHostInput, smtpUserInput, smtpPort);
   if (!typedSmtpPassword && settings?.smtpPassword && !smtpTargetKept && (smtpHostInput || smtpUserInput)) {
     return { error: SMTP_PASSWORD_REENTER_ERROR };
   }
@@ -298,12 +298,13 @@ async function resolveStoredSecret(
 async function resolveSmtpPassword(
   typed: string | undefined,
   host: string | undefined,
-  user: string | undefined
+  user: string | undefined,
+  port: string | null
 ): Promise<{ pass?: string; reenter?: boolean }> {
   if (typed) return { pass: typed };
   const stored = await prisma.applicationSettings.findFirst();
   if (!stored?.smtpPassword) return {};
-  if (!isSameSmtpTarget(stored, host, user)) return { reenter: true };
+  if (!isSameSmtpTarget(stored, host, user, port)) return { reenter: true };
   return { pass: decryptSecret(stored.smtpPassword) || undefined };
 }
 
@@ -319,7 +320,8 @@ export async function testSmtpConnection(
   const { pass, reenter } = await resolveSmtpPassword(
     (formData.get("smtpPassword") as string | null)?.trim(),
     host,
-    user
+    user,
+    portRaw
   );
   if (reenter) return { error: SMTP_PASSWORD_REENTER_ERROR };
 
@@ -369,7 +371,8 @@ export async function testEmailNotification(
   const { pass, reenter } = await resolveSmtpPassword(
     (formData.get("smtpPassword") as string | null)?.trim(),
     host,
-    user
+    user,
+    portRaw
   );
   if (reenter) return { error: SMTP_PASSWORD_REENTER_ERROR };
   const fromName = (formData.get("smtpFromName") as string | null)?.trim() || user || "";

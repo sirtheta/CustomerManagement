@@ -40,6 +40,7 @@ const STORED = {
   invoiceNumberPrefix: "I-",
   quoteNumberPrefix: "Q-",
   smtpHost: "mail.company.ch",
+  smtpPort: 587,
   smtpUser: "billing",
   smtpPassword: "enc:stored-secret",
   smtpFromAddress: null,
@@ -100,6 +101,54 @@ describe("SMTP password reuse", () => {
       expect(nodemailer.createTransport).toHaveBeenCalledWith(
         expect.objectContaining({ auth: { user: "billing", pass: "typed" } })
       );
+    });
+  });
+
+  describe("port change", () => {
+    it("testSmtpConnection does not send the stored password to a different port", async () => {
+      const result = await testSmtpConnection(
+        {},
+        form({ smtpHost: "mail.company.ch", smtpPort: "2525", smtpUser: "billing" })
+      );
+      expect(result.error).toBe(REENTER);
+      expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    });
+
+    it("testEmailNotification does not send the stored password to a different port", async () => {
+      const result = await testEmailNotification(
+        {},
+        form({ notifyEmailAddress: "n@test.ch", smtpHost: "mail.company.ch", smtpPort: "25", smtpUser: "billing" })
+      );
+      expect(result.error).toBe(REENTER);
+      expect(nodemailer.createTransport).not.toHaveBeenCalled();
+    });
+
+    it("saveSettings refuses to keep the stored password when only the port changes", async () => {
+      const result = await saveSettings(
+        {},
+        form({ smtpHost: "mail.company.ch", smtpPort: "2525", smtpUser: "billing" })
+      );
+      expect(result.error).toBe(REENTER);
+      expect(prisma.applicationSettings.update).not.toHaveBeenCalled();
+    });
+
+    it("a blank port counts as the default port, same as a stored 587", async () => {
+      const result = await testSmtpConnection({}, form({ smtpHost: "mail.company.ch", smtpUser: "billing" }));
+      expect(result.success).toBe(true);
+      const explicit = await testSmtpConnection(
+        {},
+        form({ smtpHost: "mail.company.ch", smtpPort: "587", smtpUser: "billing" })
+      );
+      expect(explicit.success).toBe(true);
+    });
+
+    it("a stored default (no port) matches an explicit 587", async () => {
+      vi.mocked(prisma.applicationSettings.findFirst).mockResolvedValue({ ...STORED, smtpPort: null } as never);
+      const result = await testSmtpConnection(
+        {},
+        form({ smtpHost: "mail.company.ch", smtpPort: "587", smtpUser: "billing" })
+      );
+      expect(result.success).toBe(true);
     });
   });
 
