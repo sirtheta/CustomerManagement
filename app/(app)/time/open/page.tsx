@@ -1,8 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/module-guard";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import { BackLink } from "@/components/back-link";
 
 export default async function OpenWorkPage() {
   await requireModule("timeTracking");
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
 
   const rows = await listOpenWork(prisma);

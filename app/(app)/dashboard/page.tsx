@@ -1,4 +1,3 @@
-import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { customerDisplayName } from "@/lib/customer-display";
 import { sumOpenAmount } from "@/lib/payments";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 import { loadModules } from "@/lib/module-guard";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { hasSmtpSettings } from "@/lib/smtp";
 import { SetupChecklist } from "./SetupChecklist";
 import { missingCompanyFields } from "@/lib/company-completeness";
@@ -18,7 +17,7 @@ import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 
 export default async function DashboardPage() {
-  const session = await auth();
+  const session = await requireSession();
   const canEdit = isEditorSession(session);
   const isAdmin = session ? hasRole(session, [UserRole.Admin]) : false;
   const modules = await loadModules();

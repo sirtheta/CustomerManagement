@@ -1,7 +1,6 @@
-import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { requireModule } from "@/lib/module-guard";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { selectableCustomersWhere } from "@/lib/customer-archive";
 import { swissDateString } from "@/lib/date";
@@ -11,7 +10,7 @@ import WorkEntryList from "./WorkEntryList";
 
 export default async function TimePage({ searchParams }: { searchParams: Promise<{ customer?: string }> }) {
   await requireModule("timeTracking");
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
 
   const { customer: customerParam } = await searchParams;

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import prisma from "@/lib/prisma";
 import { csvResponse } from "@/lib/csv-export";
 import { auth } from "@/lib/auth";
@@ -9,7 +10,7 @@ import { moduleDisabledResponse } from "@/lib/module-guard";
 
 export async function GET(request: Request) {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) redirect("/dashboard");
 
   const disabled = await moduleDisabledResponse("accounting");

@@ -2,7 +2,7 @@
 
 import { compare, hash } from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { logAudit } from "@/lib/audit";
 import { validatePasswordPolicy } from "@/lib/password";
@@ -42,8 +42,19 @@ export async function changeOwnPassword(
   if (!valid) return { error: "Aktuelles Passwort ist falsch." };
 
   const passwordHash = await hash(newPassword, config.bcrypt.rounds);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  // sessionEpoch bump revokes every session issued under the old password
+  // (including a stolen one); this one has to log in again as well.
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, sessionEpoch: { increment: 1 } },
+  });
+  // A reset link requested before the change must not set a password again.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   resetRateLimit(rateLimitKey);
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "password-changed" });
+  // The sessionEpoch bump above also ends this session, so sign out on purpose
+  // instead of letting the next click bounce to /login unexplained. signOut
+  // redirects by throwing; that must propagate.
+  await signOut({ redirectTo: "/login?notice=password-changed" });
   return { success: true, _ts: Date.now() };
 }

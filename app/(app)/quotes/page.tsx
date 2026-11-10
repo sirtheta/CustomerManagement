@@ -21,8 +21,7 @@ import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
 import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 
@@ -54,7 +53,7 @@ type Props = {
 
 export default async function QuotesPage({ searchParams }: Props) {
   await requireModule("quotes");
-  const canEdit = isEditorSession(await auth());
+  const canEdit = isEditorSession(await requireSession());
   const { state, search, customerId, page, sortBy, order, dateFrom, dateTo } = await searchParams;
   const customerFilter = customerId ? parseInt(customerId, 10) || undefined : undefined;
   const activeFilter = state ?? "all";

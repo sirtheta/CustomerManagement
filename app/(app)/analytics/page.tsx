@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FitText } from "@/components/ui/fit-text";
 import { formatCurrency } from "@/lib/utils";
@@ -26,7 +26,7 @@ type Props = {
 
 export default async function AnalyticsPage({ searchParams }: Props) {
   await requireModule("analytics");
-  await auth();
+  await requireSession();
 
   const { year, drillMonth, drillStatus, drillCustomer, drillIncomeCategory, drillExpenseCategory, drillCombinedCategory } =
     await searchParams;

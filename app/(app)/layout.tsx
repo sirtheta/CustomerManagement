@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import { NavLinks } from "@/components/nav-links";
@@ -23,7 +24,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
 
   const modules = await loadModules();
   const navCounts = await loadWorkCounts(prisma, modules, isEditorSession(session));

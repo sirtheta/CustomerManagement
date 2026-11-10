@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { OTP } from "otplib";
 import {
   generateBackupCodes,
   hashBackupCodes,
@@ -103,5 +104,30 @@ describe("verifyTotpOrBackup", () => {
     // by confirming a backup-code match sets consumedIndex to a number
     const result = verifyTotpOrBackup("JKLM-NPQR", TEST_SECRET, BACKUP_CODES);
     expect(result).toEqual({ valid: true, consumedIndex: 1 });
+  });
+});
+
+describe("verifyTotpOrBackup – replay protection", () => {
+  const otp = new OTP({ strategy: "totp" });
+  const REPLAY_SECRET = otp.generateSecret();
+
+  it("reports the time step of an accepted TOTP code", () => {
+    const token = otp.generateSync({ secret: REPLAY_SECRET });
+    const result = verifyTotpOrBackup(token, REPLAY_SECRET, []);
+    expect(result).toMatchObject({ valid: true, consumedIndex: null });
+    expect((result as { timeStep: number }).timeStep).toEqual(expect.any(Number));
+  });
+
+  it("rejects a code whose time step was already used", () => {
+    const token = otp.generateSync({ secret: REPLAY_SECRET });
+    const first = verifyTotpOrBackup(token, REPLAY_SECRET, []);
+    const step = (first as { timeStep: number }).timeStep;
+    expect(verifyTotpOrBackup(token, REPLAY_SECRET, [], step).valid).toBe(false);
+  });
+
+  it("accepts a code newer than the last used time step", () => {
+    const token = otp.generateSync({ secret: REPLAY_SECRET });
+    const step = (verifyTotpOrBackup(token, REPLAY_SECRET, []) as { timeStep: number }).timeStep;
+    expect(verifyTotpOrBackup(token, REPLAY_SECRET, [], step - 1).valid).toBe(true);
   });
 });

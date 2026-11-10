@@ -11,8 +11,7 @@ import { computeReminderCharges, reminderTitle } from "@/lib/reminder-charges";
 import { DEFAULT_REMINDER_COOLDOWN_DAYS, daysOverdue, lastLevelSentReminderIds, latestSentReminders } from "@/lib/reminders";
 import { billingEmail } from "@/lib/customer-billing";
 import { requireModule } from "@/lib/module-guard";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { buildSalutation } from "@/lib/salutation";
 import { customerDisplayName } from "@/lib/customer-display";
@@ -25,7 +24,7 @@ type Props = {
 
 export default async function RemindersPage({ searchParams }: Props) {
   await requireModule("reminders");
-  if (!isEditorSession(await auth())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
+  if (!isEditorSession(await requireSession())) return <EditorOnlyNotice backHref="/invoices" backLabel="Zu den Rechnungen" />;
   const { search } = await searchParams;
   const term = search?.trim() ?? "";
   const now = new Date();

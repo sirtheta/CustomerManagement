@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasRole } from "@/lib/permissions";
@@ -13,7 +14,7 @@ const log = logger.child({ module: "api.year-package" });
 
 export async function GET(request: Request) {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   if (!hasRole(session, [UserRole.Admin, UserRole.Editor])) redirect("/dashboard");
 
   const disabled = await moduleDisabledResponse("accounting");

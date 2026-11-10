@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/module-guard";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 import { customerDisplayName } from "@/lib/customer-display";
 import { CUSTOMER_ARCHIVED_ERROR } from "@/lib/customer-archive";
@@ -13,7 +12,7 @@ import { BackLink } from "@/components/back-link";
 
 export default async function BillPage({ params }: { params: Promise<{ customerId: string }> }) {
   await requireModule("timeTracking");
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice />;
 
   const customerId = Number((await params).customerId);

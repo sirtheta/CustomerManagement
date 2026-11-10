@@ -3,9 +3,8 @@ import { loadUnitOrder } from "@/lib/unit-usage";
 import { notFound } from "next/navigation";
 import ServiceForm from "../ServiceForm";
 import DeleteServiceButton from "../DeleteServiceButton";
-import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { EditorOnlyNotice } from "@/components/editor-only-notice";
 
 type Props = {
@@ -13,7 +12,7 @@ type Props = {
 };
 
 export default async function EditServicePage({ params }: Props) {
-  const session = await auth();
+  const session = await requireSession();
   if (!isEditorSession(session)) return <EditorOnlyNotice backHref="/services" backLabel="Zu den Leistungen" />;
   const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
   const { id } = await params;

@@ -24,8 +24,7 @@ import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 import { customerDisplayName } from "@/lib/customer-display";
@@ -259,7 +258,7 @@ export default async function InvoicesPage({ searchParams }: Props) {
   const term = search?.trim() ?? "";
 
   const modules = await loadModules();
-  const canEdit = isEditorSession(await auth());
+  const canEdit = isEditorSession(await requireSession());
   const attention = await loadAttentionCounts(prisma, modules, canEdit);
 
   function sortHref(col: SortField) {

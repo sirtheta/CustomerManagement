@@ -3,6 +3,7 @@
 import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/permissions";
+import { signOut } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { hash } from "bcryptjs";
 import { OTP } from "otplib";
@@ -131,7 +132,18 @@ export async function updateUser(
   const guardError = await guardLastAdmin(id, role, isActive);
   if (guardError) return { error: guardError };
 
-  const user = await prisma.user.update({ where: { id }, data: { name, role, isActive } });
+  // The jwt callback reads role and isActive live, but a role change or
+  // deactivation still bumps sessionEpoch: it ends the user's sessions for
+  // good, so a later reactivation or promotion cannot revive an old token.
+  // A plain rename keeps them.
+  const existing = await prisma.user.findUniqueOrThrow({ where: { id } });
+  const revokeSessions = existing.role !== role || existing.isActive !== isActive;
+  const user = await prisma.user.update({
+    where: { id },
+    data: { name, role, isActive, ...(revokeSessions ? { sessionEpoch: { increment: 1 } } : {}) },
+  });
+  // A deactivated account must not keep a live invite/reset link.
+  if (!isActive) await prisma.passwordResetToken.deleteMany({ where: { userId: id } });
   await logAudit(session, "UPDATE", "User", id, user.email, { name, role, isActive });
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now() };
@@ -181,10 +193,15 @@ export async function generateTotpSetup(
   await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  // A stale page (another admin enabled 2FA meanwhile) must not silently turn
+  // off a working second factor below: re-keying goes through disableTotp.
+  if (user.totpEnabled) return { error: "2FA ist bereits aktiv. Bitte zuerst deaktivieren." };
   const secret = otp.generateSecret();
   const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(APP_NAME)}`;
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   // Store the pending secret temporarily in the user record (not yet enabled)
+  // Sessions are revoked when the setup is confirmed (confirmTotpSetup), the
+  // step that actually activates the new factor, not here.
   await prisma.user.update({
     where: { id: userId },
     data: { totpSecret: encryptSecret(secret), totpEnabled: false },
@@ -195,7 +212,7 @@ export async function generateTotpSetup(
 export async function confirmTotpSetup(
   userId: number,
   token: string
-): Promise<ActionState & { backupCodes?: string[] }> {
+): Promise<ActionState & { backupCodes?: string[]; endsOwnSession?: boolean }> {
   const session = await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -203,13 +220,46 @@ export async function confirmTotpSetup(
   const result = otp.verifySync({ token, secret: decryptSecret(user.totpSecret) });
   if (!result.valid) return { error: "Falscher Code. Bitte erneut versuchen." };
   const backupCodes = generateBackupCodes();
+  // Re-keying the second factor is what people do after a suspected session
+  // theft, so it ends the user's sessions. For the admin's own account that
+  // happens in finishOwnTotpSetup, after they have seen the one-time backup
+  // codes: a bump here plus revalidatePath re-renders the page, the layout
+  // sees the epoch mismatch and redirects before the codes are ever shown.
+  const ownAccount = String(session.user.id) === String(userId);
   await prisma.user.update({
     where: { id: userId },
-    data: { totpEnabled: true, totpBackupCodes: JSON.stringify(hashBackupCodes(backupCodes)) },
+    data: {
+      totpEnabled: true,
+      totpBackupCodes: JSON.stringify(hashBackupCodes(backupCodes)),
+      ...(ownAccount ? {} : { sessionEpoch: { increment: 1 } }),
+      // The confirmation code must not be accepted again as a login code.
+      ...("timeStep" in result && typeof result.timeStep === "number" ? { totpLastStep: result.timeStep } : {}),
+    },
   });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-enabled" });
+  if (ownAccount) return { success: true, _ts: Date.now(), backupCodes, endsOwnSession: true };
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now(), backupCodes };
+}
+
+/**
+ * Second half of the admin's own 2FA setup: called once the backup codes have
+ * been saved. Ends every session of the own account (a hijacked one included)
+ * and signs out; the redirect propagates by throwing.
+ */
+export async function finishOwnTotpSetup(): Promise<void> {
+  const session = await requireAdmin();
+  // The dialog only reaches this step after confirmTotpSetup, which the demo
+  // guard already refuses; without it this would be a bare "log everyone out".
+  if (USER_MUTATIONS_DISABLED) return;
+  await prisma.user.update({
+    where: { id: Number(session.user.id) },
+    data: { sessionEpoch: { increment: 1 } },
+  });
+  await logAudit(session, "UPDATE", "User", Number(session.user.id), session.user.email ?? undefined, {
+    action: "totp-enabled-sessions-ended",
+  });
+  await signOut({ redirectTo: "/login?notice=totp-enabled" });
 }
 
 /**
@@ -236,8 +286,13 @@ export async function disableTotp(userId: number): Promise<{ error: string } | v
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { totpEnabled: false, totpSecret: null },
+    data: { totpEnabled: false, totpSecret: null, sessionEpoch: { increment: 1 } },
   });
+  // Disabling 2FA is what an admin does after a lost device or a suspected
+  // compromise: a reset link issued before must not survive it. Not done when
+  // 2FA is set up or confirmed (generate/confirmTotpSetup): invitations share
+  // this table, and an invitee without a password yet still needs the link.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-disabled" });
   revalidatePath("/settings/users");
 }

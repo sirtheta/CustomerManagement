@@ -1,10 +1,11 @@
 import { auth } from "@/lib/auth";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import { redirect } from "next/navigation";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 
 export default async function ProfilePage() {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
 
   return (
     <div className="space-y-6 max-w-2xl">

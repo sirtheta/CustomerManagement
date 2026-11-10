@@ -25,9 +25,8 @@ import { requireModule } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
 import { quoteMail } from "@/lib/mail-templates";
 import { generateQuoteNumber } from "@/lib/document-number";
-import { auth } from "@/lib/auth";
 import { UserRole } from "@prisma/client";
-import { hasRole, isEditorSession } from "@/lib/permissions";
+import { hasRole, isEditorSession, requireSession } from "@/lib/permissions";
 import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
 import { fromCrumbs, parseFrom, withFrom } from "@/lib/return-to";
 
@@ -38,7 +37,7 @@ type Props = {
 
 export default async function QuoteDetailPage({ params, searchParams }: Props) {
   await requireModule("quotes");
-  const session = await auth();
+  const session = await requireSession();
   const canEdit = isEditorSession(session);
   const canDelete = session ? hasRole(session, [UserRole.Admin]) : false;
   const { id } = await params;

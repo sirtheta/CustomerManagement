@@ -1,8 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { requireModule } from "@/lib/module-guard";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { formatDate } from "@/lib/utils";
 import { listSubscriptionOverview } from "@/lib/subscription-overview";
 import { INTERVAL_LABELS } from "@/lib/subscription-dates";
@@ -15,7 +14,8 @@ import { activeBadge } from "@/lib/document-states";
 
 export default async function SubscriptionsPage() {
   await requireModule("subscriptions");
-  const [session, rows] = await Promise.all([auth(), listSubscriptionOverview(prisma)]);
+  const session = await requireSession();
+  const rows = await listSubscriptionOverview(prisma);
   const canEdit = isEditorSession(session);
 
   return (

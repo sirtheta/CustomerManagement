@@ -23,7 +23,7 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
-vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAudit: vi.fn() }));
 vi.mock("bcryptjs", () => ({ hash: vi.fn() }));
@@ -59,11 +59,12 @@ import {
   deleteUser,
   generateTotpSetup,
   confirmTotpSetup,
+  finishOwnTotpSetup,
   sendPasswordSetupEmail,
   disableTotp,
 } from "@/app/(app)/settings/users/actions";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { logAudit } from "@/lib/audit";
 import { hash } from "bcryptjs";
@@ -267,6 +268,48 @@ describe("settings/users actions", () => {
     });
   });
 
+  describe("updateUser session revocation", () => {
+    async function update(existing: { role: string; isActive: boolean }, fields: Record<string, string>) {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 2, ...existing } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "user@test.ch" } as never);
+      return updateUser(2, {}, form(fields));
+    }
+
+    it("bumps sessionEpoch when the role changes", async () => {
+      vi.mocked(prisma.user.count).mockResolvedValue(1); // another active admin exists
+      await update({ role: "Admin", isActive: true }, { name: "U", role: "Viewer", isActive: "true" });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { name: "U", role: "Viewer", isActive: true, sessionEpoch: { increment: 1 } },
+      });
+    });
+
+    it("bumps sessionEpoch when the user is deactivated", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "U", role: "Editor", isActive: "false" });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 2 },
+        data: { name: "U", role: "Editor", isActive: false, sessionEpoch: { increment: 1 } },
+      });
+    });
+
+    it("deletes outstanding password-reset links when the user is deactivated", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "U", role: "Editor", isActive: "false" });
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 2 } });
+    });
+
+    it("keeps reset links when the user stays active", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "Neu", role: "Editor", isActive: "true" });
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps sessions when only the name changes", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "Neu", role: "Editor", isActive: "true" });
+      const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sessionEpoch");
+    });
+  });
+
   describe("resetPassword", () => {
     it("returns password policy error", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
@@ -410,6 +453,27 @@ describe("settings/users actions", () => {
         data: expect.objectContaining({ totpEnabled: false }),
       });
     });
+
+    it("refuses to re-key a user whose 2FA is already active (stale admin page)", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 4,
+        email: "user@test.ch",
+        totpEnabled: true,
+      } as never);
+      const result = await generateTotpSetup(4);
+      expect(result).toEqual({ error: "2FA ist bereits aktiv. Bitte zuerst deaktivieren." });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("does not touch sessions yet: 2FA only changes once the setup is confirmed", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      await generateTotpSetup(4);
+      const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sessionEpoch");
+    });
   });
 
   describe("confirmTotpSetup", () => {
@@ -461,6 +525,141 @@ describe("settings/users actions", () => {
     });
   });
 
+  describe("reset and invite links vs. 2FA changes", () => {
+    beforeEach(() => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "user@test.ch" } as never);
+    });
+
+    it("disableTotp deletes outstanding password-reset links", async () => {
+      await disableTotp(7);
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 7 } });
+    });
+
+    // Invitations use the same table: an invitee has no password of their own yet
+    // and needs the link. Opening or abandoning "QR-Code generieren" must not kill it.
+    it("generateTotpSetup keeps outstanding password-reset and invite links", async () => {
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
+      await generateTotpSetup(4);
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    // Activating 2FA only strengthens the login, so a not yet redeemed invitation
+    // of a user without a password of their own is left alone.
+    it("confirmTotpSetup keeps outstanding password-reset and invite links", async () => {
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 6,
+        totpSecret: "enc:MOCKSECRET",
+        email: "user@test.ch",
+      } as never);
+      mockOtp.verifySync.mockReturnValueOnce({ valid: true, timeStep: 1 });
+      await confirmTotpSetup(6, "123456");
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("confirmTotpSetup session revocation", () => {
+    async function confirm(userId: number) {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: userId,
+        totpSecret: "enc:MOCKSECRET",
+        email: "user@test.ch",
+      } as never);
+      mockOtp.verifySync.mockReturnValueOnce({ valid: true, timeStep: 777 });
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      return confirmTotpSetup(userId, "123456");
+    }
+
+    it("bumps sessionEpoch for another user when 2FA is activated", async () => {
+      await confirm(6);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 6 },
+        data: expect.objectContaining({ totpEnabled: true, sessionEpoch: { increment: 1 } }),
+      });
+    });
+
+    // Bumping the epoch and revalidating /settings/users in the same action makes
+    // the server re-render the page, the layout sees the epoch mismatch and
+    // redirects to /login before the one-time backup codes ever show up. For the
+    // admin's own account nothing may trigger a render until they have the codes.
+    it("own account: no epoch bump and no revalidation, so the backup codes stay visible", async () => {
+      const result = await confirm(1);
+      const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sessionEpoch");
+      expect(revalidatePath).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.backupCodes).toHaveLength(8);
+      expect(result.endsOwnSession).toBe(true);
+    });
+
+    it("another user: session ended and page revalidated as before", async () => {
+      const result = await confirm(6);
+      expect(revalidatePath).toHaveBeenCalledWith("/settings/users");
+      expect(result.endsOwnSession).toBeUndefined();
+    });
+
+    it("records the confirmation code's time step so it cannot be replayed at login", async () => {
+      await confirm(6);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 6 },
+        data: expect.objectContaining({ totpLastStep: 777 }),
+      });
+    });
+  });
+
+  describe("finishOwnTotpSetup", () => {
+    it("ends the admin's own sessions and signs out with a notice", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      await finishOwnTotpSetup();
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { sessionEpoch: { increment: 1 } },
+      });
+      expect(signOut).toHaveBeenCalledWith({ redirectTo: "/login?notice=totp-enabled" });
+    });
+
+    it("writes an audit entry before signing out", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      await finishOwnTotpSetup();
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "User", 1, "admin@test.ch", {
+        action: "totp-enabled-sessions-ended",
+      });
+      const order = (fn: unknown) => vi.mocked(fn as never as () => void).mock.invocationCallOrder[0];
+      expect(order(logAudit)).toBeLessThan(order(signOut));
+    });
+
+    it("signs out only after the epoch was bumped", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      await finishOwnTotpSetup();
+      const order = (fn: unknown) => vi.mocked(fn as never as () => void).mock.invocationCallOrder[0];
+      expect(order(prisma.user.update)).toBeLessThan(order(signOut));
+    });
+
+    it("lets the sign-out redirect propagate", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      vi.mocked(signOut).mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+      await expect(finishOwnTotpSetup()).rejects.toThrow("NEXT_REDIRECT");
+    });
+
+    it("only touches the signed-in admin's own account", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      await finishOwnTotpSetup();
+      expect(vi.mocked(prisma.user.update).mock.calls.every((c) => c[0].where.id === 1)).toBe(true);
+    });
+
+    it("rejects non-admins", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      await expect(finishOwnTotpSetup()).rejects.toThrow();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("disableTotp", () => {
     it("disables TOTP, logs audit, and revalidates", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
@@ -469,7 +668,7 @@ describe("settings/users actions", () => {
       await disableTotp(7);
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 7 },
-        data: { totpEnabled: false, totpSecret: null },
+        data: { totpEnabled: false, totpSecret: null, sessionEpoch: { increment: 1 } },
       });
       expect(logAudit).toHaveBeenCalledWith(
         adminSession,

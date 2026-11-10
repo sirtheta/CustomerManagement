@@ -30,7 +30,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 vi.mock("bcryptjs", () => ({ compare: vi.fn() }));
-vi.mock("@/lib/backup-codes", () => ({ verifyTotpOrBackup: vi.fn() }));
+vi.mock("@/lib/backup-codes", () => ({ verifyTotpOrBackup: vi.fn(), claimTotpStep: vi.fn() }));
 vi.mock("@/lib/crypto", () => ({ decryptSecret: vi.fn((v: string) => v) }));
 vi.mock("@/lib/password", () => ({ dummyCompare: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({
@@ -48,7 +48,7 @@ vi.mock("@/lib/logger", () => ({
 import "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { compare } from "bcryptjs";
-import { verifyTotpOrBackup } from "@/lib/backup-codes";
+import { verifyTotpOrBackup, claimTotpStep } from "@/lib/backup-codes";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 import { dummyCompare } from "@/lib/password";
 
@@ -164,14 +164,47 @@ describe("auth.ts – authorize()", () => {
       totpBackupCodes: null,
     } as never);
     vi.mocked(compare).mockResolvedValue(true as never);
-    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: true, consumedIndex: null });
+    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: true, consumedIndex: null, timeStep: 4242 });
+    vi.mocked(claimTotpStep).mockResolvedValue(true);
     const result = await callAuthorize({
       email: "user@test.ch",
       password: "correct",
       totpCode: "123456",
     });
     expect(result).toMatchObject({ email: "user@test.ch", role: "Editor" });
+    expect(claimTotpStep).toHaveBeenCalledWith(prisma, baseUser.id, 4242);
     expect(resetRateLimit).toHaveBeenCalled();
+  });
+
+  it("passes the last used time step to verification", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      ...baseUser,
+      totpEnabled: true,
+      totpSecret: "encryptedsecret",
+      totpBackupCodes: null,
+      totpLastStep: 4241,
+    } as never);
+    vi.mocked(compare).mockResolvedValue(true as never);
+    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: false });
+    await expect(
+      callAuthorize({ email: "user@test.ch", password: "correct", totpCode: "123456" })
+    ).rejects.toMatchObject({ code: "totp_invalid" });
+    expect(verifyTotpOrBackup).toHaveBeenCalledWith("123456", "encryptedsecret", [], 4241);
+  });
+
+  it("throws totp_invalid when the TOTP time step was already used (replay)", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      ...baseUser,
+      totpEnabled: true,
+      totpSecret: "encryptedsecret",
+      totpBackupCodes: null,
+    } as never);
+    vi.mocked(compare).mockResolvedValue(true as never);
+    vi.mocked(verifyTotpOrBackup).mockReturnValue({ valid: true, consumedIndex: null, timeStep: 4242 });
+    vi.mocked(claimTotpStep).mockResolvedValue(false);
+    await expect(
+      callAuthorize({ email: "user@test.ch", password: "correct", totpCode: "123456" })
+    ).rejects.toMatchObject({ code: "totp_invalid" });
   });
 
   it("consumes backup code and returns user", async () => {

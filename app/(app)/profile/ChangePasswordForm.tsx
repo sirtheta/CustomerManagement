@@ -22,7 +22,7 @@ export function ChangePasswordForm() {
       <CardHeader>
         <CardTitle>Passwort ändern</CardTitle>
         <CardDescription>
-          Mindestens 8 Zeichen. Nach der Änderung gilt das neue Passwort ab der nächsten Anmeldung.
+          Mindestens 8 Zeichen. Nach der Änderung wirst du abgemeldet und meldest dich mit dem neuen Passwort neu an.
         </CardDescription>
       </CardHeader>
       <CardContent>

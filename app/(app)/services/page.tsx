@@ -17,8 +17,7 @@ import { UNIT_LABELS } from "@/lib/units";
 import { SearchInput } from "@/components/search-input";
 import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
-import { auth } from "@/lib/auth";
-import { isEditorSession } from "@/lib/permissions";
+import { isEditorSession, requireSession } from "@/lib/permissions";
 import { activeBadge } from "@/lib/document-states";
 
 const PAGE_SIZE = 25;
@@ -32,7 +31,7 @@ type Props = {
 
 export default async function ServicesPage({ searchParams }: Props) {
   const { search, page, sortBy, order } = await searchParams;
-  const canEdit = isEditorSession(await auth());
+  const canEdit = isEditorSession(await requireSession());
   const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
   const sortField: SortField = sortBy === "unitPrice" ? "unitPrice" : "name";
   const sortOrder: SortOrder = order === "desc" ? "desc" : "asc";

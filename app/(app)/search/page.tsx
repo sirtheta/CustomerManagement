@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { requireSession } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default async function SearchPage({ searchParams }: Props) {
+  await requireSession();
   const { q } = await searchParams;
   const term = q?.trim() ?? "";
 
