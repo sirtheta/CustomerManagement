@@ -470,6 +470,7 @@ model User {
   totpSecret      String?
   totpEnabled     Boolean   @default(false)
   totpBackupCodes String?   // JSON array of bcrypt-hashed one-time backup codes
+  totpLastStep    Int?      // Last accepted TOTP time step; codes at or before it are replays
   role            UserRole  @default(Viewer)
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())

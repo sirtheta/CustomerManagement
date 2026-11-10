@@ -4,7 +4,7 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
-import { verifyTotpOrBackup } from "@/lib/backup-codes";
+import { verifyTotpOrBackup, claimTotpStep } from "@/lib/backup-codes";
 import { decryptSecret } from "@/lib/crypto";
 import { dummyCompare } from "@/lib/password";
 import logger from "@/lib/logger";
@@ -91,12 +91,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               log.error({ userId: user.id }, "invalid totpBackupCodes JSON — ignoring backup codes");
             }
           }
-          const verify = verifyTotpOrBackup(totpCode, decryptSecret(user.totpSecret), backupCodes);
+          const verify = verifyTotpOrBackup(
+            totpCode,
+            decryptSecret(user.totpSecret),
+            backupCodes,
+            user.totpLastStep
+          );
           if (!verify.valid) {
             log.warn({ email }, "login failed: invalid totp code");
             throw new TotpInvalidError();
           }
-          if (verify.consumedIndex !== null) {
+          if (verify.consumedIndex === null) {
+            // A TOTP code stays valid for its whole time step: remember the
+            // step so the same code cannot be used for a second login.
+            if (!(await claimTotpStep(prisma, user.id, verify.timeStep))) {
+              log.warn({ email }, "login failed: totp code already used");
+              throw new TotpInvalidError();
+            }
+          } else {
             const remaining = backupCodes.filter((_, i) => i !== verify.consumedIndex);
             // Conditional update so two concurrent logins can't both spend
             // the same backup code: only succeeds if the stored value is

@@ -1,6 +1,7 @@
 import { randomInt } from "crypto";
 import { OTP } from "otplib";
 import { hashSync, compareSync } from "bcryptjs";
+import type { PrismaClient } from "@prisma/client";
 import { config } from "@/lib/config";
 
 const otp = new OTP({ strategy: "totp" });
@@ -30,19 +31,27 @@ export function matchBackupCode(hashedCodes: string[], input: string): number {
 }
 
 export type VerifyResult =
-  | { valid: true; consumedIndex: null }   // TOTP matched
+  | { valid: true; consumedIndex: null; timeStep: number } // TOTP matched
   | { valid: true; consumedIndex: number } // backup code matched
   | { valid: false };
 
 export function verifyTotpOrBackup(
   input: string,
   secret: string,
-  hashedBackupCodes: string[]
+  hashedBackupCodes: string[],
+  lastStep?: number | null
 ): VerifyResult {
   try {
-    // otplib throws TokenLengthError for non-6-digit tokens (e.g. backup codes)
-    const result = otp.verifySync({ token: input, secret });
-    if (result.valid) return { valid: true, consumedIndex: null };
+    // otplib throws TokenLengthError for non-6-digit tokens (e.g. backup codes).
+    // afterTimeStep rejects a code from an already used (or older) time step.
+    const result = otp.verifySync({
+      token: input,
+      secret,
+      ...(typeof lastStep === "number" ? { afterTimeStep: lastStep } : {}),
+    });
+    if (result.valid && "timeStep" in result) {
+      return { valid: true, consumedIndex: null, timeStep: result.timeStep };
+    }
   } catch {
     // Not 6-digit format — fall through to backup code check
   }
@@ -50,4 +59,24 @@ export function verifyTotpOrBackup(
   const idx = matchBackupCode(hashedBackupCodes, input);
   if (idx === -1) return { valid: false };
   return { valid: true, consumedIndex: idx };
+}
+
+/**
+ * Marks a TOTP time step as used. Conditional update, so of two concurrent
+ * logins presenting the same code only one wins (a code is valid for a whole
+ * time step and would otherwise be replayable within it).
+ */
+export async function claimTotpStep(
+  prisma: Pick<PrismaClient, "user">,
+  userId: number,
+  timeStep: number
+): Promise<boolean> {
+  const { count } = await prisma.user.updateMany({
+    where: {
+      id: userId,
+      OR: [{ totpLastStep: null }, { totpLastStep: { lt: timeStep } }],
+    },
+    data: { totpLastStep: timeStep },
+  });
+  return count === 1;
 }
