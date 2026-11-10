@@ -72,6 +72,9 @@ export function TotpSetupDialog({ user }: { user: User }) {
             <p className="text-sm text-muted-foreground">
               Diese Codes jetzt sicher aufbewahren — sie werden nur einmal angezeigt. Jeder Code kann einmalig statt des Authenticator-Codes verwendet werden.
             </p>
+            <p className="text-sm text-muted-foreground">
+              Bestehende Sitzungen dieses Benutzers wurden beendet. Bei deinem eigenen Konto meldest du dich danach neu an.
+            </p>
             <div className="grid grid-cols-2 gap-1.5 rounded-md border bg-muted p-3 font-mono text-sm">
               {backupCodes?.map((code) => <span key={code}>{code}</span>)}
             </div>

@@ -453,22 +453,11 @@ describe("settings/users actions", () => {
       });
     });
 
-    it("bumps sessionEpoch when replacing another user's TOTP secret", async () => {
+    it("does not touch sessions yet: 2FA only changes once the setup is confirmed", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
       vi.mocked(prisma.user.update).mockResolvedValue({} as never);
       await generateTotpSetup(4);
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 4 },
-        data: expect.objectContaining({ sessionEpoch: { increment: 1 } }),
-      });
-    });
-
-    it("does not log the admin out of their own session mid-setup", async () => {
-      vi.mocked(auth).mockResolvedValue(adminSession);
-      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 1, email: "admin@test.ch" } as never);
-      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
-      await generateTotpSetup(1);
       const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
       expect(data).not.toHaveProperty("sessionEpoch");
     });
@@ -520,6 +509,44 @@ describe("settings/users actions", () => {
         data: expect.objectContaining({ totpEnabled: true }),
       });
       expect(logAudit).toHaveBeenCalled();
+    });
+  });
+
+  describe("confirmTotpSetup session revocation", () => {
+    async function confirm(userId: number) {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: userId,
+        totpSecret: "enc:MOCKSECRET",
+        email: "user@test.ch",
+      } as never);
+      mockOtp.verifySync.mockReturnValueOnce({ valid: true, timeStep: 777 });
+      vi.mocked(prisma.user.update).mockResolvedValue({} as never);
+      return confirmTotpSetup(userId, "123456");
+    }
+
+    it("bumps sessionEpoch for another user when 2FA is activated", async () => {
+      await confirm(6);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 6 },
+        data: expect.objectContaining({ totpEnabled: true, sessionEpoch: { increment: 1 } }),
+      });
+    });
+
+    it("bumps sessionEpoch for the admin's own account too (hijacked sessions end)", async () => {
+      await confirm(1);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: expect.objectContaining({ totpEnabled: true, sessionEpoch: { increment: 1 } }),
+      });
+    });
+
+    it("records the confirmation code's time step so it cannot be replayed at login", async () => {
+      await confirm(6);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 6 },
+        data: expect.objectContaining({ totpLastStep: 777 }),
+      });
     });
   });
 

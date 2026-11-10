@@ -188,24 +188,18 @@ export async function deleteUser(id: number): Promise<{ error?: string }> {
 export async function generateTotpSetup(
   userId: number
 ): Promise<{ secret: string; qrCodeDataUrl: string; otpauthUrl: string } | { error: string }> {
-  const session = await requireAdmin();
+  await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const secret = otp.generateSecret();
   const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(APP_NAME)}`;
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
   // Store the pending secret temporarily in the user record (not yet enabled)
-  // Replacing the second factor revokes the user's existing sessions. Not for
-  // the admin's own account: that would end their session before they can
-  // confirm the setup (confirmTotpSetup requires a valid admin session).
-  const revokeSessions = String(session.user.id) !== String(userId);
+  // Sessions are revoked when the setup is confirmed (confirmTotpSetup), the
+  // step that actually activates the new factor, not here.
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      totpSecret: encryptSecret(secret),
-      totpEnabled: false,
-      ...(revokeSessions ? { sessionEpoch: { increment: 1 } } : {}),
-    },
+    data: { totpSecret: encryptSecret(secret), totpEnabled: false },
   });
   return { secret, qrCodeDataUrl, otpauthUrl };
 }
@@ -223,7 +217,16 @@ export async function confirmTotpSetup(
   const backupCodes = generateBackupCodes();
   await prisma.user.update({
     where: { id: userId },
-    data: { totpEnabled: true, totpBackupCodes: JSON.stringify(hashBackupCodes(backupCodes)) },
+    data: {
+      totpEnabled: true,
+      totpBackupCodes: JSON.stringify(hashBackupCodes(backupCodes)),
+      // Re-keying the second factor is what people do after a suspected
+      // session theft, so it ends every existing session, the admin's own
+      // included (they log in again with the new factor).
+      sessionEpoch: { increment: 1 },
+      // The confirmation code must not be accepted again as a login code.
+      ...("timeStep" in result && typeof result.timeStep === "number" ? { totpLastStep: result.timeStep } : {}),
+    },
   });
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "totp-enabled" });
   revalidatePath("/settings/users");
