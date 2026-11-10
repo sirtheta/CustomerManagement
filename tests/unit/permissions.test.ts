@@ -71,12 +71,12 @@ describe("requireSession", () => {
     await expect(requireSession()).resolves.toBe(s);
   });
 
-  it("redirects to /login without a session", async () => {
+  it("redirects to the session-expired route (clears a dead cookie) without a session", async () => {
     const { auth } = await import("@/lib/auth");
     const { redirect } = await import("next/navigation");
     const { requireSession } = await import("@/lib/permissions");
     vi.mocked(auth).mockResolvedValueOnce(null as never);
     await requireSession();
-    expect(redirect).toHaveBeenCalledWith("/login");
+    expect(redirect).toHaveBeenCalledWith("/api/auth/session-expired");
   });
 });

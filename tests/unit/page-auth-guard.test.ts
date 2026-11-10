@@ -1,4 +1,5 @@
 import fs from "fs";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import path from "path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -55,9 +56,9 @@ describe("pages under app/(app) require a session themselves", () => {
     expect(pages.length).toBeGreaterThan(30);
   });
 
-  it.each(pages)("%s redirects to /login without a session", async (file) => {
+  it.each(pages)("%s redirects to the session-expired route without a session", async (file) => {
     const mod = (await import(/* @vite-ignore */ `@/app/(app)/${file}`)) as { default: (p: typeof props) => Promise<unknown> };
-    await expect(mod.default(props)).rejects.toThrow("NEXT_REDIRECT:/login");
+    await expect(mod.default(props)).rejects.toThrow(`NEXT_REDIRECT:${SESSION_EXPIRED_PATH}`);
     expect(touched.prisma).toEqual([]);
   });
 });

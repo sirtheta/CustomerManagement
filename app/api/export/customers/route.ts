@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { buildCsv, csvResponse } from "@/lib/csv-export";
@@ -7,7 +8,7 @@ import { INTERVAL_LABELS } from "@/lib/subscription-dates";
 
 export async function GET() {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   if (session.user.role === UserRole.Viewer) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { buildCsv, csvResponse } from "@/lib/csv-export";
@@ -17,7 +18,7 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   if (session.user.role === UserRole.Viewer) {
     return Response.json({ error: "Forbidden" }, { status: 403 });
   }

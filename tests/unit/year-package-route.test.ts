@@ -38,9 +38,9 @@ beforeEach(() => {
 });
 
 describe("GET /api/export/year-package", () => {
-  it("redirects an unauthenticated request to the login", async () => {
+  it("redirects an unauthenticated request to the session-expired route", async () => {
     currentSession = null;
-    await expect(GET(req())).rejects.toThrow("REDIRECT:/login");
+    await expect(GET(req())).rejects.toThrow("REDIRECT:/api/auth/session-expired");
   });
 
   it("redirects a viewer to the dashboard", async () => {

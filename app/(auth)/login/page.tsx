@@ -13,10 +13,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 // Shown after changeOwnPassword signed the user out (all sessions end with the change).
 function LoginNotice() {
   const notice = useSearchParams().get("notice");
-  if (notice !== "password-changed") return null;
+  const text =
+    notice === "password-changed"
+      ? "Passwort geändert. Bitte melde dich mit dem neuen Passwort neu an."
+      : notice === "session-ended"
+        ? "Deine Sitzung wurde beendet. Bitte melde dich erneut an."
+        : null;
+  if (!text) return null;
   return (
     <p role="status" className="mb-4 text-sm text-muted-foreground text-center">
-      Passwort geändert. Bitte melde dich mit dem neuen Passwort neu an.
+      {text}
     </p>
   );
 }

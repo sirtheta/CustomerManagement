@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { SESSION_EXPIRED_PATH } from "@/lib/session-expired";
 import { redirect } from "next/navigation";
 import { UserRole } from "@prisma/client";
 import type { Session } from "next-auth";
@@ -22,13 +23,13 @@ export function isEditorSession(session: Session | null): boolean {
  */
 export async function requireSession(): Promise<Session> {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   return session;
 }
 
 export async function requireRole(roles: UserRole[]): Promise<Session> {
   const session = await auth();
-  if (!session) redirect("/login");
+  if (!session) redirect(SESSION_EXPIRED_PATH);
   if (!roles.includes(session.user.role)) redirect("/dashboard");
   return session;
 }
