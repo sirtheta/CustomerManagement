@@ -140,6 +140,8 @@ export async function updateUser(
     where: { id },
     data: { name, role, isActive, ...(revokeSessions ? { sessionEpoch: { increment: 1 } } : {}) },
   });
+  // A deactivated account must not keep a live invite/reset link.
+  if (!isActive) await prisma.passwordResetToken.deleteMany({ where: { userId: id } });
   await logAudit(session, "UPDATE", "User", id, user.email, { name, role, isActive });
   revalidatePath("/settings/users");
   return { success: true, _ts: Date.now() };

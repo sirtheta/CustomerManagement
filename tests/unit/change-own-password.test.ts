@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
-  default: { user: { findUnique: vi.fn(), update: vi.fn() } },
+  default: {
+    user: { findUnique: vi.fn(), update: vi.fn() },
+    passwordResetToken: { deleteMany: vi.fn() },
+  },
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -107,6 +110,18 @@ describe("changeOwnPassword", () => {
     await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
     const updateArg = vi.mocked(prisma.user.update).mock.calls[0][0];
     expect(updateArg.data).toMatchObject({ sessionEpoch: { increment: 1 } });
+  });
+
+  it("invalidates outstanding password-reset links", async () => {
+    vi.mocked(compare).mockResolvedValue(true as never);
+    await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
+    expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 1 } });
+  });
+
+  it("does not touch reset links when the current password is wrong", async () => {
+    vi.mocked(compare).mockResolvedValue(false as never);
+    await changeOwnPassword({}, form("wrong", "new-test-pw-9x7q"));
+    expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
   });
 
   it("never stores the plaintext password", async () => {

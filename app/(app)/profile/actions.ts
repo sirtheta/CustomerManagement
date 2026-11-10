@@ -48,6 +48,8 @@ export async function changeOwnPassword(
     where: { id: userId },
     data: { passwordHash, sessionEpoch: { increment: 1 } },
   });
+  // A reset link requested before the change must not set a password again.
+  await prisma.passwordResetToken.deleteMany({ where: { userId } });
   resetRateLimit(rateLimitKey);
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "password-changed" });
   return { success: true, _ts: Date.now() };

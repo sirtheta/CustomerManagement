@@ -292,6 +292,16 @@ describe("settings/users actions", () => {
       });
     });
 
+    it("deletes outstanding password-reset links when the user is deactivated", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "U", role: "Editor", isActive: "false" });
+      expect(prisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 2 } });
+    });
+
+    it("keeps reset links when the user stays active", async () => {
+      await update({ role: "Editor", isActive: true }, { name: "Neu", role: "Editor", isActive: "true" });
+      expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+    });
+
     it("keeps sessions when only the name changes", async () => {
       await update({ role: "Editor", isActive: true }, { name: "Neu", role: "Editor", isActive: "true" });
       const data = vi.mocked(prisma.user.update).mock.calls[0][0].data;
