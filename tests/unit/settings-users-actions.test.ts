@@ -454,6 +454,18 @@ describe("settings/users actions", () => {
       });
     });
 
+    it("refuses to re-key a user whose 2FA is already active (stale admin page)", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
+        id: 4,
+        email: "user@test.ch",
+        totpEnabled: true,
+      } as never);
+      const result = await generateTotpSetup(4);
+      expect(result).toEqual({ error: "2FA ist bereits aktiv. Bitte zuerst deaktivieren." });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
     it("does not touch sessions yet: 2FA only changes once the setup is confirmed", async () => {
       vi.mocked(auth).mockResolvedValue(adminSession);
       vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({ id: 4, email: "user@test.ch" } as never);
@@ -606,6 +618,17 @@ describe("settings/users actions", () => {
         data: { sessionEpoch: { increment: 1 } },
       });
       expect(signOut).toHaveBeenCalledWith({ redirectTo: "/login?notice=totp-enabled" });
+    });
+
+    it("writes an audit entry before signing out", async () => {
+      vi.mocked(auth).mockResolvedValue(adminSession);
+      vi.mocked(prisma.user.update).mockResolvedValue({ email: "admin@test.ch" } as never);
+      await finishOwnTotpSetup();
+      expect(logAudit).toHaveBeenCalledWith(adminSession, "UPDATE", "User", 1, "admin@test.ch", {
+        action: "totp-enabled-sessions-ended",
+      });
+      const order = (fn: unknown) => vi.mocked(fn as never as () => void).mock.invocationCallOrder[0];
+      expect(order(logAudit)).toBeLessThan(order(signOut));
     });
 
     it("signs out only after the epoch was bumped", async () => {

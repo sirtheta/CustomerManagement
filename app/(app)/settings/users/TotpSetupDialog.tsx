@@ -66,11 +66,21 @@ export function TotpSetupDialog({ user }: { user: User }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else setOpen(true); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        // Backup-code step: only the explicit button closes (and, for the own
+        // account, signs out). Escape or a click outside must not drop the
+        // one-time codes before they were copied.
+        if (!o && step === "backup") return;
+        if (!o) handleClose();
+        else setOpen(true);
+      }}
+    >
       <DialogTrigger render={<Button size="sm" variant={user.totpEnabled ? "destructive" : "outline"} />}>
         {user.totpEnabled ? "2FA deaktivieren" : "2FA einrichten"}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent showCloseButton={step !== "backup"}>
         <DialogHeader>
           <DialogTitle>
             {user.totpEnabled ? "2FA deaktivieren" : "2FA einrichten"} — {user.name}

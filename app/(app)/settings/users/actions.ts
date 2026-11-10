@@ -193,6 +193,9 @@ export async function generateTotpSetup(
   await requireAdmin();
   if (USER_MUTATIONS_DISABLED) return { error: USER_MUTATIONS_DISABLED_MSG };
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  // A stale page (another admin enabled 2FA meanwhile) must not silently turn
+  // off a working second factor below: re-keying goes through disableTotp.
+  if (user.totpEnabled) return { error: "2FA ist bereits aktiv. Bitte zuerst deaktivieren." };
   const secret = otp.generateSecret();
   const otpauthUrl = `otpauth://totp/${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(APP_NAME)}`;
   const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
@@ -246,9 +249,15 @@ export async function confirmTotpSetup(
  */
 export async function finishOwnTotpSetup(): Promise<void> {
   const session = await requireAdmin();
+  // The dialog only reaches this step after confirmTotpSetup, which the demo
+  // guard already refuses; without it this would be a bare "log everyone out".
+  if (USER_MUTATIONS_DISABLED) return;
   await prisma.user.update({
     where: { id: Number(session.user.id) },
     data: { sessionEpoch: { increment: 1 } },
+  });
+  await logAudit(session, "UPDATE", "User", Number(session.user.id), session.user.email ?? undefined, {
+    action: "totp-enabled-sessions-ended",
   });
   await signOut({ redirectTo: "/login?notice=totp-enabled" });
 }
