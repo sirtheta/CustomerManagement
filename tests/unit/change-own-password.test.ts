@@ -9,6 +9,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/auth", () => ({
   auth: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 vi.mock("bcryptjs", () => ({
@@ -27,7 +28,7 @@ vi.mock("@/lib/audit", () => ({
 
 import { changeOwnPassword } from "@/app/(app)/profile/actions";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { compare } from "bcryptjs";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
@@ -122,6 +123,32 @@ describe("changeOwnPassword", () => {
     vi.mocked(compare).mockResolvedValue(false as never);
     await changeOwnPassword({}, form("wrong", "new-test-pw-9x7q"));
     expect(prisma.passwordResetToken.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("signs the user out and sends them to the login page with a notice", async () => {
+    vi.mocked(compare).mockResolvedValue(true as never);
+    await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
+    expect(signOut).toHaveBeenCalledWith({ redirectTo: "/login?notice=password-changed" });
+  });
+
+  it("signs out only after the new hash and the audit entry are written", async () => {
+    vi.mocked(compare).mockResolvedValue(true as never);
+    await changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"));
+    const order = (fn: unknown) => vi.mocked(fn as never as () => void).mock.invocationCallOrder[0];
+    expect(order(prisma.user.update)).toBeLessThan(order(logAudit));
+    expect(order(logAudit)).toBeLessThan(order(signOut));
+  });
+
+  it("lets the sign-out redirect propagate", async () => {
+    vi.mocked(compare).mockResolvedValue(true as never);
+    vi.mocked(signOut).mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await expect(changeOwnPassword({}, form("old-password", "new-test-pw-9x7q"))).rejects.toThrow("NEXT_REDIRECT");
+  });
+
+  it("keeps the session when the password change is rejected", async () => {
+    vi.mocked(compare).mockResolvedValue(false as never);
+    await changeOwnPassword({}, form("wrong", "new-test-pw-9x7q"));
+    expect(signOut).not.toHaveBeenCalled();
   });
 
   it("never stores the plaintext password", async () => {

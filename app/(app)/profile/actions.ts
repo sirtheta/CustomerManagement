@@ -2,7 +2,7 @@
 
 import { compare, hash } from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { logAudit } from "@/lib/audit";
 import { validatePasswordPolicy } from "@/lib/password";
@@ -52,5 +52,9 @@ export async function changeOwnPassword(
   await prisma.passwordResetToken.deleteMany({ where: { userId } });
   resetRateLimit(rateLimitKey);
   await logAudit(session, "UPDATE", "User", userId, user.email, { action: "password-changed" });
+  // The sessionEpoch bump above also ends this session, so sign out on purpose
+  // instead of letting the next click bounce to /login unexplained. signOut
+  // redirects by throwing; that must propagate.
+  await signOut({ redirectTo: "/login?notice=password-changed" });
   return { success: true, _ts: Date.now() };
 }

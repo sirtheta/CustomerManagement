@@ -1,13 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { Suspense, useActionState, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Shown after changeOwnPassword signed the user out (all sessions end with the change).
+function LoginNotice() {
+  const notice = useSearchParams().get("notice");
+  if (notice !== "password-changed") return null;
+  return (
+    <p role="status" className="mb-4 text-sm text-muted-foreground text-center">
+      Passwort geändert. Bitte melde dich mit dem neuen Passwort neu an.
+    </p>
+  );
+}
 
 export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, undefined);
@@ -25,13 +37,16 @@ export default function LoginPage() {
           <CardTitle className="text-2xl text-center">Anmelden</CardTitle>
         </CardHeader>
         <CardContent>
+          <Suspense fallback={null}>
+            <LoginNotice />
+          </Suspense>
           <form
             action={formAction}
             onSubmit={() => setWentBack(false)}
             className="space-y-4"
           >
             {totpStep ? (
-              <p className="text-sm text-muted-foreground text-center">
+              <p className="mb-4 text-sm text-muted-foreground text-center">
                 Authenticator-Code für <strong>{email}</strong>
               </p>
             ) : (
