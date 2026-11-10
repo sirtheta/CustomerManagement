@@ -3,7 +3,14 @@
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import sharp from "sharp";
-import { createSmtpTransport, DEFAULT_SMTP_PORT, formatSender, isEmailDisabled } from "@/lib/smtp";
+import {
+  createSmtpTransport,
+  DEFAULT_SMTP_PORT,
+  formatSender,
+  isEmailDisabled,
+  isSameSmtpTarget,
+  SMTP_PASSWORD_REENTER_ERROR,
+} from "@/lib/smtp";
 import type { ActionState } from "@/hooks/use-action-toast";
 import { requireAdmin } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
@@ -129,6 +136,16 @@ export async function saveSettings(
     return { error: "SMTP-Port muss zwischen 1 und 65535 liegen." };
   }
 
+  // A blank password field keeps the stored password, but only for the same
+  // server and user; otherwise it would be handed to whatever host was typed in.
+  const smtpHostInput = ((formData.get("smtpHost") as string) || "").trim() || null;
+  const smtpUserInput = ((formData.get("smtpUser") as string) || "").trim() || null;
+  const typedSmtpPassword = formData.get("smtpPassword") as string;
+  const smtpTargetKept = isSameSmtpTarget(settings, smtpHostInput, smtpUserInput);
+  if (!typedSmtpPassword && settings?.smtpPassword && !smtpTargetKept && (smtpHostInput || smtpUserInput)) {
+    return { error: SMTP_PASSWORD_REENTER_ERROR };
+  }
+
   const appData = {
     numberFormat: (formData.get("numberFormat") as string) || "de-CH",
     defaultPaymentTermDays: isNaN(paymentTermDays) ? 30 : paymentTermDays,
@@ -140,9 +157,11 @@ export async function saveSettings(
     smtpUser: (formData.get("smtpUser") as string) || null,
     // Secrets are stored encrypted; an empty field keeps the stored value
     // (the form never prefills secrets)
-    smtpPassword: (formData.get("smtpPassword") as string)
-      ? encryptSecret(formData.get("smtpPassword") as string)
-      : settings?.smtpPassword ?? null,
+    smtpPassword: typedSmtpPassword
+      ? encryptSecret(typedSmtpPassword)
+      : smtpTargetKept
+        ? settings?.smtpPassword ?? null
+        : null,
     smtpFromName: (formData.get("smtpFromName") as string) || null,
     smtpFromAddress: (formData.get("smtpFromAddress") as string) || null,
     emailSubjectTemplate: (formData.get("emailSubjectTemplate") as string) || null,
@@ -274,6 +293,20 @@ async function resolveStoredSecret(
   return value ? decryptSecret(value) || undefined : undefined;
 }
 
+// SMTP variant: the stored password is only reused while host and user are
+// unchanged (see isSameSmtpTarget), never sent to a newly typed server.
+async function resolveSmtpPassword(
+  typed: string | undefined,
+  host: string | undefined,
+  user: string | undefined
+): Promise<{ pass?: string; reenter?: boolean }> {
+  if (typed) return { pass: typed };
+  const stored = await prisma.applicationSettings.findFirst();
+  if (!stored?.smtpPassword) return {};
+  if (!isSameSmtpTarget(stored, host, user)) return { reenter: true };
+  return { pass: decryptSecret(stored.smtpPassword) || undefined };
+}
+
 export async function testSmtpConnection(
   _prev: ActionState,
   formData: FormData
@@ -283,10 +316,12 @@ export async function testSmtpConnection(
   const host = (formData.get("smtpHost") as string | null)?.trim();
   const portRaw = formData.get("smtpPort") as string | null;
   const user = (formData.get("smtpUser") as string | null)?.trim();
-  const pass = await resolveStoredSecret(
+  const { pass, reenter } = await resolveSmtpPassword(
     (formData.get("smtpPassword") as string | null)?.trim(),
-    async () => (await prisma.applicationSettings.findFirst())?.smtpPassword
+    host,
+    user
   );
+  if (reenter) return { error: SMTP_PASSWORD_REENTER_ERROR };
 
   if (!host || !user || !pass) {
     return { error: "Bitte SMTP-Server, Benutzername und Passwort ausfüllen." };
@@ -331,10 +366,12 @@ export async function testEmailNotification(
   const host = (formData.get("smtpHost") as string | null)?.trim();
   const portRaw = formData.get("smtpPort") as string | null;
   const user = (formData.get("smtpUser") as string | null)?.trim();
-  const pass = await resolveStoredSecret(
+  const { pass, reenter } = await resolveSmtpPassword(
     (formData.get("smtpPassword") as string | null)?.trim(),
-    async () => (await prisma.applicationSettings.findFirst())?.smtpPassword
+    host,
+    user
   );
+  if (reenter) return { error: SMTP_PASSWORD_REENTER_ERROR };
   const fromName = (formData.get("smtpFromName") as string | null)?.trim() || user || "";
   const fromAddress = (formData.get("smtpFromAddress") as string | null)?.trim() || user;
 

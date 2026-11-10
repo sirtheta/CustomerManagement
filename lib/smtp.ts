@@ -43,6 +43,25 @@ export function hasSmtpSettings(settings: Pick<ApplicationSettings, "smtpHost" |
   return Boolean(settings.smtpHost && settings.smtpUser && settings.smtpPassword);
 }
 
+/**
+ * True when host and user still point at the stored SMTP account. The stored
+ * password may only be reused (blank password field, test buttons) while this
+ * holds; for a changed target the password has to be typed again, so it can
+ * never be sent to a server the person did not enter it for.
+ */
+export function isSameSmtpTarget(
+  stored: { smtpHost: string | null; smtpUser: string | null } | null | undefined,
+  host: string | null | undefined,
+  user: string | null | undefined
+): boolean {
+  if (!stored) return false;
+  const norm = (v: string | null | undefined) => (v ?? "").trim();
+  return norm(stored.smtpHost).toLowerCase() === norm(host).toLowerCase() && norm(stored.smtpUser) === norm(user);
+}
+
+export const SMTP_PASSWORD_REENTER_ERROR =
+  "Server oder Benutzername wurden geändert: Bitte das SMTP-Passwort erneut eingeben.";
+
 export const SMTP_NOT_CONFIGURED_ERROR =
   "E-Mail-Versand ist noch nicht eingerichtet (Einstellungen → E-Mail Versand). Es wurde nichts versendet und keine Nummer vergeben.";
 
