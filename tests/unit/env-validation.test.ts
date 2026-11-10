@@ -50,6 +50,24 @@ describe("validateEnv", () => {
     expect(() => validateEnv()).toThrow("AUTH_URL");
   });
 
+  // docker-compose.test.yml loads .env.test (copied from .env.test.example) with NODE_ENV=production.
+  it("throws in production when AUTH_SECRET is the placeholder from .env.test.example", () => {
+    process.env = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "<zufaelliger-32-Zeichen-String-hier-eintragen>",
+    };
+    expect(() => validateEnv()).toThrow("placeholder");
+  });
+
+  it("throws in production when AUTH_URL is the placeholder from .env.test.example", () => {
+    process.env = {
+      NODE_ENV: "production",
+      AUTH_SECRET: "k3Jx9mQ2vLp7TnR4wY8zB1cD6fG0hA5s",
+      AUTH_URL: "https://test.deinedomain.ch",
+    };
+    expect(() => validateEnv()).toThrow("AUTH_URL");
+  });
+
   it("passes in production with a real AUTH_URL", () => {
     process.env = {
       NODE_ENV: "production",

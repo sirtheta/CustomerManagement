@@ -8,10 +8,11 @@ const schema = z.object({
 });
 
 const MIN_AUTH_SECRET_LENGTH = 32;
-// Values copied unchanged from .env.example (the AUTH_SECRET one is long
-// enough to pass the length check, so it is rejected by name).
-const AUTH_SECRET_PLACEHOLDER = /^ersetzen-mit/i;
-const AUTH_URL_PLACEHOLDER = /deine-domain\.ch/i;
+// Values copied unchanged from .env.example and .env.test.example (docker-compose.test.yml
+// loads the latter with NODE_ENV=production). The AUTH_SECRET ones are long enough to pass
+// the length check, so they are rejected by pattern.
+const AUTH_SECRET_PLACEHOLDER = /^ersetzen-mit|^<.*>$|hier-eintragen/i;
+const AUTH_URL_PLACEHOLDER = /deine-?domain\.ch/i;
 
 export type Env = z.infer<typeof schema>;
 
