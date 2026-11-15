@@ -67,8 +67,17 @@ export function GlobalSearch({ autoFocus, size = "default", className, disableDr
     setActiveIndex(-1);
   }
 
+  // Picking a result is arriving at the destination: reset the field (the
+  // header lives in the layout and is not remounted, so the text would stay).
+  // Enter without a selection goes through handleSubmit and keeps the term.
   function navigateTo(href: string) {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    requestIdRef.current++;
+    setValue("");
+    setResults(null);
+    setLoading(false);
     closeDropdown();
+    inputRef.current?.blur();
     router.push(href);
   }
 
