@@ -14,7 +14,7 @@ import { documentLabel } from "@/lib/document-display";
 import { AGE_BUCKETS, fetchReceivables } from "@/lib/receivables";
 import { requireModule } from "@/lib/module-guard";
 import { BackLink } from "@/components/back-link";
-import { CardLink, ListCard } from "@/components/ui/list-card";
+import { CardLink, ListCard, ListRow } from "@/components/ui/list-card";
 
 type Props = { searchParams: Promise<{ asOf?: string }> };
 
@@ -96,13 +96,13 @@ export default async function ReceivablesPage({ searchParams }: Props) {
           {report.byCustomer.length > 0 && (
             <ul className="divide-y md:hidden">
               {report.byCustomer.map((c) => (
-                <li key={c.customerId} className="py-2 text-sm">
-                  <Link href={`/customers/${c.customerId}`} className="font-medium underline">{c.customerName}</Link>
+                <ListRow key={c.customerId} className="py-2 text-sm">
+                  <CardLink href={`/customers/${c.customerId}`} className="font-medium underline">{c.customerName}</CardLink>
                   <p className="text-muted-foreground">
                     Offen {formatCurrency(c.openRappen / 100)}
                     {c.creditRappen > 0 && ` · zu viel bezahlt ${formatCurrency(c.creditRappen / 100)}`}
                   </p>
-                </li>
+                </ListRow>
               ))}
             </ul>
           )}

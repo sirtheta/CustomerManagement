@@ -230,20 +230,20 @@ export default async function DashboardPage() {
             ) : (
               <ul className="divide-y">
                 {openTasks.map((task) => (
-                  <li key={task.id} className="py-2 flex justify-between items-center gap-3">
-                    <Link href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
+                  <ListRow key={task.id} className="py-2 flex justify-between items-center gap-3">
+                    <CardLink href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
                       <span className="font-medium">{task.title}</span>
                       <span className="text-muted-foreground">
                         {" · "}
                         {customerDisplayName(task.customer)}
                       </span>
-                    </Link>
+                    </CardLink>
                     <span
                       className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-destructive font-medium" : "text-muted-foreground"}`}
                     >
                       {formatDate(task.dueDate)}
                     </span>
-                  </li>
+                  </ListRow>
                 ))}
               </ul>
             )}
@@ -265,14 +265,14 @@ export default async function DashboardPage() {
             ) : (
               <ul className="divide-y">
                 {scheduledSubscriptions.map((sub) => (
-                  <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
-                    <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
+                  <ListRow key={sub.id} className="py-2 flex justify-between items-center gap-3">
+                    <CardLink href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
                       {customerDisplayName(sub.customer)}
-                    </Link>
+                    </CardLink>
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
                       {INTERVAL_LABELS[sub.interval]} · {formatDate(sub.nextInvoiceDate)}
                     </span>
-                  </li>
+                  </ListRow>
                 ))}
               </ul>
             )}
