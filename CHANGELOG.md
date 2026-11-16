@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.7](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.6...customer-management-v1.10.7) (2026-11-16)
+
+
+### Bug Fixes
+
+* **ui:** make whole mobile list cards tappable ([#224](https://github.com/sirtheta/CustomerManagement/issues/224)) ([bf1b883](https://github.com/sirtheta/CustomerManagement/commit/bf1b8830df83dc72b0b98be83866aa1048fa79fa))
+
 ## [1.10.6](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.5...customer-management-v1.10.6) (2026-11-15)
 
 
