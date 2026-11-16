@@ -15,6 +15,7 @@ import { SetupChecklist } from "./SetupChecklist";
 import { missingCompanyFields } from "@/lib/company-completeness";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
+import { CardLink, ListRow } from "@/components/ui/list-card";
 
 export default async function DashboardPage() {
   const session = await requireSession();
@@ -289,14 +290,14 @@ export default async function DashboardPage() {
           ) : (
             <ul className="divide-y">
               {recentInvoices.map((inv) => (
-                <li key={inv.id} className="py-2 flex justify-between items-center">
+                <ListRow key={inv.id} className="py-2 flex justify-between items-center">
                   <div>
-                    <Link
+                    <CardLink
                       href={`/invoices/${inv.id}`}
                       className="font-medium text-sm hover:underline"
                     >
                       {documentLabel(inv.documentNumber)}
-                    </Link>
+                    </CardLink>
                     {inv.creditNoteForId !== null && (
                       <span className="ml-2 text-xs text-muted-foreground">Gutschrift</span>
                     )}
@@ -307,7 +308,7 @@ export default async function DashboardPage() {
                   <span className="text-sm font-medium">
                     {formatCurrency(inv.totalAmount.toNumber())}
                   </span>
-                </li>
+                </ListRow>
               ))}
             </ul>
           )}

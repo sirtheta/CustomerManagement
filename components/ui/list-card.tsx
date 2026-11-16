@@ -26,6 +26,22 @@ export function ListCard({ className, ...props }: ComponentProps<"li">) {
   );
 }
 
+/**
+ * Borderless variant for compact lists inside an existing Card (dashboard): same
+ * stretched-link pattern, the tap highlight bleeds 0.5rem past the content edge.
+ */
+export function ListRow({ className, ...props }: ComponentProps<"li">) {
+  return (
+    <li
+      className={cn(
+        "relative isolate -mx-2 rounded-lg px-2 transition-colors has-[[data-card-link]:active]:bg-muted/60",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 export function CardLink({ className, ...props }: ComponentProps<typeof Link>) {
   return (
     <Link

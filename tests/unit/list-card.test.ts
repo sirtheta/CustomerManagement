@@ -13,7 +13,7 @@ const helperSource = fs.readFileSync(path.join(root, "components/ui/list-card.ts
 const files = (fs.readdirSync(path.join(root, "app"), { recursive: true }) as string[])
   .filter((f) => f.endsWith(".tsx"))
   .map((f) => path.join(root, "app", f))
-  .filter((f) => fs.readFileSync(f, "utf8").includes("<ListCard"));
+  .filter((f) => /<(ListCard|ListRow)\b/.test(fs.readFileSync(f, "utf8")));
 
 /** Opening tag from `start` to its closing `>`; braces nest so `render={<Link />}` stays inside. */
 function openingTag(src: string, start: number): string {
@@ -28,7 +28,7 @@ function openingTag(src: string, start: number): string {
 }
 
 function listCardBlocks(src: string): string[] {
-  return [...src.matchAll(/<ListCard\b[\s\S]*?<\/ListCard>/g)].map((m) => m[0]);
+  return [...src.matchAll(/<(ListCard|ListRow)\b[\s\S]*?<\/\1>/g)].map((m) => m[0]);
 }
 
 describe("ListCard stretched-link pattern", () => {
@@ -37,7 +37,7 @@ describe("ListCard stretched-link pattern", () => {
   });
 
   it("isolates the card so lifted elements stay below the sticky header", () => {
-    expect(helperSource).toMatch(/"relative isolate /);
+    expect(helperSource.match(/"relative isolate /g)?.length).toBe(2); // ListCard + ListRow
     expect(helperSource).toContain('cardInteractiveClass = "relative z-10"');
   });
 
