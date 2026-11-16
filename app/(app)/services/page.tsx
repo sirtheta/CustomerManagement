@@ -19,6 +19,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { isEditorSession, requireSession } from "@/lib/permissions";
 import { activeBadge } from "@/lib/document-states";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 const PAGE_SIZE = 25;
 
@@ -94,9 +95,15 @@ export default async function ServicesPage({ searchParams }: Props) {
         // Phones get cards instead of a table that scrolls sideways
         <ul className="space-y-3 md:hidden">
           {services.map((s) => (
-            <li key={s.id} className="rounded-lg border p-3 space-y-1">
+            <ListCard key={s.id} className="space-y-1">
               <div className="flex items-start justify-between gap-2">
-                <span className="font-medium">{s.name}</span>
+                {canEdit ? (
+                  <CardLink href={`/services/${s.id}`} className="font-medium hover:underline">
+                    {s.name}
+                  </CardLink>
+                ) : (
+                  <span className="font-medium">{s.name}</span>
+                )}
                 <Badge variant={activeBadge(s.isActive).variant}>{activeBadge(s.isActive).label}</Badge>
               </div>
               {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
@@ -106,12 +113,17 @@ export default async function ServicesPage({ searchParams }: Props) {
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold">{formatCurrency(s.unitPrice.toNumber())}</span>
                 {canEdit && (
-                  <Button variant="outline" size="sm" render={<Link href={`/services/${s.id}`} />}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cardInteractiveClass}
+                    render={<Link href={`/services/${s.id}`} />}
+                  >
                     Bearbeiten
                   </Button>
                 )}
               </div>
-            </li>
+            </ListCard>
           ))}
         </ul>
       )}

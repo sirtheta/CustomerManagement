@@ -24,6 +24,7 @@ import { requireModule } from "@/lib/module-guard";
 import { isEditorSession, requireSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
 import { quoteStateLabels, quoteStateVariants } from "@/lib/document-states";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 const PAGE_SIZE = 25;
 
@@ -176,21 +177,24 @@ export default async function QuotesPage({ searchParams }: Props) {
         // Phones get cards instead of a table that scrolls sideways
         <ul className="space-y-3 md:hidden">
           {quotes.map((q) => (
-            <li key={q.id} className="rounded-lg border p-3 space-y-1">
+            <ListCard key={q.id} className="space-y-1">
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/quotes/${q.id}`} className="font-medium hover:underline">
+                <CardLink href={`/quotes/${q.id}`} className="font-medium hover:underline">
                   {documentLabel(q.documentNumber)}
-                </Link>
+                </CardLink>
                 <Badge variant={quoteStateVariants[q.state]}>{quoteStateLabels[q.state]}</Badge>
               </div>
-              <Link href={`/customers/${q.customer.customerId}`} className="block text-sm hover:underline">
+              <Link
+                href={`/customers/${q.customer.customerId}`}
+                className={cn(cardInteractiveClass, "block w-fit text-sm hover:underline")}
+              >
                 {customerDisplayName(q.customer)}
               </Link>
               <p className="text-sm text-muted-foreground">
                 {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
               </p>
               <p className="text-sm font-semibold">{formatCurrency(q.totalAmount.toNumber())}</p>
-            </li>
+            </ListCard>
           ))}
         </ul>
       )}

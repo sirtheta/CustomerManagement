@@ -23,6 +23,7 @@ import { UserRole } from "@prisma/client";
 import { isEditorSession, requireSession } from "@/lib/permissions";
 import { customerDisplayName } from "@/lib/customer-display";
 import { loadModules } from "@/lib/module-guard";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 const PAGE_SIZE = 25;
 
@@ -73,20 +74,30 @@ async function CustomersTable({
         // Phones get cards instead of a table that scrolls sideways (delete/archive stays in the table and on the customer page)
         <ul className="space-y-3 md:hidden">
           {customers.map((c) => (
-            <li key={c.customerId} className="rounded-lg border p-3">
-              <Link href={`/customers/${c.customerId}`} className="block hover:underline">
+            <ListCard key={c.customerId}>
+              <CardLink href={`/customers/${c.customerId}`} className="block hover:underline">
                 <span className="font-medium">{customerDisplayName(c)}</span>
                 {!c.contactInsteadOfCompany && c.company && (
                   <span className="block text-xs text-muted-foreground">{c.contactPerson}</span>
                 )}
-              </Link>
+              </CardLink>
               <p className="mt-1 text-sm text-muted-foreground">
                 {c.customerNumber != null && `Nr. ${c.customerNumber} · `}
                 {c.zipCode} {c.city}
               </p>
-              <p className="break-all text-sm">{c.email}</p>
-              {c.phone && <p className="text-sm text-muted-foreground">{c.phone}</p>}
-            </li>
+              {/* mailto:/tel: keep email and phone usable (copy, call) although the card itself is a link */}
+              <a href={`mailto:${c.email}`} className={`${cardInteractiveClass} block w-fit break-all text-sm hover:underline`}>
+                {c.email}
+              </a>
+              {c.phone && (
+                <a
+                  href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}
+                  className={`${cardInteractiveClass} block w-fit text-sm text-muted-foreground hover:underline`}
+                >
+                  {c.phone}
+                </a>
+              )}
+            </ListCard>
           ))}
         </ul>
       )}

@@ -39,6 +39,7 @@ import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
 import { FlashToast } from "@/components/flash-toast";
+import { CardLink, ListCard } from "@/components/ui/list-card";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -237,14 +238,14 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
             // Phones get cards: amount and status stay visible without sideways scrolling
             <ul className="space-y-3 md:hidden">
               {invoices.map((inv) => (
-                <li key={inv.id} className="rounded-lg border p-3">
+                <ListCard key={inv.id}>
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/invoices/${inv.id}?from=customers/${customerId}`} className="font-medium hover:underline">
+                    <CardLink href={`/invoices/${inv.id}?from=customers/${customerId}`} className="font-medium hover:underline">
                       {documentLabel(inv.documentNumber)}
                       {inv.creditNoteForId !== null && (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
                       )}
-                    </Link>
+                    </CardLink>
                     <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
                   </div>
                   <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
@@ -254,7 +255,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     </span>
                     <span className="font-semibold text-foreground">{formatCurrency(inv.totalAmount.toNumber())}</span>
                   </div>
-                </li>
+                </ListCard>
               ))}
             </ul>
           )}
@@ -335,11 +336,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
             {quotes.length > 0 && (
               <ul className="space-y-3 md:hidden">
                 {quotes.map((q) => (
-                  <li key={q.id} className="rounded-lg border p-3">
+                  <ListCard key={q.id}>
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="font-medium hover:underline">
+                      <CardLink href={`/quotes/${q.id}?from=customers/${customerId}`} className="font-medium hover:underline">
                         {documentLabel(q.documentNumber)}
-                      </Link>
+                      </CardLink>
                       <Badge variant={quoteStateVariants[q.state]}>{quoteStateLabels[q.state]}</Badge>
                     </div>
                     <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
@@ -348,7 +349,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                       </span>
                       <span className="font-semibold text-foreground">{formatCurrency(q.totalAmount.toNumber())}</span>
                     </div>
-                  </li>
+                  </ListCard>
                 ))}
               </ul>
             )}

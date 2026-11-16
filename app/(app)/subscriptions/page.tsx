@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import SubscriptionRowActions from "./SubscriptionRowActions";
 import { BackLink } from "@/components/back-link";
 import { activeBadge } from "@/lib/document-states";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 export default async function SubscriptionsPage() {
   await requireModule("subscriptions");
@@ -39,14 +40,11 @@ export default async function SubscriptionsPage() {
         // Phones get cards instead of a table that scrolls sideways
         <ul className="space-y-3 md:hidden">
           {rows.map((row) => (
-            <li
-              key={row.id}
-              className={`rounded-lg border p-3 space-y-2 ${row.active ? "" : "text-muted-foreground"}`}
-            >
+            <ListCard key={row.id} className={`space-y-2 ${row.active ? "" : "text-muted-foreground"}`}>
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/customers/${row.customerId}`} className="font-medium hover:underline">
+                <CardLink href={`/customers/${row.customerId}`} className="font-medium hover:underline">
                   {row.customerName}
-                </Link>
+                </CardLink>
                 <Badge variant={activeBadge(row.active, "Pausiert").variant}>{activeBadge(row.active, "Pausiert").label}</Badge>
               </div>
               <p className="text-sm">
@@ -58,9 +56,11 @@ export default async function SubscriptionsPage() {
                 {row.autoSend ? "Automatisch" : "Nach Prüfung"}
               </p>
               {canEdit && (
-                <SubscriptionRowActions customerId={row.customerId} subscriptionId={row.id} active={row.active} />
+                <div className={`${cardInteractiveClass} ml-auto w-fit`}>
+                  <SubscriptionRowActions customerId={row.customerId} subscriptionId={row.id} active={row.active} />
+                </div>
               )}
-            </li>
+            </ListCard>
           ))}
         </ul>
       )}
