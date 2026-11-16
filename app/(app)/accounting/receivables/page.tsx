@@ -14,6 +14,7 @@ import { documentLabel } from "@/lib/document-display";
 import { AGE_BUCKETS, fetchReceivables } from "@/lib/receivables";
 import { requireModule } from "@/lib/module-guard";
 import { BackLink } from "@/components/back-link";
+import { CardLink, ListCard, ListRow } from "@/components/ui/list-card";
 
 type Props = { searchParams: Promise<{ asOf?: string }> };
 
@@ -95,13 +96,13 @@ export default async function ReceivablesPage({ searchParams }: Props) {
           {report.byCustomer.length > 0 && (
             <ul className="divide-y md:hidden">
               {report.byCustomer.map((c) => (
-                <li key={c.customerId} className="py-2 text-sm">
-                  <Link href={`/customers/${c.customerId}`} className="font-medium underline">{c.customerName}</Link>
+                <ListRow key={c.customerId} className="py-2 text-sm">
+                  <CardLink href={`/customers/${c.customerId}`} className="font-medium underline">{c.customerName}</CardLink>
                   <p className="text-muted-foreground">
                     Offen {formatCurrency(c.openRappen / 100)}
                     {c.creditRappen > 0 && ` · zu viel bezahlt ${formatCurrency(c.creditRappen / 100)}`}
                   </p>
-                </li>
+                </ListRow>
               ))}
             </ul>
           )}
@@ -142,11 +143,11 @@ export default async function ReceivablesPage({ searchParams }: Props) {
           {report.rows.length > 0 && (
             <ul className="space-y-3 md:hidden">
               {report.rows.map((r) => (
-                <li key={r.invoiceId} className="rounded-lg border p-3 space-y-1">
+                <ListCard key={r.invoiceId} className="space-y-1">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/invoices/${r.invoiceId}?from=accounting/receivables`} className="font-medium underline">
+                    <CardLink href={`/invoices/${r.invoiceId}?from=accounting/receivables`} className="font-medium underline">
                       {documentLabel(r.documentNumber)}
-                    </Link>
+                    </CardLink>
                     <span className="text-xs text-muted-foreground">
                       {AGE_BUCKETS.find((b) => b.key === r.bucket)?.label ?? ""}
                     </span>
@@ -164,7 +165,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
                   {r.creditRappen > 0 && (
                     <p className="text-sm text-muted-foreground">Zu viel bezahlt {formatCurrency(r.creditRappen / 100)}</p>
                   )}
-                </li>
+                </ListCard>
               ))}
             </ul>
           )}

@@ -28,6 +28,7 @@ import DeleteExpenseButton from "./DeleteExpenseButton";
 import { documentLabel } from "@/lib/document-display";
 import { Badge } from "@/components/ui/badge";
 import { requireModule } from "@/lib/module-guard";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 type Props = {
   searchParams: Promise<{ year?: string }>;
@@ -222,9 +223,11 @@ export default async function AccountingPage({ searchParams }: Props) {
               // Phones get cards instead of a table with eight columns
               <ul className="space-y-3 md:hidden">
                 {expenses.map((exp) => (
-                  <li key={exp.id} className="rounded-lg border p-3 space-y-1">
+                  <ListCard key={exp.id} className="space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium">{exp.description}</span>
+                      <CardLink href={`/accounting/${exp.id}`} className="font-medium hover:underline">
+                        {exp.description}
+                      </CardLink>
                       <span className="font-semibold">{formatCurrency(exp.amount)}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -241,14 +244,21 @@ export default async function AccountingPage({ searchParams }: Props) {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="sm" render={<Link href={`/accounting/${exp.id}`} />}>
+                      <div className={`${cardInteractiveClass} flex items-center gap-1`}>
+                        {/* same target as the card link: keep it for the look, skip it for keyboard/screen readers */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          render={<Link href={`/accounting/${exp.id}`} />}
+                        >
                           Bearbeiten
                         </Button>
                         {canDelete && <DeleteExpenseButton expenseId={exp.id} size="sm" />}
                       </div>
                     </div>
-                  </li>
+                  </ListCard>
                 ))}
               </ul>
             )}
@@ -315,17 +325,17 @@ export default async function AccountingPage({ searchParams }: Props) {
               // Phones get cards: customer names make the table scroll sideways
               <ul className="space-y-3 md:hidden">
                 {payments.map((inv) => (
-                  <li key={inv.id} className="rounded-lg border p-3 space-y-1">
+                  <ListCard key={inv.id} className="space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/invoices/${inv.invoiceId}`} className="font-medium underline">
+                      <CardLink href={`/invoices/${inv.invoiceId}`} className="font-medium underline">
                         {documentLabel(inv.documentNumber)}
-                      </Link>
+                      </CardLink>
                       <span className="font-semibold">{formatCurrency(inv.amount)}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {formatDate(inv.paidDate)} · {inv.customerName}
                     </p>
-                  </li>
+                  </ListCard>
                 ))}
               </ul>
             )}

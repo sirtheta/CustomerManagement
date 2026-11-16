@@ -15,6 +15,7 @@ import { SetupChecklist } from "./SetupChecklist";
 import { missingCompanyFields } from "@/lib/company-completeness";
 import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
+import { CardLink, ListRow } from "@/components/ui/list-card";
 
 export default async function DashboardPage() {
   const session = await requireSession();
@@ -229,20 +230,20 @@ export default async function DashboardPage() {
             ) : (
               <ul className="divide-y">
                 {openTasks.map((task) => (
-                  <li key={task.id} className="py-2 flex justify-between items-center gap-3">
-                    <Link href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
+                  <ListRow key={task.id} className="py-2 flex justify-between items-center gap-3">
+                    <CardLink href={`/customers/${task.customer.customerId}`} className="text-sm hover:underline">
                       <span className="font-medium">{task.title}</span>
                       <span className="text-muted-foreground">
                         {" · "}
                         {customerDisplayName(task.customer)}
                       </span>
-                    </Link>
+                    </CardLink>
                     <span
                       className={`text-sm whitespace-nowrap ${task.dueDate < new Date() ? "text-destructive font-medium" : "text-muted-foreground"}`}
                     >
                       {formatDate(task.dueDate)}
                     </span>
-                  </li>
+                  </ListRow>
                 ))}
               </ul>
             )}
@@ -264,14 +265,14 @@ export default async function DashboardPage() {
             ) : (
               <ul className="divide-y">
                 {scheduledSubscriptions.map((sub) => (
-                  <li key={sub.id} className="py-2 flex justify-between items-center gap-3">
-                    <Link href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
+                  <ListRow key={sub.id} className="py-2 flex justify-between items-center gap-3">
+                    <CardLink href={`/customers/${sub.customer.customerId}`} className="font-medium text-sm hover:underline">
                       {customerDisplayName(sub.customer)}
-                    </Link>
+                    </CardLink>
                     <span className="text-sm text-muted-foreground whitespace-nowrap">
                       {INTERVAL_LABELS[sub.interval]} · {formatDate(sub.nextInvoiceDate)}
                     </span>
-                  </li>
+                  </ListRow>
                 ))}
               </ul>
             )}
@@ -289,14 +290,14 @@ export default async function DashboardPage() {
           ) : (
             <ul className="divide-y">
               {recentInvoices.map((inv) => (
-                <li key={inv.id} className="py-2 flex justify-between items-center">
+                <ListRow key={inv.id} className="py-2 flex justify-between items-center">
                   <div>
-                    <Link
+                    <CardLink
                       href={`/invoices/${inv.id}`}
                       className="font-medium text-sm hover:underline"
                     >
                       {documentLabel(inv.documentNumber)}
-                    </Link>
+                    </CardLink>
                     {inv.creditNoteForId !== null && (
                       <span className="ml-2 text-xs text-muted-foreground">Gutschrift</span>
                     )}
@@ -307,7 +308,7 @@ export default async function DashboardPage() {
                   <span className="text-sm font-medium">
                     {formatCurrency(inv.totalAmount.toNumber())}
                   </span>
-                </li>
+                </ListRow>
               ))}
             </ul>
           )}

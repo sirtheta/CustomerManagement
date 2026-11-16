@@ -29,6 +29,7 @@ import { attentionBanners, loadAttentionCounts } from "@/lib/attention-counts";
 import { AttentionBanners } from "@/components/attention-banners";
 import { customerDisplayName } from "@/lib/customer-display";
 import { invoiceStateLabels, invoiceStateVariants } from "@/lib/document-states";
+import { CardLink, ListCard, cardInteractiveClass } from "@/components/ui/list-card";
 
 const PAGE_SIZE = 25;
 
@@ -101,17 +102,20 @@ async function InvoicesTable({
         // Phones get cards: amount and status stay visible without sideways scrolling
         <ul className="space-y-3 md:hidden">
           {invoices.map((inv) => (
-            <li key={inv.id} className="rounded-lg border p-3">
+            <ListCard key={inv.id}>
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/invoices/${inv.id}`} className="font-medium hover:underline">
+                <CardLink href={`/invoices/${inv.id}`} className="font-medium hover:underline">
                   {documentLabel(inv.documentNumber)}
                   {inv.creditNoteForId !== null && (
                     <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
                   )}
-                </Link>
+                </CardLink>
                 <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
               </div>
-              <Link href={`/customers/${inv.customer.customerId}`} className="mt-1 block text-sm hover:underline">
+              <Link
+                href={`/customers/${inv.customer.customerId}`}
+                className={cn(cardInteractiveClass, "mt-1 block w-fit text-sm hover:underline")}
+              >
                 {customerDisplayName(inv.customer)}
               </Link>
               <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
@@ -121,7 +125,7 @@ async function InvoicesTable({
                 </span>
                 <span className="font-semibold text-foreground">{formatCurrency(inv.totalAmount.toNumber())}</span>
               </div>
-            </li>
+            </ListCard>
           ))}
         </ul>
       )}
