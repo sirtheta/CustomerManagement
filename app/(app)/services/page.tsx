@@ -117,6 +117,9 @@ export default async function ServicesPage({ searchParams }: Props) {
                     variant="outline"
                     size="sm"
                     className={cardInteractiveClass}
+                    // same target as the card link: keep it for the look, skip it for keyboard/screen readers
+                    tabIndex={-1}
+                    aria-hidden="true"
                     render={<Link href={`/services/${s.id}`} />}
                   >
                     Bearbeiten

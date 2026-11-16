@@ -91,7 +91,7 @@ async function CustomersTable({
               </a>
               {c.phone && (
                 <a
-                  href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}
+                  href={`tel:${c.phone.replace(/\(0\)/g, "").replace(/[^\d+]/g, "")}`}
                   className={`${cardInteractiveClass} block w-fit text-sm text-muted-foreground hover:underline`}
                 >
                   {c.phone}

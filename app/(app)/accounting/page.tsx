@@ -245,7 +245,14 @@ export default async function AccountingPage({ searchParams }: Props) {
                         )}
                       </div>
                       <div className={`${cardInteractiveClass} flex items-center gap-1`}>
-                        <Button variant="outline" size="sm" render={<Link href={`/accounting/${exp.id}`} />}>
+                        {/* same target as the card link: keep it for the look, skip it for keyboard/screen readers */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          render={<Link href={`/accounting/${exp.id}`} />}
+                        >
                           Bearbeiten
                         </Button>
                         {canDelete && <DeleteExpenseButton expenseId={exp.id} size="sm" />}
