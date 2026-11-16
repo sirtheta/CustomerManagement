@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.6](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.5...customer-management-v1.10.6) (2026-11-15)
+
+
+### Bug Fixes
+
+* **search:** clear header search field after picking a result ([#220](https://github.com/sirtheta/CustomerManagement/issues/220)) ([459855c](https://github.com/sirtheta/CustomerManagement/commit/459855cbee7e4eba0e587a2ed64e5b543f2f0b1e))
+
 ## [1.10.5](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.4...customer-management-v1.10.5) (2026-11-10)
 
 
