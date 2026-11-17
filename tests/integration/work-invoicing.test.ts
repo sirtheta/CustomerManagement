@@ -78,6 +78,8 @@ describe("billing work entries", () => {
       ["Kies", 1, 0, 0],
     ]);
     expect(Number(invoice.totalAmount)).toBe(350);
+    // Suggested from the months of the entries, editable in the draft.
+    expect(invoice.topic).toBe("Arbeiten Oktober 2026");
     // Payment term of the settings (14 days), counted from the invoice date.
     expect(Math.round((invoice.dueDate.getTime() - invoice.date.getTime()) / 86_400_000)).toBe(14);
 

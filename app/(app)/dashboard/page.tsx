@@ -303,6 +303,7 @@ export default async function DashboardPage() {
                     )}
                     <p className="text-xs text-muted-foreground">
                       {customerDisplayName(inv.customer)}
+                      {inv.topic && ` · ${inv.topic}`}
                     </p>
                   </div>
                   <span className="text-sm font-medium">

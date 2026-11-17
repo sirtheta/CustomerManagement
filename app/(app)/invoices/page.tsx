@@ -22,6 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { isEditorSession, requireSession } from "@/lib/permissions";
@@ -119,7 +120,7 @@ async function InvoicesTable({
               >
                 {customerDisplayName(inv.customer)}
               </Link>
-              {inv.topic && <p className="mt-0.5 truncate text-sm">{inv.topic}</p>}
+              <DocumentTopic topic={inv.topic} variant="card" />
               <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
                 <span>
                   {formatDate(inv.date)}
@@ -191,11 +192,7 @@ async function InvoicesTable({
                     {inv.creditNoteForId !== null && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
                     )}
-                    {inv.topic && (
-                      <div className="max-w-64 truncate text-xs font-normal text-muted-foreground" title={inv.topic}>
-                        {inv.topic}
-                      </div>
-                    )}
+                    <DocumentTopic topic={inv.topic} />
                   </TableCell>
                   <TableCell>
                     <Link href={`/customers/${inv.customer.customerId}`} className="hover:underline">

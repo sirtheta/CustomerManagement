@@ -19,6 +19,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
 import { isEditorSession, requireSession } from "@/lib/permissions";
@@ -191,7 +192,7 @@ export default async function QuotesPage({ searchParams }: Props) {
               >
                 {customerDisplayName(q.customer)}
               </Link>
-              {q.topic && <p className="mt-0.5 truncate text-sm">{q.topic}</p>}
+              <DocumentTopic topic={q.topic} variant="card" />
               <p className="text-sm text-muted-foreground">
                 {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
               </p>
@@ -258,11 +259,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                     <Link href={`/quotes/${q.id}`} className="hover:underline">
                       {documentLabel(q.documentNumber)}
                     </Link>
-                    {q.topic && (
-                      <div className="max-w-64 truncate text-xs font-normal text-muted-foreground" title={q.topic}>
-                        {q.topic}
-                      </div>
-                    )}
+                    <DocumentTopic topic={q.topic} />
                   </TableCell>
                   <TableCell>
                     <Link

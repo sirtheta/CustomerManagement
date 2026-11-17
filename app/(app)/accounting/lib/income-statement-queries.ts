@@ -88,6 +88,7 @@ export type IncomeRow = {
   id: number;
   invoiceId: number;
   documentNumber: string | null;
+  topic: string | null;
   customerName: string;
   paidDate: string;
   amount: number;
@@ -108,6 +109,7 @@ export async function fetchPaymentsForYear(prisma: PrismaClient, year: number): 
         select: {
           id: true,
           documentNumber: true,
+          topic: true,
           customer: { select: { company: true, contactPerson: true, contactInsteadOfCompany: true } },
         },
       },
@@ -118,6 +120,7 @@ export async function fetchPaymentsForYear(prisma: PrismaClient, year: number): 
     id: p.id,
     invoiceId: p.invoice.id,
     documentNumber: p.invoice.documentNumber,
+    topic: p.invoice.topic,
     customerName: customerDisplayName(p.invoice.customer),
     paidDate: p.date.toISOString(),
     amount: p.amount.toNumber(),

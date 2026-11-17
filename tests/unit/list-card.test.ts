@@ -14,7 +14,7 @@ const helperSource = fs.readFileSync(helperPath, "utf8");
 
 const LIFT = "cardInteractiveClass";
 // Capitalised components are treated as interactive unless listed here.
-const INERT_COMPONENTS = new Set(["Badge", "CardLink", "ListCard", "ListRow", "ExpenseStatus"]);
+const INERT_COMPONENTS = new Set(["Badge", "CardLink", "ListCard", "ListRow", "ExpenseStatus", "DocumentTopic"]);
 const NATIVE_INTERACTIVE = new Set(["a", "button", "input", "select", "textarea", "form", "label", "summary"]);
 
 function sourceFiles(dir: string): string[] {

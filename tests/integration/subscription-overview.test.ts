@@ -13,6 +13,7 @@ describe("listSubscriptionOverview", () => {
     templateId?: number | null;
     autoSend?: boolean;
     interval?: "Monthly" | "Quarterly" | "Yearly";
+    topic?: string | null;
     customer?: Partial<Prisma.CustomerUncheckedCreateInput>;
   }) {
     const customer = await db.prisma.customer.create({
@@ -30,9 +31,22 @@ describe("listSubscriptionOverview", () => {
         nextInvoiceDate: new Date(opts.nextInvoiceDate),
         active: opts.active ?? true,
         autoSend: opts.autoSend ?? false,
+        topic: opts.topic ?? null,
       },
     });
   }
+
+  it("shows the subscription's topic, else the template's", async () => {
+    const template = await db.prisma.invoiceTemplate.create({ data: { name: "Hosting", topic: "Hosting {period}" } });
+    const own = await seed({ nextInvoiceDate: "2027-01-01", templateId: template.id, topic: "Domain {period}" });
+    const inherited = await seed({ nextInvoiceDate: "2027-02-01", templateId: template.id });
+    const none = await seed({ nextInvoiceDate: "2027-03-01" });
+
+    const topics = new Map((await listSubscriptionOverview(db.prisma)).map((r) => [r.id, r.topic]));
+    expect(topics.get(own.id)).toBe("Domain {period}");
+    expect(topics.get(inherited.id)).toBe("Hosting {period}");
+    expect(topics.get(none.id)).toBeNull();
+  });
 
   it("returns an empty list without subscriptions", async () => {
     expect(await listSubscriptionOverview(db.prisma)).toEqual([]);

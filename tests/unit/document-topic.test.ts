@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MAX_TOPIC_LENGTH, normalizeTopic, removeEmptyPlaceholder, resolveTopic, subscriptionPeriodLabel } from "@/lib/document-topic";
+import { MAX_TOPIC_LENGTH, normalizeTopic, removeEmptyPlaceholder, resolveTopic, subscriptionPeriodLabel, workEntriesTopic } from "@/lib/document-topic";
 
 describe("normalizeTopic", () => {
   it("keeps one trimmed line", () => {
@@ -64,5 +64,22 @@ describe("removeEmptyPlaceholder", () => {
   it("works for any key", () => {
     expect(removeEmptyPlaceholder("Rechnung – {period} – Firma", "period")).toBe("Rechnung – Firma");
     expect(removeEmptyPlaceholder("Rechnung – {topic}", "period")).toBe("Rechnung – {topic}");
+  });
+});
+
+describe("workEntriesTopic", () => {
+  const utc = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  it("names one month", () => {
+    expect(workEntriesTopic(utc("2026-11-03"), utc("2026-11-28"))).toBe("Arbeiten November 2026");
+  });
+
+  it("names a month range, across a year end too", () => {
+    expect(workEntriesTopic(utc("2026-10-30"), utc("2026-11-02"))).toBe("Arbeiten Oktober–November 2026");
+    expect(workEntriesTopic(utc("2026-12-15"), utc("2027-01-10"))).toBe("Arbeiten Dezember 2026 – Januar 2027");
+  });
+
+  it("reads calendar days in UTC", () => {
+    expect(workEntriesTopic(utc("2026-12-01"), utc("2026-12-31"))).toBe("Arbeiten Dezember 2026");
   });
 });

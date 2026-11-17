@@ -39,6 +39,14 @@ const MONTH_NAMES = [
   "Juli", "August", "September", "Oktober", "November", "Dezember",
 ];
 
+/** "November 2026", "Oktober–November 2026" or "Dezember 2026 – Januar 2027" (months 0–11). */
+function monthRangeLabel(startYear: number, startMonth: number, endYear: number, endMonth: number): string {
+  if (startYear === endYear && startMonth === endMonth) return `${MONTH_NAMES[startMonth]} ${startYear}`;
+  return startYear === endYear
+    ? `${MONTH_NAMES[startMonth]}–${MONTH_NAMES[endMonth]} ${startYear}`
+    : `${MONTH_NAMES[startMonth]} ${startYear} – ${MONTH_NAMES[endMonth]} ${endYear}`;
+}
+
 const INTERVAL_MONTHS: Record<SubscriptionIntervalName, number> = { Monthly: 1, Quarterly: 3, Yearly: 12 };
 
 /**
@@ -54,11 +62,16 @@ export function subscriptionPeriodLabel(start: Date, interval: SubscriptionInter
   if (interval === "Quarterly" && month % 3 === 0) return `Q${month / 3 + 1} ${year}`;
   if (interval === "Yearly" && month === 0) return String(year);
   const endIndex = month + INTERVAL_MONTHS[interval] - 1;
-  const endMonth = endIndex % 12;
-  const endYear = year + Math.floor(endIndex / 12);
-  return endYear === year
-    ? `${MONTH_NAMES[month]}–${MONTH_NAMES[endMonth]} ${year}`
-    : `${MONTH_NAMES[month]} ${year} – ${MONTH_NAMES[endMonth]} ${endYear}`;
+  return monthRangeLabel(year, month, year + Math.floor(endIndex / 12), endIndex % 12);
+}
+
+/**
+ * Suggested topic of an invoice from work entries, from the months of the
+ * first and last entry (calendar days stored as UTC midnight): "Arbeiten
+ * November 2026" or "Arbeiten Oktober–November 2026". Editable in the draft.
+ */
+export function workEntriesTopic(first: Date, last: Date): string {
+  return `Arbeiten ${monthRangeLabel(first.getUTCFullYear(), first.getUTCMonth(), last.getUTCFullYear(), last.getUTCMonth())}`;
 }
 
 /**
