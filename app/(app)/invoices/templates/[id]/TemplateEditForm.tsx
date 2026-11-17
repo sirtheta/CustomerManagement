@@ -10,19 +10,21 @@ import { updateTemplate } from "../actions";
 import { useActionToast, type ActionState } from "@/hooks/use-action-toast";
 import Link from "next/link";
 import type { Category, Service, Unit } from "@prisma/client";
+import { TopicTemplateField } from "@/components/topic-template-field";
 
 type SerializedService = Omit<Service, "unitPrice"> & { unitPrice: number };
 
 type Props = {
   templateId: number;
   name: string;
+  topic: string | null;
   initialItems: ItemData[];
   services: SerializedService[];
   categories: Category[];
   unitOrder?: readonly Unit[];
 };
 
-export default function TemplateEditForm({ templateId, name, initialItems, services, categories, unitOrder }: Props) {
+export default function TemplateEditForm({ templateId, name, topic, initialItems, services, categories, unitOrder }: Props) {
   const action = updateTemplate.bind(null, templateId);
   const [state, formAction, isPending] = useActionState<ActionState, FormData>(action, {});
   useActionToast(state, "Vorlage gespeichert", { toastErrors: false });
@@ -36,11 +38,12 @@ export default function TemplateEditForm({ templateId, name, initialItems, servi
         <CardHeader>
           <CardTitle>Vorlagendaten</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input id="name" name="name" defaultValue={name} required className="max-w-sm" />
           </div>
+          <TopicTemplateField id="topic" defaultValue={topic ?? ""} />
         </CardContent>
       </Card>
 

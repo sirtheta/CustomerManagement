@@ -96,12 +96,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
     modules.subscriptions
       ? prisma.subscription.findMany({
           where: { customerId },
-          include: { template: { select: { name: true } } },
+          include: { template: { select: { name: true, topic: true } } },
           orderBy: { nextInvoiceDate: "asc" },
         })
       : [],
     modules.subscriptions
-      ? prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+      ? prisma.invoiceTemplate.findMany({ select: { id: true, name: true, topic: true }, orderBy: { name: "asc" } })
       : [],
     prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),
     modules.tasks
@@ -198,6 +198,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                 active: s.active,
                 templateId: s.templateId,
                 templateName: s.template?.name ?? null,
+                topic: s.topic,
+                templateTopic: s.template?.topic ?? null,
               }))}
             />
           )}

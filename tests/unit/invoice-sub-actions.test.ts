@@ -388,6 +388,7 @@ describe("invoices/templates actions", () => {
     it("creates template from invoice and returns success", async () => {
       vi.mocked(auth).mockResolvedValue(editorSession);
       vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+        topic: "Hosting 2026",
         items: [{ name: "Item", description: null, unit: "Stunde", unitPrice: 100, quantity: 1, categoryId: null }],
       } as never);
       vi.mocked(prisma.invoiceTemplate.create).mockResolvedValue({} as never);
@@ -395,7 +396,7 @@ describe("invoices/templates actions", () => {
       const result = await saveAsTemplate(1, "Monatsrechnung");
       expect(result.success).toBe(true);
       expect(prisma.invoiceTemplate.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ name: "Monatsrechnung" }),
+        data: expect.objectContaining({ name: "Monatsrechnung", topic: "Hosting 2026" }),
       });
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/templates");
     });
@@ -464,7 +465,22 @@ describe("invoices/templates actions", () => {
       expect(logAudit).toHaveBeenCalledWith(editorSession, "UPDATE", "InvoiceTemplate", 2, "Abo Hosting", {
         itemCount: 2,
         total: 210,
+        topic: null,
       });
+    });
+
+    it("stores the topic on one line, {period} included", async () => {
+      vi.mocked(auth).mockResolvedValue(editorSession);
+      vi.mocked(prisma.templateItem.deleteMany).mockResolvedValue({ count: 0 } as never);
+      vi.mocked(prisma.invoiceTemplate.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.$transaction).mockImplementation((arg: ((tx: typeof prisma) => Promise<unknown>) | Promise<unknown>[]) =>
+        Array.isArray(arg) ? Promise.all(arg) as never : arg(prisma) as never
+      );
+
+      await updateTemplate(2, {}, form({ name: "Hosting", topic: " Hosting\n{period} ", itemsJson: "[]" }));
+      expect(prisma.invoiceTemplate.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ topic: "Hosting {period}" }) })
+      );
     });
   });
 

@@ -207,6 +207,8 @@ model Item {
 model InvoiceTemplate {
   id    Int            @id @default(autoincrement())
   name  String
+  /// Default topic for invoices from this template; `{period}` is filled on subscription invoices.
+  topic String?
   items TemplateItem[]
   subscriptions Subscription[]
 }
@@ -237,6 +239,8 @@ model Subscription {
   nextInvoiceDate DateTime
   autoSend        Boolean              @default(false)
   active          Boolean              @default(true)
+  /// Topic of the invoices; empty = the template's topic. `{period}` = billed period.
+  topic           String?
   createdAt       DateTime             @default(now())
   customer        Customer             @relation(fields: [customerId], references: [customerId], onDelete: Cascade)
   template        InvoiceTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)

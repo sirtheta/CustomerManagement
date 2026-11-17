@@ -4,6 +4,7 @@ import { calculateInvoiceTotal, calculateItemTotal } from "@/lib/calculations";
 import { advancePast, skippedPeriods, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { logAuditEntry } from "@/lib/audit";
 import { fillPlaceholders, invoiceMailTemplate, invoicePlaceholders } from "@/lib/mail-templates";
+import { resolveTopic, subscriptionPeriodLabel } from "@/lib/document-topic";
 import logger from "@/lib/logger";
 import { billingEmail, effectivePaymentTermDays } from "@/lib/customer-billing";
 import { customerDisplayName } from "@/lib/customer-display";
@@ -101,8 +102,6 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
 
   if (due.length === 0) return;
 
-  // Subscription drafts carry no custom text.
-  const mailTpl = invoiceMailTemplate(settings, { isCreditNote: false, hasCustomText: false });
   const defaultPaymentDays = settings?.defaultPaymentTermDays ?? 30;
 
   for (const sub of due) {
@@ -126,6 +125,10 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
     });
     const totalAmount = calculateInvoiceTotal(items, 0, { roundTo5Rappen: settings?.roundTotalTo5Rappen ?? false });
     const interval = sub.interval as SubscriptionIntervalName;
+    // The invoice bills the period starting at the due date (later skipped periods get none).
+    const topic = resolveTopic(sub.topic ?? sub.template?.topic, subscriptionPeriodLabel(sub.nextInvoiceDate, interval));
+    // Subscription drafts carry no custom text.
+    const mailTpl = invoiceMailTemplate(settings, { isCreditNote: false, hasCustomText: false, hasTopic: topic != null });
     const nextInvoiceDate = advancePast(sub.nextInvoiceDate, interval, today);
     const skipped = skippedPeriods(sub.nextInvoiceDate, interval, today);
 
@@ -136,6 +139,7 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
         const invoice = await tx.invoice.create({
           data: {
             customerId: sub.customerId,
+            topic,
             date: today,
             dueDate,
             totalAmount,

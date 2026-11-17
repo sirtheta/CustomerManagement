@@ -188,6 +188,7 @@ async function main() {
           customerId: customer.customerId,
           interval: forcedYearly ? "Yearly" : faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"] as const),
           nextInvoiceDate: faker.date.future(),
+          topic: faker.helpers.arrayElement(["Hosting {period}", "Wartung {period}", null]),
         },
       });
     }

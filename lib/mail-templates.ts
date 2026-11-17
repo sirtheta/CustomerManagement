@@ -2,6 +2,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { customerDisplayName, type CustomerNameFields } from "@/lib/customer-display";
 import { buildSalutation, type SalutationFields } from "@/lib/salutation";
 import { MAX_REMINDER_LEVEL, reminderTitle } from "@/lib/reminder-charges";
+import { removeEmptyPlaceholder } from "@/lib/document-topic";
 
 /**
  * Mail placeholders and default texts for every customer mail (invoice, credit
@@ -25,20 +26,9 @@ export type PlaceholderKey =
 /** A missing (undefined) value leaves its placeholder in the text, e.g. the number of a draft. */
 export type PlaceholderValues = Partial<Record<PlaceholderKey, string | undefined>>;
 
-/**
- * Takes an empty `{topic}` out of a (custom) template together with what only
- * belongs to it: a line like "Betreff: {topic}", quotes or brackets around it,
- * and the separator before it (or after it, at the start), so
- * "Rechnung {documentNumber} – {topic} – {companyName}" does not end up with
- * an empty "–  –". A text that uses the topic mid-sentence keeps the sentence.
- */
+/** An empty `{topic}` is removed with its separator, see `removeEmptyPlaceholder`. */
 export function removeEmptyTopic(template: string): string {
-  return template
-    .replace(/^[ \t]*(?:\p{L}[\p{L} .]{0,29}:[ \t]*)?\{topic\}[ \t]*\r?\n/gmu, "")
-    .replace(/[ \t]*[«"„“‹'(\[]\{topic\}[»"“”›')\]]/g, "")
-    .replace(/[ \t]*[–—\-:|/,][ \t]*\{topic\}/g, "")
-    .replace(/\{topic\}[ \t]*[–—\-:|/,][ \t]*/g, "")
-    .replace(/[ \t]*\{topic\}/g, "");
+  return removeEmptyPlaceholder(template, "topic");
 }
 
 /**

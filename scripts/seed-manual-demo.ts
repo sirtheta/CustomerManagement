@@ -112,11 +112,22 @@ async function main() {
   ];
   const customers = await Promise.all(customerData.map((data) => prisma.customer.create({ data })));
 
+  // Hosting template with a topic; {period} becomes the billed period on each subscription invoice
+  const hostingTemplate = await prisma.invoiceTemplate.create({
+    data: {
+      name: "Hosting Starter",
+      topic: "Hosting {period}",
+      items: {
+        create: [{ name: "Hosting Starter", description: "Managed Hosting inkl. SSL", unit: Unit.Piece, unitPrice: 29, quantity: 12, categoryId: hosting.categoryId }],
+      },
+    },
+  });
+
   // Demo subscriptions for three customers (Bergland, Optik Sonnenschein, Confiserie Mathez)
   await prisma.subscription.createMany({
     data: [
-      { customerId: customers[0].customerId, interval: "Yearly", nextInvoiceDate: daysFromNow(45) },
-      { customerId: customers[3].customerId, interval: "Quarterly", nextInvoiceDate: daysFromNow(120) },
+      { customerId: customers[0].customerId, interval: "Yearly", nextInvoiceDate: daysFromNow(45), templateId: hostingTemplate.id },
+      { customerId: customers[3].customerId, interval: "Quarterly", nextInvoiceDate: daysFromNow(120), templateId: hostingTemplate.id, topic: "Hosting optik-sonnenschein.ch {period}" },
       { customerId: customers[7].customerId, interval: "Monthly", nextInvoiceDate: daysFromNow(200) },
     ],
   });
@@ -163,6 +174,11 @@ async function main() {
   ];
 
   let invoiceCounter = 1;
+  // Subject lines ("Thema") of the demo documents; null shows a document without one
+  const topics = ["Website-Relaunch", "Relaunch Onlineshop", null, "Support-Pauschale", "Neuer Webauftritt"];
+  let topicIndex = 0;
+  const nextTopic = () => topics[topicIndex++ % topics.length];
+
   for (const plan of invoicePlans) {
     const date = pastDate(plan.daysAgo);
     const dueDate = new Date(date.getTime() + plan.dueInDays * 24 * 60 * 60 * 1000);
@@ -177,6 +193,7 @@ async function main() {
       data: {
         customerId: plan.customer.customerId,
         documentNumber,
+        topic: nextTopic(),
         date,
         dueDate,
         totalAmount,
@@ -235,6 +252,7 @@ async function main() {
       data: {
         customerId: plan.customer.customerId,
         documentNumber,
+        topic: nextTopic(),
         date,
         validUntil,
         totalAmount,

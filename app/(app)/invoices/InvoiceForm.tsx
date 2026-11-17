@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { MAX_TOPIC_LENGTH } from "@/lib/document-topic";
+import { MAX_TOPIC_LENGTH, resolveTopic } from "@/lib/document-topic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -50,6 +50,7 @@ type SerializedTemplateItem = {
 type SerializedTemplate = {
   id: number;
   name: string;
+  topic: string | null;
   items: SerializedTemplateItem[];
 };
 
@@ -146,6 +147,7 @@ export default function InvoiceForm({
 
   const initialItems = invoice ? invoice.items.map(toItemData) : [];
   const [templateKey, setTemplateKey] = useState(0);
+  const [topic, setTopic] = useState(invoice?.topic ?? "");
   const [currentItems, setCurrentItems] = useState<ItemData[]>(initialItems);
 
   function handleTemplateLoad(templateId: string | null) {
@@ -166,6 +168,9 @@ export default function InvoiceForm({
       }))
     );
     setTemplateKey((k) => k + 1);
+    // A topic typed by hand wins; {period} only means something on subscription invoices.
+    const templateTopic = resolveTopic(tpl.topic);
+    if (templateTopic && !topic.trim()) setTopic(templateTopic);
   }
 
   return (
@@ -256,7 +261,8 @@ export default function InvoiceForm({
               <Input
                 id="topic"
                 name="topic"
-                defaultValue={invoice?.topic ?? ""}
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
                 maxLength={MAX_TOPIC_LENGTH}
                 placeholder="z. B. Hosting 2027 oder Installation Office 365"
               />

@@ -38,7 +38,10 @@ export default async function TemplatesPage() {
           {templates.map((tpl) => (
             <div key={tpl.id} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">
-                <span className="font-medium">{tpl.name}</span>
+                <span className="min-w-0">
+                  <span className="font-medium">{tpl.name}</span>
+                  {tpl.topic && <span className="block truncate text-xs text-muted-foreground">Thema: {tpl.topic}</span>}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {tpl.items.length} Position{tpl.items.length !== 1 ? "en" : ""}
