@@ -11,6 +11,7 @@ import { generateReminderPdf } from "../lib/pdf/reminder-pdf";
 import { computeReminderCharges, reminderTitle } from "../lib/reminder-charges";
 import { checkOverdueInvoices } from "../lib/reminders";
 import { swissDateString } from "../lib/date";
+import { encryptSecret } from "../lib/crypto";
 
 loadEnvConfig(process.cwd());
 
@@ -360,6 +361,14 @@ async function main() {
   await prisma.applicationSettings.create({
     data: {
       companyInformationId: company.companyInformationId,
+      // Local Mailpit (docker run -p 1025:1025 -p 8025:8025 axllent/mailpit): every mail
+      // lands in http://localhost:8025. The app needs user and password to count SMTP as
+      // configured; Mailpit without auth ignores them.
+      smtpHost: "localhost",
+      smtpPort: 1025,
+      smtpUser: "mailpit",
+      smtpPassword: encryptSecret("mailpit"),
+      smtpFromAddress: "rechnungen@example.ch",
     },
   });
 
