@@ -79,6 +79,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-semibold">{documentLabel(quote.documentNumber)}</h1>
+          {quote.topic && <p className="font-medium">{quote.topic}</p>}
           <p className="text-sm text-muted-foreground mt-0.5">
             <Link
               href={`/customers/${quote.customer.customerId}`}

@@ -13,6 +13,8 @@ export type SubscriptionOverviewRow = {
   active: boolean;
   templateId: number | null;
   templateName: string | null;
+  /** Topic of the next invoices: the subscription's own, else the template's; `{period}` unresolved. */
+  topic: string | null;
 };
 
 /**
@@ -25,7 +27,7 @@ export async function listSubscriptionOverview(prisma: PrismaClient): Promise<Su
     where: { customer: { archivedAt: null } },
     include: {
       customer: { select: { customerId: true, company: true, contactPerson: true, contactInsteadOfCompany: true } },
-      template: { select: { name: true } },
+      template: { select: { name: true, topic: true } },
     },
     orderBy: [{ active: "desc" }, { nextInvoiceDate: "asc" }, { id: "asc" }],
   });
@@ -40,5 +42,6 @@ export async function listSubscriptionOverview(prisma: PrismaClient): Promise<Su
     active: s.active,
     templateId: s.templateId,
     templateName: s.template?.name ?? null,
+    topic: s.topic ?? s.template?.topic ?? null,
   }));
 }

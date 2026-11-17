@@ -19,6 +19,7 @@ import { SortableColumn } from "@/components/ui/sortable-column";
 import { Pagination } from "@/components/ui/pagination";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { ExportButton } from "@/components/export-button";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { requireModule } from "@/lib/module-guard";
 import { isEditorSession, requireSession } from "@/lib/permissions";
@@ -79,6 +80,7 @@ export default async function QuotesPage({ searchParams }: Props) {
       ? {
           OR: [
             { documentNumber: { contains: term } },
+            { topic: { contains: term } },
             { customer: { company: { contains: term } } },
             { customer: { contactPerson: { contains: term } } },
           ],
@@ -190,6 +192,7 @@ export default async function QuotesPage({ searchParams }: Props) {
               >
                 {customerDisplayName(q.customer)}
               </Link>
+              <DocumentTopic topic={q.topic} variant="card" />
               <p className="text-sm text-muted-foreground">
                 {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
               </p>
@@ -256,6 +259,7 @@ export default async function QuotesPage({ searchParams }: Props) {
                     <Link href={`/quotes/${q.id}`} className="hover:underline">
                       {documentLabel(q.documentNumber)}
                     </Link>
+                    <DocumentTopic topic={q.topic} />
                   </TableCell>
                   <TableCell>
                     <Link

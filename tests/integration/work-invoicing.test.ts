@@ -78,6 +78,8 @@ describe("billing work entries", () => {
       ["Kies", 1, 0, 0],
     ]);
     expect(Number(invoice.totalAmount)).toBe(350);
+    // Suggested from the months of the entries, editable in the draft.
+    expect(invoice.topic).toBe("Arbeiten Oktober 2026");
     // Payment term of the settings (14 days), counted from the invoice date.
     expect(Math.round((invoice.dueDate.getTime() - invoice.date.getTime()) / 86_400_000)).toBe(14);
 
@@ -125,7 +127,7 @@ describe("billing work entries", () => {
     // The hook is what claims the entries; if it finds fewer rows than expected, no invoice may remain.
     await expect(
       createDocumentWithItems(
-        { kind: "invoice", customerId, customUserText: null, date: new Date(), dueDate: new Date(), totalAmount: 0, discountPercent: 0, items: [] },
+        { kind: "invoice", customerId, topic: null, customUserText: null, date: new Date(), dueDate: new Date(), totalAmount: 0, discountPercent: 0, items: [] },
         {
           onCreated: async () => {
             throw new WorkBillingError(WORK_ALREADY_BILLED_ERROR);

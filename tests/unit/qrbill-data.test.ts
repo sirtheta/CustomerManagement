@@ -177,6 +177,7 @@ describe("QRBill data preparation", () => {
         id: 1,
         customerId: 1,
         documentNumber: validInvoice.documentNumber,
+        topic: "Hosting 2027",
         date: new Date(),
         dueDate: new Date(Date.now() + 30 * 86_400_000),
         version: 1,

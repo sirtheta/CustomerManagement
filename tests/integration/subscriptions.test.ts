@@ -12,10 +12,11 @@ describe("checkSubscriptions", () => {
   const yesterday = new Date(Date.now() - 86_400_000);
   const tomorrow = new Date(Date.now() + 86_400_000);
 
-  async function seedTemplate() {
+  async function seedTemplate(topic: string | null = null) {
     return db.prisma.invoiceTemplate.create({
       data: {
         name: "Mitgliederbeitrag",
+        topic,
         items: {
           create: [
             { name: "Beitrag", unit: "Piece", unitPrice: 120, quantity: 1 },
@@ -27,7 +28,7 @@ describe("checkSubscriptions", () => {
   }
 
   async function seedSubscription(
-    overrides: Partial<{ nextInvoiceDate: Date; interval: "Monthly" | "Quarterly" | "Yearly"; active: boolean; templateId: number | null; archived: boolean; email: string; customer: Partial<Prisma.CustomerUncheckedCreateInput> }> = {}
+    overrides: Partial<{ nextInvoiceDate: Date; interval: "Monthly" | "Quarterly" | "Yearly"; active: boolean; templateId: number | null; archived: boolean; email: string; topic: string | null; customer: Partial<Prisma.CustomerUncheckedCreateInput> }> = {}
   ) {
     const customer = await db.prisma.customer.create({
       data: {
@@ -44,6 +45,7 @@ describe("checkSubscriptions", () => {
         interval: overrides.interval ?? "Yearly",
         nextInvoiceDate: overrides.nextInvoiceDate ?? yesterday,
         active: overrides.active ?? true,
+        topic: overrides.topic ?? null,
       },
     });
   }
@@ -68,6 +70,41 @@ describe("checkSubscriptions", () => {
     // Kept as placeholder: resolved at send time from the (possibly edited) invoice total.
     expect(pending[0].body).toContain("{totalAmount}");
     expect(pending[0].body).not.toContain("246");
+  });
+
+  describe("topic", () => {
+    it("fills {period} of the template topic and keeps {topic} open in the pending mail", async () => {
+      const template = await seedTemplate("Hosting {period}");
+      await seedSubscription({ templateId: template.id, interval: "Yearly", nextInvoiceDate: new Date(2026, 0, 1) });
+      await checkSubscriptions(db.prisma);
+
+      const invoice = await db.prisma.invoice.findFirstOrThrow();
+      expect(invoice.topic).toBe("Hosting 2026");
+      const pending = await db.prisma.pendingEmail.findFirstOrThrow();
+      // The topic stays a placeholder until approval (it can still be edited on the draft).
+      expect(pending.subject).toContain("– {topic} –");
+      expect(pending.body).toContain("für «{topic}»");
+    });
+
+    it("prefers the subscription's own topic", async () => {
+      const template = await seedTemplate("Hosting {period}");
+      await seedSubscription({
+        templateId: template.id,
+        interval: "Quarterly",
+        nextInvoiceDate: new Date(2026, 3, 1),
+        topic: "Domain example.ch {period}",
+      });
+      await checkSubscriptions(db.prisma);
+      expect((await db.prisma.invoice.findFirstOrThrow()).topic).toBe("Domain example.ch Q2 2026");
+    });
+
+    it("leaves the topic and the default mail without it when neither has one", async () => {
+      const template = await seedTemplate();
+      await seedSubscription({ templateId: template.id });
+      await checkSubscriptions(db.prisma);
+      expect((await db.prisma.invoice.findFirstOrThrow()).topic).toBeNull();
+      expect((await db.prisma.pendingEmail.findFirstOrThrow()).body).not.toContain("für «");
+    });
   });
 
   it("creates an empty draft when the subscription has no template", async () => {

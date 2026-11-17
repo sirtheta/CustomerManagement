@@ -58,6 +58,7 @@ export async function createCreditNoteDraft(
     const credit = await tx.invoice.create({
       data: {
         customerId: original.customerId,
+        topic: original.topic,
         customUserText: original.customUserText,
         date: now,
         // A credit note has nothing to pay; the column is required, so reuse the date.

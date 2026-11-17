@@ -22,6 +22,7 @@ export type CustomerHit = {
 export type DocumentHit<TState extends string> = {
   id: number;
   documentNumber: string | null;
+  topic: string | null;
   date: string;
   totalAmount: number;
   state: TState;
@@ -43,6 +44,7 @@ export const EMPTY_SEARCH_RESULTS: GlobalSearchResults = {
 const documentSelect = {
   id: true,
   documentNumber: true,
+  topic: true,
   date: true,
   totalAmount: true,
   state: true,
@@ -62,6 +64,7 @@ export async function searchGlobal(
   const documentWhere = {
     OR: [
       { documentNumber: { contains: q } },
+      { topic: { contains: q } },
       { customer: { company: { contains: q } } },
       { customer: { contactPerson: { contains: q } } },
     ],
@@ -104,6 +107,7 @@ export async function searchGlobal(
   const toHit = <TState extends string>(doc: {
     id: number;
     documentNumber: string | null;
+    topic: string | null;
     date: Date;
     totalAmount: { toNumber(): number };
     state: TState;
@@ -111,6 +115,7 @@ export async function searchGlobal(
   }): DocumentHit<TState> => ({
     id: doc.id,
     documentNumber: doc.documentNumber,
+    topic: doc.topic,
     date: doc.date.toISOString(),
     totalAmount: doc.totalAmount.toNumber(),
     state: doc.state,

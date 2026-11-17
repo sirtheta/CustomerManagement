@@ -460,7 +460,8 @@ export default function SettingsForm(props: Props) {
             <p className="text-xs text-muted-foreground">
               Platzhalter: {"{documentNumber}"} (Rechnungsnummer), {"{salutation}"} (Briefanrede des Kunden, z. B. «Guten Tag Anna Muster»), {"{contactPerson}"} (Ansprechperson), {"{customerName}"} (Kundenname),
               {" "}{"{companyName}"} (deine Firma), {"{totalAmount}"} (Gesamtbetrag), {"{date}"} (Rechnungsdatum), {"{dueDate}"} (Fälligkeitsdatum),
-              {" "}{"{customUserText}"} (Zusatztext)
+              {" "}{"{customUserText}"} (Zusatztext), {"{topic}"} (Thema der Rechnung). Hat eine Rechnung kein Thema,
+              wird {"{topic}"} samt Trennzeichen davor entfernt (z. B. «–» oder «:»).
             </p>
           </div>
 

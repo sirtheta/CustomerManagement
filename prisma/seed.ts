@@ -11,6 +11,7 @@ import { generateReminderPdf } from "../lib/pdf/reminder-pdf";
 import { computeReminderCharges, reminderTitle } from "../lib/reminder-charges";
 import { checkOverdueInvoices } from "../lib/reminders";
 import { swissDateString } from "../lib/date";
+import { encryptSecret } from "../lib/crypto";
 
 loadEnvConfig(process.cwd());
 
@@ -28,6 +29,24 @@ const QUOTE_STATES = Object.values(QuoteState);
 const UNITS = Object.values(Unit);
 
 const DAY_MS = 86_400_000;
+
+// Typical subject lines ("Thema"); about a third of the documents get none, as in real use.
+const SEED_TOPICS = [
+  "Hosting 2027",
+  "Domain und E-Mail",
+  "Installation Office 365",
+  "Neuer Webauftritt",
+  "Wartung Server Q1",
+  "Netzwerk-Erweiterung Büro",
+  "Support-Pauschale",
+  "Migration Mailserver",
+  "Backup-Lösung",
+  "Schulung Mitarbeitende",
+];
+
+function seedTopic(): string | null {
+  return faker.datatype.boolean({ probability: 0.7 }) ? faker.helpers.arrayElement(SEED_TOPICS) : null;
+}
 
 // Number of subscription drafts with a pending mail to seed (see seedPendingSubscriptionInvoices)
 const PENDING_SUBSCRIPTION_COUNT = 3;
@@ -169,6 +188,7 @@ async function main() {
           customerId: customer.customerId,
           interval: forcedYearly ? "Yearly" : faker.helpers.arrayElement(["Monthly", "Quarterly", "Yearly"] as const),
           nextInvoiceDate: faker.date.future(),
+          topic: faker.helpers.arrayElement(["Hosting {period}", "Wartung {period}", null]),
         },
       });
     }
@@ -211,10 +231,12 @@ async function main() {
       const invoiceNumber = invoiceSent
         ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`
         : null;
+      const topic = seedTopic();
       const invoice = await prisma.invoice.create({
         data: {
           customerId: customer.customerId,
           documentNumber: invoiceNumber,
+          topic,
           customUserText: faker.lorem.paragraph(),
           date,
           dueDate,
@@ -238,6 +260,7 @@ async function main() {
           data: {
             customerId: customer.customerId,
             documentNumber: creditNumber,
+            topic,
             date: creditDate,
             // A credit note has nothing to pay; the column is required, so reuse the date.
             dueDate: creditDate,
@@ -272,6 +295,7 @@ async function main() {
         data: {
           customerId: customer.customerId,
           documentNumber: quoteNumber,
+          topic: seedTopic(),
           customUserText: faker.lorem.paragraph(),
           date,
           validUntil,
@@ -338,6 +362,14 @@ async function main() {
   await prisma.applicationSettings.create({
     data: {
       companyInformationId: company.companyInformationId,
+      // Local Mailpit (docker run -p 1025:1025 -p 8025:8025 axllent/mailpit): every mail
+      // lands in http://localhost:8025. The app needs user and password to count SMTP as
+      // configured; Mailpit without auth ignores them.
+      smtpHost: "localhost",
+      smtpPort: 1025,
+      smtpUser: "mailpit",
+      smtpPassword: encryptSecret("mailpit"),
+      smtpFromAddress: "rechnungen@example.ch",
     },
   });
 
@@ -458,6 +490,7 @@ async function seedReminders(
       data: {
         customerId: customer.customerId,
         documentNumber: number,
+        topic: seedTopic(),
         date,
         dueDate,
         totalAmount: total,

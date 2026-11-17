@@ -14,6 +14,7 @@ import { useActionToast } from "@/hooks/use-action-toast";
 import { submitKeepingInput } from "@/hooks/submit-keeping-input";
 import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscription-dates";
 import { swissDateString } from "@/lib/date";
+import { TopicTemplateField } from "@/components/topic-template-field";
 import {
   createSubscription,
   updateSubscription,
@@ -21,7 +22,7 @@ import {
   deleteSubscription,
 } from "./subscription-actions";
 
-type TemplateOption = { id: number; name: string };
+type TemplateOption = { id: number; name: string; topic: string | null };
 type SubscriptionRecord = {
   id: number;
   interval: SubscriptionIntervalName;
@@ -30,6 +31,9 @@ type SubscriptionRecord = {
   active: boolean;
   templateId: number | null;
   templateName: string | null;
+  /** Own topic; null = the template's. */
+  topic: string | null;
+  templateTopic: string | null;
 };
 type Props = {
   customerId: number;
@@ -43,6 +47,7 @@ type FieldValues = {
   nextInvoiceDate: string;
   templateId: string;
   autoSend: boolean;
+  topic: string;
 };
 
 function SubscriptionFields({
@@ -59,6 +64,7 @@ function SubscriptionFields({
   disabled: boolean;
 }) {
   const noTemplate = values.templateId === "";
+  const templateTopic = templates.find((t) => String(t.id) === values.templateId)?.topic ?? null;
   // The daily job bills every active subscription whose date is today or earlier.
   const dueNow = values.nextInvoiceDate !== "" && values.nextInvoiceDate <= swissDateString();
   return (
@@ -145,6 +151,14 @@ function SubscriptionFields({
           </p>
         )}
       </div>
+      <TopicTemplateField
+        id={`${idPrefix}-topic`}
+        value={values.topic}
+        onChange={(e) => onChange({ ...values, topic: e.target.value })}
+        disabled={disabled}
+        placeholder={templateTopic ?? undefined}
+        note={templateTopic ? "Leer lassen, um das Thema der Vorlage zu verwenden." : undefined}
+      />
       <label className="flex items-center gap-2 text-sm cursor-pointer">
         <input
           type="checkbox"
@@ -165,6 +179,7 @@ const EMPTY_VALUES: FieldValues = {
   nextInvoiceDate: "",
   templateId: "",
   autoSend: false,
+  topic: "",
 };
 
 function NewSubscriptionForm({
@@ -221,6 +236,7 @@ function SubscriptionItem({
     nextInvoiceDate: sub.nextInvoiceDate,
     templateId: sub.templateId == null ? "" : String(sub.templateId),
     autoSend: sub.autoSend,
+    topic: sub.topic ?? "",
   });
   useActionToast(state, "Abo gespeichert");
   const [isToggling, startToggle] = useTransition();
@@ -293,6 +309,9 @@ function ReadOnlyItem({ sub }: { sub: SubscriptionRecord }) {
         Nächste Rechnung: {`${day}.${month}.${year}`} · Vorlage: {sub.templateName ?? "–"} · Automatisch
         versenden: {sub.autoSend ? "Ja" : "Nein"}
       </p>
+      {(sub.topic ?? sub.templateTopic) && (
+        <p className="text-muted-foreground">Thema: {sub.topic ?? sub.templateTopic}</p>
+      )}
     </li>
   );
 }
@@ -313,7 +332,7 @@ export default function SubscriptionsSection({ customerId, subscriptions, templa
             {subscriptions.map((sub) =>
               canEdit ? (
                 <SubscriptionItem
-                  key={`${sub.id}-${sub.nextInvoiceDate}-${sub.templateId}-${sub.autoSend}-${sub.interval}`}
+                  key={`${sub.id}-${sub.nextInvoiceDate}-${sub.templateId}-${sub.autoSend}-${sub.interval}-${sub.topic}`}
                   customerId={customerId}
                   sub={sub}
                   templates={templates}

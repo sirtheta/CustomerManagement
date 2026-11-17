@@ -72,6 +72,7 @@ describe("subscription actions", () => {
           nextInvoiceDate: new Date(2027, 0, 1),
           templateId: 5,
           autoSend: true,
+          topic: null,
           active: true,
         },
       });
@@ -83,6 +84,12 @@ describe("subscription actions", () => {
         expect.any(String),
         expect.objectContaining({ customerId: 1, templateId: 5, autoSend: true })
       );
+    });
+
+    it("stores the topic on one line, {period} included", async () => {
+      vi.mocked(prisma.subscription.create).mockResolvedValue({ id: 12 } as never);
+      await createSubscription(1, {}, form({ ...VALID, topic: "  Hosting\n {period} " }));
+      expect(vi.mocked(prisma.subscription.create).mock.calls[0][0]).toMatchObject({ data: { topic: "Hosting {period}" } });
     });
 
     it("rejects an invalid interval", async () => {
@@ -152,6 +159,7 @@ describe("subscription actions", () => {
           nextInvoiceDate: new Date(2027, 0, 1),
           templateId: 5,
           autoSend: true,
+          topic: null,
         },
       });
       expect(logAudit).toHaveBeenCalledWith(
@@ -170,7 +178,7 @@ describe("subscription actions", () => {
       expect(res.success).toBe(true);
       expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
         where: { id: 7, customerId: 1 },
-        data: { interval: "Quarterly", templateId: 5, autoSend: true },
+        data: { interval: "Quarterly", templateId: 5, autoSend: true, topic: null },
       });
     });
 

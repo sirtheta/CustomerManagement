@@ -84,7 +84,10 @@ export default async function SearchPage({ searchParams }: Props) {
                 className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <div>
-                  <p className="font-medium text-sm">{documentLabel(inv.documentNumber)}</p>
+                  <p className="font-medium text-sm">
+                    {documentLabel(inv.documentNumber)}
+                    {inv.topic && <span className="font-normal text-muted-foreground"> · {inv.topic}</span>}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {inv.customerName}
                     {" · "}
@@ -117,7 +120,10 @@ export default async function SearchPage({ searchParams }: Props) {
                 className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
               >
                 <div>
-                  <p className="font-medium text-sm">{documentLabel(q.documentNumber)}</p>
+                  <p className="font-medium text-sm">
+                    {documentLabel(q.documentNumber)}
+                    {q.topic && <span className="font-normal text-muted-foreground"> · {q.topic}</span>}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {q.customerName}
                     {" · "}

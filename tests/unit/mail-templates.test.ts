@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  DEFAULT_CREDIT_NOTE_BODY,
   DEFAULT_CREDIT_NOTE_SUBJECT,
   DEFAULT_INVOICE_SUBJECT,
   defaultInvoiceBody,
@@ -11,6 +12,7 @@ import {
   invoicePlaceholders,
   quoteMail,
   reminderMail,
+  removeEmptyTopic,
 } from "@/lib/mail-templates";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -19,6 +21,7 @@ const customer = { contactPerson: "Max Muster", company: "Muster AG", contactIns
 function makeInvoice(overrides: Record<string, unknown> = {}) {
   return {
     documentNumber: "I-26090001" as string | null,
+    topic: null as string | null,
     totalAmount: { toNumber: () => 120 },
     date: new Date("2026-09-01T00:00:00Z"),
     dueDate: new Date("2026-10-01T00:00:00Z"),
@@ -122,6 +125,7 @@ describe("quoteMail", () => {
     const mail = quoteMail(
       {
         documentNumber: "Q-1",
+        topic: null,
         totalAmount: { toNumber: () => 50 },
         date: new Date("2026-09-01T00:00:00Z"),
         validUntil: new Date("2026-09-30T00:00:00Z"),
@@ -207,6 +211,7 @@ describe("salutation placeholder", () => {
     const mail = invoiceMail(
       {
         documentNumber: "I-1",
+        topic: null,
         totalAmount: { toNumber: () => 10 },
         date: new Date("2026-01-01"),
         dueDate: new Date("2026-01-31"),
@@ -231,5 +236,96 @@ describe("salutation placeholder", () => {
       openAmount: 10,
     });
     expect(mail.body).toMatch(/^Sehr geehrte Damen und Herren\n\n/);
+  });
+});
+
+describe("topic placeholder", () => {
+  it("names the topic in the default invoice mail", () => {
+    const mail = invoiceMail(makeInvoice({ topic: "Hosting 2027" }), null, "Test AG");
+    expect(mail.subject).toBe("Rechnung Nr. I-26090001 – Hosting 2027 – Test AG");
+    expect(mail.body).toContain("die Rechnung Nr. I-26090001 für «Hosting 2027» vom ");
+  });
+
+  it("leaves the default texts unchanged without a topic", () => {
+    const mail = invoiceMail(makeInvoice(), null, "Test AG");
+    expect(mail.subject).toBe("Rechnung Nr. I-26090001 – Test AG");
+    expect(mail.body).toContain("die Rechnung Nr. I-26090001 vom ");
+    expect(invoiceMailTemplate(null, { isCreditNote: true, hasCustomText: false }).body).toBe(DEFAULT_CREDIT_NOTE_BODY);
+  });
+
+  it("names the topic in credit note and quote mails", () => {
+    const credit = invoiceMail(makeInvoice({ topic: "Domain", creditNoteForId: 1 }), null, "Test AG");
+    expect(credit.subject).toBe("Gutschrift Nr. I-26090001 – Domain – Test AG");
+    expect(credit.body).toContain("die Gutschrift Nr. I-26090001 für «Domain» vom ");
+
+    const quote = quoteMail(
+      {
+        documentNumber: "Q-1",
+        topic: "Office-Installation",
+        totalAmount: { toNumber: () => 50 },
+        date: new Date("2026-09-01T00:00:00Z"),
+        validUntil: new Date("2026-09-30T00:00:00Z"),
+        customUserText: null,
+        customer,
+      },
+      "Test AG"
+    );
+    expect(quote.subject).toBe("Offerte Nr. Q-1 – Office-Installation – Test AG");
+    expect(quote.body).toContain("die Offerte Nr. Q-1 für «Office-Installation» vom ");
+  });
+
+  it("fills {topic} in a custom template", () => {
+    const mail = invoiceMail(
+      makeInvoice({ topic: "Hosting" }),
+      { emailSubjectTemplate: "{topic}: Rechnung {documentNumber}", emailBodyTemplate: "Betreff: {topic}\nText" },
+      "Test AG"
+    );
+    expect(mail).toEqual({ subject: "Hosting: Rechnung I-26090001", body: "Betreff: Hosting\nText" });
+  });
+
+  it("removes an empty topic with its separator from a custom template", () => {
+    const mail = invoiceMail(
+      makeInvoice(),
+      {
+        emailSubjectTemplate: "Rechnung {documentNumber} – {topic} – {companyName}",
+        emailBodyTemplate: "Hallo\nBetreff: {topic}\nRechnung «{topic}» {documentNumber}",
+      },
+      "Test AG"
+    );
+    expect(mail).toEqual({ subject: "Rechnung I-26090001 – Test AG", body: "Hallo\nRechnung I-26090001" });
+  });
+
+  it("removeEmptyTopic handles leading, trailing and bare placeholders", () => {
+    expect(removeEmptyTopic("{topic} – Rechnung {documentNumber}")).toBe("Rechnung {documentNumber}");
+    expect(removeEmptyTopic("Rechnung {documentNumber}: {topic}")).toBe("Rechnung {documentNumber}");
+    expect(removeEmptyTopic("Rechnung ({topic}) {documentNumber}")).toBe("Rechnung {documentNumber}");
+    expect(removeEmptyTopic("A\n{topic}\nB")).toBe("A\nB");
+    expect(removeEmptyTopic("Text\n\nBetreff: {topic}")).toBe("Text\n");
+    expect(removeEmptyTopic("Gruss\n{topic}")).toBe("Gruss");
+    expect(removeEmptyTopic("für {topic} danke")).toBe("für danke");
+    // The default phrase "für «{topic}»" goes as a whole, also in a custom template.
+    expect(removeEmptyTopic("die Rechnung Nr. 1 für «{topic}» vom 1.1.")).toBe("die Rechnung Nr. 1 vom 1.1.");
+    expect(removeEmptyTopic("Rechnung zu ({topic}) vom")).toBe("Rechnung vom");
+    // Only whole words: "Vorfür" is not the preposition.
+    expect(removeEmptyTopic("Vorfür «{topic}» x")).toBe("Vorfür x");
+    // A one-line text (a subject) keeps its label: the line rules need a line break before or after.
+    expect(removeEmptyTopic("Betreff: {topic}")).toBe("Betreff");
+  });
+
+  it("keeps {topic} while its value is unknown", () => {
+    expect(fillPlaceholders("R – {topic}", { topic: undefined })).toBe("R – {topic}");
+  });
+
+  it("adds a subject line to the reminder mail only with a topic", () => {
+    const base = {
+      level: 1,
+      numberLabel: "I-1",
+      contactPerson: "Max Muster",
+      companyName: "Firma",
+      dueDate: new Date("2026-01-31"),
+      openAmount: 10,
+    };
+    expect(reminderMail({ ...base, topic: "Hosting 2027" }).body).toContain("Rechnung Nr.: I-1\nBetreff: Hosting 2027\nBetrag:");
+    expect(reminderMail(base).body).toContain("Rechnung Nr.: I-1\nBetrag:");
   });
 });

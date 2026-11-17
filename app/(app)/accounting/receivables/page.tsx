@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { AGE_BUCKETS, fetchReceivables } from "@/lib/receivables";
 import { requireModule } from "@/lib/module-guard";
@@ -152,6 +153,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
                       {AGE_BUCKETS.find((b) => b.key === r.bucket)?.label ?? ""}
                     </span>
                   </div>
+                  <DocumentTopic topic={r.topic} variant="card" />
                   <p className="text-sm">{r.customerName}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatDate(r.date)} · fällig {formatDate(r.dueDate)}
@@ -191,6 +193,7 @@ export default async function ReceivablesPage({ searchParams }: Props) {
                       <Link href={`/invoices/${r.invoiceId}?from=accounting/receivables`} className="underline">
                         {documentLabel(r.documentNumber)}
                       </Link>
+                      <DocumentTopic topic={r.topic} />
                     </TableCell>
                     <TableCell>{r.customerName}</TableCell>
                     <TableCell>{formatDate(r.date)}</TableCell>

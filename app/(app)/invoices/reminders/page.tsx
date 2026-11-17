@@ -40,6 +40,7 @@ export default async function RemindersPage({ searchParams }: Props) {
     ? {
         OR: [
           { invoice: { documentNumber: { contains: term } } },
+          { invoice: { topic: { contains: term } } },
           { invoice: { customer: { company: { contains: term } } } },
           { invoice: { customer: { contactPerson: { contains: term } } } },
         ],
@@ -128,6 +129,7 @@ export default async function RemindersPage({ searchParams }: Props) {
             const { subject: defaultSubject, body: defaultBody } = reminderMail({
               level: r.reminderLevel,
               numberLabel: documentLabel(inv.documentNumber),
+              topic: inv.topic,
               contactPerson: c.contactPerson,
               salutation: buildSalutation(c),
               companyName: senderDisplayName(settings?.companyInfo ?? {}, inv.senderProfile),
@@ -142,6 +144,7 @@ export default async function RemindersPage({ searchParams }: Props) {
                 reminderId={r.id}
                 invoiceId={inv.id}
                 documentNumber={inv.documentNumber}
+                topic={inv.topic}
                 customerName={customerName}
                 totalAmount={remaining}
                 invoiceTotal={inv.totalAmount.toNumber()}

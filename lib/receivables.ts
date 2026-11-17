@@ -32,6 +32,7 @@ export function ageBucket(dueDate: Date, asOf: Date): AgeBucket {
 export type ReceivableInput = {
   id: number;
   documentNumber: string | null;
+  topic?: string | null;
   state: InvoiceState;
   date: Date;
   dueDate: Date;
@@ -54,6 +55,7 @@ export type ReceivableInput = {
 export type ReceivableRow = {
   invoiceId: number;
   documentNumber: string | null;
+  topic: string | null;
   customerId: number;
   customerName: string;
   customerAddress: { street: string; zip: string; city: string; country: string };
@@ -113,6 +115,7 @@ export function buildReceivables(invoices: ReceivableInput[], asOf: Date): Recei
     rows.push({
       invoiceId: inv.id,
       documentNumber: inv.documentNumber,
+      topic: inv.topic ?? null,
       customerId: inv.customer.customerId,
       customerName,
       customerAddress: hasBillingAddress(inv.customer)
@@ -161,6 +164,7 @@ export async function fetchReceivables(prisma: PrismaClient, asOf: Date): Promis
     select: {
       id: true,
       documentNumber: true,
+      topic: true,
       state: true,
       date: true,
       dueDate: true,

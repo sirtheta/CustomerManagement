@@ -72,6 +72,7 @@ describe("createDocumentWithItems", () => {
     const result = await createDocumentWithItems({
       kind: "invoice",
       customerId: 1,
+      topic: null,
       customUserText: null,
       date: new Date(),
       dueDate: new Date(),
@@ -89,6 +90,7 @@ describe("createDocumentWithItems", () => {
     const result = await createDocumentWithItems({
       kind: "quote",
       customerId: 1,
+      topic: null,
       customUserText: null,
       date: new Date(),
       validUntil: new Date(),
@@ -111,6 +113,7 @@ describe("createDocumentWithItems", () => {
       createDocumentWithItems({
         kind: "invoice",
         customerId: 1,
+        topic: null,
         customUserText: null,
         date: new Date(),
         dueDate: new Date(),
@@ -139,6 +142,7 @@ describe("updateDocumentWithItems", () => {
     await updateDocumentWithItems(3, {
       kind: "quote",
       customerId: 1,
+      topic: null,
       customUserText: null,
       date: new Date(),
       validUntil: new Date(),
@@ -156,6 +160,7 @@ describe("updateDocumentWithItems", () => {
   const invoiceInput = {
     kind: "invoice" as const,
     customerId: 1,
+    topic: null,
     customUserText: null,
     date: new Date(),
     dueDate: new Date(),

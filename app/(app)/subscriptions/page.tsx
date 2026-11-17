@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentTopic } from "@/components/document-topic";
 import prisma from "@/lib/prisma";
 import { requireModule } from "@/lib/module-guard";
 import { isEditorSession, requireSession } from "@/lib/permissions";
@@ -55,6 +56,7 @@ export default async function SubscriptionsPage() {
                 {" · "}
                 {row.autoSend ? "Automatisch" : "Nach Prüfung"}
               </p>
+              <DocumentTopic topic={row.topic} variant="card" className="text-muted-foreground" />
               {canEdit && (
                 <div className={`${cardInteractiveClass} ml-auto w-fit`}>
                   <SubscriptionRowActions customerId={row.customerId} subscriptionId={row.id} active={row.active} />
@@ -101,6 +103,7 @@ export default async function SubscriptionsPage() {
                     ) : (
                       row.templateName
                     )}
+                    <DocumentTopic topic={row.topic} />
                   </TableCell>
                   <TableCell>{row.autoSend ? "Automatisch" : "Nach Prüfung"}</TableCell>
                   <TableCell>

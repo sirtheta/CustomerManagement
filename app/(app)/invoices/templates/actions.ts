@@ -7,6 +7,7 @@ import type { ActionState } from "@/hooks/use-action-toast";
 import { saveItemsToCatalog } from "@/lib/service-catalog";
 import { logAudit } from "@/lib/audit";
 import { calculateInvoiceTotal } from "@/lib/calculations";
+import { normalizeTopic } from "@/lib/document-topic";
 
 // Templates drive unattended subscription sends, so the audit trail records
 // what a template would bill.
@@ -37,6 +38,8 @@ export async function saveAsTemplate(
   const template = await prisma.invoiceTemplate.create({
     data: {
       name: name.trim(),
+      // No topic: the invoice's is already dated ("Hosting November 2026"), and a subscription
+      // using the template would repeat it forever. One with {period} is set on the template form.
       items: {
         create: invoice.items.map((item) => ({
           name: item.name,
@@ -67,6 +70,7 @@ export async function updateTemplate(
   const session = await requireEditor();
   const name = (formData.get("name") as string)?.trim();
   if (!name) return { error: "Bitte einen Namen angeben." };
+  const topic = normalizeTopic(formData.get("topic"));
 
   const itemsJson = formData.get("itemsJson") as string;
   const { itemDataSchema } = await import("@/components/items-editor-schema");
@@ -79,6 +83,7 @@ export async function updateTemplate(
       where: { id },
       data: {
         name,
+        topic,
         items: {
           create: items.map((item) => ({
             name: item.name,
@@ -93,7 +98,7 @@ export async function updateTemplate(
     });
   });
 
-  await logAudit(session, "UPDATE", "InvoiceTemplate", id, name, templateSummary(items));
+  await logAudit(session, "UPDATE", "InvoiceTemplate", id, name, { ...templateSummary(items), topic });
 
   revalidatePath("/invoices/templates");
   return { success: true, _ts: Date.now() };

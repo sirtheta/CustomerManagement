@@ -66,6 +66,8 @@ async function createItems(
 export type DocumentInput = {
   kind: DocumentKind;
   customerId: number;
+  /** Short subject line ("Thema"); already normalised (`normalizeTopic`). */
+  topic: string | null;
   customUserText: string | null;
   /** Quotes only: text above the salutation, stored per quote. */
   closingText?: string | null;
@@ -96,6 +98,7 @@ export async function createDocumentWithItems(
       const invoice = await tx.invoice.create({
         data: {
           customerId: input.customerId,
+          topic: input.topic,
           customUserText: input.customUserText,
           date: input.date,
           dueDate: input.dueDate!,
@@ -110,6 +113,7 @@ export async function createDocumentWithItems(
       const quote = await tx.quote.create({
         data: {
           customerId: input.customerId,
+          topic: input.topic,
           customUserText: input.customUserText,
           closingText: input.closingText ?? null,
           date: input.date,
@@ -154,6 +158,7 @@ export async function updateDocumentWithItems(
         where: { id },
         data: {
           customerId: input.customerId,
+          topic: input.topic,
           customUserText: input.customUserText,
           date: input.date,
           dueDate: input.dueDate!,
@@ -169,6 +174,7 @@ export async function updateDocumentWithItems(
         where: { id },
         data: {
           customerId: input.customerId,
+          topic: input.topic,
           customUserText: input.customUserText,
           closingText: input.closingText ?? null,
           date: input.date,

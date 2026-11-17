@@ -35,6 +35,7 @@ import {
   quoteStateVariants,
 } from "@/lib/document-states";
 import { decryptSecret } from "@/lib/crypto";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { loadModules } from "@/lib/module-guard";
 import { customerDisplayName } from "@/lib/customer-display";
@@ -96,12 +97,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
     modules.subscriptions
       ? prisma.subscription.findMany({
           where: { customerId },
-          include: { template: { select: { name: true } } },
+          include: { template: { select: { name: true, topic: true } } },
           orderBy: { nextInvoiceDate: "asc" },
         })
       : [],
     modules.subscriptions
-      ? prisma.invoiceTemplate.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+      ? prisma.invoiceTemplate.findMany({ select: { id: true, name: true, topic: true }, orderBy: { name: "asc" } })
       : [],
     prisma.customerContact.findMany({ where: { customerId }, orderBy: [{ createdAt: "asc" }, { contactId: "asc" }] }),
     modules.tasks
@@ -198,6 +199,8 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                 active: s.active,
                 templateId: s.templateId,
                 templateName: s.template?.name ?? null,
+                topic: s.topic,
+                templateTopic: s.template?.topic ?? null,
               }))}
             />
           )}
@@ -248,6 +251,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     </CardLink>
                     <Badge variant={invoiceStateVariants[inv.state]}>{invoiceStateLabels[inv.state]}</Badge>
                   </div>
+                  <DocumentTopic topic={inv.topic} variant="card" />
                   <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
                     <span>
                       {formatDate(inv.date)}
@@ -294,6 +298,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                         {inv.creditNoteForId !== null && (
                           <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
                         )}
+                        <DocumentTopic topic={inv.topic} />
                       </TableCell>
                       <TableCell>{formatDate(inv.date)}</TableCell>
                       <TableCell>{inv.creditNoteForId !== null ? "" : formatDate(inv.dueDate)}</TableCell>
@@ -343,6 +348,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                       </CardLink>
                       <Badge variant={quoteStateVariants[q.state]}>{quoteStateLabels[q.state]}</Badge>
                     </div>
+                    <DocumentTopic topic={q.topic} variant="card" />
                     <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
                       <span>
                         {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
@@ -385,6 +391,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                           <Link href={`/quotes/${q.id}?from=customers/${customerId}`} className="hover:underline">
                             {documentLabel(q.documentNumber)}
                           </Link>
+                          <DocumentTopic topic={q.topic} />
                         </TableCell>
                         <TableCell>{formatDate(q.date)}</TableCell>
                         <TableCell>{formatDate(q.validUntil)}</TableCell>

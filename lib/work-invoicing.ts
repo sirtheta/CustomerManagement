@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { workEntriesTopic } from "@/lib/document-topic";
 import prisma from "@/lib/prisma";
 import { createDocumentWithItems } from "@/lib/document-actions";
 import { assertCustomerActive } from "@/lib/customer-archive";
@@ -95,6 +96,8 @@ export async function createInvoiceFromWorkEntries(
     {
       kind: "invoice",
       customerId,
+      // Entries are sorted by date, so the first and last span the billed months.
+      topic: workEntriesTopic(entries[0].date, entries[entries.length - 1].date),
       customUserText: null,
       date: swissToday(),
       dueDate: new Date(`${addDays(swissDateString(), termDays)}T00:00:00.000Z`),

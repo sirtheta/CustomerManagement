@@ -25,6 +25,7 @@ import {
 import { YearSelector } from "./components/year-selector";
 import { ProfitLossChart } from "./components/profit-loss-chart";
 import DeleteExpenseButton from "./DeleteExpenseButton";
+import { DocumentTopic } from "@/components/document-topic";
 import { documentLabel } from "@/lib/document-display";
 import { Badge } from "@/components/ui/badge";
 import { requireModule } from "@/lib/module-guard";
@@ -332,6 +333,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                       </CardLink>
                       <span className="font-semibold">{formatCurrency(inv.amount)}</span>
                     </div>
+                    <DocumentTopic topic={inv.topic} variant="card" />
                     <p className="text-sm text-muted-foreground">
                       {formatDate(inv.paidDate)} · {inv.customerName}
                     </p>
@@ -364,6 +366,7 @@ export default async function AccountingPage({ searchParams }: Props) {
                           <Link href={`/invoices/${inv.invoiceId}`} className="underline">
                             {documentLabel(inv.documentNumber)}
                           </Link>
+                          <DocumentTopic topic={inv.topic} />
                         </TableCell>
                         <TableCell>{inv.customerName}</TableCell>
                         <TableCell className="text-right tabular-nums">{formatCurrency(inv.amount)}</TableCell>

@@ -19,6 +19,8 @@ type Props = {
   id: number;
   invoiceId: number;
   documentNumber: string | null;
+  /** Topic of the draft invoice (from the subscription or its template). */
+  topic: string | null;
   customerName: string;
   totalAmount: number;
   discountPercent: number;
@@ -57,7 +59,10 @@ export default function PendingEmailRow(props: Props) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <CardTitle className="text-base">{documentLabel(props.documentNumber)}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-0.5">{props.customerName}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {props.customerName}
+              {props.topic && ` · ${props.topic}`}
+            </p>
           </div>
           <Button
             variant="outline"

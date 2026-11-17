@@ -62,6 +62,7 @@ export async function generateReminderPdf(
       charges.overdueDays > 0
         ? `Die Rechnung ist seit ${charges.overdueDays} Tagen überfällig. Bitte überweisen Sie den offenen Betrag bis zum angegebenen Datum.`
         : undefined,
+    topic: invoice.topic,
     customUserText: null,
     totalAmount: total,
     customer: invoice.customer,

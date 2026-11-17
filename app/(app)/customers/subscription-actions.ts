@@ -9,12 +9,14 @@ import { INTERVAL_LABELS, type SubscriptionIntervalName } from "@/lib/subscripti
 import { isValidDateString, parseDate } from "@/lib/date";
 import { requireModule } from "@/lib/module-guard";
 import { assertCustomerActive } from "@/lib/customer-archive";
+import { normalizeTopic } from "@/lib/document-topic";
 
 type SubscriptionFields = {
   interval: SubscriptionIntervalName;
   nextInvoiceDate: Date;
   templateId: number | null;
   autoSend: boolean;
+  topic: string | null;
 };
 
 async function parseSubscriptionForm(
@@ -50,7 +52,9 @@ async function parseSubscriptionForm(
     }
   }
 
-  return { data: { interval: interval as SubscriptionIntervalName, nextInvoiceDate, templateId, autoSend } };
+  const topic = normalizeTopic(formData.get("topic"));
+
+  return { data: { interval: interval as SubscriptionIntervalName, nextInvoiceDate, templateId, autoSend, topic } };
 }
 
 export async function createSubscription(
@@ -72,6 +76,7 @@ export async function createSubscription(
     customerId,
     templateId: parsed.data.templateId,
     autoSend: parsed.data.autoSend,
+    topic: parsed.data.topic,
   });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");
@@ -107,6 +112,7 @@ export async function updateSubscription(
     customerId,
     templateId: parsed.data.templateId,
     autoSend: parsed.data.autoSend,
+    topic: parsed.data.topic,
   });
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/dashboard");

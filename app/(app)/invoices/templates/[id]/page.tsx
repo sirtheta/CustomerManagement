@@ -53,6 +53,7 @@ export default async function TemplateEditPage({ params }: Props) {
       <TemplateEditForm
         templateId={templateId}
         name={template.name}
+        topic={template.topic}
         initialItems={initialItems}
         services={services}
           categories={categories}

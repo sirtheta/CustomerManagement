@@ -41,6 +41,7 @@ export default async function PendingEmailsPage() {
                 id={p.id}
                 invoiceId={p.invoiceId}
                 documentNumber={p.invoice.documentNumber}
+                topic={p.invoice.topic}
                 customerName={customerName}
                 totalAmount={p.invoice.totalAmount.toNumber()}
                 discountPercent={p.invoice.discountPercent.toNumber()}

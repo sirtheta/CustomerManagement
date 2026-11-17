@@ -3,6 +3,7 @@
 import { effectivePaymentTermDays } from "@/lib/customer-billing";
 import { assertCustomerActive, CUSTOMER_ARCHIVED_ERROR } from "@/lib/customer-archive";
 import { resolveSenderProfileId } from "@/lib/sender-profile";
+import { normalizeTopic } from "@/lib/document-topic";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { QuoteState } from "@prisma/client";
@@ -71,6 +72,7 @@ export async function createQuote(
     ({ id: newQuoteId } = await createDocumentWithItems({
       kind: "quote",
       customerId,
+      topic: normalizeTopic(formData.get("topic")),
       customUserText: customUserText || null,
       closingText: closingText || null,
       date: new Date(dateRaw),
@@ -131,6 +133,7 @@ export async function updateQuote(
     await updateDocumentWithItems(id, {
       kind: "quote",
       customerId,
+      topic: normalizeTopic(formData.get("topic")),
       customUserText: customUserText || null,
       closingText: closingText || null,
       date: new Date(dateRaw),
@@ -265,6 +268,7 @@ async function convertLocked(
     const invoice = await tx.invoice.create({
       data: {
         customerId: quote.customerId,
+        topic: quote.topic,
         customUserText: quote.customUserText,
         date: today,
         dueDate,

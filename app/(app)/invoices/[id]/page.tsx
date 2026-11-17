@@ -168,6 +168,7 @@ export default async function InvoiceDetailPage({ params, searchParams }: Props)
           <h1 className="text-2xl font-semibold">
             {isCreditNote ? "Gutschrift " : ""}{documentLabel(invoice.documentNumber)}
           </h1>
+          {invoice.topic && <p className="font-medium">{invoice.topic}</p>}
           {invoice.creditNoteFor && (
             <p className="text-sm text-muted-foreground">
               Zu Rechnung{" "}
