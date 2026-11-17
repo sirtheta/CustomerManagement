@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.7...customer-management-v1.11.0) (2026-11-17)
+
+
+### Features
+
+* **invoices:** add topic field for invoices and quotes ([#226](https://github.com/sirtheta/CustomerManagement/issues/226)) ([f9f6208](https://github.com/sirtheta/CustomerManagement/commit/f9f6208e594c0ed762239eb43a7b3c6a5df0aab8))
+
 ## [1.10.7](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.6...customer-management-v1.10.7) (2026-11-16)
 
 
