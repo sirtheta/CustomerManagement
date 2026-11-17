@@ -153,9 +153,11 @@ export async function checkSubscriptions(prisma: PrismaClient): Promise<void> {
           // The draft has no number yet, so {documentNumber} stays until the mail is approved.
           ...invoicePlaceholders({ ...invoice, customer: sub.customer }, ""),
           // Kept as placeholders too, resolved at send time: positions can be edited on the pending
-          // page, and the sender profile can still be changed on the draft.
+          // page, and the sender profile and topic can still be changed on the draft (a topic
+          // cleared by then is removed together with "für «…»" or its separator).
           totalAmount: undefined,
           companyName: undefined,
+          topic: undefined,
         };
 
         const pendingEmail = await tx.pendingEmail.create({

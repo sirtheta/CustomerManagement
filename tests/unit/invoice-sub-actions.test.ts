@@ -396,8 +396,10 @@ describe("invoices/templates actions", () => {
       const result = await saveAsTemplate(1, "Monatsrechnung");
       expect(result.success).toBe(true);
       expect(prisma.invoiceTemplate.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ name: "Monatsrechnung", topic: "Hosting 2026" }),
+        data: expect.objectContaining({ name: "Monatsrechnung" }),
       });
+      // The invoice's topic is dated; a template must not carry it into later subscription invoices.
+      expect(vi.mocked(prisma.invoiceTemplate.create).mock.calls[0][0].data).not.toHaveProperty("topic");
       expect(revalidatePath).toHaveBeenCalledWith("/invoices/templates");
     });
 

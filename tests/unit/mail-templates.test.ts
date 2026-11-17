@@ -300,8 +300,15 @@ describe("topic placeholder", () => {
     expect(removeEmptyTopic("Rechnung {documentNumber}: {topic}")).toBe("Rechnung {documentNumber}");
     expect(removeEmptyTopic("Rechnung ({topic}) {documentNumber}")).toBe("Rechnung {documentNumber}");
     expect(removeEmptyTopic("A\n{topic}\nB")).toBe("A\nB");
+    expect(removeEmptyTopic("Text\n\nBetreff: {topic}")).toBe("Text\n");
+    expect(removeEmptyTopic("Gruss\n{topic}")).toBe("Gruss");
     expect(removeEmptyTopic("für {topic} danke")).toBe("für danke");
-    // A subject line never loses its label: the line rule only applies to lines followed by another one.
+    // The default phrase "für «{topic}»" goes as a whole, also in a custom template.
+    expect(removeEmptyTopic("die Rechnung Nr. 1 für «{topic}» vom 1.1.")).toBe("die Rechnung Nr. 1 vom 1.1.");
+    expect(removeEmptyTopic("Rechnung zu ({topic}) vom")).toBe("Rechnung vom");
+    // Only whole words: "Vorfür" is not the preposition.
+    expect(removeEmptyTopic("Vorfür «{topic}» x")).toBe("Vorfür x");
+    // A one-line text (a subject) keeps its label: the line rules need a line break before or after.
     expect(removeEmptyTopic("Betreff: {topic}")).toBe("Betreff");
   });
 

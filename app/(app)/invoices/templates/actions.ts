@@ -38,7 +38,8 @@ export async function saveAsTemplate(
   const template = await prisma.invoiceTemplate.create({
     data: {
       name: name.trim(),
-      topic: invoice.topic,
+      // No topic: the invoice's is already dated ("Hosting November 2026"), and a subscription
+      // using the template would repeat it forever. One with {period} is set on the template form.
       items: {
         create: invoice.items.map((item) => ({
           name: item.name,

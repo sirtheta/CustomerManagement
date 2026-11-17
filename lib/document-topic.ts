@@ -19,16 +19,20 @@ export function normalizeTopic(raw: FormDataEntryValue | string | null | undefin
 
 /**
  * Takes an empty `{key}` out of a text together with what only belongs to it:
- * a line like "Betreff: {key}", quotes or brackets around it, and the
- * separator before it (or after it, at the start), so
- * "Rechnung {documentNumber} – {topic} – {companyName}" does not end up with
- * an empty "–  –". A text that uses it mid-sentence keeps the sentence.
+ * a line like "Betreff: {key}" (also as the last line), quotes or brackets
+ * around it together with a "für", "zu" or "betreffend" right before them
+ * (the default texts say "für «{topic}»"), and the separator before it (or
+ * after it, at the start), so "Rechnung {documentNumber} – {topic} –
+ * {companyName}" does not end up with an empty "–  –". A bare placeholder
+ * mid-sentence keeps the sentence.
  */
 export function removeEmptyPlaceholder(text: string, key: string): string {
   const p = `\\{${key}\\}`;
+  const label = `(?:\\p{L}[\\p{L} .]{0,29}:[ \\t]*)?`;
   return text
-    .replace(new RegExp(`^[ \\t]*(?:\\p{L}[\\p{L} .]{0,29}:[ \\t]*)?${p}[ \\t]*\\r?\\n`, "gmu"), "")
-    .replace(new RegExp(`[ \\t]*[«"„“‹'(\\[]${p}[»"“”›')\\]]`, "g"), "")
+    .replace(new RegExp(`^[ \\t]*${label}${p}[ \\t]*\\r?\\n`, "gmu"), "")
+    .replace(new RegExp(`\\r?\\n[ \\t]*${label}${p}[ \\t]*$`, "u"), "")
+    .replace(new RegExp(`[ \\t]*(?:(?<![\\p{L}])(?:für|zu|betreffend)[ \\t]+)?[«"„“‹'(\\[]${p}[»"“”›')\\]]`, "gu"), "")
     .replace(new RegExp(`[ \\t]*[–—\\-:|/,][ \\t]*${p}`, "g"), "")
     .replace(new RegExp(`${p}[ \\t]*[–—\\-:|/,][ \\t]*`, "g"), "")
     .replace(new RegExp(`[ \\t]*${p}`, "g"), "");

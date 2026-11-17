@@ -73,7 +73,7 @@ describe("checkSubscriptions", () => {
   });
 
   describe("topic", () => {
-    it("fills {period} of the template topic and names it in the pending mail", async () => {
+    it("fills {period} of the template topic and keeps {topic} open in the pending mail", async () => {
       const template = await seedTemplate("Hosting {period}");
       await seedSubscription({ templateId: template.id, interval: "Yearly", nextInvoiceDate: new Date(2026, 0, 1) });
       await checkSubscriptions(db.prisma);
@@ -81,8 +81,9 @@ describe("checkSubscriptions", () => {
       const invoice = await db.prisma.invoice.findFirstOrThrow();
       expect(invoice.topic).toBe("Hosting 2026");
       const pending = await db.prisma.pendingEmail.findFirstOrThrow();
-      expect(pending.subject).toContain("– Hosting 2026 –");
-      expect(pending.body).toContain("für «Hosting 2026»");
+      // The topic stays a placeholder until approval (it can still be edited on the draft).
+      expect(pending.subject).toContain("– {topic} –");
+      expect(pending.body).toContain("für «{topic}»");
     });
 
     it("prefers the subscription's own topic", async () => {

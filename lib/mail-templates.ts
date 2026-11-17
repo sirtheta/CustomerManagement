@@ -55,6 +55,11 @@ export function fillTotalAmount(text: string, formattedTotal: string): string {
   return fillPlaceholders(text, { totalAmount: formattedTotal });
 }
 
+/** Fills in the current topic at send time; an empty one is removed with its separator. */
+export function fillTopic(text: string, topic: string): string {
+  return fillPlaceholders(text, { topic });
+}
+
 type Amount = { toNumber(): number };
 
 type MailCustomer = CustomerNameFields & Omit<SalutationFields, "contactPerson"> & { contactPerson: string };

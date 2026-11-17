@@ -13,6 +13,7 @@ import {
 import type { ArchiveResult } from "@/lib/document-archive";
 import { assignDocumentNumber } from "@/lib/document-number";
 import { fillDocumentNumber, fillTotalAmount } from "@/lib/document-display";
+import { fillTopic } from "@/lib/mail-templates";
 import { formatCurrency } from "@/lib/utils";
 import { logAudit } from "@/lib/audit";
 import { mailNotConfiguredError } from "@/lib/smtp";
@@ -92,8 +93,10 @@ async function sendLocked(input: {
   }
   const invoice = { ...pending.invoice, documentNumber };
   const total = formatCurrency(Number(pending.invoice.totalAmount));
-  const finalSubject = fillTotalAmount(fillDocumentNumber(subject, documentNumber), total);
-  const finalBody = fillTotalAmount(fillDocumentNumber(body, documentNumber), total);
+  // The topic as it is now: it may have been edited on the draft since the mail was queued.
+  const topic = pending.invoice.topic ?? "";
+  const finalSubject = fillTopic(fillTotalAmount(fillDocumentNumber(subject, documentNumber), total), topic);
+  const finalBody = fillTopic(fillTotalAmount(fillDocumentNumber(body, documentNumber), total), topic);
 
   let archive: ArchiveResult;
   try {

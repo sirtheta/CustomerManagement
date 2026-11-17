@@ -29,6 +29,8 @@ import { verifyArchived, sha256Hex } from "@/lib/document-archive";
 import { generateInvoicePdf } from "@/lib/pdf/invoice-pdf";
 import { sendInvoiceEmail } from "@/lib/email";
 import { formatCurrency } from "@/lib/utils";
+import { sendPendingInvoice } from "@/lib/pending-email-send";
+import { SYSTEM_ACTOR } from "@/lib/system-actor";
 
 describe("autoSend end to end", () => {
   const db = createTestDatabase();
@@ -89,5 +91,48 @@ describe("autoSend end to end", () => {
     // {companyName} stays open in the queued text and is filled by sendInvoiceEmail with the
     // sender profile's name (covered in email-send.test.ts), so a profile chosen on the draft applies.
     expect(overrides?.subject).toContain("{companyName}");
+  });
+
+  describe("topic edited on the draft before approval", () => {
+    async function queueDraft() {
+      const template = await db.prisma.invoiceTemplate.create({
+        data: { name: "T", topic: "Hosting {period}", items: { create: [{ name: "Beitrag", unit: "Piece", unitPrice: 50, quantity: 1 }] } },
+      });
+      const customer = await db.prisma.customer.create({ data: createValidTestCustomer() });
+      await db.prisma.subscription.create({
+        data: { customerId: customer.customerId, templateId: template.id, interval: "Yearly", nextInvoiceDate: new Date(2026, 0, 1) },
+      });
+      await checkSubscriptions(db.prisma);
+      return db.prisma.pendingEmail.findFirstOrThrow();
+    }
+
+    async function approve(pending: { id: number; to: string; subject: string; body: string }) {
+      const result = await sendPendingInvoice({ pendingId: pending.id, to: pending.to, subject: pending.subject, body: pending.body, actor: SYSTEM_ACTOR });
+      expect(result).toHaveProperty("invoiceId");
+      return vi.mocked(sendInvoiceEmail).mock.calls[0][3]!;
+    }
+
+    it("keeps {topic} open in the queued mail and sends the current topic", async () => {
+      const pending = await queueDraft();
+      expect(pending.subject).toContain("– {topic} –");
+      expect(pending.body).toContain("für «{topic}»");
+
+      await db.prisma.invoice.update({ where: { id: pending.invoiceId }, data: { topic: "Hosting und Support 2026" } });
+      const mail = await approve(pending);
+
+      expect(mail.subject).toContain("– Hosting und Support 2026 –");
+      expect(mail.body).toContain("für «Hosting und Support 2026»");
+      expect((await db.prisma.invoiceSentLog.findFirstOrThrow()).subject).toContain("Hosting und Support 2026");
+    });
+
+    it("removes the topic cleanly when it was cleared", async () => {
+      const pending = await queueDraft();
+      await db.prisma.invoice.update({ where: { id: pending.invoiceId }, data: { topic: null } });
+      const mail = await approve(pending);
+
+      expect(mail.subject).not.toMatch(/\{topic\}|–\s+–/);
+      expect(mail.body).not.toMatch(/\{topic\}|für\s/);
+      expect(mail.body).toMatch(/Rechnung Nr\. \S+ vom /);
+    });
   });
 });
