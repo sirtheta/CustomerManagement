@@ -29,6 +29,24 @@ const UNITS = Object.values(Unit);
 
 const DAY_MS = 86_400_000;
 
+// Typical subject lines ("Thema"); about a third of the documents get none, as in real use.
+const SEED_TOPICS = [
+  "Hosting 2027",
+  "Domain und E-Mail",
+  "Installation Office 365",
+  "Neuer Webauftritt",
+  "Wartung Server Q1",
+  "Netzwerk-Erweiterung Büro",
+  "Support-Pauschale",
+  "Migration Mailserver",
+  "Backup-Lösung",
+  "Schulung Mitarbeitende",
+];
+
+function seedTopic(): string | null {
+  return faker.datatype.boolean({ probability: 0.7 }) ? faker.helpers.arrayElement(SEED_TOPICS) : null;
+}
+
 // Number of subscription drafts with a pending mail to seed (see seedPendingSubscriptionInvoices)
 const PENDING_SUBSCRIPTION_COUNT = 3;
 
@@ -211,10 +229,12 @@ async function main() {
       const invoiceNumber = invoiceSent
         ? `I-${prefix}${String(invoiceCounter++).padStart(4, "0")}`
         : null;
+      const topic = seedTopic();
       const invoice = await prisma.invoice.create({
         data: {
           customerId: customer.customerId,
           documentNumber: invoiceNumber,
+          topic,
           customUserText: faker.lorem.paragraph(),
           date,
           dueDate,
@@ -238,6 +258,7 @@ async function main() {
           data: {
             customerId: customer.customerId,
             documentNumber: creditNumber,
+            topic,
             date: creditDate,
             // A credit note has nothing to pay; the column is required, so reuse the date.
             dueDate: creditDate,
@@ -272,6 +293,7 @@ async function main() {
         data: {
           customerId: customer.customerId,
           documentNumber: quoteNumber,
+          topic: seedTopic(),
           customUserText: faker.lorem.paragraph(),
           date,
           validUntil,
@@ -458,6 +480,7 @@ async function seedReminders(
       data: {
         customerId: customer.customerId,
         documentNumber: number,
+        topic: seedTopic(),
         date,
         dueDate,
         totalAmount: total,
