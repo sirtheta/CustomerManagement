@@ -43,6 +43,8 @@ export type RenderDoc = {
   referenceLine?: string; // e.g. "Zu Rechnung R-…" (credit notes)
   dueLabel: string; // "Fälligkeit:" | "Gültig bis:"
   closingNoteLabel: string; // "Zahlbar bis:" | "Gültig bis:"
+  /** Subject line ("Thema"), printed bold under the document details. */
+  topic?: string | null;
   customUserText: string | null;
   /** Quotes only: free text printed right above the closing salutation. */
   closingText?: string | null;
@@ -321,6 +323,15 @@ export async function generateDocumentPdf(
       y += LINE_HEIGHT + 2;
     });
     y += 12;
+
+    // ── Topic (subject line) ─────────────────────────────────────────────
+    if (doc.topic) {
+      pdf.font(BOLD).fontSize(BASE).fillColor(TEXT_COLOR);
+      const topic = clean(doc.topic);
+      const topicH = pdf.heightOfString(topic, { width: CONTENT_W });
+      pdf.text(topic, MARGIN, y, { width: CONTENT_W });
+      y += topicH + 12;
+    }
 
     // ── Custom user text ─────────────────────────────────────────────────
     if (doc.customUserText) {

@@ -76,6 +76,7 @@ async function InvoicesTable({
       ? {
           OR: [
             { documentNumber: { contains: term } },
+            { topic: { contains: term } },
             { customer: { company: { contains: term } } },
             { customer: { contactPerson: { contains: term } } },
           ],
@@ -118,6 +119,7 @@ async function InvoicesTable({
               >
                 {customerDisplayName(inv.customer)}
               </Link>
+              {inv.topic && <p className="mt-0.5 truncate text-sm">{inv.topic}</p>}
               <div className="mt-1 flex items-baseline justify-between text-sm text-muted-foreground">
                 <span>
                   {formatDate(inv.date)}
@@ -188,6 +190,11 @@ async function InvoicesTable({
                     </Link>
                     {inv.creditNoteForId !== null && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">Gutschrift</span>
+                    )}
+                    {inv.topic && (
+                      <div className="max-w-64 truncate text-xs font-normal text-muted-foreground" title={inv.topic}>
+                        {inv.topic}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>

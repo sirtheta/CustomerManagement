@@ -49,6 +49,8 @@ model Invoice {
   id             Int              @id @default(autoincrement())
   customerId     Int
   documentNumber String?
+  /// Short subject line ("Thema"), max 100 chars; printed in the PDF and filled into mails as {topic}.
+  topic          String?
   customUserText String?
   date           DateTime
   version        Int              @default(1)
@@ -155,6 +157,8 @@ model Quote {
   id             Int        @id @default(autoincrement())
   customerId     Int
   documentNumber String?
+  /// Short subject line ("Thema"), max 100 chars; copied to the invoice on conversion.
+  topic          String?
   customUserText String?
   closingText    String?
   date           DateTime

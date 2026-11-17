@@ -95,6 +95,7 @@ export async function createInvoiceFromWorkEntries(
     {
       kind: "invoice",
       customerId,
+      topic: null,
       customUserText: null,
       date: swissToday(),
       dueDate: new Date(`${addDays(swissDateString(), termDays)}T00:00:00.000Z`),

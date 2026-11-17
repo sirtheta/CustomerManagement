@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { MAX_TOPIC_LENGTH } from "@/lib/document-topic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -248,6 +250,20 @@ export default function InvoiceForm({
             {!creditNoteFor && (
               <SenderProfileSelect profiles={senderProfiles} firstLabel={firstSenderLabel} value={invoice?.senderProfileId ?? null} />
             )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="topic">Thema</Label>
+              <Input
+                id="topic"
+                name="topic"
+                defaultValue={invoice?.topic ?? ""}
+                maxLength={MAX_TOPIC_LENGTH}
+                placeholder="z. B. Hosting 2027 oder Installation Office 365"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Erscheint als Betreffzeile auf der Rechnung und in der E-Mail.
+              </p>
+            </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="customUserText">Zusatztext</Label>

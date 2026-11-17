@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
     dueDate: due,
     dueLabel: type === "invoice" ? "Fälligkeit:" : "Gültig bis:",
     closingNoteLabel: type === "invoice" ? "Zahlbar bis:" : "Gültig bis:",
+    topic: "Neuer Webauftritt",
     customUserText: "Vielen Dank für Ihren Auftrag.",
     closingText: type === "quote" ? resolveTheme(body.theme).quoteClosingText : null,
     totalAmount: SAMPLE_TOTAL,

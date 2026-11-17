@@ -12,6 +12,7 @@ import { DocumentItemsError } from "@/lib/document-items-error";
 import { loadTotalOptions } from "@/lib/total-options";
 import { assertCustomerActive } from "@/lib/customer-archive";
 import { resolveSenderProfileId } from "@/lib/sender-profile";
+import { normalizeTopic } from "@/lib/document-topic";
 import type { ActionState } from "@/hooks/use-action-toast";
 import logger from "@/lib/logger";
 import { logAudit } from "@/lib/audit";
@@ -79,6 +80,7 @@ export async function createInvoice(
     ({ id: newInvoiceId } = await createDocumentWithItems({
       kind: "invoice",
       customerId,
+      topic: normalizeTopic(formData.get("topic")),
       customUserText: customUserText || null,
       date: new Date(dateRaw),
       dueDate: new Date(dueDateRaw),
@@ -148,6 +150,7 @@ export async function updateInvoice(
   let input = {
     kind: "invoice" as const,
     customerId,
+    topic: normalizeTopic(formData.get("topic")),
     customUserText: customUserText || null,
     date: new Date(dateRaw),
     dueDate: isCreditNote ? new Date(dateRaw) : new Date(dueDateRaw),

@@ -11,6 +11,7 @@ import { MAX_REMINDER_LEVEL, reminderTitle } from "@/lib/reminder-charges";
 
 export type PlaceholderKey =
   | "documentNumber"
+  | "topic"
   | "contactPerson"
   | "salutation"
   | "customerName"
@@ -25,12 +26,30 @@ export type PlaceholderKey =
 export type PlaceholderValues = Partial<Record<PlaceholderKey, string | undefined>>;
 
 /**
+ * Takes an empty `{topic}` out of a (custom) template together with what only
+ * belongs to it: a line like "Betreff: {topic}", quotes or brackets around it,
+ * and the separator before it (or after it, at the start), so
+ * "Rechnung {documentNumber} – {topic} – {companyName}" does not end up with
+ * an empty "–  –". A text that uses the topic mid-sentence keeps the sentence.
+ */
+export function removeEmptyTopic(template: string): string {
+  return template
+    .replace(/^[ \t]*(?:\p{L}[\p{L} .]{0,29}:[ \t]*)?\{topic\}[ \t]*\r?\n/gmu, "")
+    .replace(/[ \t]*[«"„“‹'(\[]\{topic\}[»"“”›')\]]/g, "")
+    .replace(/[ \t]*[–—\-:|/,][ \t]*\{topic\}/g, "")
+    .replace(/\{topic\}[ \t]*[–—\-:|/,][ \t]*/g, "")
+    .replace(/[ \t]*\{topic\}/g, "");
+}
+
+/**
  * Replaces `{key}` for every key with a value. Placeholders without a value and
  * unknown `{words}` stay as they are, so they can still be filled in at send time.
- * The values are inserted literally (no `$&` replacement patterns).
+ * The values are inserted literally (no `$&` replacement patterns). An empty
+ * topic is removed with its separator (`removeEmptyTopic`).
  */
 export function fillPlaceholders(template: string, values: PlaceholderValues): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => {
+  const source = values.topic === "" ? removeEmptyTopic(template) : template;
+  return source.replace(/\{(\w+)\}/g, (match, key: string) => {
     const value = (values as Record<string, string | undefined>)[key];
     return value === undefined ? match : value;
   });
@@ -52,6 +71,7 @@ type MailCustomer = CustomerNameFields & Omit<SalutationFields, "contactPerson">
 
 export type InvoiceMailSource = {
   documentNumber: string | null;
+  topic: string | null;
   totalAmount: Amount;
   date: Date;
   dueDate: Date;
@@ -61,6 +81,7 @@ export type InvoiceMailSource = {
 
 export type QuoteMailSource = {
   documentNumber: string | null;
+  topic: string | null;
   totalAmount: Amount;
   date: Date;
   validUntil: Date;
@@ -72,6 +93,7 @@ export type QuoteMailSource = {
 export function invoicePlaceholders(invoice: InvoiceMailSource, companyName: string): PlaceholderValues {
   return {
     documentNumber: invoice.documentNumber ?? undefined,
+    topic: invoice.topic ?? "",
     contactPerson: invoice.customer.contactPerson,
     salutation: buildSalutation(invoice.customer),
     customerName: customerDisplayName(invoice.customer),
@@ -86,6 +108,7 @@ export function invoicePlaceholders(invoice: InvoiceMailSource, companyName: str
 export function quotePlaceholders(quote: QuoteMailSource, companyName: string): PlaceholderValues {
   return {
     documentNumber: quote.documentNumber ?? undefined,
+    topic: quote.topic ?? "",
     contactPerson: quote.customer.contactPerson,
     salutation: buildSalutation(quote.customer),
     customerName: customerDisplayName(quote.customer),
@@ -109,16 +132,40 @@ export const DEFAULT_INVOICE_SUBJECT = "Rechnung Nr. {documentNumber} – {compa
 export const DEFAULT_CREDIT_NOTE_SUBJECT = "Gutschrift Nr. {documentNumber} – {companyName}";
 export const DEFAULT_QUOTE_SUBJECT = "Offerte Nr. {documentNumber} – {companyName}";
 
-export function defaultInvoiceBody(hasCustomText: boolean): string {
-  return `{salutation}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Zahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}`;
+// The default texts name the topic only when the document has one, like the custom text.
+function topicSubject(subject: string, hasTopic: boolean): string {
+  return hasTopic ? subject.replace(" – {companyName}", " – {topic} – {companyName}") : subject;
+}
+
+function topicPhrase(hasTopic: boolean): string {
+  return hasTopic ? " für «{topic}»" : "";
+}
+
+export function defaultInvoiceSubject(hasTopic = false): string {
+  return topicSubject(DEFAULT_INVOICE_SUBJECT, hasTopic);
+}
+
+export function defaultCreditNoteSubject(hasTopic = false): string {
+  return topicSubject(DEFAULT_CREDIT_NOTE_SUBJECT, hasTopic);
+}
+
+export function defaultQuoteSubject(hasTopic = false): string {
+  return topicSubject(DEFAULT_QUOTE_SUBJECT, hasTopic);
+}
+
+export function defaultInvoiceBody(hasCustomText: boolean, hasTopic = false): string {
+  return `{salutation}\n\nanbei erhalten Sie die Rechnung Nr. {documentNumber}${topicPhrase(hasTopic)} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Zahlbar bis: {dueDate}\n\nMit freundlichen Grüssen\n{companyName}`;
 }
 
 // Credit notes have no due date and no custom text.
-export const DEFAULT_CREDIT_NOTE_BODY =
-  "{salutation}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}";
+export function defaultCreditNoteBody(hasTopic = false): string {
+  return `{salutation}\n\nanbei erhalten Sie die Gutschrift Nr. {documentNumber}${topicPhrase(hasTopic)} vom {date} über {totalAmount}.\n\nMit freundlichen Grüssen\n{companyName}`;
+}
 
-export function defaultQuoteBody(hasCustomText: boolean): string {
-  return `{salutation}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Gültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}`;
+export const DEFAULT_CREDIT_NOTE_BODY = defaultCreditNoteBody(false);
+
+export function defaultQuoteBody(hasCustomText: boolean, hasTopic = false): string {
+  return `{salutation}\n\nanbei erhalten Sie die Offerte Nr. {documentNumber}${topicPhrase(hasTopic)} vom {date} über {totalAmount}.\n\n${customTextParagraph(hasCustomText)}Gültig bis: {validUntil}\n\nMit freundlichen Grüssen\n{companyName}`;
 }
 
 type InvoiceTemplateSettings = {
@@ -133,12 +180,21 @@ type InvoiceTemplateSettings = {
  */
 export function invoiceMailTemplate(
   settings: InvoiceTemplateSettings,
-  opts: { isCreditNote: boolean; hasCustomText: boolean }
+  opts: { isCreditNote: boolean; hasCustomText: boolean; hasTopic?: boolean }
 ): MailTemplate {
-  if (opts.isCreditNote) return { subject: DEFAULT_CREDIT_NOTE_SUBJECT, body: DEFAULT_CREDIT_NOTE_BODY };
+  const hasTopic = opts.hasTopic ?? false;
+  if (opts.isCreditNote) return { subject: defaultCreditNoteSubject(hasTopic), body: defaultCreditNoteBody(hasTopic) };
   return {
-    subject: settings?.emailSubjectTemplate || DEFAULT_INVOICE_SUBJECT,
-    body: settings?.emailBodyTemplate || defaultInvoiceBody(opts.hasCustomText),
+    subject: settings?.emailSubjectTemplate || defaultInvoiceSubject(hasTopic),
+    body: settings?.emailBodyTemplate || defaultInvoiceBody(opts.hasCustomText, hasTopic),
+  };
+}
+
+/** Unfilled subject/body for a quote mail (quotes have no configurable template). */
+export function quoteMailTemplate(opts: { hasCustomText: boolean; hasTopic: boolean }): MailTemplate {
+  return {
+    subject: defaultQuoteSubject(opts.hasTopic),
+    body: defaultQuoteBody(opts.hasCustomText, opts.hasTopic),
   };
 }
 
@@ -151,6 +207,7 @@ export function invoiceMail(
   const template = invoiceMailTemplate(settings, {
     isCreditNote: invoice.creditNoteForId != null,
     hasCustomText: Boolean(invoice.customUserText),
+    hasTopic: Boolean(invoice.topic),
   });
   const values = invoicePlaceholders(invoice, companyName);
   return { subject: fillPlaceholders(template.subject, values), body: fillPlaceholders(template.body, values) };
@@ -159,9 +216,10 @@ export function invoiceMail(
 /** Prefilled quote mail (quotes have no configurable template). */
 export function quoteMail(quote: QuoteMailSource, companyName: string): MailTemplate {
   const values = quotePlaceholders(quote, companyName);
+  const template = quoteMailTemplate({ hasCustomText: Boolean(quote.customUserText), hasTopic: Boolean(quote.topic) });
   return {
-    subject: fillPlaceholders(DEFAULT_QUOTE_SUBJECT, values),
-    body: fillPlaceholders(defaultQuoteBody(Boolean(quote.customUserText)), values),
+    subject: fillPlaceholders(template.subject, values),
+    body: fillPlaceholders(template.body, values),
   };
 }
 
@@ -205,6 +263,8 @@ export function reminderMail(params: {
   level: number;
   /** Display label of the invoice number (`documentLabel`, "Entwurf" without one). */
   numberLabel: string;
+  /** Topic of the invoice; adds a "Betreff:" line under the number when set. */
+  topic?: string | null;
   contactPerson: string;
   /** Letter salutation of the customer; without it the default "Guten Tag <contactPerson>" is used. */
   salutation?: string;
@@ -219,7 +279,7 @@ export function reminderMail(params: {
     creditedRappen?: number;
   } | null;
 }): MailTemplate {
-  const { level, numberLabel, contactPerson, salutation, companyName, dueDate, openAmount, charges } = params;
+  const { level, numberLabel, topic, contactPerson, salutation, companyName, dueDate, openAmount, charges } = params;
   const text = REMINDER_TEXTS[Math.min(Math.max(level, 1), MAX_REMINDER_LEVEL)];
   // After a partial payment or credit note only the remainder is requested; say so.
   const received = (charges?.paidRappen ?? 0) > 0 || (charges?.creditedRappen ?? 0) > 0;
@@ -232,6 +292,7 @@ export function reminderMail(params: {
       : "";
   const values: PlaceholderValues = {
     documentNumber: numberLabel,
+    topic: topic ?? "",
     contactPerson,
     salutation: salutation ?? buildSalutation({ contactPerson }),
     companyName,
@@ -239,6 +300,6 @@ export function reminderMail(params: {
     dueDate: formatDate(dueDate),
   };
   const subject = `${reminderTitle(level)}${text.subjectSuffix}: Rechnung {documentNumber} – {companyName}`;
-  const body = `{salutation}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\n${amountLine}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
+  const body = `{salutation}\n\n${text.opening}\n\nRechnung Nr.: {documentNumber}\n${topic ? "Betreff: {topic}\n" : ""}${amountLine}${extra}\nFälligkeitsdatum: {dueDate}\n\n${text.closing}\n\nMit freundlichen Grüssen\n{companyName}`;
   return { subject: fillPlaceholders(subject, values), body: fillPlaceholders(body, values) };
 }

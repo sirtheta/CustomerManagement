@@ -20,6 +20,8 @@ type Props = {
   reminderId: number;
   invoiceId: number;
   documentNumber: string | null;
+  /** Topic of the invoice, shown after the customer name. */
+  topic: string | null;
   customerName: string;
   /** Open remainder (after payments and sent credit notes): what the notice requests. */
   totalAmount: number;
@@ -109,7 +111,10 @@ export default function ReminderRow(props: Props) {
             </span>
             <span className="col-span-2 row-start-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:contents">
               <span className="text-xs text-muted-foreground sm:shrink-0">{levelLabel}</span>
-              <span className="min-w-0 text-muted-foreground sm:truncate">{props.customerName}</span>
+              <span className="min-w-0 text-muted-foreground sm:truncate">
+                {props.customerName}
+                {props.topic && ` · ${props.topic}`}
+              </span>
               <span className="text-xs text-destructive tabular-nums sm:order-2 sm:shrink-0">
                 {props.daysOverdue} {props.daysOverdue === 1 ? "Tag" : "Tage"} überfällig
               </span>
@@ -121,7 +126,8 @@ export default function ReminderRow(props: Props) {
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <p className="text-sm text-muted-foreground">
-              {props.customerName} · Fällig:{" "}
+              {props.customerName}
+              {props.topic && ` · ${props.topic}`} · Fällig:{" "}
               <span className="text-destructive font-medium">{props.dueDate}</span> ·{" "}
               {props.paidAmount > 0 || props.creditedAmount > 0 ? "offen " : ""}
               {formatCurrency(props.totalAmount)}

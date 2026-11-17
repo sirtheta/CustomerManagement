@@ -171,6 +171,7 @@ describe("InvoiceRepository", () => {
         {
           kind: "invoice",
           customerId: customer.customerId,
+          topic: null,
           customUserText: null,
           date: new Date(),
           dueDate: new Date(),

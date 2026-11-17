@@ -79,6 +79,7 @@ export default async function QuotesPage({ searchParams }: Props) {
       ? {
           OR: [
             { documentNumber: { contains: term } },
+            { topic: { contains: term } },
             { customer: { company: { contains: term } } },
             { customer: { contactPerson: { contains: term } } },
           ],
@@ -190,6 +191,7 @@ export default async function QuotesPage({ searchParams }: Props) {
               >
                 {customerDisplayName(q.customer)}
               </Link>
+              {q.topic && <p className="mt-0.5 truncate text-sm">{q.topic}</p>}
               <p className="text-sm text-muted-foreground">
                 {formatDate(q.date)} · gültig bis {formatDate(q.validUntil)}
               </p>
@@ -256,6 +258,11 @@ export default async function QuotesPage({ searchParams }: Props) {
                     <Link href={`/quotes/${q.id}`} className="hover:underline">
                       {documentLabel(q.documentNumber)}
                     </Link>
+                    {q.topic && (
+                      <div className="max-w-64 truncate text-xs font-normal text-muted-foreground" title={q.topic}>
+                        {q.topic}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Link

@@ -4,11 +4,10 @@ import { senderDisplayName } from "@/lib/sender-profile";
 import { billingEmail } from "@/lib/customer-billing";
 import { createSettingsTransport, isEmailDisabled, settingsSender } from "@/lib/smtp";
 import {
-  DEFAULT_QUOTE_SUBJECT,
-  defaultQuoteBody,
   fillPlaceholders,
   invoiceMailTemplate,
   invoicePlaceholders,
+  quoteMailTemplate,
   quotePlaceholders,
 } from "@/lib/mail-templates";
 
@@ -39,6 +38,7 @@ export async function sendInvoiceEmail(
   const template = invoiceMailTemplate(settings, {
     isCreditNote,
     hasCustomText: Boolean(invoice.customUserText),
+    hasTopic: Boolean(invoice.topic),
   });
   const values = { ...invoicePlaceholders(invoice, senderDisplayName(settings.companyInfo, invoice.senderProfile)), documentNumber };
 
@@ -84,11 +84,12 @@ export async function sendQuoteEmail(
   if (!documentNumber) throw new Error("Offerte hat noch keine Nummer.");
 
   const values = { ...quotePlaceholders(quote, senderDisplayName(settings.companyInfo, quote.senderProfile)), documentNumber };
+  const template = quoteMailTemplate({ hasCustomText: Boolean(quote.customUserText), hasTopic: Boolean(quote.topic) });
 
   await sendWithSettings(settings, {
     to: overrides?.to ?? quote.customer.email,
-    subject: fillPlaceholders(overrides?.subject ?? DEFAULT_QUOTE_SUBJECT, values),
-    text: fillPlaceholders(overrides?.body ?? defaultQuoteBody(Boolean(quote.customUserText)), values),
+    subject: fillPlaceholders(overrides?.subject ?? template.subject, values),
+    text: fillPlaceholders(overrides?.body ?? template.body, values),
     attachments: [{ filename: `offerte-${documentNumber}.pdf`, content: pdf, contentType: "application/pdf" }],
   });
 }

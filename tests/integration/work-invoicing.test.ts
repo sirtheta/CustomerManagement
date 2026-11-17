@@ -125,7 +125,7 @@ describe("billing work entries", () => {
     // The hook is what claims the entries; if it finds fewer rows than expected, no invoice may remain.
     await expect(
       createDocumentWithItems(
-        { kind: "invoice", customerId, customUserText: null, date: new Date(), dueDate: new Date(), totalAmount: 0, discountPercent: 0, items: [] },
+        { kind: "invoice", customerId, topic: null, customUserText: null, date: new Date(), dueDate: new Date(), totalAmount: 0, discountPercent: 0, items: [] },
         {
           onCreated: async () => {
             throw new WorkBillingError(WORK_ALREADY_BILLED_ERROR);
