@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.1](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.11.0...customer-management-v1.11.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **auth:** log client IP and throttle logins per IP ([#228](https://github.com/sirtheta/CustomerManagement/issues/228)) ([331dd4c](https://github.com/sirtheta/CustomerManagement/commit/331dd4cf583df103e1cb0c2447bea54e38220a3b))
+* **auth:** renew session cookie while the app is in use ([#230](https://github.com/sirtheta/CustomerManagement/issues/230)) ([314436e](https://github.com/sirtheta/CustomerManagement/commit/314436eecc17146b0e427dfcdb3061caf63411ac))
+
 ## [1.11.0](https://github.com/sirtheta/CustomerManagement/compare/customer-management-v1.10.7...customer-management-v1.11.0) (2026-11-17)
 
 
