@@ -80,7 +80,7 @@ Die wichtigsten Umgebungsvariablen in der `.env`:
 | `AUTH_URL` | Öffentliche URL der Anwendung (z. B. `https://kunden.meine-firma.ch`) |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Zugangsdaten des ersten Admin-Kontos (optional) |
 | `NOTIFY_CRON_SCHEDULE` | Zeitplan für Benachrichtigungen (Standard: täglich 08:00) |
-| `TRUST_PROXY_HEADERS` | Anzahl Reverse-Proxies vor der App (z. B. `1`), damit das Rate-Limiting die echte Client-IP verwendet |
+| `TRUST_PROXY_HEADERS` | Anzahl Reverse-Proxies vor der App (z. B. `1`), damit Rate-Limiting (Login, Passwort-Reset) und Login-Logs die echte Client-IP verwenden. Hinter Nginx Proxy Manager: `1` |
 | `BUDGET_INTEGRATION_API_KEY` | Shared Secret für die Anbindung der Budget-App (ohne Wert deaktiviert) |
 
 Alle weiteren Optionen (Session-Dauer, Backup- und Log-Aufbewahrung, PDF-Archiv-Pfad usw.)
