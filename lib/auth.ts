@@ -8,7 +8,8 @@ import { verifyTotpOrBackup, claimTotpStep } from "@/lib/backup-codes";
 import { decryptSecret } from "@/lib/crypto";
 import { dummyCompare } from "@/lib/password";
 import logger from "@/lib/logger";
-import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, refundAttempt, resetRateLimit } from "@/lib/rate-limit";
+import { clientIp, ipBucket } from "@/lib/client-ip";
 import { config } from "@/lib/config";
 
 const log = logger.child({ module: "auth" });
@@ -51,15 +52,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Passwort", type: "password" },
         totpCode: { label: "Authenticator Code", type: "text" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
+        // null unless TRUST_PROXY_HEADERS is configured (see lib/client-ip.ts).
+        const ip = clientIp(request?.headers);
+
+        // Per-IP throttle on top of the per-account one below: without it a
+        // single host can spray many different accounts and never trip the
+        // account limit. The attempt is counted *before* the awaits below, so
+        // parallel requests cannot all pass the check before any has failed,
+        // and handed back (refundIp) on every path that is not a failed
+        // credential check, so shared IPs (office NAT) are not locked out by
+        // normal use. The ceiling is deliberately higher than the per-account
+        // one for the same reason.
+        const ipKey = ip ? `login-ip:${ipBucket(ip)}` : null;
+        const ipLimit = { maxAttempts: config.rateLimit.maxAttempts * 4 };
+        if (ipKey && !checkRateLimit(ipKey, ipLimit)) {
+          log.warn({ ip }, "login blocked: ip rate limit exceeded");
+          return null;
+        }
+        const refundIp = () => {
+          if (ipKey) refundAttempt(ipKey);
+        };
+
         const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          log.warn({ ip }, "login failed: malformed credentials");
+          // Nothing was checked (e.g. a mistyped, too short TOTP code).
+          refundIp();
+          return null;
+        }
 
         const { email, password, totpCode } = parsed.data;
 
         const rateLimitKey = `login:${email}`;
         if (!checkRateLimit(rateLimitKey)) {
-          log.warn({ email }, "login blocked: rate limit exceeded");
+          log.warn({ email, ip }, "login blocked: rate limit exceeded");
+          // No credential was checked; don't let a locked account drain the
+          // shared IP bucket of everyone behind the same NAT.
+          refundIp();
           return null;
         }
 
@@ -68,19 +98,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Equalize response time with the real password check so the
           // duration does not reveal whether the email exists.
           await dummyCompare(password);
-          log.warn({ email }, "login failed: user not found or inactive");
+          log.warn({ email, ip }, "login failed: user not found or inactive");
           return null;
         }
 
         const passwordValid = await compare(password, user.passwordHash);
         if (!passwordValid) {
-          log.warn({ email }, "login failed: wrong password");
+          log.warn({ email, ip }, "login failed: wrong password");
           return null;
         }
 
         if (user.totpEnabled) {
           if (!totpCode || !user.totpSecret) {
-            log.warn({ email }, "login failed: totp required but code missing");
+            log.warn({ email, ip }, "login failed: totp required but code missing");
+            // The password was right; asking for the code is the normal flow.
+            refundIp();
             throw new TotpRequiredError();
           }
           let backupCodes: string[] = [];
@@ -98,14 +130,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             user.totpLastStep
           );
           if (!verify.valid) {
-            log.warn({ email }, "login failed: invalid totp code");
+            log.warn({ email, ip }, "login failed: invalid totp code");
             throw new TotpInvalidError();
           }
           if (verify.consumedIndex === null) {
             // A TOTP code stays valid for its whole time step: remember the
             // step so the same code cannot be used for a second login.
             if (!(await claimTotpStep(prisma, user.id, verify.timeStep))) {
-              log.warn({ email }, "login failed: totp code already used");
+              log.warn({ email, ip }, "login failed: totp code already used");
               throw new TotpInvalidError();
             }
           } else {
@@ -118,15 +150,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               data: { totpBackupCodes: JSON.stringify(remaining) },
             });
             if (count === 0) {
-              log.warn({ email }, "login failed: backup code concurrently consumed");
+              log.warn({ email, ip }, "login failed: backup code concurrently consumed");
               throw new TotpInvalidError();
             }
-            log.info({ email, userId: user.id }, "login: backup code consumed");
+            log.info({ email, userId: user.id, ip }, "login: backup code consumed");
           }
         }
 
         resetRateLimit(rateLimitKey);
-        log.info({ email, userId: user.id }, "login success");
+        refundIp();
+        log.info({ email, userId: user.id, ip }, "login success");
         return {
           id: String(user.id),
           name: user.name,

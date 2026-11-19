@@ -1,6 +1,6 @@
 import { config } from "@/lib/config";
 
-type Bucket = { count: number; resetAt: number };
+type Bucket = { count: number; resetAt: number; maxAttempts: number };
 type Limit = { maxAttempts?: number; windowMs?: number };
 
 const buckets = new Map<string, Bucket>();
@@ -9,6 +9,8 @@ const buckets = new Map<string, Bucket>();
 // not grow without bound. Expired buckets are swept whenever the map gets
 // large; if a sweep doesn't help (all buckets still live), the oldest entries
 // are dropped — failing open for a few keys is better than exhausting memory.
+// Buckets that are currently blocking someone are dropped last, so flooding the
+// map with throwaway keys cannot be used to reset a lockout.
 const MAX_BUCKETS = 10_000;
 
 function sweep(now: number): void {
@@ -18,9 +20,17 @@ function sweep(now: number): void {
   if (buckets.size >= MAX_BUCKETS) {
     const surplus = buckets.size - MAX_BUCKETS + 1;
     let dropped = 0;
+    for (const [key, bucket] of buckets) {
+      if (dropped >= surplus) break;
+      if (bucket.count < bucket.maxAttempts) {
+        buckets.delete(key);
+        dropped++;
+      }
+    }
     for (const key of buckets.keys()) {
-      if (dropped++ >= surplus) break;
+      if (dropped >= surplus) break;
       buckets.delete(key);
+      dropped++;
     }
   }
 }
@@ -36,7 +46,7 @@ export function checkRateLimit(key: string, limit: Limit = {}): boolean {
   const bucket = buckets.get(key);
   if (!bucket || bucket.resetAt <= now) {
     if (buckets.size >= MAX_BUCKETS) sweep(now);
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
+    buckets.set(key, { count: 1, resetAt: now + windowMs, maxAttempts });
     return true;
   }
   if (bucket.count >= maxAttempts) return false;
@@ -60,6 +70,17 @@ export function isRateLimited(key: string, limit: Limit = {}): boolean {
 /** Counts one failed attempt against `key` (see `isRateLimited`). */
 export function recordFailedAttempt(key: string, limit: Limit = {}): void {
   checkRateLimit(key, limit);
+}
+
+/**
+ * Gives back one attempt taken by `checkRateLimit`. For callers that must count
+ * an attempt up front (so concurrent requests cannot all pass the check before
+ * any of them has failed) but only want failures to stay on the books.
+ */
+export function refundAttempt(key: string): void {
+  const bucket = buckets.get(key);
+  if (!bucket || bucket.resetAt <= Date.now()) return;
+  if (--bucket.count <= 0) buckets.delete(key);
 }
 
 export function resetRateLimit(key: string): void {

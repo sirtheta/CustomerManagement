@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { checkRateLimit, resetRateLimit, isRateLimited, recordFailedAttempt } from "@/lib/rate-limit";
+import { checkRateLimit, resetRateLimit, isRateLimited, recordFailedAttempt, refundAttempt } from "@/lib/rate-limit";
 
 // Each test uses a unique key so the module-level store doesn't leak between cases.
 let key: string;
@@ -85,5 +85,36 @@ describe("isRateLimited / recordFailedAttempt", () => {
     recordFailedAttempt(key, { maxAttempts: 2 });
     recordFailedAttempt(key, { maxAttempts: 2 });
     expect(isRateLimited(key, { maxAttempts: 2 })).toBe(true);
+  });
+});
+
+describe("refundAttempt", () => {
+  it("gives back one attempt", () => {
+    for (let i = 0; i < 5; i++) checkRateLimit(key);
+    refundAttempt(key);
+    expect(checkRateLimit(key)).toBe(true);
+    expect(checkRateLimit(key)).toBe(false);
+  });
+
+  it("does nothing for an unknown key and never goes below zero", () => {
+    refundAttempt(key);
+    checkRateLimit(key);
+    refundAttempt(key);
+    refundAttempt(key);
+    for (let i = 0; i < 5; i++) expect(checkRateLimit(key)).toBe(true);
+    expect(checkRateLimit(key)).toBe(false);
+  });
+});
+
+describe("bucket eviction", () => {
+  it("drops unblocked buckets before ones that are currently blocking someone", () => {
+    const blocked = `${key}-blocked`;
+    for (let i = 0; i < 5; i++) checkRateLimit(blocked);
+    expect(checkRateLimit(blocked)).toBe(false);
+
+    // Flood the store far past MAX_BUCKETS (10 000) with throwaway keys.
+    for (let i = 0; i < 25_000; i++) checkRateLimit(`${key}-flood-${i}`);
+
+    expect(checkRateLimit(blocked)).toBe(false);
   });
 });
