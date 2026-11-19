@@ -17,6 +17,7 @@ import { Suspense } from "react";
 import { loadModules } from "@/lib/module-guard";
 import { APP_NAME } from "@/lib/app-name";
 import { RELEASES_URL } from "@/lib/release-links";
+import { SessionRefresh } from "@/components/session-refresh";
 
 export default async function AppLayout({
   children,
@@ -31,6 +32,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SessionRefresh />
       <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
         <div className="max-w-[1800px] w-full mx-auto px-4 sm:px-6 lg:px-8 flex h-14 items-center justify-between gap-4">
           {/* The logo sits outside the clipping box: if the nav pills scroll sideways inside it
